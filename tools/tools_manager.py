@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Callable, Optional
+from typing import List, Dict, Any, Callable, Optional, Union
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool
 from langchain_core.runnables import RunnableLambda
@@ -9,10 +9,25 @@ import asyncio
 import os
 import uuid
 import inspect
-from app.services.agent.capabilities.contextual.capability.registry.tool_graph_manager import ToolGraphManager
-from app.config.config_manager import config_manager
-from app.repositories.tool.tool_repo import ToolRepository
-from app.models.tool.tool_model import Tool
+import importlib.util
+import sys
+from pathlib import Path
+
+# 有条件导入，避免缺少依赖时出错
+try:
+    from app.services.agent.capabilities.contextual.capability.registry.tool_graph_manager import ToolGraphManager
+    from app.config.config_manager import config_manager
+    from app.repositories.tool.tool_repo import ToolRepository
+    from app.models.tool.tool_model import Tool
+    EXTERNAL_DEPS = True
+except ImportError:
+    # 尝试导入本地依赖
+    try:
+        from ..capability.registry.tool_graph_manager import ToolGraphManager
+        EXTERNAL_DEPS = False
+    except ImportError:
+        ToolGraphManager = None
+        EXTERNAL_DEPS = False
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +45,7 @@ class ToolsManager:
         self._test_mode = False
         self._tool_repo = None
         self._persist_to_db = False
+        self._mcp_tools = {}  # 存储原生MCP工具
         
     async def initialize(self, test_mode: bool = False, persist_to_db: bool = False):
         """Initialize the tools manager with graph support
@@ -157,6 +173,132 @@ class ToolsManager:
             return tool_func
         return decorator
     
+    def register_mcp_tool(self, name: str, func: Callable, description: str = None):
+        """注册原生MCP工具到工具管理器
+        
+        Args:
+            name: 工具名称
+            func: 工具函数
+            description: 工具描述（如果未提供，将从函数文档获取）
+        """
+        if not description and func.__doc__:
+            description = func.__doc__.strip()
+        elif not description:
+            description = f"{name} tool"
+            
+        # 存储原生MCP工具
+        self._mcp_tools[name] = {
+            "func": func,
+            "description": description
+        }
+        
+        # 创建Langchain工具包装
+        @tool(name=name)
+        async def wrapped_tool(*args, **kwargs):
+            """自动包装的MCP工具"""
+            result = await func(*args, **kwargs)
+            return result
+            
+        # 设置描述
+        wrapped_tool.description = description
+        
+        # 添加到工具列表
+        self.tools.append(wrapped_tool)
+        
+        # 注册到图数据库
+        if not self._test_mode and self._initialized and self.graph_manager:
+            asyncio.create_task(self.graph_manager.register_tool(wrapped_tool))
+            
+        return wrapped_tool
+    
+    async def discover_tools_from_file(self, file_path: str) -> List[str]:
+        """从文件中发现并注册工具
+        
+        Args:
+            file_path: Python文件路径
+            
+        Returns:
+            List[str]: 已注册工具名称列表
+        """
+        discovered_tools = []
+        
+        try:
+            # 获取绝对路径
+            abs_path = os.path.abspath(file_path)
+            if not os.path.exists(abs_path):
+                logger.warning(f"文件不存在: {abs_path}")
+                return discovered_tools
+                
+            # 构建模块名
+            module_name = Path(file_path).stem
+            
+            # 动态加载模块
+            spec = importlib.util.spec_from_file_location(module_name, abs_path)
+            if not spec or not spec.loader:
+                logger.warning(f"无法加载模块规范: {abs_path}")
+                return discovered_tools
+                
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            
+            # 查找所有函数
+            for name, obj in inspect.getmembers(module, inspect.isfunction):
+                # 检查是否有docstring
+                doc = inspect.getdoc(obj)
+                if not doc:
+                    continue
+                    
+                # 检查是否有语义标记
+                if "@semantic" in doc:
+                    logger.info(f"发现语义标记工具: {name} in {file_path}")
+                    
+                    # 注册为Langchain工具
+                    tool_func = tool(obj)
+                    self.tools.append(tool_func)
+                    discovered_tools.append(name)
+                    
+                    # 注册到图数据库
+                    if not self._test_mode and self.graph_manager:
+                        await self.graph_manager.register_tool(tool_func)
+        
+        except Exception as e:
+            logger.error(f"从文件加载工具时出错 {file_path}: {str(e)}")
+            
+        return discovered_tools
+    
+    async def discover_tools_from_directory(self, directory: str) -> Dict[str, List[str]]:
+        """从目录中发现并注册工具
+        
+        Args:
+            directory: 目录路径
+            
+        Returns:
+            Dict[str, List[str]]: 按文件分组的已注册工具名称
+        """
+        result = {}
+        
+        if not os.path.exists(directory):
+            logger.warning(f"目录不存在: {directory}")
+            return result
+            
+        # 获取所有Python文件
+        py_files = [
+            os.path.join(root, file)
+            for root, _, files in os.walk(directory)
+            for file in files if file.endswith('.py')
+        ]
+        
+        for py_file in py_files:
+            try:
+                tools = await self.discover_tools_from_file(py_file)
+                if tools:
+                    result[py_file] = tools
+            except Exception as e:
+                logger.error(f"处理文件时出错 {py_file}: {str(e)}")
+                
+        return result
+    
     def default_error_handler(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Default error handler for tools"""
         error = state.get("error")
@@ -248,6 +390,7 @@ class ToolsManager:
     def clear_tools(self):
         """Clear all registered tools"""
         self.tools = []
+        self._mcp_tools = {}
     
     async def verify_tools_integrity(self) -> List[Dict[str, Any]]:
         """Verify integrity of all registered tools"""
@@ -351,4 +494,9 @@ async def initialize(persist_to_db: bool = False):
     """Initialize the global tools manager"""
     await tools_manager.initialize(persist_to_db=persist_to_db)
 
-__all__ = ['tools_manager', 'initialize']
+# 新增快捷方法
+async def discover_directory(directory: str) -> Dict[str, List[str]]:
+    """从目录发现工具的快捷方法"""
+    return await tools_manager.discover_tools_from_directory(directory)
+
+__all__ = ['tools_manager', 'initialize', 'discover_directory']

@@ -1,0 +1,32 @@
+# MCP服务器配置示例
+
+# 服务基本配置
+server:
+  name: "智能工具服务"
+  host: "0.0.0.0"
+  port: 8000
+  transport: "streamable-http"  # 可选: http, streamable-http, ws
+
+# 工具目录配置
+tools:
+  directories:
+    - "tools"
+    - "tools/basic"
+    - "examples"
+  auto_discovery: true
+
+# Neo4j数据库配置
+neo4j:
+  uri: "bolt://localhost:7687"
+  user: "neo4j"
+  password: "password"
+
+# 服务发现配置
+discovery:
+  enabled: true
+  interval: 300  # 秒
+  
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s" 
