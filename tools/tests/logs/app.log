@@ -1,6 +1,0 @@
-2024-12-15 09:56:01,072 - app.config.config_manager - INFO - Initializing configurations...
-2024-12-15 09:56:01,163 - app.config.config_manager - INFO - All configurations initialized and validated
-2024-12-15 09:56:29,599 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
-2024-12-15 09:56:36,232 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
-2024-12-15 10:01:38,173 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
-2024-12-15 10:01:41,415 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
