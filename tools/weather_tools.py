@@ -1,11 +1,13 @@
+"""
+Weather information tools that provide weather data for locations.
+"""
+
 from typing import Dict, List, Any, Optional
-from langchain_core.tools import tool
 import random
 import logging
 
 logger = logging.getLogger(__name__)
 
-@tool
 async def get_weather(location: str) -> Dict[str, Any]:
     """
     Get the current weather for a specified location.
@@ -52,7 +54,6 @@ async def get_weather(location: str) -> Dict[str, Any]:
             "location": location
         }
 
-@tool
 async def get_coolest_cities() -> List[Dict[str, Any]]:
     """
     Get a list of cities with currently cool temperatures.

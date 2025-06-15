@@ -1,6 +1,9 @@
+"""
+Shopify tools for e-commerce operations.
+"""
+
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
-from core.tool import tool
 
 from apps.shopify.shopify_client import ShopifyClient
 
@@ -19,10 +22,24 @@ class CartOperationInput(BaseModel):
     quantity: int = Field(1, description="添加到购物车的数量", ge=1)
 
 # 品类查询工具
-@tool("shopify_list_collections", return_direct=True)
-def list_collections(limit: int = 10) -> Dict:
+async def list_collections(limit: int = 10) -> Dict:
     """
     查询Shopify商店中的所有产品品类/集合
+    
+    @semantic
+    concept: 查询产品品类
+    domain: 电商
+    type: 读取
+    
+    @functional
+    operation: query
+    input: limit:int
+    output: Dict
+    
+    @context
+    usage: 查看店铺所有产品集合
+    prereq: Shopify API凭证
+    constraint: 需要有效的店铺域名
     
     Args:
         limit: 返回的最大品类数量，默认为10
@@ -50,10 +67,24 @@ def list_collections(limit: int = 10) -> Dict:
     return {"collections": collections}
 
 # 产品查询工具
-@tool("shopify_query_products", return_direct=True)
-def query_products(input_data: ProductQueryInput) -> Dict:
+async def query_products(input_data: ProductQueryInput) -> Dict:
     """
     查询Shopify商店中的产品，可以按集合查询或查询单个产品详情
+    
+    @semantic
+    concept: 查询产品信息
+    domain: 电商
+    type: 读取
+    
+    @functional
+    operation: query
+    input: input_data:ProductQueryInput
+    output: Dict
+    
+    @context
+    usage: 查看产品详情或集合中的产品列表
+    prereq: Shopify API凭证
+    constraint: 需要提供集合ID或产品ID
     
     Args:
         input_data: 包含查询参数的ProductQueryInput对象
@@ -149,113 +180,148 @@ def query_products(input_data: ProductQueryInput) -> Dict:
         return {"error": "必须提供collection_id或product_id"}
 
 # 购物车操作工具
-@tool("shopify_cart_operations", return_direct=True)
-def cart_operations(action: str, input_data: Optional[CartOperationInput] = None) -> Dict:
+async def cart_operations(action: str, input_data: Optional[CartOperationInput] = None) -> Dict:
     """
     执行购物车操作，包括创建购物车、添加产品到购物车、查看购物车
     
+    @semantic
+    concept: 购物车操作
+    domain: 电商
+    type: 写入
+    
+    @functional
+    operation: cart
+    input: action:str,input_data:CartOperationInput
+    output: Dict
+    
+    @context
+    usage: 管理购物车，添加商品，查看购物车
+    prereq: Shopify API凭证
+    constraint: 添加商品需要先创建购物车
+    
     Args:
-        action: 操作类型，可选值："create"、"add"、"view"
-        input_data: 操作参数，添加商品时需要提供
+        action: 要执行的操作，可选值为：create（创建购物车）、add（添加商品）、view（查看购物车）
+        input_data: 购物车操作输入数据，添加商品时需要提供
         
     Returns:
-        操作结果字典
+        购物车操作结果
     
     Example:
         创建购物车：cart_operations(action="create")
         添加商品：cart_operations(action="add", input_data={"variant_id": "gid://shopify/ProductVariant/12345", "quantity": 2})
         查看购物车：cart_operations(action="view")
     """
+    
     if action == "create":
+        # 创建一个新购物车
         result = shopify_client.create_cart()
         if 'data' in result and 'cartCreate' in result['data']:
-            cart = result['data']['cartCreate']['cart']
             return {
-                'cart_id': cart['id'],
-                'checkout_url': cart['checkoutUrl']
+                "success": True,
+                "cart_id": result['data']['cartCreate']['cart']['id'],
+                "checkout_url": result['data']['cartCreate']['cart']['checkoutUrl']
             }
         else:
-            return {"error": "创建购物车失败"}
-    
-    elif action == "add":
-        if not input_data or not input_data.variant_id:
-            return {"error": "添加商品需要提供variant_id"}
-        
-        result = shopify_client.add_to_cart(
-            input_data.variant_id,
-            quantity=input_data.quantity
-        )
-        
+            return {"success": False, "error": "无法创建购物车"}
+            
+    elif action == "add" and input_data:
+        # 添加商品到购物车
+        result = shopify_client.add_to_cart(input_data.variant_id, input_data.quantity)
         if 'data' in result and 'cartLinesAdd' in result['data']:
             cart = result['data']['cartLinesAdd']['cart']
+            cart_lines = []
             
-            # 简化购物车内容
-            items = []
             for edge in cart['lines']['edges']:
-                item = edge['node']
-                merchandise = item['merchandise']
-                items.append({
-                    'id': item['id'],
-                    'quantity': item['quantity'],
-                    'variant_id': merchandise['id'],
-                    'variant_title': merchandise['title'],
-                    'product_title': merchandise['product']['title']
+                line = edge['node']
+                cart_lines.append({
+                    'id': line['id'],
+                    'quantity': line['quantity'],
+                    'title': line['merchandise']['product']['title'],
+                    'variant': line['merchandise']['title']
                 })
-            
+                
             return {
-                'cart_id': cart['id'],
-                'items': items,
-                'total': cart['estimatedCost']['totalAmount']['amount'],
-                'currency': cart['estimatedCost']['totalAmount']['currencyCode'],
-                'checkout_url': cart['checkoutUrl']
+                "success": True,
+                "cart_id": cart['id'],
+                "items": cart_lines,
+                "subtotal": cart['estimatedCost']['totalAmount']['amount'],
+                "currency": cart['estimatedCost']['totalAmount']['currencyCode']
             }
         else:
-            return {"error": "添加商品失败"}
-    
+            return {"success": False, "error": "无法添加商品到购物车"}
+            
     elif action == "view":
+        # 查看购物车
         result = shopify_client.get_cart()
+        if not result or 'data' not in result or 'cart' not in result['data']:
+            return {"success": False, "error": "购物车不存在或尚未创建"}
+            
+        cart = result['data']['cart']
+        cart_lines = []
         
-        if 'data' in result and 'cart' in result['data'] and result['data']['cart']:
-            cart = result['data']['cart']
+        for edge in cart['lines']['edges']:
+            line = edge['node']
+            cart_lines.append({
+                'id': line['id'],
+                'quantity': line['quantity'],
+                'title': line['merchandise']['product']['title'],
+                'variant': line['merchandise']['title'],
+                'price': line['cost']['totalAmount']['amount']
+            })
             
-            # 简化购物车内容
-            items = []
-            for edge in cart['lines']['edges']:
-                item = edge['node']
-                merchandise = item['merchandise']
-                items.append({
-                    'id': item['id'],
-                    'quantity': item['quantity'],
-                    'variant_id': merchandise['id'],
-                    'variant_title': merchandise['title'],
-                    'product_title': merchandise['product']['title'],
-                    'price': merchandise.get('priceV2', {}).get('amount'),
-                    'currency': merchandise.get('priceV2', {}).get('currencyCode')
-                })
-            
-            return {
-                'cart_id': cart['id'],
-                'items': items,
-                'total': cart['estimatedCost']['totalAmount']['amount'],
-                'currency': cart['estimatedCost']['totalAmount']['currencyCode'],
-                'checkout_url': cart['checkoutUrl']
-            }
-        else:
-            return {"error": "购物车为空或不存在"}
-    
+        return {
+            "success": True,
+            "cart_id": cart['id'],
+            "items": cart_lines,
+            "subtotal": cart['estimatedCost']['subtotalAmount']['amount'],
+            "tax": cart['estimatedCost']['totalTaxAmount']['amount'],
+            "total": cart['estimatedCost']['totalAmount']['amount'],
+            "currency": cart['estimatedCost']['totalAmount']['currencyCode']
+        }
     else:
-        return {"error": f"不支持的操作: {action}"}
+        return {"success": False, "error": f"不支持的操作: {action}"}
 
 # 结账工具
-@tool("shopify_checkout", return_direct=True)
-def checkout() -> Dict:
+async def checkout() -> Dict:
     """
-    获取Shopify结账URL，用于完成支付
+    将当前购物车转换为结账链接
+    
+    @semantic
+    concept: 结账支付
+    domain: 电商
+    type: 读取
+    
+    @functional
+    operation: checkout
+    input: 无
+    output: Dict
+    
+    @context
+    usage: 完成购物并支付
+    prereq: 购物车中有商品
+    constraint: 需要有效的购物车ID
     
     Returns:
-        包含结账URL的字典
+        结账URL和购物车信息
     
     Example:
         checkout()
     """
-    return shopify_client.checkout() 
+    # 获取购物车信息和结账URL
+    cart_info = await cart_operations(action="view")
+    
+    if not cart_info.get("success"):
+        return {"success": False, "error": "无法获取购物车信息"}
+    
+    # 获取结账URL
+    checkout_result = shopify_client.checkout()
+    if not checkout_result.get("success"):
+        return {"success": False, "error": "无法创建结账链接"}
+    
+    return {
+        "success": True,
+        "items": cart_info["items"],
+        "total": cart_info["total"],
+        "currency": cart_info["currency"],
+        "checkout_url": checkout_result["checkout_url"]
+    } 
