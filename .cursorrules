@@ -1,0 +1,384 @@
+# MCP Service Development Rules
+
+## 🎯 项目概述
+这是一个基于Model Context Protocol (MCP)的综合服务平台，集成了记忆管理、知识库、工具集和第三方应用。
+
+## 🏗️ 架构原则
+
+### 核心设计模式
+- **插件化架构**: 所有组件都应该是可插拔的
+- **异步优先**: 所有I/O操作必须使用async/await
+- **类型安全**: 严格使用类型注解和Pydantic模型
+- **错误处理**: 统一的异常处理和错误响应
+- **配置驱动**: 通过配置文件管理所有设置
+
+### MCP协议规范
+- 严格遵循MCP协议规范
+- 所有工具必须有清晰的输入/输出schema
+- 资源必须有适当的URI和类型
+- Prompt必须返回标准的Prompt对象
+
+## 📁 代码组织规则
+
+### 目录结构约定
+```
+- apps/: 第三方应用集成 (shopify, notion, github等)
+- clients/: MCP客户端实现
+- core/: 核心配置和工具类
+- registry/: 自动发现和注册系统
+- resources/: 知识库、模板、数据集
+- servers/: MCP服务器实现
+- tools/: 工具集合
+- databases/: 数据访问层
+```
+
+### 命名约定
+- **文件名**: snake_case (memory_server.py)
+- **类名**: PascalCase (MemoryServer)
+- **函数名**: snake_case (get_memories)
+- **常量**: UPPER_SNAKE_CASE (DEFAULT_PORT)
+- **变量**: snake_case (user_input)
+
+### 导入规则
+```python
+# 1. 标准库导入
+import asyncio
+import json
+from typing import Dict, List, Optional
+
+# 2. 第三方库导入
+from pydantic import BaseModel
+from mcp import types
+
+# 3. 本地导入
+from core.config import settings
+from tools.base import ToolBase
+```
+
+## 🔧 代码风格规范
+
+### 类型注解
+- 所有函数参数和返回值必须有类型注解
+- 使用泛型类型注解 (List[str], Dict[str, Any])
+- 复杂类型使用Pydantic模型
+
+```python
+from typing import List, Dict, Optional
+from pydantic import BaseModel
+
+class MemoryItem(BaseModel):
+    key: str
+    value: str
+    category: Optional[str] = None
+    importance: int = 1
+
+async def store_memory(item: MemoryItem) -> Dict[str, str]:
+    """存储记忆项"""
+    pass
+```
+
+### 异步编程
+- I/O操作必须使用async/await
+- 使用asyncio.gather()并发执行任务
+- 正确处理异步上下文管理器
+
+```python
+async def process_multiple_tools(tools: List[str]) -> List[Dict]:
+    """并发处理多个工具"""
+    tasks = [process_tool(tool) for tool in tools]
+    return await asyncio.gather(*tasks)
+```
+
+### 错误处理
+- 使用自定义异常类
+- 记录详细的错误日志
+- 提供有意义的错误消息
+
+```python
+from core.exceptions import MCPError
+
+class ToolNotFoundError(MCPError):
+    """工具未找到异常"""
+    pass
+
+async def call_tool(name: str) -> Dict:
+    try:
+        return await execute_tool(name)
+    except ToolNotFoundError as e:
+        logger.error(f"Tool {name} not found: {e}")
+        raise MCPError(f"工具 {name} 不存在")
+```
+
+## 🛠️ MCP开发规范
+
+### 服务器开发
+```python
+from mcp.server import Server
+from mcp.server.models import InitializationOptions
+import mcp.types as types
+
+# 创建服务器实例
+server = Server("my-server")
+
+@server.tool()
+async def my_tool(
+    param1: str,
+    param2: Optional[int] = None
+) -> str:
+    """工具描述"""
+    # 实现逻辑
+    return "result"
+
+@server.prompt()
+async def my_prompt(context: str) -> types.Prompt:
+    """提示词生成"""
+    return types.Prompt(
+        name="my_prompt",
+        description="提示词描述",
+        messages=[
+            types.PromptMessage(
+                role="user",
+                content=types.TextContent(type="text", text=context)
+            )
+        ]
+    )
+```
+
+### 客户端开发
+```python
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client
+
+async def create_client_session():
+    async with stdio_client() as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            # 使用session
+            tools = await session.list_tools()
+            return tools
+```
+
+### 工具开发
+```python
+from tools.base import ToolBase
+from pydantic import BaseModel, Field
+
+class MyToolInput(BaseModel):
+    query: str = Field(description="查询参数")
+    limit: int = Field(default=10, description="结果限制")
+
+class MyTool(ToolBase):
+    name = "my_tool"
+    description = "工具描述"
+    input_schema = MyToolInput
+    
+    async def execute(self, params: MyToolInput) -> Dict[str, Any]:
+        """执行工具逻辑"""
+        return {"result": "success"}
+```
+
+## 📊 数据库规范
+
+### 模型定义
+```python
+from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
+
+Base = declarative_base()
+
+class MemoryModel(Base):
+    __tablename__ = "memories"
+    
+    id = Column(Integer, primary_key=True)
+    key = Column(String, unique=True, nullable=False)
+    value = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+```
+
+### 仓储模式
+```python
+from abc import ABC, abstractmethod
+from typing import List, Optional
+
+class BaseRepository(ABC):
+    @abstractmethod
+    async def create(self, entity: BaseModel) -> BaseModel:
+        pass
+    
+    @abstractmethod
+    async def get_by_id(self, id: int) -> Optional[BaseModel]:
+        pass
+    
+    @abstractmethod
+    async def list(self, limit: int = 100) -> List[BaseModel]:
+        pass
+```
+
+## 🧪 测试规范
+
+### 单元测试
+```python
+import pytest
+from unittest.mock import AsyncMock, patch
+
+@pytest.mark.asyncio
+async def test_memory_storage():
+    """测试记忆存储功能"""
+    memory_store = MemoryStore()
+    
+    result = await memory_store.store("key", "value")
+    
+    assert result["status"] == "success"
+    assert result["key"] == "key"
+```
+
+### 集成测试
+```python
+@pytest.mark.asyncio
+async def test_mcp_server_integration():
+    """测试MCP服务器集成"""
+    async with create_test_server() as server:
+        client = create_test_client()
+        
+        tools = await client.list_tools()
+        assert len(tools) > 0
+```
+
+## 📝 文档规范
+
+### 函数文档
+```python
+async def complex_function(
+    param1: str,
+    param2: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, str]]:
+    """
+    执行复杂操作的函数
+    
+    Args:
+        param1: 主要参数说明
+        param2: 可选参数说明，默认为None
+        
+    Returns:
+        包含结果字典的列表
+        
+    Raises:
+        ValueError: 当param1为空时
+        MCPError: 当操作失败时
+        
+    Example:
+        >>> result = await complex_function("test")
+        >>> print(result[0]["status"])
+        "success"
+    """
+    pass
+```
+
+### README模板
+每个模块都应该有README.md，包含：
+- 功能概述
+- 安装说明
+- 使用示例
+- API文档
+- 配置说明
+
+## 🔒 安全规范
+
+### 输入验证
+- 所有外部输入必须验证
+- 使用Pydantic模型验证数据
+- 防范SQL注入和XSS攻击
+
+### 认证授权
+```python
+from core.security import require_auth
+
+@require_auth
+async def protected_endpoint(user: User):
+    """需要认证的端点"""
+    pass
+```
+
+### 敏感数据
+- 使用环境变量存储敏感配置
+- 不在日志中记录敏感信息
+- 使用加密存储密码和密钥
+
+## 🚀 性能规范
+
+### 缓存策略
+```python
+from functools import lru_cache
+from core.cache import redis_cache
+
+@redis_cache(expire=3600)
+async def expensive_operation(param: str) -> Dict:
+    """昂贵操作的缓存"""
+    pass
+```
+
+### 并发控制
+```python
+import asyncio
+
+# 限制并发数
+semaphore = asyncio.Semaphore(10)
+
+async def limited_operation():
+    async with semaphore:
+        # 执行操作
+        pass
+```
+
+## 📦 依赖管理
+
+### pyproject.toml配置
+```toml
+[tool.poetry]
+name = "mcp-service"
+version = "0.1.0"
+description = "MCP综合服务平台"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+mcp = "^1.0.0"
+fastapi = "^0.104.0"
+pydantic = "^2.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+pytest-asyncio = "^0.21.0"
+black = "^23.0.0"
+mypy = "^1.0.0"
+```
+
+## 🔍 代码质量
+
+### 预提交钩子
+- 使用black格式化代码
+- 使用mypy检查类型
+- 使用pytest运行测试
+- 使用flake8检查代码风格
+
+### 代码审查检查点
+- [ ] 是否遵循异步编程规范
+- [ ] 是否有适当的类型注解
+- [ ] 是否有充分的错误处理
+- [ ] 是否有单元测试覆盖
+- [ ] 是否符合MCP协议规范
+- [ ] 是否有适当的文档注释
+
+## 🎯 开发工作流
+
+1. **创建功能分支**: `git checkout -b feature/new-tool`
+2. **编写代码**: 遵循上述规范
+3. **编写测试**: 确保测试覆盖率 > 80%
+4. **运行检查**: `poetry run pytest && poetry run mypy`
+5. **提交代码**: 使用语义化提交消息
+6. **创建PR**: 包含功能描述和测试结果
+7. **代码审查**: 至少一个reviewer批准
+8. **合并代码**: 使用squash merge
+
+记住：质量 > 速度，安全 > 便利，文档 > 代码
