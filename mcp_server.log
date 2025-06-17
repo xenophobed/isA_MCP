@@ -27,3 +27,11 @@
 2025-06-16 23:37:11,254 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
 2025-06-16 23:49:35,560 - mcp.server.streamable_http - INFO - Terminating session: 002894ec661d4cf09bf3dda250c5fb06
 2025-06-16 23:49:37,525 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager shutting down
+2025-06-17 00:15:55,863 - __main__ - INFO - Database initialized with security and monitoring tables
+2025-06-17 00:15:55,864 - __main__ - INFO - Sample data initialized
+2025-06-17 00:15:55,917 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager started
+2025-06-17 00:16:15,874 - mcp.server.streamable_http_manager - INFO - Created new transport with session ID: 1da24359288c40fbbb8cb1a6ee6d80b0
+2025-06-17 00:16:15,882 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 00:16:15,886 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 00:16:15,889 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 00:16:18,558 - mcp.server.streamable_http - INFO - Terminating session: 1da24359288c40fbbb8cb1a6ee6d80b0

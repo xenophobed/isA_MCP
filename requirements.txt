@@ -1,0 +1,40 @@
+# AI and Machine Learning Frameworks
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-openai>=0.1.0
+langgraph>=0.0.10
+langchain-mcp-adapters>=0.1.0
+
+# MCP (Model Context Protocol)
+mcp>=1.0.0
+fastmcp>=0.1.0
+
+# Data Validation and Models
+pydantic>=2.0.0
+
+# Database and Storage
+neo4j>=5.0.0
+motor>=3.0.0
+redis>=4.0.0
+
+# Data Processing
+numpy>=1.20.0
+
+# Web Frameworks and HTTP
+fastapi>=0.100.0
+uvicorn>=0.22.0
+httpx>=0.24.0
+
+# Configuration and Environment
+python-dotenv>=1.0.0
+PyYAML>=6.0.0
+
+# Third-party Integrations
+notion-client>=2.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# Build and Development Tools
+setuptools>=65.0.0
