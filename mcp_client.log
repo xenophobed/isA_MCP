@@ -1,0 +1,38 @@
+2025-06-16 21:45:57,332 - __main__ - ERROR - Failed to connect to MCP server: ClientSession.__init__() missing 1 required positional argument: 'write_stream'
+2025-06-16 21:45:57,332 - __main__ - ERROR - Failed to list capabilities: 'NoneType' object has no attribute 'list_tools'
+2025-06-16 21:45:57,332 - __main__ - INFO - Initialized agent with 0 tools, 0 resources
+2025-06-16 21:45:59,797 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 21:46:00,853 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 21:46:00,855 - __main__ - ERROR - Workflow execution failed: 'final_response'
+2025-06-16 21:46:00,857 - __main__ - ERROR - Failed to connect to MCP server: ClientSession.__init__() missing 1 required positional argument: 'write_stream'
+2025-06-16 21:46:00,857 - __main__ - ERROR - Failed to list capabilities: 'NoneType' object has no attribute 'list_tools'
+2025-06-16 21:46:00,857 - __main__ - INFO - Initialized agent with 0 tools, 0 resources
+2025-06-16 21:46:02,066 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 21:46:03,654 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 21:46:03,660 - __main__ - ERROR - Workflow execution failed: 'final_response'
+2025-06-16 21:46:03,663 - __main__ - ERROR - Failed to connect to MCP server: ClientSession.__init__() missing 1 required positional argument: 'write_stream'
+2025-06-16 21:46:03,664 - __main__ - ERROR - Failed to list capabilities: 'NoneType' object has no attribute 'list_tools'
+2025-06-16 21:46:03,664 - __main__ - INFO - Initialized agent with 0 tools, 0 resources
+2025-06-16 21:51:31,586 - __main__ - ERROR - Failed to connect to MCP server: ClientSession.__init__() missing 1 required positional argument: 'write_stream'
+2025-06-16 21:51:31,586 - __main__ - ERROR - Failed to list capabilities: 'NoneType' object has no attribute 'list_tools'
+2025-06-16 21:51:31,586 - __main__ - INFO - Initialized agent with 0 tools, 0 resources
+2025-06-16 22:04:09,375 - __main__ - INFO - Configuration saved to mcp_config.json
+2025-06-16 22:04:14,927 - __main__ - INFO - Running in mock mode - no real MCP server connection
+2025-06-16 22:04:14,927 - __main__ - INFO - Initialized agent with 4 tools, 2 resources
+2025-06-16 22:04:16,298 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 22:04:17,850 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 22:04:17,854 - __main__ - ERROR - Workflow execution failed: 1 validation error for ConversationResult
+tokens_used
+  Field required [type=missing, input_value={'status': <ResponseStatu..., 'security_events': []}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+2025-06-16 22:04:17,855 - __main__ - ERROR - Chat error: 1 validation error for ConversationResult
+tokens_used
+  Field required [type=missing, input_value={'status': <ResponseStatu..., 'security_events': []}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+2025-06-16 22:07:26,615 - __main__ - ERROR - Failed to connect to MCP server: cannot unpack non-iterable _AsyncGeneratorContextManager object
+2025-06-16 22:07:26,615 - __main__ - INFO - Falling back to mock mode
+2025-06-16 22:07:26,616 - __main__ - INFO - Initialized agent with 4 tools, 2 resources
+2025-06-16 22:07:27,673 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 22:07:28,615 - httpx - INFO - HTTP Request: POST https://api.ai-yyds.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-16 22:07:28,625 - __main__ - INFO - Conversation completed in 2.01s with 0 tool calls
+2025-06-16 22:07:28,634 - __main__ - ERROR - Workflow execution failed: 'conversation_result'
