@@ -35,3 +35,59 @@
 2025-06-17 00:16:15,886 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
 2025-06-17 00:16:15,889 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
 2025-06-17 00:16:18,558 - mcp.server.streamable_http - INFO - Terminating session: 1da24359288c40fbbb8cb1a6ee6d80b0
+2025-06-17 14:04:39,093 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager shutting down
+2025-06-17 15:10:28,168 - __main__ - INFO - Database initialized with security and monitoring tables
+2025-06-17 15:10:28,169 - __main__ - INFO - Sample data initialized
+2025-06-17 15:10:28,179 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager started
+2025-06-17 15:11:15,063 - mcp.server.streamable_http_manager - INFO - Created new transport with session ID: 49b6bcc5e13445eaa735483f6a266d77
+2025-06-17 15:11:15,072 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 15:11:15,078 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 15:11:15,081 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 15:11:24,178 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 15:11:24,184 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 15:11:24,187 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 15:12:38,017 - mcp.server.streamable_http - INFO - Terminating session: 49b6bcc5e13445eaa735483f6a266d77
+2025-06-17 16:09:06,358 - mcp.server.streamable_http_manager - INFO - Created new transport with session ID: 73f3efbe92e141a4b103bc9ca581523d
+2025-06-17 16:09:06,379 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:06,387 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:06,393 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:09:12,595 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:12,599 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:12,603 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:09:17,028 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:17,038 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:17,045 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:09:19,033 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-06-17 16:09:30,473 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:30,480 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:30,483 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:09:35,444 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-06-17 16:09:35,445 - __main__ - INFO - Auto-approved remember for user default
+2025-06-17 16:09:41,637 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:41,643 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:41,646 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:09:43,060 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-06-17 16:09:52,157 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:09:52,164 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:09:52,169 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:10:41,797 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:10:41,803 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:10:41,806 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:11:00,321 - mcp.server.streamable_http - INFO - Terminating session: 73f3efbe92e141a4b103bc9ca581523d
+2025-06-17 16:18:21,760 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager shutting down
+2025-06-17 16:39:33,350 - __main__ - INFO - Database initialized with security and monitoring tables
+2025-06-17 16:39:33,352 - __main__ - INFO - Sample data initialized
+2025-06-17 16:39:33,363 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager started
+2025-06-17 16:39:41,490 - mcp.server.streamable_http_manager - INFO - Created new transport with session ID: b9666e6aceda44e7acd7f7a1e549faa8
+2025-06-17 16:39:41,507 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:39:41,517 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:39:41,525 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:39:55,458 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:39:55,465 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:39:55,469 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:40:03,259 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-06-17 16:40:03,268 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-06-17 16:40:03,274 - mcp.server.lowlevel.server - INFO - Processing request of type ListPromptsRequest
+2025-06-17 16:40:05,184 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-06-17 16:40:12,779 - mcp.server.streamable_http - INFO - Terminating session: b9666e6aceda44e7acd7f7a1e549faa8
+2025-06-17 16:42:58,520 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager shutting down
