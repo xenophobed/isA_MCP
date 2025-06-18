@@ -107,7 +107,9 @@ def main():
     
     # Run the server
     logger.info("Starting MCP server with streamable HTTP transport...")
-    mcp.run(transport="streamable-http")
-
+    mcp.run(
+        transport="streamable-http"
+    )
 if __name__ == "__main__":
     main()
+

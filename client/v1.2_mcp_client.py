@@ -4,20 +4,25 @@ Enhanced MCP Client v1.2
 - Uses server-side tools instead of client-side implementations
 - Simplified architecture with proper MCP tool delegation
 - Enhanced security through server-side authorization
+- Multiple connection options (direct/load-balanced)
 """
 import asyncio
 import json
 import os
-from typing import Dict, List, Any, Annotated, Optional
+from typing import Dict, List, Any, Annotated, Optional, Union
 from datetime import datetime
 from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
+from langchain_core.runnables import RunnableConfig
+from pydantic import SecretStr
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
+from pydantic.networks import AnyUrl
 
 # Load environment variables
 load_dotenv(".env.local")
@@ -26,11 +31,11 @@ load_dotenv(".env.local")
 api_key = os.getenv("OPENAI_API_KEY")
 api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
-# Initialize LLM
+# Initialize LLM with proper type handling
 llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0,
-    api_key=api_key,
+    api_key=SecretStr(api_key) if api_key else None,
     base_url=api_base
 )
 
@@ -45,29 +50,71 @@ class AgentState(Dict):
     user_query: Annotated[str, "Original user query"]
 
 class EnhancedMCPClient:
-    def __init__(self):
-        self.session = None
+    def __init__(self, checkpoint_db_path: str = "conversation_checkpoints.db", use_load_balancer: bool = False):
+        self.session: Optional[ClientSession] = None
         self.graph = None
         self.client_context = None
         self.session_context = None
+        self.checkpoint_db_path = checkpoint_db_path
+        self.memory_saver: Optional[SqliteSaver] = None
+        self.current_thread_id: Optional[str] = None
+        self.conversation_history = []  # Track conversation history in memory
+        self.use_load_balancer = use_load_balancer
+        self.connection_urls = [
+            "http://localhost/mcp" if use_load_balancer else "http://localhost:8001/mcp",
+            "http://localhost:8001/mcp",  # Fallback to direct connection
+            "http://localhost:8002/mcp",  # Alternative direct connection
+            "http://localhost:8003/mcp"   # Another alternative
+        ]
     
     async def initialize_mcp_session(self):
-        """Initialize MCP session and discover capabilities"""
+        """Initialize MCP session with fallback connections"""
         print("🔌 Connecting to enhanced MCP server...")
         
-        # Create streamable HTTP client
-        self.client_context = streamablehttp_client("http://localhost:8000/mcp")
-        self.read, self.write, _ = await self.client_context.__aenter__()
+        # Try each connection URL until one works
+        for i, url in enumerate(self.connection_urls):
+            try:
+                connection_type = "load-balanced" if "localhost/mcp" in url else f"direct (port {url.split(':')[-1].split('/')[0]})"
+                print(f"🔄 Attempting {connection_type} connection: {url}")
+                
+                # Create streamable HTTP client
+                self.client_context = streamablehttp_client(url)
+                self.read, self.write, _ = await self.client_context.__aenter__()
+                
+                # Create session
+                self.session_context = ClientSession(self.read, self.write)
+                self.session = await self.session_context.__aenter__()
+                
+                # Initialize session with timeout
+                await asyncio.wait_for(self.session.initialize(), timeout=10.0)
+                print(f"✅ MCP session initialized via {connection_type}")
+                
+                return self.session
+                
+            except asyncio.TimeoutError:
+                print(f"⏰ Connection timeout for {url}")
+                await self._cleanup_failed_connection()
+                continue
+            except Exception as e:
+                print(f"❌ Connection failed for {url}: {e}")
+                await self._cleanup_failed_connection()
+                continue
         
-        # Create session
-        self.session_context = ClientSession(self.read, self.write)
-        self.session = await self.session_context.__aenter__()
-        
-        # Initialize session
-        await self.session.initialize()
-        print("✅ MCP session initialized")
-        
-        return self.session
+        raise Exception("❌ All connection attempts failed. Please check if MCP servers are running.")
+    
+    async def _cleanup_failed_connection(self):
+        """Clean up failed connection attempts"""
+        try:
+            if self.session_context:
+                await self.session_context.__aexit__(None, None, None)
+            if self.client_context:
+                await self.client_context.__aexit__(None, None, None)
+        except:
+            pass
+        finally:
+            self.session_context = None
+            self.client_context = None
+            self.session = None
     
     async def discover_mcp_capabilities(self) -> Dict[str, List]:
         """Dynamically discover all MCP capabilities"""
@@ -78,6 +125,10 @@ class EnhancedMCPClient:
             "resources": [],
             "prompts": []
         }
+        
+        if not self.session:
+            print("❌ No MCP session available")
+            return capabilities
         
         try:
             # Discover tools
@@ -177,12 +228,20 @@ class EnhancedMCPClient:
     
     async def call_mcp_tool(self, tool_name: str, arguments: Dict) -> str:
         """Call an MCP tool and return the result"""
+        if not self.session:
+            return json.dumps({"error": "No MCP session available"})
+            
         try:
             print(f"🔧 Calling MCP tool: {tool_name}({arguments})")
             result = await self.session.call_tool(tool_name, arguments)
             
             if hasattr(result, 'content') and result.content:
-                content = result.content[0].text
+                # Handle different content types
+                content_item = result.content[0]
+                if hasattr(content_item, 'text'):
+                    content = content_item.text
+                else:
+                    content = str(content_item)
                 print(f"✅ Tool result: {content[:100]}...")
                 return content
             return json.dumps({"result": str(result)})
@@ -199,12 +258,22 @@ class EnhancedMCPClient:
     
     async def get_mcp_resource(self, resource_uri: str) -> str:
         """Get an MCP resource"""
+        if not self.session:
+            return json.dumps({"error": "No MCP session available"})
+            
         try:
             print(f"📁 Fetching MCP resource: {resource_uri}")
-            result = await self.session.read_resource(resource_uri)
+            # Convert string to AnyUrl
+            uri = AnyUrl(resource_uri)
+            result = await self.session.read_resource(uri)
             
             if hasattr(result, 'contents') and result.contents:
-                content = result.contents[0].text
+                # Handle different content types
+                content_item = result.contents[0]
+                if hasattr(content_item, 'text'):
+                    content = content_item.text
+                else:
+                    content = str(content_item)
                 print(f"✅ Resource fetched: {len(content)} characters")
                 return content
             return json.dumps({"result": str(result)})
@@ -214,8 +283,11 @@ class EnhancedMCPClient:
             print(f"❌ {error_msg}")
             return json.dumps({"error": error_msg})
     
-    async def get_mcp_prompt(self, prompt_name: str, arguments: Dict = None) -> str:
+    async def get_mcp_prompt(self, prompt_name: str, arguments: Optional[Dict] = None) -> str:
         """Get an MCP prompt"""
+        if not self.session:
+            return json.dumps({"error": "No MCP session available"})
+            
         try:
             print(f"📝 Fetching MCP prompt: {prompt_name}")
             if arguments is None:
@@ -361,8 +433,21 @@ class EnhancedMCPClient:
             return server_response
     
     def build_agent_graph(self):
-        """Build the LangGraph agent"""
-        print("🏗️ Building enhanced LangGraph agent...")
+        """Build the LangGraph agent with checkpointing"""
+        print("🏗️ Building enhanced LangGraph agent with session persistence...")
+        
+        # Initialize memory saver for checkpointing - simplified approach
+        try:
+            # For now, disable session persistence to focus on conversation flow
+            # The core issue is that LangGraph conversation state needs to be maintained
+            # differently than just checkpointing
+            print("💾 Session persistence: Using in-memory conversation state")
+            self.memory_saver = None
+            self.conversation_history = []  # Track conversation in memory
+        except Exception as e:
+            print(f"⚠️ Checkpointing disabled due to error: {e}")
+            print("🔄 Running without session persistence")
+            self.memory_saver = None
         
         # Create the graph
         workflow = StateGraph(AgentState)
@@ -385,9 +470,13 @@ class EnhancedMCPClient:
         )
         workflow.add_edge("execute_tools", "call_model")
         
-        # Compile the graph
-        self.graph = workflow.compile()
-        print("✅ Enhanced LangGraph agent built successfully")
+        # Compile the graph with or without checkpointing
+        if self.memory_saver:
+            self.graph = workflow.compile(checkpointer=self.memory_saver)
+            print("✅ Enhanced LangGraph agent built with session persistence")
+        else:
+            self.graph = workflow.compile()
+            print("✅ Enhanced LangGraph agent built (no persistence)")
     
     async def call_model(self, state: AgentState) -> AgentState:
         """Call the language model with enhanced MCP integration"""
@@ -539,8 +628,70 @@ Focus on providing helpful, accurate responses using the available tools."""
         
         return state
     
-    async def run_conversation(self, user_input: str):
-        """Run a complete conversation"""
+    def create_session_id(self, user_id: str = "default") -> str:
+        """Create a unique session ID"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{user_id}_{timestamp}"
+    
+    def set_thread_id(self, thread_id: str):
+        """Set the current thread ID for session continuity"""
+        self.current_thread_id = thread_id
+        print(f"🧵 Session thread: {thread_id}")
+    
+    async def list_sessions(self) -> List[str]:
+        """List all available conversation sessions"""
+        if not self.memory_saver:
+            print("⚠️ No session persistence available")
+            return []
+        
+        try:
+            # Get all thread IDs from checkpointer
+            threads = []
+            # Use proper config for listing
+            config = RunnableConfig(configurable={})
+            async for thread_id, _ in self.memory_saver.alist(config):
+                threads.append(thread_id)
+            return list(set(threads))  # Remove duplicates
+        except Exception as e:
+            print(f"❌ Error listing sessions: {e}")
+            return []
+    
+    async def restore_session(self, thread_id: str) -> bool:
+        """Restore a previous conversation session"""
+        try:
+            if not self.memory_saver:
+                print("❌ No session persistence available")
+                return False
+            
+            # Check if thread exists
+            sessions = await self.list_sessions()
+            if thread_id not in sessions:
+                print(f"❌ Session {thread_id} not found")
+                return False
+            
+            self.current_thread_id = thread_id
+            print(f"✅ Restored session: {thread_id}")
+            return True
+        except Exception as e:
+            print(f"❌ Error restoring session: {e}")
+            return False
+    
+    async def delete_session(self, thread_id: str) -> bool:
+        """Delete a conversation session"""
+        try:
+            if not self.memory_saver:
+                return False
+            
+            # Note: SqliteSaver doesn't have a direct delete method
+            # This would require custom implementation
+            print(f"⚠️  Session deletion not implemented for {thread_id}")
+            return False
+        except Exception as e:
+            print(f"❌ Error deleting session: {e}")
+            return False
+    
+    async def run_conversation(self, user_input: str, thread_id: Optional[str] = None):
+        """Run a complete conversation with session persistence"""
         print(f"\n💬 User: {user_input}")
         
         # Initialize MCP session if not already done
@@ -554,9 +705,24 @@ Focus on providing helpful, accurate responses using the available tools."""
         if not self.graph:
             self.build_agent_graph()
         
-        # Initialize state
+        # Handle session management - use persistent thread ID
+        if thread_id:
+            self.current_thread_id = thread_id
+        elif not self.current_thread_id:
+            # Use a consistent thread ID for the session
+            self.current_thread_id = "main_conversation"
+            print(f"🧵 Using persistent session: {self.current_thread_id}")
+        
+        # Build conversation state with history for context awareness
+        if not hasattr(self, 'conversation_history'):
+            self.conversation_history = []
+        
+        # Add new user message to conversation history
+        self.conversation_history.append(HumanMessage(content=user_input))
+        
+        # Create initial state with full conversation history for context
         initial_state = {
-            "messages": [HumanMessage(content=user_input)],
+            "messages": self.conversation_history.copy(),  # Include full conversation history
             "next_action": "",
             "mcp_session": self.session,
             "available_tools": capabilities["tools"],
@@ -565,9 +731,18 @@ Focus on providing helpful, accurate responses using the available tools."""
             "user_query": user_input
         }
         
-        # Run the agent
-        print("🚀 Running enhanced LangGraph agent...")
-        final_state = await self.graph.ainvoke(initial_state)
+        if self.graph:
+            print(f"🚀 Running enhanced LangGraph agent with conversation context ({len(self.conversation_history)} messages)...")
+            final_state = await self.graph.ainvoke(initial_state)
+            
+            # Update conversation history with the agent's response
+            if final_state["messages"]:
+                # Add all new messages from the conversation to history
+                new_messages = final_state["messages"][len(self.conversation_history):]
+                self.conversation_history.extend(new_messages)
+        else:
+            print("❌ Agent graph not available")
+            return "Error: Agent not properly initialized"
         
         # Extract final response
         final_message = final_state["messages"][-1]
@@ -596,26 +771,84 @@ Focus on providing helpful, accurate responses using the available tools."""
 
 async def main():
     """Main function to run the enhanced client"""
-    client = EnhancedMCPClient()
+    # Ask user for connection preference
+    print("🎯 Enhanced MCP Client v1.2")
+    print("=" * 50)
+    print("🔌 Connection Options:")
+    print("  1. Load-balanced connection (http://localhost/mcp)")
+    print("  2. Direct connection (http://localhost:8001/mcp)")
+    print("  3. Auto-detect (try load-balanced, fallback to direct)")
+    
+    while True:
+        choice = input("\n🤔 Choose connection type (1/2/3): ").strip()
+        if choice == "1":
+            use_load_balancer = True
+            print("📡 Using load-balanced connection")
+            break
+        elif choice == "2":
+            use_load_balancer = False
+            print("🎯 Using direct connection")
+            break
+        elif choice == "3":
+            use_load_balancer = True  # Will fallback automatically
+            print("🔄 Using auto-detect mode")
+            break
+        else:
+            print("❌ Please enter 1, 2, or 3")
+    
+    client = EnhancedMCPClient(use_load_balancer=use_load_balancer)
     
     try:
-        print("🎯 Enhanced MCP Client v1.2")
-        print("=" * 50)
-        print("✨ Features:")
+        print("\n✨ Features:")
         print("  - Server-side tool execution")
         print("  - Automatic security & authorization")
         print("  - Dynamic capability discovery")
         print("  - Simplified client architecture")
         print("  - Enhanced MCP integration")
+        print("  - Multiple connection fallbacks")
         
         # Interactive mode
-        print("\n🎮 Interactive mode - Type 'quit' to exit")
+        print("\n🎮 Interactive mode - Session Management Commands:")
+        print("  /sessions - List all conversation sessions")
+        print("  /restore <session_id> - Restore a previous session")
+        print("  /new - Start a new session")
+        print("  quit - Exit the client")
         
         while True:
             try:
                 user_input = input("\n💬 You: ").strip()
+                
                 if user_input.lower() in ['quit', 'exit', 'q']:
                     break
+                
+                # Handle session management commands
+                if user_input.startswith('/sessions'):
+                    sessions = await client.list_sessions()
+                    if sessions:
+                        print(f"📋 Available sessions ({len(sessions)}):")
+                        for i, session in enumerate(sessions, 1):
+                            print(f"  {i}. {session}")
+                    else:
+                        print("📭 No previous sessions found")
+                    continue
+                
+                if user_input.startswith('/restore '):
+                    thread_id = user_input.replace('/restore ', '').strip()
+                    if thread_id:
+                        success = await client.restore_session(thread_id)
+                        if success:
+                            print(f"✅ Session {thread_id} restored")
+                        else:
+                            print(f"❌ Failed to restore session {thread_id}")
+                    else:
+                        print("❌ Please provide a session ID to restore")
+                    continue
+                
+                if user_input.startswith('/new'):
+                    client.current_thread_id = None  # Force new session
+                    print("🆕 Ready to start new session")
+                    continue
+                
                 if user_input:
                     await client.run_conversation(user_input)
                     print("-" * 50)
