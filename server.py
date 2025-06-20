@@ -19,10 +19,13 @@ from tools.memory_tools import register_memory_tools
 from tools.weather_tools import register_weather_tools
 from tools.admin_tools import register_admin_tools
 from tools.client_interaction_tools import register_client_interaction_tools
+from tools.event_sourcing_tools import register_event_sourcing_tools
 from prompts.system_prompts import register_system_prompts
 from resources.memory_resources import register_memory_resources
 from resources.monitoring_resources import register_monitoring_resources
+from resources.event_sourcing_resources import register_event_sourcing_resources
 from resources.database_init import initialize_database
+from tools.services.event_sourcing_services import init_event_sourcing_service
 
 logger = get_logger(__name__)
 
@@ -47,9 +50,11 @@ def create_mcp_server():
     register_weather_tools(mcp)
     register_admin_tools(mcp)
     register_client_interaction_tools(mcp)
+    register_event_sourcing_tools(mcp)
     register_system_prompts(mcp)
     register_memory_resources(mcp)
     register_monitoring_resources(mcp)
+    register_event_sourcing_resources(mcp)
     
     return mcp
 
@@ -65,6 +70,9 @@ async def run_server(port: int):
     
     # Initialize database (do this once)
     initialize_database()
+    
+    # Initialize event sourcing service
+    await init_event_sourcing_service()
     
     # Create MCP server
     mcp = create_mcp_server()
