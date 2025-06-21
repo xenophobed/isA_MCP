@@ -4,17 +4,5 @@ Shopify集成应用包
 允许用户查询产品目录、添加商品到购物车并完成支付流程。
 """
 
-from apps.shopify.shopify_tools import (
-    list_collections,
-    query_products, 
-    cart_operations, 
-    checkout
-)
-
-# 导出所有工具
-__all__ = [
-    'list_collections',
-    'query_products',
-    'cart_operations',
-    'checkout'
-] 
+# 简化版本，不导入具体函数，避免循环导入
+__all__ = [] 

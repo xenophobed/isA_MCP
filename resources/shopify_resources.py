@@ -10,8 +10,8 @@ from typing import Dict, List
 
 from core.logging import get_logger
 from core.monitoring import monitor_manager
-from services.shopify_client import ShopifyClient
-from services.ai_shopping_assistant import AIShoppingAssistant
+from tools.services.shopify_client import ShopifyClient
+from tools.services.ai_shopping_assistant import AIShoppingAssistant
 
 logger = get_logger(__name__)
 
@@ -28,7 +28,7 @@ def register_shopify_resources(mcp):
         monitor_manager.log_request("get_collections_catalog", "system", True, 0.2, "LOW")
         
         try:
-            result = shopify_client.get_collections(50)  # 获取更多分类
+            result = await shopify_client.get_collections(50)  # 获取更多分类
             
             if "data" in result and "collections" in result["data"]:
                 collections = []

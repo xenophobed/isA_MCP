@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Enhanced MCP Client v1.3 - Event Sourcing & Ambient Agent
-- Tests Event-Driven MCP services
-- Background task management
-- Proactive notification system
-- Agent feedback processing
+Enhanced MCP Client v1.2 - FIXED
+- Uses custom HTTP client that works with load balancer
+- Server-side tool execution with proper load balancing support
+- Enhanced security through server-side authorization
+- Multiple connection options (direct/load-balanced)
 """
 import asyncio
 import json
@@ -15,8 +15,8 @@ from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
+from isa_model.inference.ai_factory import AIFactory 
 
 # Import our custom working HTTP client
 import sys
@@ -31,13 +31,12 @@ load_dotenv(".env.local")
 api_key = os.getenv("OPENAI_API_KEY")
 api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
-# Initialize LLM
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0,
-    api_key=SecretStr(api_key) if api_key else None,
-    base_url=api_base
-)
+config = {
+    "api_key": api_key,
+    "api_base": api_base
+}
+
+llm = AIFactory.get_instance().get_llm("gpt-4o-mini", "openai", config=config)
 
 # State definition for the agent
 class AgentState(Dict):
@@ -48,17 +47,15 @@ class AgentState(Dict):
     available_resources: Annotated[List[Dict], "Available MCP resources"]
     available_prompts: Annotated[List[Dict], "Available MCP prompts"]
     user_query: Annotated[str, "Original user query"]
-    event_feedback: Annotated[Optional[Dict], "Event feedback from background tasks"]
 
-class EventDrivenMCPClient:
+class EnhancedMCPClient:
     def __init__(self, use_load_balancer: bool = True):
         self.session: Optional[MCPHTTPClient] = None
         self.graph = None
         self.conversation_history = []
         self.use_load_balancer = use_load_balancer
-        self.background_tasks = []
         
-        # Connection URLs for different servers
+        # Connection URLs in priority order
         if use_load_balancer:
             self.connection_urls = [
                 "http://localhost/mcp",        # Load balancer first
@@ -76,7 +73,7 @@ class EventDrivenMCPClient:
     
     async def initialize_mcp_session(self):
         """Initialize MCP session with fallback connections"""
-        print("🔌 Connecting to Event-Driven MCP server...")
+        print("🔌 Connecting to enhanced MCP server...")
         
         # Try each connection URL until one works
         for i, url in enumerate(self.connection_urls):
@@ -159,14 +156,6 @@ class EventDrivenMCPClient:
                 })
             
             print(f"📊 Discovered: {len(capabilities['tools'])} tools, {len(capabilities['resources'])} resources, {len(capabilities['prompts'])} prompts")
-            
-            # Check for Event Sourcing tools
-            event_tools = [t for t in capabilities['tools'] if 'background' in t['name'].lower() or 'event' in t['name'].lower()]
-            if event_tools:
-                print(f"🎯 Event Sourcing tools found: {[t['name'] for t in event_tools]}")
-            else:
-                print("⚠️ No Event Sourcing tools found. Make sure Event Sourcing server is running.")
-            
             return capabilities
             
         except Exception as e:
@@ -242,41 +231,17 @@ class EventDrivenMCPClient:
             result = await self.session.call_tool(tool_name, arguments)
             
             print(f"✅ Tool result: {str(result)[:100]}...")
-            
-            # Handle special tool responses
-            if tool_name == "create_background_task":
-                self._handle_background_task_created(result)
-            elif tool_name == "list_background_tasks":
-                self._handle_background_tasks_listed(result)
-            
             return str(result)
             
         except Exception as e:
             error_msg = str(e)
             print(f"❌ Error: {error_msg}")
+            
+            # Check if this is an authorization error
+            if "Authorization required" in error_msg and "Request ID:" in error_msg:
+                return await self.handle_authorization_error(error_msg, tool_name, arguments)
+            
             return json.dumps({"error": f"Tool call failed: {error_msg}"})
-    
-    def _handle_background_task_created(self, result: str):
-        """Handle background task creation response"""
-        try:
-            result_data = json.loads(result)
-            if result_data.get("status") == "success":
-                task_data = result_data.get("data", {})
-                self.background_tasks.append(task_data)
-                print(f"📝 Background task registered: {task_data.get('task_id', 'unknown')}")
-        except:
-            pass
-    
-    def _handle_background_tasks_listed(self, result: str):
-        """Handle background tasks list response"""
-        try:
-            result_data = json.loads(result)
-            if result_data.get("status") == "success":
-                tasks = result_data.get("data", {}).get("tasks", [])
-                self.background_tasks = tasks
-                print(f"📋 Background tasks updated: {len(tasks)} tasks")
-        except:
-            pass
     
     async def get_mcp_resource(self, resource_uri: str) -> str:
         """Get an MCP resource"""
@@ -315,9 +280,128 @@ class EventDrivenMCPClient:
             print(f"❌ {error_msg}")
             return json.dumps({"error": error_msg})
     
+    async def handle_authorization_error(self, error_msg: str, tool_name: str, arguments: Dict) -> str:
+        """Handle authorization error by extracting details and prompting user"""
+        try:
+            # Create authorization request through the server with the ORIGINAL tool arguments
+            auth_response = await self.call_mcp_tool("request_authorization", {
+                "tool_name": tool_name,
+                "reason": f"User requested to execute {tool_name}",
+                "tool_args": arguments  # Pass the original tool arguments
+            })
+            
+            # Handle the authorization response, but override tool_args with original arguments
+            return await self.handle_authorization_response(auth_response, arguments)
+            
+        except Exception as e:
+            print(f"❌ Error handling authorization: {e}")
+            return f"Authorization error: {error_msg}"
+
+    async def handle_ask_human_response(self, server_response: str) -> str:
+        """Handle ask_human tool response by prompting the user"""
+        try:
+            response_data = json.loads(server_response)
+            if response_data.get("status") == "human_input_requested":
+                data = response_data.get("data", {})
+                question = data.get("question", "Please provide input:")
+                context = data.get("context", "")
+                
+                print(f"\n🤔 {question}")
+                if context:
+                    print(f"Context: {context}")
+                
+                user_input = input("👤 Your response: ").strip()
+                return f"Human response: {user_input}"
+            else:
+                return server_response
+        except Exception as e:
+            print(f"❌ Error handling human input: {e}")
+            return server_response
+    
+    async def handle_authorization_response(self, server_response: str, tool_args: dict) -> str:
+        """Handle authorization request by prompting the user"""
+        try:
+            response_data = json.loads(server_response)
+            if response_data.get("status") == "authorization_requested":
+                data = response_data.get("data", {})
+                tool_name = data.get("tool_name", "unknown")
+                reason = data.get("reason", "No reason provided")
+                security_level = data.get("security_level", "MEDIUM")
+                
+                print(f"\n🔐 SECURITY AUTHORIZATION REQUEST")
+                print("=" * 50)
+                print(f"🎯 Tool: {tool_name}")
+                print(f"📋 Arguments: {json.dumps(tool_args, indent=2)}")
+                print(f"❓ Reason: {reason}")
+                print(f"🔒 Security Level: {security_level}")
+                
+                # Check if this is a high-security operation
+                high_security_tools = ["forget", "delete", "modify", "admin"]
+                is_high_security = any(sec_tool in tool_name.lower() for sec_tool in high_security_tools)
+                
+                if is_high_security:
+                    print("\n⚠️  HIGH SECURITY OPERATION DETECTED ⚠️")
+                    print("This operation may have significant impact.")
+                    print("Please review carefully before proceeding.")
+                
+                print("\n🔍 Security Impact Assessment:")
+                if "remember" in tool_name.lower():
+                    print("  - Will store information in persistent memory")
+                    print("  - Data will be retrievable in future sessions")
+                elif "forget" in tool_name.lower():
+                    print("  - Will permanently delete information")
+                    print("  - This action cannot be undone")
+                elif "search" in tool_name.lower():
+                    print("  - Will access stored information")
+                    print("  - Low security impact")
+                
+                print("=" * 50)
+                
+                while True:
+                    response = input("👤 Authorize this action? (y/n): ").strip().lower()
+                    if response in ['y', 'yes']:
+                        print("✅ Authorization GRANTED")
+                        # Approve the authorization on the server side
+                        request_id = data.get("request_id")
+                        if request_id:
+                            print(f"🔧 Approving authorization request: {request_id}")
+                            approval_result = await self.call_mcp_tool("approve_authorization", {
+                                "request_id": request_id,
+                                "approved_by": "human_user"
+                            })
+                            print(f"✅ Approval result: {approval_result[:100]}...")
+                            
+                            # Now execute the actual tool - fix tool name if it has "functions." prefix
+                            actual_tool_name = data.get("tool_name")
+                            # Use the original tool_args passed to this method, not from server response
+                            actual_tool_args = tool_args if tool_args else data.get("tool_args", {})
+                            if actual_tool_name:
+                                # Remove "functions." prefix if present
+                                if actual_tool_name.startswith("functions."):
+                                    actual_tool_name = actual_tool_name.replace("functions.", "")
+                                
+                                # Debug: Print the arguments being passed
+                                print(f"🔧 Executing authorized tool: {actual_tool_name} with args: {actual_tool_args}")
+                                result = await self.call_mcp_tool(actual_tool_name, actual_tool_args)
+                                return f"Authorization granted and executed: {result}"
+                            else:
+                                return "Authorization granted, but no tool specified to execute."
+                        else:
+                            return "Authorization granted, but no request ID found."
+                    elif response in ['n', 'no']:
+                        print("❌ Authorization DENIED")
+                        return "Authorization denied. The tool call has been cancelled."
+                    else:
+                        print("Please enter 'y' for yes or 'n' for no")
+            else:
+                return server_response
+        except Exception as e:
+            print(f"❌ Error handling authorization: {e}")
+            return server_response
+    
     def build_agent_graph(self):
-        """Build the LangGraph agent with Event Sourcing support"""
-        print("🏗️ Building Event-Driven LangGraph agent...")
+        """Build the LangGraph agent"""
+        print("🏗️ Building enhanced LangGraph agent...")
         
         # Create the graph
         workflow = StateGraph(AgentState)
@@ -326,7 +410,6 @@ class EventDrivenMCPClient:
         workflow.add_node("call_model", self.call_model)
         workflow.add_node("should_continue", self.should_continue)
         workflow.add_node("execute_tools", self.execute_tools)
-        workflow.add_node("process_event_feedback", self.process_event_feedback)
         
         # Add edges
         workflow.set_entry_point("call_model")
@@ -336,19 +419,17 @@ class EventDrivenMCPClient:
             lambda state: state["next_action"],
             {
                 "execute_tools": "execute_tools",
-                "process_event_feedback": "process_event_feedback",
                 "end": END
             }
         )
         workflow.add_edge("execute_tools", "call_model")
-        workflow.add_edge("process_event_feedback", "call_model")
         
         # Compile the graph
         self.graph = workflow.compile()
-        print("✅ Event-Driven LangGraph agent built successfully")
+        print("✅ Enhanced LangGraph agent built successfully")
     
     async def call_model(self, state: AgentState) -> AgentState:
-        """Call the language model with Event Sourcing integration"""
+        """Call the language model with enhanced MCP integration"""
         print("🧠 Calling language model...")
         
         messages = state["messages"]
@@ -356,82 +437,56 @@ class EventDrivenMCPClient:
         # Create tools for LLM
         available_tools = self.create_tools_for_llm(state)
         
-        # Enhanced system prompt for Event Sourcing
-        system_prompt = f"""You are an intelligent Event-Driven Assistant with comprehensive MCP server access and background task capabilities.
+        # Enhanced system prompt
+        system_prompt = f"""You are an intelligent assistant with access to a comprehensive MCP server via LOAD BALANCER.
 
-🎯 EVENT SOURCING CAPABILITIES:
 Available MCP Tools ({len(state['available_tools'])}):
 {', '.join([tool['name'] for tool in state['available_tools']])}
 
-🔍 BACKGROUND TASK TYPES:
-- web_monitor: Monitor websites for content changes with keywords
-- schedule: Run tasks on daily/interval schedules  
-- news_digest: Generate daily news summaries from multiple sources
-- threshold_watch: Monitor metrics and alert on threshold breaches
+Available Prompts ({len(state['available_prompts'])}):
+{', '.join([prompt['name'] for prompt in state['available_prompts']])}
 
-📊 CURRENT BACKGROUND TASKS: {len(self.background_tasks)} active tasks
+Available Resources ({len(state['available_resources'])}):
+{', '.join([resource['name'] for resource in state['available_resources']])}
 
 Current query: {state['user_query']}
 
-🚀 EVENT-DRIVEN WORKFLOW:
-1. **Task Creation**: Use create_background_task to set up monitoring
-2. **Task Management**: Use list/pause/resume/delete_background_task for control
-3. **Event Processing**: Analyze event feedback and determine user notifications
-4. **Proactive Notifications**: Use send_sms/send_email for important updates
+🎯 CONNECTION STATUS: Using load-balanced MCP servers for high availability and performance.
 
-📋 TASK CONFIGURATION EXAMPLES:
+ENHANCED CAPABILITIES:
+1. **Memory Management**: Use remember, forget, update_memory, search_memories for persistent data
+2. **Weather Information**: Use get_weather for current weather data
+3. **Human Interaction**: 
+   - Use ask_human ONLY to get additional information or clarification from the user
+   - Use request_authorization ONLY when a tool requires explicit authorization before execution
+4. **Security & Monitoring**: Use check_security_status, admin tools for system oversight
+5. **Response Formatting**: Use format_response for structured outputs
+6. **Dynamic Prompts**: Access specialized prompts via get_prompt_[name]
+7. **Resource Access**: Get additional context via get_resource_[name]
 
-Web Monitor:
-{{
-  "urls": ["https://techcrunch.com", "https://news.ycombinator.com"],
-  "keywords": ["artificial intelligence", "AI", "machine learning"],
-  "check_interval_minutes": 30,
-  "notification": {{
-    "method": "send_sms",
-    "phone_number": "+1234567890"
-  }}
-}}
+IMPORTANT DISTINCTION:
+- ask_human: For getting MORE INFORMATION from the user (questions, clarifications, etc.)
+- request_authorization: For getting PERMISSION to execute sensitive operations (forget, admin tools, etc.)
 
-Daily Schedule:
-{{
-  "type": "daily",
-  "hour": 8,
-  "minute": 0,
-  "action": "news_digest",
-  "notification": {{
-    "method": "send_sms",
-    "phone_number": "+1234567890"
-  }}
-}}
+WORKFLOW:
+1. Analyze the user's request and determine required capabilities
+2. If you need more information from the user, use ask_human
+3. For memory operations:
+   - remember: Call directly (auto-approved)
+   - update_memory: Call directly (auto-approved) 
+   - search_memories: Call directly (no authorization needed)
+   - forget: Call directly with proper arguments (authorization will be handled automatically)
+4. Use appropriate MCP tools to gather information or perform actions
+5. Format responses appropriately for clarity and structure
+6. Leverage prompts and resources for enhanced context when needed
 
-News Digest:
-{{
-  "news_urls": ["https://techcrunch.com", "https://bbc.com/news"],
-  "hour": 8,
-  "categories": ["technology", "business"],
-  "notification": {{
-    "method": "send_sms",
-    "phone_number": "+1234567890"
-  }}
-}}
+CRITICAL: ALWAYS call tools directly with their required arguments. 
+- For forget tool: ALWAYS include the 'key' parameter with the specific key to delete
+- For remember tool: ALWAYS include 'key' and 'value' parameters
+- Never call request_authorization manually - the system handles authorization automatically
 
-🎯 ENHANCED CAPABILITIES:
-- **Memory Management**: remember, forget, search_memories for persistent data
-- **Weather Information**: get_weather for current conditions
-- **Communication**: send_sms, send_email for notifications
-- **Security & Monitoring**: Built-in authorization and audit trails
-- **Dynamic Resources**: Access specialized prompts and data sources
-
-CRITICAL INSTRUCTIONS:
-1. When users request monitoring/scheduling, create appropriate background tasks
-2. Always include notification preferences in task config
-3. Use callback_url: "http://localhost:8000/process_background_feedback" for event callbacks
-4. Explain what the background task will do and how notifications will work
-5. For urgent events, use immediate notifications via SMS/email
-6. Provide clear status updates on background task management
-
-The Event Sourcing system runs independently and will proactively notify users when conditions are met.
-Focus on creating meaningful, actionable background tasks that provide real value to users."""
+The authorization system will handle security automatically when needed.
+Focus on providing helpful, accurate responses using the available tools."""
 
         # Build the full message list
         full_messages = [SystemMessage(content=system_prompt)] + messages
@@ -453,21 +508,17 @@ Focus on creating meaningful, actionable background tasks that provide real valu
         """Decide whether to continue with tool calls or end"""
         last_message = state["messages"][-1]
         
-        # Check for event feedback to process
-        if state.get("event_feedback"):
-            print("📥 Event feedback detected, processing...")
-            state["next_action"] = "process_event_feedback"
-        elif hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
             print(f"🔄 Tool calls detected: {len(last_message.tool_calls)} tools to execute")
             state["next_action"] = "execute_tools"
         else:
-            print("🏁 No tool calls or events, ending conversation")
+            print("🏁 No tool calls, ending conversation")
             state["next_action"] = "end"
         
         return state
     
     async def execute_tools(self, state: AgentState) -> AgentState:
-        """Execute all MCP tool calls"""
+        """Execute all MCP tool calls with human interaction support"""
         print("🛠️ Executing MCP tools...")
         
         last_message = state["messages"][-1]
@@ -484,6 +535,13 @@ Focus on creating meaningful, actionable background tasks that provide real valu
                 if tool_name in [tool['name'] for tool in state['available_tools']]:
                     # Standard MCP tool call
                     result = await self.call_mcp_tool(tool_name, tool_args)
+                    
+                    # Handle human interaction responses
+                    if tool_name == "ask_human":
+                        result = await self.handle_ask_human_response(result)
+                    elif tool_name == "request_authorization":
+                        result = await self.handle_authorization_response(result, tool_args)
+                    
                 elif tool_name.startswith("get_prompt_"):
                     # Prompt access
                     prompt_name = tool_name.replace("get_prompt_", "")
@@ -522,43 +580,8 @@ Focus on creating meaningful, actionable background tasks that provide real valu
         
         return state
     
-    async def process_event_feedback(self, state: AgentState) -> AgentState:
-        """Process event feedback from background tasks"""
-        print("📥 Processing event feedback...")
-        
-        event_feedback = state.get("event_feedback")
-        if not event_feedback:
-            return state
-        
-        # Create a message about the event feedback
-        feedback_message = f"""
-Event feedback received from background task:
-
-Task ID: {event_feedback.get('task_id', 'unknown')}
-Event Type: {event_feedback.get('event_type', 'unknown')}
-Priority: {event_feedback.get('priority', 1)}
-Timestamp: {event_feedback.get('timestamp', 'unknown')}
-
-Data:
-{json.dumps(event_feedback.get('data', {}), indent=2)}
-
-Please analyze this event feedback and determine:
-1. Is this information relevant and actionable?
-2. Should the user be notified immediately?
-3. What summary or action should be taken?
-4. If notification is needed, use appropriate communication tools.
-"""
-        
-        # Add the feedback as a human message for processing
-        state["messages"].append(HumanMessage(content=feedback_message))
-        
-        # Clear the event feedback
-        state["event_feedback"] = None
-        
-        return state
-    
-    async def run_conversation(self, user_input: str, event_feedback: Optional[Dict] = None):
-        """Run a complete conversation with optional event feedback"""
+    async def run_conversation(self, user_input: str):
+        """Run a complete conversation"""
         print(f"\n💬 User: {user_input}")
         
         # Initialize MCP session if not already done
@@ -583,12 +606,11 @@ Please analyze this event feedback and determine:
             "available_tools": capabilities["tools"],
             "available_resources": capabilities["resources"],
             "available_prompts": capabilities["prompts"],
-            "user_query": user_input,
-            "event_feedback": event_feedback
+            "user_query": user_input
         }
         
         if self.graph:
-            print(f"🚀 Running Event-Driven LangGraph agent...")
+            print(f"🚀 Running enhanced LangGraph agent with load balancer support...")
             final_state = await self.graph.ainvoke(initial_state)
             
             # Update conversation history with the agent's response
@@ -614,23 +636,6 @@ Please analyze this event feedback and determine:
             print(f"\n🤖 Assistant: {str(final_message)}")
             return str(final_message)
     
-    async def simulate_event_feedback(self, task_id: str, event_type: str, data: Dict):
-        """Simulate event feedback for testing"""
-        event_feedback = {
-            "task_id": task_id,
-            "event_type": event_type,
-            "data": data,
-            "timestamp": datetime.now().isoformat(),
-            "priority": 3
-        }
-        
-        print(f"📥 Simulating event feedback: {event_type}")
-        response = await self.run_conversation(
-            "Process this background task event feedback",
-            event_feedback=event_feedback
-        )
-        return response
-    
     async def cleanup(self):
         """Clean up resources"""
         try:
@@ -641,19 +646,15 @@ Please analyze this event feedback and determine:
             print(f"⚠️ Cleanup warning: {e}")
 
 async def main():
-    """Main function to run the Event-Driven client"""
-    print("🎯 Event-Driven MCP Client v1.3")
-    print("=" * 60)
-    print("🌟 FEATURES:")
-    print("  - Background Task Management")
-    print("  - Event-Driven Monitoring")
-    print("  - Proactive Notifications")
-    print("  - Web Content Monitoring")
-    print("  - Scheduled Task Execution")
-    print("  - News Digest Generation")
+    """Main function to run the enhanced client"""
+    print("🎯 Enhanced MCP Client v1.2 - FIXED")
+    print("=" * 50)
+    print("🔌 Connection Options:")
+    print("  1. Load-balanced connection (http://localhost/mcp) - RECOMMENDED")
+    print("  2. Direct connection (http://localhost:8001/mcp)")
     
     while True:
-        choice = input("\n🤔 Choose connection type (1=Load Balancer, 2=Direct): ").strip()
+        choice = input("\n🤔 Choose connection type (1/2): ").strip()
         if choice == "1":
             use_load_balancer = True
             print("📡 Using load-balanced connection - HIGH AVAILABILITY MODE")
@@ -665,14 +666,20 @@ async def main():
         else:
             print("❌ Please enter 1 or 2")
     
-    client = EventDrivenMCPClient(use_load_balancer=use_load_balancer)
+    client = EnhancedMCPClient(use_load_balancer=use_load_balancer)
     
     try:
+        print("\n✨ Features:")
+        print("  - ✅ WORKING Load Balancer Support")
+        print("  - Server-side tool execution")
+        print("  - Automatic security & authorization")
+        print("  - Dynamic capability discovery")
+        print("  - Enhanced MCP integration")
+        print("  - High availability failover")
+        
+        # Interactive mode
         print("\n🎮 Interactive mode:")
         print("  quit - Exit the client")
-        print("  demo - Run demo scenarios")
-        print("  tasks - Show background tasks")
-        print("  simulate - Simulate event feedback")
         
         while True:
             try:
@@ -680,15 +687,10 @@ async def main():
                 
                 if user_input.lower() in ['quit', 'exit', 'q']:
                     break
-                elif user_input.lower() == 'demo':
-                    await run_demo_scenarios(client)
-                elif user_input.lower() == 'tasks':
-                    await show_background_tasks(client)
-                elif user_input.lower() == 'simulate':
-                    await simulate_event_scenarios(client)
-                elif user_input:
+                
+                if user_input:
                     await client.run_conversation(user_input)
-                    print("-" * 60)
+                    print("-" * 50)
             except KeyboardInterrupt:
                 print("\n👋 Goodbye!")
                 break
@@ -699,82 +701,5 @@ async def main():
     finally:
         await client.cleanup()
 
-async def run_demo_scenarios(client):
-    """Run demo scenarios for Event Sourcing"""
-    print("\n🎬 Running Event Sourcing Demo Scenarios...")
-    
-    # Demo 1: Web Monitoring
-    print("\n📊 Demo 1: Web Content Monitoring")
-    await client.run_conversation(
-        "Set up a background task to monitor TechCrunch for new articles about artificial intelligence. "
-        "Check every 30 minutes and send me SMS notifications when new AI content is found. "
-        "My phone number is +1234567890."
-    )
-    
-    # Demo 2: Daily News Digest
-    print("\n📰 Demo 2: Daily News Digest")
-    await client.run_conversation(
-        "Create a daily news digest task that summarizes the latest technology news from TechCrunch and Hacker News. "
-        "Send me the digest every morning at 8 AM via SMS to +1234567890."
-    )
-    
-    # Demo 3: Scheduled Reminder
-    print("\n⏰ Demo 3: Scheduled Reminder")
-    await client.run_conversation(
-        "Set up a daily reminder to check my project status every day at 9 AM. "
-        "Send the reminder via SMS to +1234567890."
-    )
-
-async def show_background_tasks(client):
-    """Show current background tasks"""
-    print("\n📋 Current Background Tasks:")
-    await client.run_conversation("List all my background tasks and their status")
-
-async def simulate_event_scenarios(client):
-    """Simulate event feedback scenarios"""
-    print("\n🎭 Simulating Event Scenarios...")
-    
-    # Simulate web content change
-    await client.simulate_event_feedback(
-        task_id="demo-task-1",
-        event_type="web_content_change",
-        data={
-            "url": "https://techcrunch.com",
-            "content": "New breakthrough in artificial intelligence: GPT-5 announced with revolutionary capabilities...",
-            "keywords_found": ["artificial intelligence", "GPT-5"],
-            "description": "Monitor TechCrunch for AI news",
-            "user_id": "default"
-        }
-    )
-    
-    # Simulate daily news digest
-    await client.simulate_event_feedback(
-        task_id="demo-task-2",
-        event_type="daily_news_digest",
-        data={
-            "digest_date": datetime.now().date().isoformat(),
-            "news_summaries": [
-                {
-                    "source": "https://techcrunch.com",
-                    "headlines": [
-                        "AI startup raises $100M Series A",
-                        "New quantum computing breakthrough",
-                        "Apple announces AI-powered features"
-                    ]
-                },
-                {
-                    "source": "https://news.ycombinator.com",
-                    "headlines": [
-                        "Show HN: My AI coding assistant",
-                        "The future of programming with AI",
-                        "Building scalable AI infrastructure"
-                    ]
-                }
-            ],
-            "description": "Daily tech news digest",
-            "user_id": "default"
-        }
-    )
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main()) 

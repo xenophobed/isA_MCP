@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Multi-Port MCP Server Deployment
 Run your MCP server on multiple ports for nginx load balancing
@@ -10,6 +10,9 @@ from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+from dotenv import load_dotenv
+from mcp.server import Server
+from tools.apps.shopify.shopify_tools import register_realistic_shopify_tools
 
 # Your existing imports
 from core.logging import get_logger
@@ -28,6 +31,9 @@ from resources.database_init import initialize_database
 from tools.services.event_sourcing_services import init_event_sourcing_service
 
 logger = get_logger(__name__)
+
+# Load environment variables
+load_dotenv()
 
 async def health_check(request):
     """Health check endpoint for load balancer"""
@@ -48,24 +54,15 @@ def create_mcp_server():
     logger.info("Registering MCP components...")
     
     try:
+        register_realistic_shopify_tools(mcp)
         register_memory_tools(mcp)
         register_weather_tools(mcp)
         register_admin_tools(mcp)
         register_client_interaction_tools(mcp)
-        
-        # Try to register event sourcing tools with detailed error handling
-        logger.info("Attempting to register event sourcing tools...")
         register_event_sourcing_tools(mcp)
-        logger.info("Event sourcing tools registration completed")
-        
         register_system_prompts(mcp)
         register_memory_resources(mcp)
-        register_monitoring_resources(mcp)
-        
-        # Try to register event sourcing resources with detailed error handling
-        logger.info("Attempting to register event sourcing resources...")
-        register_event_sourcing_resources(mcp)
-        logger.info("Event sourcing resources registration completed")
+        register_monitoring_resources(mcp)        
         
     except Exception as e:
         logger.error(f"Error during MCP component registration: {e}")

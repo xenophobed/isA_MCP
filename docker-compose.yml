@@ -7,6 +7,15 @@ services:
     command: python server.py --port 8001
     ports:
       - "8001:8001"
+    environment:
+      - SHOPIFY_STORE_DOMAIN=${SHOPIFY_STORE_DOMAIN}
+      - SHOPIFY_STOREFRONT_ACCESS_TOKEN=${SHOPIFY_STOREFRONT_ACCESS_TOKEN}
+      - SHOPIFY_ADMIN_ACCESS_TOKEN=${SHOPIFY_ADMIN_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    env_file:
+      - .env.local
     networks:
       - mcp-network
     restart: unless-stopped
@@ -21,6 +30,15 @@ services:
     command: python server.py --port 8002
     ports:
       - "8002:8002"
+    environment:
+      - SHOPIFY_STORE_DOMAIN=${SHOPIFY_STORE_DOMAIN}
+      - SHOPIFY_STOREFRONT_ACCESS_TOKEN=${SHOPIFY_STOREFRONT_ACCESS_TOKEN}
+      - SHOPIFY_ADMIN_ACCESS_TOKEN=${SHOPIFY_ADMIN_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    env_file:
+      - .env.local
     networks:
       - mcp-network
     restart: unless-stopped
@@ -35,6 +53,15 @@ services:
     command: python server.py --port 8003
     ports:
       - "8003:8003"
+    environment:
+      - SHOPIFY_STORE_DOMAIN=${SHOPIFY_STORE_DOMAIN}
+      - SHOPIFY_STOREFRONT_ACCESS_TOKEN=${SHOPIFY_STOREFRONT_ACCESS_TOKEN}
+      - SHOPIFY_ADMIN_ACCESS_TOKEN=${SHOPIFY_ADMIN_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    env_file:
+      - .env.local
     networks:
       - mcp-network
     restart: unless-stopped
@@ -49,6 +76,15 @@ services:
     command: python servers/event_feedback_server.py
     ports:
       - "8000:8000"
+    environment:
+      - SHOPIFY_STORE_DOMAIN=${SHOPIFY_STORE_DOMAIN}
+      - SHOPIFY_STOREFRONT_ACCESS_TOKEN=${SHOPIFY_STOREFRONT_ACCESS_TOKEN}
+      - SHOPIFY_ADMIN_ACCESS_TOKEN=${SHOPIFY_ADMIN_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    env_file:
+      - .env.local
     networks:
       - mcp-network
     restart: unless-stopped
@@ -67,9 +103,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      # SSL volume removed for development
-      # - ./ssl:/etc/nginx/ssl
+      - ./deployment/nginx.conf:/etc/nginx/nginx.conf
     networks:
       - mcp-network
     depends_on:
