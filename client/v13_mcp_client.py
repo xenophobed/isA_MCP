@@ -161,11 +161,17 @@ class EventDrivenMCPClient:
             print(f"📊 Discovered: {len(capabilities['tools'])} tools, {len(capabilities['resources'])} resources, {len(capabilities['prompts'])} prompts")
             
             # Check for Event Sourcing tools
-            event_tools = [t for t in capabilities['tools'] if 'background' in t['name'].lower() or 'event' in t['name'].lower()]
+            event_tools = [t for t in capabilities['tools'] if 
+                         'background' in t['name'].lower() or 
+                         'event' in t['name'].lower() or
+                         t['name'] in ['create_background_task', 'list_background_tasks', 
+                                     'pause_background_task', 'resume_background_task', 
+                                     'delete_background_task', 'get_event_sourcing_status']]
             if event_tools:
                 print(f"🎯 Event Sourcing tools found: {[t['name'] for t in event_tools]}")
             else:
                 print("⚠️ No Event Sourcing tools found. Make sure Event Sourcing server is running.")
+                print(f"📋 Available tools: {[t['name'] for t in capabilities['tools']]}")
             
             return capabilities
             

@@ -46,15 +46,32 @@ def create_mcp_server():
     
     # Register all components
     logger.info("Registering MCP components...")
-    register_memory_tools(mcp)
-    register_weather_tools(mcp)
-    register_admin_tools(mcp)
-    register_client_interaction_tools(mcp)
-    register_event_sourcing_tools(mcp)
-    register_system_prompts(mcp)
-    register_memory_resources(mcp)
-    register_monitoring_resources(mcp)
-    register_event_sourcing_resources(mcp)
+    
+    try:
+        register_memory_tools(mcp)
+        register_weather_tools(mcp)
+        register_admin_tools(mcp)
+        register_client_interaction_tools(mcp)
+        
+        # Try to register event sourcing tools with detailed error handling
+        logger.info("Attempting to register event sourcing tools...")
+        register_event_sourcing_tools(mcp)
+        logger.info("Event sourcing tools registration completed")
+        
+        register_system_prompts(mcp)
+        register_memory_resources(mcp)
+        register_monitoring_resources(mcp)
+        
+        # Try to register event sourcing resources with detailed error handling
+        logger.info("Attempting to register event sourcing resources...")
+        register_event_sourcing_resources(mcp)
+        logger.info("Event sourcing resources registration completed")
+        
+    except Exception as e:
+        logger.error(f"Error during MCP component registration: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise
     
     return mcp
 

@@ -1,0 +1,3 @@
+2025-06-20 21:03:24,481 - __main__ - INFO - 📥 Received event: web_content_change from task 84232c7c-8b9f-44dc-b341-d7411548153c
+2025-06-20 21:03:24,486 - __main__ - ERROR - Agent returned status 404
+2025-06-20 21:03:24,486 - __main__ - WARNING - ⚠️ Failed to forward event to agent

@@ -28,7 +28,7 @@ def register_event_sourcing_tools(mcp):
     async def create_background_task(
         task_type: str,
         description: str,
-        config: str,  # JSON string
+        config: Any,  # JSON string or dict
         callback_url: str = "http://localhost:8000/process_background_feedback",
         user_id: str = "default"
     ) -> str:
@@ -37,7 +37,7 @@ def register_event_sourcing_tools(mcp):
         Args:
             task_type: Type of task (web_monitor, schedule, news_digest, threshold_watch)
             description: Human-readable description of the task
-            config: JSON configuration for the task
+            config: JSON configuration for the task (string or dict)
             callback_url: URL to send feedback to when events occur
             user_id: User who created the task
         
@@ -46,8 +46,13 @@ def register_event_sourcing_tools(mcp):
         """
         
         try:
-            # Parse config
-            config_dict = json.loads(config)
+            # Parse config - handle both string and dict formats
+            if isinstance(config, str):
+                config_dict = json.loads(config)
+            elif isinstance(config, dict):
+                config_dict = config
+            else:
+                raise ValueError(f"Config must be a JSON string or dictionary, got {type(config)}")
             
             # Validate task type
             try:

@@ -44,6 +44,24 @@ services:
       timeout: 10s
       retries: 3
 
+  event-feedback-server:
+    build: .
+    command: python servers/event_feedback_server.py
+    ports:
+      - "8000:8000"
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - mcp-server-1
+      - mcp-server-2  
+      - mcp-server-3
+
   nginx:
     image: nginx:alpine
     ports:
@@ -58,6 +76,7 @@ services:
       - mcp-server-1
       - mcp-server-2
       - mcp-server-3
+      - event-feedback-server
     restart: unless-stopped
 
 networks:
