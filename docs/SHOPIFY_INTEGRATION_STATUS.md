@@ -95,6 +95,16 @@ isA_MCP/
 
 ## 🚀 Docker Deployment Ready
 
+### Environment Variables Required
+```bash
+SHOPIFY_STORE_DOMAIN=your-store-domain.myshopify.com
+SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_storefront_access_token
+SHOPIFY_ADMIN_ACCESS_TOKEN=your_admin_access_token
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_BASE=https://api.openai.com/v1
+REPLICATE_API_TOKEN=your_replicate_api_token
+```
+
 ### Services Configuration
 - **mcp-server-1**: Port 8001 ✅
 - **mcp-server-2**: Port 8002 ✅  

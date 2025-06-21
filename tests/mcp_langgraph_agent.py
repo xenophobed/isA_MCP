@@ -238,7 +238,7 @@ async def main():
         logger.info("创建LLM")
         llm = ChatOpenAI(
             model="gpt-4o",
-            api_key="your_openai_api_key",
+            api_key=os.getenv("OPENAI_API_KEY", "your_openai_api_key"),
             base_url="https://api.ai-yyds.com/v1",
             temperature=0
         )
