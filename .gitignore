@@ -1,3 +1,4 @@
 *.env.shopify
 *.env.local
 *.env.dev
+*.env 
