@@ -22,7 +22,14 @@ def register_admin_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_authorization_requests(user_id: str = "admin") -> str:
-        """Get pending authorization requests (admin only)"""
+        """Get pending authorization requests (admin only)
+        
+        This tool provides administrative access to view pending authorization 
+        requests that require manual approval for secure operations.
+        
+        Keywords: admin, authorization, requests, security, approval, management
+        Category: admin
+        """
         if user_id != "admin":
             raise McpError("Unauthorized: Admin access required")
         
@@ -55,7 +62,14 @@ def register_admin_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def approve_authorization(request_id: str, approved_by: str = "admin") -> str:
-        """Approve an authorization request"""
+        """Approve an authorization request
+        
+        This tool allows administrators to approve pending authorization
+        requests for secure operations and tool access.
+        
+        Keywords: admin, approve, authorization, security, management, access
+        Category: admin
+        """
         auth_manager = security_manager.auth_manager
         
         success = auth_manager.approve_request(request_id, approved_by)
@@ -73,7 +87,14 @@ def register_admin_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_monitoring_metrics(user_id: str = "admin") -> str:
-        """Get system monitoring metrics"""
+        """Get system monitoring metrics
+        
+        This tool provides access to system performance metrics,
+        usage statistics, and monitoring data for administrators.
+        
+        Keywords: admin, monitoring, metrics, performance, statistics, system
+        Category: admin
+        """
         if user_id != "admin":
             raise McpError("Unauthorized: Admin access required")
         
@@ -92,7 +113,14 @@ def register_admin_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_audit_log(limit: int = 50, user_id: str = "admin") -> str:
-        """Get audit log entries"""
+        """Get audit log entries
+        
+        This tool provides access to system audit logs showing
+        user actions, security events, and system activities.
+        
+        Keywords: admin, audit, log, security, history, tracking, events
+        Category: admin
+        """
         if user_id != "admin":
             raise McpError("Unauthorized: Admin access required")
         

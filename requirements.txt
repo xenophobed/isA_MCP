@@ -2,20 +2,20 @@
 fastapi>=0.110.0
 uvicorn>=0.24.0
 pydantic>=2.8.0
-python-dotenv==1.0.0
+python-dotenv>=1.1.0
 
 # MCP dependencies
 mcp>=1.9.2
-aiohttp==3.9.1
+aiohttp>=3.9.3
 
 # RAG dependencies
 sentence-transformers==2.2.2
 weaviate-client==3.24.1
-chromadb==0.4.18
+chromadb>=0.4.18
 
 # GraphRAG dependencies
 neo4j==5.11.0
-spacy==3.7.2
+spacy>=3.7.2
 networkx==3.2.1
 
 # Testing and development
@@ -31,9 +31,15 @@ langchain-core>=0.1.0
 langchain-openai>=0.1.0
 langgraph>=0.0.10
 langchain-mcp-adapters>=0.1.0
+isa_model==0.3.4
+# Pin compatible versions to avoid conflicts
+runpod<1.7.0  # Use older version compatible with our aiohttp
+setuptools-scm>=8.0.4,<9.0.0
+authlib>=1.2.1,<2.0.0
+typer>=0.9.0,<0.16.0  # Compatible with both spacy and fastmcp
 
 # MCP (Model Context Protocol)
-fastmcp>=0.1.0
+fastmcp>=0.1.0,<2.0.0  # Avoid newer versions with higher typer requirements
 
 # Data Validation and Models
 numpy>=1.20.0

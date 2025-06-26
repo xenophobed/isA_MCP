@@ -28,7 +28,14 @@ def register_weather_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_weather(city: str, user_id: str = "default") -> str:
-        """Get weather information with caching and monitoring"""
+        """Get weather information with caching and monitoring
+        
+        This tool provides current weather conditions, temperature, 
+        humidity and forecast data for any city worldwide.
+        
+        Keywords: weather, temperature, forecast, climate, rain, sunny, cloudy, wind
+        Category: weather
+        """
         city_lower = city.lower()
         
         conn = sqlite3.connect("memory.db")
