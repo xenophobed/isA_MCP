@@ -34,12 +34,6 @@ def register_event_sourcing_tools(mcp):
     ) -> str:
         """Create a background monitoring task that runs independently
         
-        This tool creates and schedules background tasks for monitoring,
-        automation, and event-driven operations that run independently.
-        
-        Keywords: background, task, monitoring, automation, schedule, events
-        Category: event
-        
         Args:
             task_type: Type of task (web_monitor, schedule, news_digest, threshold_watch)
             description: Human-readable description of the task
@@ -113,14 +107,7 @@ def register_event_sourcing_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def list_background_tasks(user_id: str = "default") -> str:
-        """List all background tasks for the user
-        
-        This tool provides a view of all active, paused, and completed
-        background tasks associated with a specific user.
-        
-        Keywords: list, background, tasks, status, monitoring, history
-        Category: event
-        """
+        """List all background tasks for the user"""
         
         try:
             tasks = await event_service.list_tasks(user_id)
@@ -162,14 +149,7 @@ def register_event_sourcing_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def pause_background_task(task_id: str, user_id: str = "default") -> str:
-        """Pause a background task
-        
-        This tool allows users to temporarily pause a running background
-        task without deleting it, preserving its configuration and state.
-        
-        Keywords: pause, background, task, control, management, suspend
-        Category: event
-        """
+        """Pause a background task"""
         
         try:
             success = await event_service.pause_task(task_id, user_id)
@@ -200,14 +180,7 @@ def register_event_sourcing_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def resume_background_task(task_id: str, user_id: str = "default") -> str:
-        """Resume a paused background task
-        
-        This tool resumes execution of a previously paused background
-        task, continuing from where it left off.
-        
-        Keywords: resume, background, task, control, management, restart
-        Category: event
-        """
+        """Resume a paused background task"""
         
         try:
             success = await event_service.resume_task(task_id, user_id)
@@ -238,14 +211,7 @@ def register_event_sourcing_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.HIGH)
     async def delete_background_task(task_id: str, user_id: str = "default") -> str:
-        """Delete a background task
-        
-        This tool permanently removes a background task and all its
-        associated data, configuration, and history.
-        
-        Keywords: delete, background, task, remove, cleanup, management
-        Category: event
-        """
+        """Delete a background task"""
         
         try:
             success = await event_service.delete_task(task_id, user_id)
@@ -275,14 +241,7 @@ def register_event_sourcing_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_event_sourcing_status() -> str:
-        """Get the status of the event sourcing service
-        
-        This tool provides health and status information about the
-        event sourcing service and its background task execution.
-        
-        Keywords: status, event, sourcing, health, service, monitoring
-        Category: event
-        """
+        """Get the status of the event sourcing service"""
         
         try:
             status = await event_service.get_service_status()

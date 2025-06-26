@@ -1,597 +1,497 @@
-# 🚀 Smart MCP Server Docker Cluster Deployment Guide
+# MCP Server Multi-Port Deployment Guide
 
-This guide explains how to deploy the Smart MCP Server cluster with AI-powered tool selection, load balancing, and comprehensive monitoring.
+This guide explains how to deploy the MCP (Model Context Protocol) server across multiple ports with load balancing and high availability.
 
 ## 🏗️ Architecture Overview
 
-The Smart MCP deployment consists of:
-- **3 Smart MCP Server instances** running on ports 4321, 4322, 4323
-- **Nginx load balancer** with intelligent request distribution (Port 8081)
-- **AI-powered tool selection** using embedding-based similarity matching
-- **Comprehensive web scraping** with Playwright and anti-detection
-- **Health monitoring** and performance metrics
-- **Docker cluster** with automatic scaling and recovery
+The deployment consists of:
+- **3 MCP Server instances** running on ports 8001, 8002, 8003
+- **Nginx load balancer** distributing traffic across servers
+- **Health monitoring** for each server instance
+- **Multiple deployment options**: Docker, systemd, or process manager
 
 ## 📁 Key Files
 
 | File | Description |
 |------|-------------|
-| `smart_server.py` | AI-powered Smart MCP server with tool selection |
-| `docker-compose.smart.yml` | Smart cluster deployment configuration |
-| `Dockerfile.smart` | Container image with Playwright dependencies |
-| `deployment/nginx.smart.conf` | Load balancer for Smart MCP cluster |
-| `start_smart_cluster.sh` | One-click cluster startup script |
-| `test_docker_cluster.py` | Comprehensive cluster testing suite |
+| `multi_mcp_server.py` | Main MCP server with health endpoints |
+| `docker-compose.yml` | Docker deployment configuration |
+| `Dockerfile` | Container image definition |
+| `nginx.conf` | Load balancer configuration |
+| `manage-mcp.sh` | Process manager script |
+| `start-mcp-servers.sh` | Systemd service installer |
+| `setup-deployment.sh` | Comprehensive setup script |
 
 ## 🚀 Quick Start
 
-### Option 1: One-Click Deployment (Recommended)
+### Option 1: Automated Setup (Recommended)
 
 ```bash
-# Make startup script executable
-chmod +x start_smart_cluster.sh
+# Install dependencies and setup everything
+./setup-deployment.sh --all
 
-# Start the complete Smart MCP cluster
-./start_smart_cluster.sh
-
-# Test the cluster
-python test_docker_cluster.py
+# Check deployment status
+./setup-deployment.sh --status
 ```
 
-### Option 2: Manual Docker Compose
+### Option 2: Docker Compose
 
 ```bash
-# Start Smart MCP cluster
-docker-compose -f docker-compose.smart.yml up -d
+# Start all services with Docker
+docker-compose up -d
 
 # Check service status
-docker-compose -f docker-compose.smart.yml ps
+docker-compose ps
 
 # View logs
-docker-compose -f docker-compose.smart.yml logs -f
+docker-compose logs -f
 ```
 
-### Option 3: Development Mode
+### Option 3: Systemd Services
 
 ```bash
-# Single Smart MCP server for development
-python smart_server.py --port 4321
+# Install as system services (requires sudo)
+sudo ./start-mcp-servers.sh
 
-# Test AI tool selection
-curl -X POST http://localhost:4321/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "scrape website for product information"}'
+# Check service status
+sudo systemctl status mcp-server-8001 mcp-server-8002 mcp-server-8003
 ```
 
-## 🔧 Prerequisites and Setup
+### Option 4: Process Manager
+
+```bash
+# Start with process manager
+./manage-mcp.sh start
+
+# Check status
+./manage-mcp.sh status
+
+# Stop servers
+./manage-mcp.sh stop
+```
+
+## 🔧 Manual Setup Steps
 
 ### 1. Install Dependencies
 
 ```bash
 # Install Python dependencies
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Install system dependencies (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install -y curl docker.io docker-compose-plugin
+sudo apt-get install -y curl openssl nginx docker.io docker-compose
 ```
 
-### 2. Environment Configuration
-
-Create `.env.local` file:
-```bash
-# Core API Keys
-OPENAI_API_KEY=your-openai-api-key-here
-OPENAI_API_BASE=https://api.openai.com/v1
-
-# Shopify Integration
-SHOPIFY_STORE_DOMAIN=example.myshopify.com
-SHOPIFY_STOREFRONT_ACCESS_TOKEN=your-token-here
-SHOPIFY_ADMIN_API_KEY=your-admin-key-here
-
-# Image Generation
-REPLICATE_API_TOKEN=your-replicate-token-here
-
-# Communication Tools
-TWILIO_ACCOUNT_SID=your-twilio-sid
-TWILIO_AUTH_TOKEN=your-twilio-token
-TWILIO_PHONE_NUMBER=your-twilio-phone
-```
-
-### 3. Create Required Directories
+### 2. Create Directories
 
 ```bash
-mkdir -p logs screenshots deployment/ssl
+mkdir -p logs pids data ssl
 ```
 
-## 🐳 Docker Cluster Deployment
-
-### Smart MCP Cluster Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Nginx Load Balancer                      │
-│                    (Port 8081)                              │
-│               ┌─────────────────────────┐                   │
-│               │ /mcp     - MCP Protocol │                   │
-│               │ /analyze - AI Tool Rec  │                   │
-│               │ /stats   - Statistics   │                   │
-│               │ /health  - Health Check │                   │
-│               └─────────────────────────┘                   │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-        ┌─────────────┼─────────────┐
-        │             │             │
-   ┌────▼───┐    ┌────▼───┐    ┌────▼───┐
-   │Smart-1 │    │Smart-2 │    │Smart-3 │
-   │Port    │    │Port    │    │Port    │
-   │4321    │    │4322    │    │4323    │
-   │        │    │        │    │        │
-   │AI Tools│    │AI Tools│    │AI Tools│
-   │Web Scrp│    │Web Scrp│    │Web Scrp│
-   │Shopify │    │Shopify │    │Shopify │
-   │Memory  │    │Memory  │    │Memory  │
-   └────────┘    └────────┘    └────────┘
-```
-
-### Build and Start Cluster
+### 3. Generate SSL Certificates (Development)
 
 ```bash
-# Build images with all dependencies
-docker-compose -f docker-compose.smart.yml build
-
-# Start cluster in background
-docker-compose -f docker-compose.smart.yml up -d
-
-# Wait for services to initialize
-sleep 30
-
-# Check cluster health
-curl http://localhost:8081/health
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout ssl/key.pem \
+    -out ssl/cert.pem \
+    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
 ```
 
-### Container Management
+### 4. Test Single Server
+
+```bash
+# Test server startup
+python3 multi_mcp_server.py --port 8888
+
+# In another terminal, test health endpoint
+curl http://localhost:8888/health
+```
+
+## 🐳 Docker Deployment
+
+### Build and Run
+
+```bash
+# Build images
+docker-compose build
+
+# Start services in background
+docker-compose up -d
+
+# Scale services if needed
+docker-compose up -d --scale mcp-server-1=2
+```
+
+### Docker Commands
 
 ```bash
 # View running containers
-docker-compose -f docker-compose.smart.yml ps
+docker-compose ps
 
-# View logs for specific service
-docker-compose -f docker-compose.smart.yml logs -f smart-mcp-server-1
+# View logs
+docker-compose logs -f mcp-server-1
 
 # Restart specific service
-docker-compose -f docker-compose.smart.yml restart smart-mcp-server-2
+docker-compose restart mcp-server-2
 
-# Scale services (if needed)
-docker-compose -f docker-compose.smart.yml up -d --scale smart-mcp-server-1=2
-
-# Stop cluster
-docker-compose -f docker-compose.smart.yml down
+# Stop all services
+docker-compose down
 
 # Remove everything including volumes
-docker-compose -f docker-compose.smart.yml down -v --remove-orphans
+docker-compose down -v --remove-orphans
 ```
 
-## 🔍 Smart MCP Endpoints
+## 🔧 Systemd Deployment
 
-### Load Balancer Endpoints (Port 8081)
+### Installation
 
 ```bash
-# Health check
-curl http://localhost:8081/health
-
-# Server statistics
-curl http://localhost:8081/stats
-
-# AI tool analysis
-curl -X POST http://localhost:8081/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "generate an image of a sunset"}'
-
-# MCP protocol endpoint
-curl -X POST http://localhost:8081/mcp/ \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}'
+# Install services (requires sudo)
+sudo ./start-mcp-servers.sh
 ```
 
-### Direct Server Access
+### Management Commands
 
 ```bash
-# Access individual servers
-curl http://localhost:4321/health
-curl http://localhost:4322/health
-curl http://localhost:4323/health
+# Check status
+sudo systemctl status mcp-server-8001 mcp-server-8002 mcp-server-8003
 
-# Test AI tool selection on specific server
-curl -X POST http://localhost:4321/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "scrape website content"}'
+# Start/Stop individual services
+sudo systemctl start mcp-server-8001
+sudo systemctl stop mcp-server-8002
+sudo systemctl restart mcp-server-8003
+
+# Enable/Disable auto-start
+sudo systemctl enable mcp-server-8001
+sudo systemctl disable mcp-server-8002
+
+# View logs
+sudo journalctl -u mcp-server-8001 -f
+sudo journalctl -u mcp-server-8002 --since "1 hour ago"
 ```
 
-## 🧪 Testing and Validation
+## 📊 Process Manager Deployment
 
-### Comprehensive Cluster Testing
+### Commands
 
 ```bash
-# Run full test suite
-python test_docker_cluster.py
+# Start all servers
+./manage-mcp.sh start
+
+# Stop all servers
+./manage-mcp.sh stop
+
+# Restart all servers
+./manage-mcp.sh restart
+
+# Check status with health checks
+./manage-mcp.sh status
 ```
 
-Expected output:
-```
-🚀 Smart MCP Server Docker Cluster Test Suite
-==================================================
-🏥 Testing Health Checks...
-  ✅ http://localhost:4321/health - Status: healthy
-  ✅ http://localhost:4322/health - Status: healthy  
-  ✅ http://localhost:4323/health - Status: healthy
-  ✅ http://localhost:8081/health - Status: healthy
-
-✅ Health Check Results: 4/4 servers healthy
-
-🧠 Testing AI Tool Selection...
-  🎯 'scrape website for product information' -> ['scrape_webpage', 'get_product_details', 'get_scraper_status']
-  🎯 'remember important user data' -> ['remember', 'get_user_info', 'forget']
-  🎯 'generate an image of a sunset' -> ['generate_image_to_file', 'generate_image', 'image_to_image']
-
-🕸️ Testing Web Scraper Integration...
-  📋 Found 6 web scraper tools:
-      • scrape_webpage
-      • scrape_multiple_pages
-      • extract_page_links
-
-🎯 Overall Result: ✅ CLUSTER WORKING
-```
-
-### Manual Testing
+### Log Files
 
 ```bash
-# Test specific functionalities
-curl -X POST http://localhost:8081/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "scrape website for news"}'
+# View logs
+tail -f logs/server-8001.log
+tail -f logs/server-8002.log
+tail -f logs/server-8003.log
 
-curl -X POST http://localhost:8081/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "remember user preferences"}'
-
-curl -X POST http://localhost:8081/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"request": "search shopify products"}'
+# Monitor all logs
+tail -f logs/server-*.log
 ```
 
-## 📊 Monitoring and Health Checks
+## 🔍 Monitoring and Health Checks
 
-### Service Health Monitoring
+### Health Endpoints
 
 ```bash
-# Check all services
-./start_smart_cluster.sh && sleep 10
-python test_docker_cluster.py
+# Check individual servers
+curl http://localhost:8001/health
+curl http://localhost:8002/health
+curl http://localhost:8003/health
 
-# Individual health checks
-curl http://localhost:4321/health | jq '.server_status'
-curl http://localhost:4322/health | jq '.server_status'
-curl http://localhost:4323/health | jq '.server_status'
+# Check through load balancer
+curl http://localhost/health        # HTTP
+curl -k https://localhost/health    # HTTPS
 ```
 
-### Performance Metrics
+### MCP Endpoints
 
 ```bash
-# Get server statistics
-curl http://localhost:8081/stats | jq '.'
+# Access MCP through load balancer
+curl http://localhost/mcp
+curl -k https://localhost/mcp
 
-# Check loaded tools
-curl http://localhost:8081/health | jq '.server_status.loaded_tools'
-
-# Monitor tool selector status
-curl http://localhost:8081/health | jq '.server_status.tool_selector_ready'
+# Direct access to servers
+curl http://localhost:8001/mcp
+curl http://localhost:8002/mcp
+curl http://localhost:8003/mcp
 ```
 
-### Log Analysis
+### Nginx Status
 
 ```bash
-# View Smart server logs
-docker-compose -f docker-compose.smart.yml logs smart-mcp-server-1 | tail -50
+# Check nginx configuration
+sudo nginx -t
 
-# Monitor all servers
-docker-compose -f docker-compose.smart.yml logs -f
+# Reload nginx configuration
+sudo nginx -s reload
 
-# Check nginx logs
-docker-compose -f docker-compose.smart.yml logs smart-nginx
+# View nginx logs
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
 ```
 
-## 🔧 Configuration
-
-### Smart Server Configuration
-
-The Smart MCP servers support AI-powered tool selection with the following features:
-
-**Tool Categories Supported:**
-- `web`: Web scraping and content extraction
-- `memory`: Information storage and retrieval  
-- `image`: AI image generation and processing
-- `shopify`: E-commerce and product management
-- `admin`: System administration and monitoring
-- `client`: User interaction and communication
-- `event`: Background task and event management
-- `weather`: Weather data and forecasts
-
-**AI Tool Selection:**
-- Uses OpenAI embeddings for semantic similarity
-- Caches embedding results for performance
-- Returns top 3 most relevant tools
-- Supports natural language tool requests
+## 🛠️ Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `OPENAI_API_KEY` | OpenAI API key for embeddings | - | ✅ |
-| `SHOPIFY_STORE_DOMAIN` | Shopify store domain | - | Optional |
-| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | Shopify API token | - | Optional |
-| `REPLICATE_API_TOKEN` | Replicate API for image generation | - | Optional |
-| `TWILIO_ACCOUNT_SID` | Twilio account SID | - | Optional |
-
-### Load Balancer Configuration
-
-The nginx load balancer (`deployment/nginx.smart.conf`) provides:
-
-- **Session Affinity**: Uses `ip_hash` for MCP persistent connections
-- **Rate Limiting**: 20 requests/second for Smart MCP endpoints
-- **Health Checks**: Automatic failover for unhealthy servers
-- **SSE Support**: Proper handling of Server-Sent Events
-- **Extended Timeouts**: 24-hour timeouts for AI processing
-
-## 🚦 Load Balancing and Scaling
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_ID` | Unique server identifier | `mcp-server-{port}` |
+| `PORT` | Server port number | From command line |
+| `PYTHONPATH` | Python module path | `/opt/mcp-server` |
 
 ### Nginx Configuration
 
+Edit `nginx.conf` to customize:
+- Domain names
+- SSL certificates
+- Rate limiting
+- Upstream servers
+
+### Docker Configuration
+
+Edit `docker-compose.yml` to customize:
+- Port mappings
+- Environment variables
+- Volume mounts
+- Resource limits
+
+## 🚦 Load Balancing
+
+### Nginx Upstream Configuration
+
 ```nginx
-upstream smart_mcp_backend {
-    ip_hash;  # Session affinity for MCP connections
-    server smart-mcp-server-1:4321 max_fails=1 fail_timeout=5s;
-    server smart-mcp-server-2:4322 max_fails=1 fail_timeout=5s;
-    server smart-mcp-server-3:4323 max_fails=1 fail_timeout=5s;
+upstream mcp_backend {
+    least_conn;                                    # Load balancing method
+    server mcp-server-1:8001 max_fails=3 fail_timeout=30s;
+    server mcp-server-2:8002 max_fails=3 fail_timeout=30s;
+    server mcp-server-3:8003 max_fails=3 fail_timeout=30s;
 }
 ```
 
-### Horizontal Scaling
+### Load Balancing Methods
 
-Add more servers to the cluster:
-
-```yaml
-# In docker-compose.smart.yml
-smart-mcp-server-4:
-  build: 
-    context: .
-    dockerfile: Dockerfile.smart
-  command: python smart_server.py --port 4324
-  ports:
-    - "4324:4324"
-  # ... same configuration as other servers
-```
-
-Update nginx upstream:
-```nginx
-server smart-mcp-server-4:4324 max_fails=1 fail_timeout=5s;
-```
-
-### Vertical Scaling
-
-```yaml
-# Resource limits for containers
-deploy:
-  resources:
-    limits:
-      cpus: '2.0'
-      memory: 4G
-    reservations:
-      cpus: '1.0'
-      memory: 2G
-```
+- `least_conn`: Route to server with fewest active connections
+- `ip_hash`: Route based on client IP hash
+- `round_robin`: Default, route requests in sequence
 
 ## 🔒 Security Features
 
-### Built-in Security
+### Rate Limiting
 
-- **Authorization Levels**: LOW, MEDIUM, HIGH security requirements
-- **Rate Limiting**: Nginx-based request throttling
-- **Security Headers**: CORS, XSS protection, content type validation
-- **SSL/TLS Ready**: HTTPS configuration templates included
+```nginx
+# MCP endpoints: 10 requests per second
+limit_req_zone $binary_remote_addr zone=mcp_limit:10m rate=10r/s;
 
-### Production Security Checklist
+# Health endpoints: 1 request per second
+limit_req_zone $binary_remote_addr zone=health_limit:10m rate=1r/s;
+```
 
-```bash
-# 1. Use proper SSL certificates
-cp your-cert.pem deployment/ssl/cert.pem
-cp your-key.pem deployment/ssl/key.pem
+### SSL/TLS Configuration
 
-# 2. Update nginx configuration for HTTPS
-# Edit deployment/nginx.smart.conf
+```nginx
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers HIGH:!aNULL:!MD5;
+ssl_prefer_server_ciphers on;
+```
 
-# 3. Set secure environment variables
-export OPENAI_API_KEY="secure-key-here"
-export SHOPIFY_STOREFRONT_ACCESS_TOKEN="secure-token-here"
+### Systemd Security
 
-# 4. Enable firewall rules
-sudo ufw allow 8081/tcp
-sudo ufw deny 4321:4323/tcp  # Block direct access to servers
+```ini
+# Security settings in systemd services
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mcp-server/logs /opt/mcp-server/pids
 ```
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Port Conflicts (8081 already in use)**
+1. **Port Already in Use**
    ```bash
-   # Find process using port 8081
-   lsof -i :8081
+   # Find process using port
+   lsof -i :8001
    
-   # Stop conflicting service
-   docker-compose down
-   
-   # Or change port in docker-compose.smart.yml
+   # Kill process
+   kill -9 <PID>
    ```
 
-2. **Build Failures**
+2. **Permission Denied**
    ```bash
-   # Check dependency conflicts
-   docker-compose -f docker-compose.smart.yml build --no-cache
+   # Check file permissions
+   ls -la multi_mcp_server.py
    
-   # View build logs
-   docker-compose -f docker-compose.smart.yml logs
+   # Make executable
+   chmod +x multi_mcp_server.py
    ```
 
-3. **Health Check Failures**
+3. **Module Not Found**
    ```bash
-   # Check individual server logs
-   docker-compose -f docker-compose.smart.yml logs smart-mcp-server-1
+   # Install dependencies
+   pip3 install -r requirements.txt
+   
+   # Check Python path
+   python3 -c "import sys; print(sys.path)"
+   ```
+
+4. **Health Check Fails**
+   ```bash
+   # Check server logs
+   tail -f logs/server-8001.log
    
    # Test direct connection
-   curl http://localhost:4321/health
+   telnet localhost 8001
    ```
 
-4. **AI Tool Selection Not Working**
-   ```bash
-   # Check OpenAI API key
-   echo $OPENAI_API_KEY
-   
-   # Test embeddings directly
-   curl -X POST http://localhost:4321/analyze \
-     -H "Content-Type: application/json" \
-     -d '{"request": "test"}'
-   ```
-
-### Debug Commands
+### Log Analysis
 
 ```bash
-# Full cluster status
-docker-compose -f docker-compose.smart.yml ps
+# Check for errors
+grep -i error logs/server-*.log
 
-# Check resource usage
-docker stats
+# Monitor real-time logs
+tail -f logs/server-*.log | grep -i "error\|warning"
 
-# Network troubleshooting
-docker network ls
-docker network inspect isa_mcp_smart-mcp-network
-
-# Volume inspection
-docker volume ls | grep smart
+# Check nginx logs
+sudo tail -f /var/log/nginx/error.log
 ```
 
-## 📈 Performance Optimization
-
-### Caching Configuration
-
-The Smart MCP servers include built-in caching:
-- **Embedding Cache**: Caches OpenAI embedding results
-- **Tool Selection Cache**: Caches similar requests
-- **Web Scraping Cache**: Caches scraped content
-
-### Performance Monitoring
+### Performance Tuning
 
 ```bash
-# Monitor response times
-time curl http://localhost:8081/analyze \
-  -X POST -H "Content-Type: application/json" \
-  -d '{"request": "scrape website"}'
+# Check system resources
+top
+htop
+iotop
 
-# Check memory usage
-docker stats --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+# Monitor network connections
+netstat -tulpn | grep :800
 
-# Monitor tool usage patterns
-curl http://localhost:8081/stats | jq '.tool_usage'
+# Check disk space
+df -h
+du -sh logs/
+```
+
+## 📈 Scaling
+
+### Horizontal Scaling
+
+1. **Add More Servers**
+   ```yaml
+   # In docker-compose.yml
+   mcp-server-4:
+     build: .
+     command: python multi_mcp_server.py --port 8004
+     ports:
+       - "8004:8004"
+   ```
+
+2. **Update Nginx Configuration**
+   ```nginx
+   upstream mcp_backend {
+       least_conn;
+       server mcp-server-1:8001;
+       server mcp-server-2:8002;
+       server mcp-server-3:8003;
+       server mcp-server-4:8004;  # Add new server
+   }
+   ```
+
+### Vertical Scaling
+
+```yaml
+# In docker-compose.yml
+services:
+  mcp-server-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
 ```
 
 ## 🔄 Backup and Recovery
 
-### Configuration Backup
+### Backup Data
 
 ```bash
-# Backup entire configuration
-tar -czf smart-mcp-backup-$(date +%Y%m%d).tar.gz \
-    smart_server.py \
-    docker-compose.smart.yml \
-    Dockerfile.smart \
-    deployment/ \
-    test_docker_cluster.py \
-    start_smart_cluster.sh \
-    requirements.txt \
-    .env.local
+# Backup configuration
+tar -czf mcp-backup-$(date +%Y%m%d).tar.gz \
+    *.py *.yml *.conf requirements.txt ssl/ logs/
 
-# Backup volumes
-docker run --rm -v isa_mcp_smart-screenshots-1:/data \
-    -v $(pwd):/backup alpine \
-    tar czf /backup/screenshots-backup.tar.gz /data
+# Backup database (if using)
+cp memory.db memory.db.backup
 ```
 
-### Disaster Recovery
+### Recovery
 
 ```bash
-# Stop cluster
-docker-compose -f docker-compose.smart.yml down
-
 # Restore from backup
-tar -xzf smart-mcp-backup-20240101.tar.gz
+tar -xzf mcp-backup-20240101.tar.gz
 
-# Rebuild and restart
-docker-compose -f docker-compose.smart.yml build --no-cache
-docker-compose -f docker-compose.smart.yml up -d
-
-# Verify functionality
-python test_docker_cluster.py
+# Restore services
+./setup-deployment.sh --all
 ```
 
-## 📞 Support and Maintenance
+## 📞 Support
 
-### Health Monitoring Script
+### Useful Commands Summary
 
 ```bash
-#!/bin/bash
-# health-monitor.sh
-while true; do
-    echo "$(date): Checking Smart MCP Cluster Health"
-    python test_docker_cluster.py > health-$(date +%Y%m%d-%H%M).log
-    if [ $? -eq 0 ]; then
-        echo "✅ Cluster healthy"
-    else
-        echo "❌ Cluster issues detected - check logs"
-    fi
-    sleep 300  # Check every 5 minutes
-done
+# Setup and deployment
+./setup-deployment.sh --help
+./setup-deployment.sh --all
+./setup-deployment.sh --status
+
+# Docker management
+docker-compose up -d
+docker-compose ps
+docker-compose logs -f
+docker-compose down
+
+# Process management
+./manage-mcp.sh start|stop|restart|status
+
+# Systemd management
+sudo systemctl status mcp-server-8001
+sudo journalctl -u mcp-server-8001 -f
+
+# Health checks
+curl http://localhost:8001/health
+curl http://localhost/health
+
+# Nginx management
+sudo nginx -t
+sudo nginx -s reload
 ```
 
-### Useful Commands Reference
+### Getting Help
 
-```bash
-# Deployment
-./start_smart_cluster.sh                    # Start cluster
-docker-compose -f docker-compose.smart.yml up -d  # Manual start
-python test_docker_cluster.py              # Test cluster
-
-# Monitoring
-curl http://localhost:8081/health           # Health check
-curl http://localhost:8081/stats            # Statistics
-docker-compose -f docker-compose.smart.yml logs -f  # Logs
-
-# Management
-docker-compose -f docker-compose.smart.yml restart  # Restart
-docker-compose -f docker-compose.smart.yml down     # Stop
-docker-compose -f docker-compose.smart.yml ps       # Status
-```
+1. Check the logs first
+2. Verify network connectivity
+3. Test individual components
+4. Review configuration files
+5. Check system resources
 
 ---
 
-## 🎯 Next Steps
-
-1. **Production Deployment**: Configure SSL, monitoring, and backups
-2. **Custom Tools**: Add domain-specific tools with Keywords/Category metadata
-3. **Advanced AI**: Implement custom embedding models or fine-tuning
-4. **Monitoring**: Set up Prometheus/Grafana for advanced metrics
-5. **Integration**: Connect with existing systems and workflows
-
-**Status**: ✅ Smart MCP Cluster Ready for Production
-
-The Smart MCP Server cluster provides AI-powered tool selection, comprehensive web scraping, and enterprise-grade reliability. Perfect for applications requiring intelligent tool recommendation and modern web interaction capabilities.
+**Note**: This deployment is configured for development/testing. For production use, ensure proper SSL certificates, security hardening, and monitoring solutions are in place. 
