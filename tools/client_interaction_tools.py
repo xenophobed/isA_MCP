@@ -21,7 +21,14 @@ def register_client_interaction_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def ask_human(question: str, context: str = "", user_id: str = "default") -> str:
-        """Ask the human for additional information or clarification"""
+        """Ask the human for additional information or clarification
+        
+        This tool provides a standardized way for the system to request
+        human input or clarification during operations.
+        
+        Keywords: human, interaction, input, question, clarification, communication
+        Category: client
+        """
         # This tool provides a standardized way for the client to request human input
         # The actual human interaction happens on the client side
         
@@ -43,7 +50,14 @@ def register_client_interaction_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def request_authorization(tool_name: str, reason: str, user_id: str = "default", tool_args: dict | None = None) -> str:
-        """Request human authorization before executing a tool"""
+        """Request human authorization before executing a tool
+        
+        This tool provides a standardized way to request authorization
+        before executing potentially sensitive or high-impact operations.
+        
+        Keywords: authorization, security, approval, permission, human, verification
+        Category: client
+        """
         # This tool provides a standardized way for authorization requests
         # The actual authorization happens on the client side or through the security manager
         
@@ -88,7 +102,14 @@ def register_client_interaction_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def check_security_status(include_metrics: bool = False, user_id: str = "default") -> str:
-        """Check the security and monitoring status of the system"""
+        """Check the security and monitoring status of the system
+        
+        This tool provides an overview of system security status,
+        including violations, rate limits, and overall health metrics.
+        
+        Keywords: security, status, monitoring, health, metrics, system
+        Category: client
+        """
         try:
             # Get monitoring metrics
             metrics = monitor_manager.get_metrics()
@@ -146,7 +167,14 @@ def register_client_interaction_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def format_response(content: str, format_type: str = "structured", user_id: str = "default") -> str:
-        """Format responses with enhanced structure and guardrails"""
+        """Format responses with enhanced structure and guardrails
+        
+        This tool formats and structures responses in various formats
+        including JSON, markdown, and security summaries for better presentation.
+        
+        Keywords: format, response, structure, presentation, json, markdown
+        Category: client
+        """
         try:
             if format_type == "json":
                 # Try to parse and reformat as JSON

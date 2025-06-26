@@ -24,7 +24,14 @@ def register_memory_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def remember(key: str, value: str, category: str = "general", importance: int = 1, user_id: str = "default") -> str:
-        """Store information in long-term memory with authorization"""
+        """Store information in long-term memory with authorization
+        
+        This tool stores information persistently for later retrieval,
+        with categorization and importance levels for organization.
+        
+        Keywords: memory, remember, store, save, information, data, persist
+        Category: memory
+        """
         conn = sqlite3.connect("memory.db")
         try:
             now = datetime.now().isoformat()
@@ -66,7 +73,14 @@ def register_memory_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.HIGH)
     async def forget(key: str, user_id: str = "default") -> str:
-        """Remove information from memory with high security authorization"""
+        """Remove information from memory with high security authorization
+        
+        This tool permanently deletes stored information from memory,
+        requiring high-level authorization for security.
+        
+        Keywords: memory, forget, delete, remove, erase, clear, security
+        Category: memory
+        """
         conn = sqlite3.connect("memory.db")
         try:
             cursor = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
@@ -89,7 +103,14 @@ def register_memory_tools(mcp):
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def update_memory(key: str, value: str, category: str | None = None, importance: int | None = None, user_id: str = "default") -> str:
-        """Update existing memory entry with new value/metadata"""
+        """Update existing memory entry with new value/metadata
+        
+        This tool modifies existing memory entries with new values
+        or metadata while preserving the original key.
+        
+        Keywords: memory, update, modify, change, edit, metadata
+        Category: memory
+        """
         conn = sqlite3.connect("memory.db")
         try:
             # First check if the key exists
@@ -142,7 +163,14 @@ def register_memory_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def search_memories(query: str, category: str = "", min_importance: int = 1, user_id: str = "default") -> str:
-        """Search through memories with security checks"""
+        """Search through memories with security checks
+        
+        This tool searches through stored memories using keywords,
+        with filtering by category and importance level.
+        
+        Keywords: memory, search, find, query, lookup, retrieve, filter
+        Category: memory
+        """
         conn = sqlite3.connect("memory.db")
         try:
             sql = """

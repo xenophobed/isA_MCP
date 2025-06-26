@@ -105,7 +105,14 @@ def register_twilio_tools(mcp):
         media_urls: str = "",  # JSON string of media URLs
         user_id: str = "default"
     ) -> str:
-        """Send SMS/MMS message via Twilio"""
+        """Send SMS/MMS message via Twilio
+        
+        This tool sends text messages and multimedia messages to phone
+        numbers using the Twilio communication platform.
+        
+        Keywords: sms, text, message, phone, communication, twilio, mobile
+        Category: communication
+        """
         
         # Initialize client
         try:
@@ -193,7 +200,14 @@ def register_twilio_tools(mcp):
         voice: str = "",
         user_id: str = "default"
     ) -> str:
-        """Make outbound voice call via Twilio"""
+        """Make outbound voice call via Twilio
+        
+        This tool initiates voice calls to phone numbers with customizable
+        voice messages and TwiML scripts for interactive experiences.
+        
+        Keywords: voice, call, phone, twilio, audio, communication, outbound
+        Category: communication
+        """
         
         # Initialize client
         try:
@@ -296,7 +310,14 @@ def register_twilio_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_message_status(message_sid: str, user_id: str = "default") -> str:
-        """Get SMS message status and details"""
+        """Get SMS message status and details
+        
+        This tool retrieves delivery status and detailed information
+        about previously sent SMS/MMS messages.
+        
+        Keywords: sms, status, delivery, tracking, message, details
+        Category: communication
+        """
         
         try:
             client = _initialize_twilio_client()
@@ -357,7 +378,14 @@ def register_twilio_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_call_status(call_sid: str, user_id: str = "default") -> str:
-        """Get voice call status and details"""
+        """Get voice call status and details
+        
+        This tool retrieves status information and call details
+        for previously initiated voice calls.
+        
+        Keywords: voice, call, status, tracking, details, duration
+        Category: communication
+        """
         
         try:
             client = _initialize_twilio_client()
@@ -423,7 +451,14 @@ def register_twilio_tools(mcp):
         message: str,
         user_id: str = "default"
     ) -> str:
-        """Send SMS to multiple recipients (max 50)"""
+        """Send SMS to multiple recipients (max 50)
+        
+        This tool sends the same text message to multiple phone numbers
+        simultaneously with rate limiting and batch processing.
+        
+        Keywords: sms, bulk, batch, multiple, recipients, broadcast
+        Category: communication
+        """
         
         # Parse recipients
         try:
@@ -517,7 +552,14 @@ def register_twilio_tools(mcp):
         days_back: int = 7,
         user_id: str = "default"
     ) -> str:
-        """List recent SMS messages"""
+        """List recent SMS messages
+        
+        This tool retrieves a list of recently sent and received
+        SMS messages with configurable time range and limits.
+        
+        Keywords: sms, list, recent, history, messages, log
+        Category: communication
+        """
         
         try:
             client = _initialize_twilio_client()
@@ -599,7 +641,14 @@ def register_twilio_tools(mcp):
         days_back: int = 7,
         user_id: str = "default"
     ) -> str:
-        """List recent voice calls"""
+        """List recent voice calls
+        
+        This tool retrieves a list of recent voice calls with
+        details like duration, status, and timestamps.
+        
+        Keywords: voice, calls, list, recent, history, log
+        Category: communication
+        """
         
         try:
             client = _initialize_twilio_client()
@@ -678,7 +727,14 @@ def register_twilio_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def validate_phone_number(phone: str, user_id: str = "default") -> str:
-        """Validate and format phone number"""
+        """Validate and format phone number
+        
+        This tool validates phone number formats and converts them
+        to standard E.164 international format for consistency.
+        
+        Keywords: phone, validate, format, number, e164, international
+        Category: communication
+        """
         
         try:
             formatted = _format_phone_number(phone)
@@ -718,7 +774,14 @@ def register_twilio_tools(mcp):
         timeout: int = 5,
         user_id: str = "default"
     ) -> str:
-        """Generate TwiML for voice responses"""
+        """Generate TwiML for voice responses
+        
+        This tool creates TwiML markup for interactive voice responses,
+        supporting speech synthesis and user input gathering.
+        
+        Keywords: twiml, voice, response, interactive, markup, ivr
+        Category: communication
+        """
         
         try:
             if twiml_type == "say":
@@ -773,7 +836,14 @@ def register_twilio_tools(mcp):
     @mcp.tool()
     @security_manager.security_check
     async def get_twilio_status(user_id: str = "admin") -> str:
-        """Get Twilio service status and configuration (admin only)"""
+        """Get Twilio service status and configuration (admin only)
+        
+        This tool provides administrative information about Twilio
+        service configuration, credentials, and connection status.
+        
+        Keywords: admin, twilio, status, configuration, service, health
+        Category: communication
+        """
         
         if user_id != "admin":
             result = {
