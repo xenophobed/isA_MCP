@@ -3,7 +3,7 @@
 Tool Selector using isa_model embeddings
 Based on embedding-based simple tool selection
 """
-import sqlite3
+from core.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
@@ -22,6 +22,7 @@ class ToolSelector:
         self.tools_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
+        self.supabase = get_supabase_client()
     
     async def initialize(self):
         """Initialize embedding service"""
@@ -163,51 +164,48 @@ class ToolSelector:
             logger.error(f"Failed to compute embeddings: {e}")
     
     async def _load_cached_embeddings(self) -> bool:
-        """Load cached embeddings"""
+        """从Supabase加载缓存的嵌入向量"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            # 查询工具嵌入向量
+            result = self.supabase.client.table('tool_embeddings').select('tool_name, embedding').execute()
             
-            # Create table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS tool_embeddings (
-                    tool_name TEXT PRIMARY KEY,
-                    embedding TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            
-            cursor = conn.execute("SELECT tool_name, embedding FROM tool_embeddings")
-            results = cursor.fetchall()
-            conn.close()
-            
-            if len(results) == len(self.tools_info):
-                for tool_name, embedding_json in results:
-                    self.embeddings_cache[tool_name] = json.loads(embedding_json)
+            if result.data and len(result.data) == len(self.tools_info):
+                for row in result.data:
+                    tool_name = row['tool_name']
+                    embedding = row['embedding']
+                    self.embeddings_cache[tool_name] = embedding
+                
+                logger.info(f"Loaded cached embeddings for {len(result.data)} tools")
                 return True
             
             return False
             
         except Exception as e:
-            logger.error(f"Failed to load cached embeddings: {e}")
+            logger.error(f"Failed to load cached embeddings from Supabase: {e}")
             return False
     
     async def _save_embeddings_cache(self):
-        """Save embeddings to cache"""
+        """保存嵌入向量到Supabase"""
         try:
-            conn = sqlite3.connect("user_data.db")
-            
-            now = datetime.now().isoformat()
+            # 批量插入/更新工具嵌入向量
             for tool_name, embedding in self.embeddings_cache.items():
-                conn.execute(
-                    "INSERT OR REPLACE INTO tool_embeddings (tool_name, embedding, created_at) VALUES (?, ?, ?)",
-                    (tool_name, json.dumps(embedding), now)
-                )
+                tool_info = self.tools_info.get(tool_name, {})
+                
+                data = {
+                    'tool_name': tool_name,
+                    'description': tool_info.get('description', ''),
+                    'keywords': tool_info.get('keywords', []),
+                    'category': tool_info.get('category', 'general'),
+                    'embedding': embedding
+                }
+                
+                # 使用upsert进行插入或更新
+                self.supabase.client.table('tool_embeddings').upsert(data).execute()
             
-            conn.commit()
-            conn.close()
+            logger.info(f"Saved embeddings cache for {len(self.embeddings_cache)} tools to Supabase")
             
         except Exception as e:
-            logger.error(f"Failed to save embeddings cache: {e}")
+            logger.error(f"Failed to save embeddings cache to Supabase: {e}")
     
     async def select_tools(self, user_request: str, max_tools: int = 3) -> List[str]:
         """Select relevant tools"""
@@ -271,53 +269,37 @@ class ToolSelector:
             return fallback
     
     async def _log_selection(self, request: str, similarities: Dict[str, float], selected: List[str]):
-        """Log selection history"""
+        """记录选择历史到Supabase"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            data = {
+                'user_query': request,
+                'selection_type': 'tool',
+                'selected_items': selected,
+                'similarity_scores': similarities,
+                'user_id': 'system'
+            }
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS tool_selections (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_request TEXT NOT NULL,
-                    similarities TEXT NOT NULL,
-                    selected_tools TEXT NOT NULL,
-                    timestamp TEXT NOT NULL
-                )
-            """)
-            
-            conn.execute(
-                "INSERT INTO tool_selections (user_request, similarities, selected_tools, timestamp) VALUES (?, ?, ?, ?)",
-                (request, json.dumps(similarities), json.dumps(selected), datetime.now().isoformat())
-            )
-            
-            conn.commit()
-            conn.close()
+            self.supabase.client.table('selection_history').insert(data).execute()
+            logger.info(f"Logged tool selection for query: {request}")
             
         except Exception as e:
-            logger.error(f"Failed to log selection: {e}")
+            logger.error(f"Failed to log selection to Supabase: {e}")
     
     async def get_stats(self) -> Dict:
-        """Get statistics"""
+        """从Supabase获取统计信息"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            # 查询最近的工具选择历史
+            result = self.supabase.client.table('selection_history').select('selected_items').eq('selection_type', 'tool').order('created_at', desc=True).limit(50).execute()
             
-            cursor = conn.execute("""
-                SELECT selected_tools FROM tool_selections 
-                ORDER BY timestamp DESC LIMIT 50
-            """)
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            # Count tool usage frequency
+            # 统计工具使用频率
             tool_usage = {}
-            for (selected_json,) in results:
-                tools = json.loads(selected_json)
+            for row in result.data:
+                tools = row['selected_items']
                 for tool in tools:
                     tool_usage[tool] = tool_usage.get(tool, 0) + 1
             
             return {
-                "total_selections": len(results),
+                "total_selections": len(result.data),
                 "tool_usage": tool_usage,
                 "available_tools": list(self.tools_info.keys()),
                 "threshold": self.threshold

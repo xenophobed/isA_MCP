@@ -3,7 +3,7 @@
 Prompt Selector using isa_model embeddings
 Similar to tool_selector but for prompts
 """
-import sqlite3
+from core.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
@@ -22,6 +22,7 @@ class PromptSelector:
         self.prompts_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
+        self.supabase = get_supabase_client()
     
     async def initialize(self):
         """Initialize embedding service"""
@@ -244,51 +245,45 @@ class PromptSelector:
             logger.error(f"Failed to compute prompt embeddings: {e}")
     
     async def _load_cached_embeddings(self) -> bool:
-        """Load cached embeddings"""
+        """从Supabase加载缓存的提示词嵌入向量"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            result = self.supabase.client.table('prompt_embeddings').select('prompt_name, embedding').execute()
             
-            # Create table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS prompt_embeddings (
-                    prompt_name TEXT PRIMARY KEY,
-                    embedding TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            
-            cursor = conn.execute("SELECT prompt_name, embedding FROM prompt_embeddings")
-            results = cursor.fetchall()
-            conn.close()
-            
-            if len(results) == len(self.prompts_info):
-                for prompt_name, embedding_json in results:
-                    self.embeddings_cache[prompt_name] = json.loads(embedding_json)
+            if result.data and len(result.data) == len(self.prompts_info):
+                for row in result.data:
+                    prompt_name = row['prompt_name']
+                    embedding = row['embedding']
+                    self.embeddings_cache[prompt_name] = embedding
+                
+                logger.info(f"Loaded cached embeddings for {len(result.data)} prompts")
                 return True
             
             return False
             
         except Exception as e:
-            logger.error(f"Failed to load cached prompt embeddings: {e}")
+            logger.error(f"Failed to load cached prompt embeddings from Supabase: {e}")
             return False
     
     async def _save_embeddings_cache(self):
-        """Save embeddings to cache"""
+        """保存提示词嵌入向量到Supabase"""
         try:
-            conn = sqlite3.connect("user_data.db")
-            
-            now = datetime.now().isoformat()
             for prompt_name, embedding in self.embeddings_cache.items():
-                conn.execute(
-                    "INSERT OR REPLACE INTO prompt_embeddings (prompt_name, embedding, created_at) VALUES (?, ?, ?)",
-                    (prompt_name, json.dumps(embedding), now)
-                )
+                prompt_info = self.prompts_info.get(prompt_name, {})
+                
+                data = {
+                    'prompt_name': prompt_name,
+                    'description': prompt_info.get('description', ''),
+                    'keywords': prompt_info.get('keywords', []),
+                    'category': prompt_info.get('category', 'general'),
+                    'embedding': embedding
+                }
+                
+                self.supabase.client.table('prompt_embeddings').upsert(data).execute()
             
-            conn.commit()
-            conn.close()
+            logger.info(f"Saved prompt embeddings cache for {len(self.embeddings_cache)} prompts to Supabase")
             
         except Exception as e:
-            logger.error(f"Failed to save prompt embeddings cache: {e}")
+            logger.error(f"Failed to save prompt embeddings cache to Supabase: {e}")
     
     async def select_prompts(self, user_request: str, max_prompts: int = 3) -> List[str]:
         """Select relevant prompts"""
@@ -352,60 +347,43 @@ class PromptSelector:
             return fallback
     
     async def _log_selection(self, request: str, similarities: Dict[str, float], selected: List[str]):
-        """Log selection history"""
+        """记录提示词选择历史到Supabase"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            data = {
+                'user_query': request,
+                'selection_type': 'prompt',
+                'selected_items': selected,
+                'similarity_scores': similarities,
+                'user_id': 'system'
+            }
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS prompt_selections (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_request TEXT NOT NULL,
-                    similarities TEXT NOT NULL,
-                    selected_prompts TEXT NOT NULL,
-                    timestamp TEXT NOT NULL
-                )
-            """)
-            
-            conn.execute(
-                "INSERT INTO prompt_selections (user_request, similarities, selected_prompts, timestamp) VALUES (?, ?, ?, ?)",
-                (request, json.dumps(similarities), json.dumps(selected), datetime.now().isoformat())
-            )
-            
-            conn.commit()
-            conn.close()
+            self.supabase.client.table('selection_history').insert(data).execute()
+            logger.info(f"Logged prompt selection for query: {request}")
             
         except Exception as e:
-            logger.error(f"Failed to log prompt selection: {e}")
+            logger.error(f"Failed to log prompt selection to Supabase: {e}")
     
     async def get_stats(self) -> Dict:
-        """Get statistics"""
+        """从Supabase获取提示词统计信息"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            result = self.supabase.client.table('selection_history').select('selected_items').eq('selection_type', 'prompt').order('created_at', desc=True).limit(50).execute()
             
-            cursor = conn.execute("""
-                SELECT selected_prompts FROM prompt_selections 
-                ORDER BY timestamp DESC LIMIT 50
-            """)
-            
-            results = cursor.fetchall()
-            conn.close()
-            
-            # Count prompt usage frequency
+            # 统计提示词使用频率
             prompt_usage = {}
-            for (selected_json,) in results:
-                prompts = json.loads(selected_json)
+            for row in result.data:
+                prompts = row['selected_items']
                 for prompt in prompts:
                     prompt_usage[prompt] = prompt_usage.get(prompt, 0) + 1
             
             return {
-                "total_selections": len(results),
+                "total_selections": len(result.data),
                 "prompt_usage": prompt_usage,
                 "available_prompts": list(self.prompts_info.keys()),
                 "threshold": self.threshold
             }
             
         except Exception as e:
-            logger.error(f"Failed to get prompt stats: {e}")
+            logger.error(f"Failed to get prompt stats from Supabase: {e}")
             return {}
     
     async def close(self):

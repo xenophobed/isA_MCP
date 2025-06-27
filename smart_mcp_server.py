@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+from starlette.middleware import Middleware
 import logging
 
 # Core services
@@ -66,7 +67,7 @@ class SmartMCPServer:
         print("  ✅ Security manager initialized")
         
         # Database
-        initialize_database()
+        await initialize_database()
         print("  ✅ Database initialized")
         
         print("✅ Core services ready")
@@ -335,6 +336,8 @@ async def capabilities_endpoint(request):
 
 def add_endpoints(app: Starlette):
     """Add custom API endpoints"""
+    from core.secure_endpoints import add_auth_endpoints
+    
     routes = [
         Route("/health", health_check),
         Route("/discover", discover_endpoint, methods=["POST"]),
@@ -344,6 +347,9 @@ def add_endpoints(app: Starlette):
     
     for route in routes:
         app.router.routes.append(route)
+    
+    # 添加安全认证端点
+    add_auth_endpoints(app)
 
 async def run_server(port: int = 4321):
     """Run the Smart MCP Server"""

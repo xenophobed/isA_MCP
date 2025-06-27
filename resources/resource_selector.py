@@ -3,7 +3,7 @@
 Resource Selector using isa_model embeddings
 Similar to tool_selector but for resources
 """
-import sqlite3
+from core.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
@@ -22,6 +22,7 @@ class ResourceSelector:
         self.resources_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
+        self.supabase = get_supabase_client()
     
     async def initialize(self):
         """Initialize embedding service"""
@@ -294,51 +295,45 @@ class ResourceSelector:
             logger.error(f"Failed to compute resource embeddings: {e}")
     
     async def _load_cached_embeddings(self) -> bool:
-        """Load cached embeddings"""
+        """从Supabase加载缓存的资源嵌入向量"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            result = self.supabase.client.table('resource_embeddings').select('resource_uri, embedding').execute()
             
-            # Create table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS resource_embeddings (
-                    resource_name TEXT PRIMARY KEY,
-                    embedding TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            
-            cursor = conn.execute("SELECT resource_name, embedding FROM resource_embeddings")
-            results = cursor.fetchall()
-            conn.close()
-            
-            if len(results) == len(self.resources_info):
-                for resource_name, embedding_json in results:
-                    self.embeddings_cache[resource_name] = json.loads(embedding_json)
+            if result.data and len(result.data) == len(self.resources_info):
+                for row in result.data:
+                    resource_uri = row['resource_uri']
+                    embedding = row['embedding']
+                    self.embeddings_cache[resource_uri] = embedding
+                
+                logger.info(f"Loaded cached embeddings for {len(result.data)} resources")
                 return True
             
             return False
             
         except Exception as e:
-            logger.error(f"Failed to load cached resource embeddings: {e}")
+            logger.error(f"Failed to load cached resource embeddings from Supabase: {e}")
             return False
     
     async def _save_embeddings_cache(self):
-        """Save embeddings to cache"""
+        """保存资源嵌入向量到Supabase"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            for resource_uri, embedding in self.embeddings_cache.items():
+                resource_info = self.resources_info.get(resource_uri, {})
+                
+                data = {
+                    'resource_uri': resource_uri,
+                    'description': resource_info.get('description', ''),
+                    'keywords': resource_info.get('keywords', []),
+                    'category': resource_info.get('category', 'general'),
+                    'embedding': embedding
+                }
+                
+                self.supabase.client.table('resource_embeddings').upsert(data).execute()
             
-            now = datetime.now().isoformat()
-            for resource_name, embedding in self.embeddings_cache.items():
-                conn.execute(
-                    "INSERT OR REPLACE INTO resource_embeddings (resource_name, embedding, created_at) VALUES (?, ?, ?)",
-                    (resource_name, json.dumps(embedding), now)
-                )
-            
-            conn.commit()
-            conn.close()
+            logger.info(f"Saved resource embeddings cache for {len(self.embeddings_cache)} resources to Supabase")
             
         except Exception as e:
-            logger.error(f"Failed to save resource embeddings cache: {e}")
+            logger.error(f"Failed to save resource embeddings cache to Supabase: {e}")
     
     async def select_resources(self, user_request: str, max_resources: int = 3) -> List[str]:
         """Select relevant resources"""
@@ -404,7 +399,7 @@ class ResourceSelector:
     async def _log_selection(self, request: str, similarities: Dict[str, float], selected: List[str]):
         """Log selection history"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            conn = self.supabase.client
             
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS resource_selections (
@@ -430,7 +425,7 @@ class ResourceSelector:
     async def get_stats(self) -> Dict:
         """Get statistics"""
         try:
-            conn = sqlite3.connect("user_data.db")
+            conn = self.supabase.client
             
             cursor = conn.execute("""
                 SELECT selected_resources FROM resource_selections 

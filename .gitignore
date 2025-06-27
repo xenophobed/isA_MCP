@@ -9,11 +9,19 @@ venv/
 ENV/
 .venv/
 
-# Environment variables
+# ⚠️ 敏感信息 - 绝不提交
 .env
 .env.local
 .env.production
 .env.staging
+.env.development
+
+# API密钥和认证信息
+*_api_key*
+*_token*
+*_secret*
+*.pem
+*.key
 
 # Database
 *.db
@@ -44,6 +52,10 @@ sessions/
 screenshots/
 generated_images/
 
-# Production secrets
+# 生产环境机密
 ssl/
 secrets/
+certificates/
+
+# 部署信息
+deployment_info.json
