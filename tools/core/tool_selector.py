@@ -36,49 +36,95 @@ class ToolSelector:
         except Exception as e:
             logger.error(f"Failed to initialize tool selector: {e}")
     
-    async def initialize_with_metadata(self, metadata: Dict[str, Any]):
-        """Initialize tool selector with pre-discovered metadata"""
+    async def initialize_with_mcp(self, mcp_server):
+        """Initialize tool selector with MCP server integration"""
         try:
-            logger.info("Initializing tool selector with auto-discovered metadata...")
+            logger.info("Initializing tool selector with MCP server...")
             
-            # Use tools from auto-discovery
-            self.tools_info = {}
-            for tool_name, tool_data in metadata.get("tools", {}).items():
-                self.tools_info[tool_name] = {
-                    "description": tool_data.get("description", ""),
-                    "keywords": tool_data.get("keywords", []),
-                }
-            
-            logger.info(f"Loaded {len(self.tools_info)} auto-discovered tools")
+            # Load tool information from MCP server
+            await self._load_tool_info_from_mcp(mcp_server)
             
             # Initialize embedding service
             self.embed_service = AIFactory().get_embed()
             await self._compute_tool_embeddings()
-            logger.info("Tool selector initialized with auto-discovered metadata")
+            logger.info(f"Tool selector initialized with {len(self.tools_info)} MCP tools")
         except Exception as e:
-            logger.error(f"Failed to initialize with metadata: {e}")
+            logger.error(f"Failed to initialize tool selector with MCP: {e}")
             # Fallback to normal initialization
             await self.initialize()
     
+
+    
     async def _load_tool_info(self):
-        """Load tool information dynamically"""
+        """Load tool information dynamically (legacy method - use initialize_with_mcp instead)"""
+        logger.warning("Using legacy tool loading method - consider using initialize_with_mcp")
+        self.tools_info = {}
+    
+    async def _load_tool_info_from_mcp(self, mcp_server):
+        """Load tool information directly from MCP server"""
         try:
-            from tools.core.smart_tools import get_all_tool_info
-            logger.info("Loading tool information dynamically...")
+            logger.info("Loading tool information from MCP server...")
             
-            self.tools_info = await get_all_tool_info()
-            logger.info(f"Loaded {len(self.tools_info)} tools: {list(self.tools_info.keys())}")
+            # Get tools from MCP server
+            tools = await mcp_server.list_tools()
+            logger.info(f"Found {len(tools)} tools in MCP server")
             
-            # Log each tool's information
-            for tool_name, info in self.tools_info.items():
-                logger.info(f"  {tool_name}: {info['description'][:50]}...")
-                logger.info(f"    Keywords: {info['keywords']}")
-                logger.info(f"    Category: {info['category']}")
+            self.tools_info = {}
+            for tool in tools:
+                tool_name = tool.name
+                description = tool.description or f"Tool: {tool_name}"
+                
+                # Extract keywords from tool name and description
+                keywords = []
+                if tool_name:
+                    keywords.extend(tool_name.replace('_', ' ').split())
+                if description:
+                    # Simple keyword extraction from description
+                    words = description.lower().split()
+                    keywords.extend([w for w in words if len(w) > 3])
+                
+                # Remove duplicates and limit
+                keywords = list(set(keywords))[:10]
+                
+                # Categorize based on tool name patterns
+                category = self._categorize_tool(tool_name)
+                
+                self.tools_info[tool_name] = {
+                    "description": description,
+                    "keywords": keywords,
+                    "category": category
+                }
+                
+                logger.info(f"  {tool_name}: {description[:50]}...")
+                logger.info(f"    Keywords: {keywords}")
+                logger.info(f"    Category: {category}")
                 
         except Exception as e:
-            logger.error(f"Failed to load tool info: {e}")
-            # Initialize empty - will be populated by actual MCP tools
+            logger.error(f"Failed to load tool info from MCP: {e}")
             self.tools_info = {}
+    
+    def _categorize_tool(self, tool_name: str) -> str:
+        """Categorize tool based on name patterns"""
+        tool_name_lower = tool_name.lower()
+        
+        if any(word in tool_name_lower for word in ["weather", "temperature", "forecast"]):
+            return "weather"
+        elif any(word in tool_name_lower for word in ["image", "generate", "picture", "visual"]):
+            return "image"
+        elif any(word in tool_name_lower for word in ["remember", "memory", "recall", "forget"]):
+            return "memory"
+        elif any(word in tool_name_lower for word in ["shopify", "product", "order", "cart", "checkout"]):
+            return "shopify"
+        elif any(word in tool_name_lower for word in ["admin", "system", "manage", "authorization"]):
+            return "admin"
+        elif any(word in tool_name_lower for word in ["web", "browser", "automation", "login", "search"]):
+            return "web"
+        elif any(word in tool_name_lower for word in ["event", "sourcing", "task", "background"]):
+            return "event"
+        elif any(word in tool_name_lower for word in ["autonomous", "plan", "execute"]):
+            return "autonomous"
+        else:
+            return "general"
     
     async def _compute_tool_embeddings(self):
         """Compute tool embeddings"""

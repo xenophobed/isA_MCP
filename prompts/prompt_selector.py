@@ -36,6 +36,23 @@ class PromptSelector:
         except Exception as e:
             logger.error(f"Failed to initialize prompt selector: {e}")
     
+    async def initialize_with_mcp(self, mcp_server):
+        """Initialize prompt selector with MCP server integration"""
+        try:
+            logger.info("Initializing prompt selector with MCP server...")
+            
+            # Load prompt information from MCP server
+            await self._load_prompt_info_from_mcp(mcp_server)
+            
+            # Initialize embedding service
+            self.embed_service = AIFactory().get_embed()
+            await self._compute_prompt_embeddings()
+            logger.info(f"Prompt selector initialized with {len(self.prompts_info)} MCP prompts")
+        except Exception as e:
+            logger.error(f"Failed to initialize prompt selector with MCP: {e}")
+            # Fallback to normal initialization
+            await self.initialize()
+    
     async def _load_prompt_info(self):
         """Load prompt information dynamically"""
         try:
@@ -118,6 +135,77 @@ class PromptSelector:
                 
         except Exception as e:
             logger.error(f"Failed to load prompt info: {e}")
+    
+    async def _load_prompt_info_from_mcp(self, mcp_server):
+        """Load prompt information directly from MCP server"""
+        try:
+            logger.info("Loading prompt information from MCP server...")
+            
+            # Get prompts from MCP server
+            prompts = await mcp_server.list_prompts()
+            logger.info(f"Found {len(prompts)} prompts in MCP server")
+            
+            self.prompts_info = {}
+            for prompt in prompts:
+                prompt_name = prompt.name
+                description = prompt.description or f"Prompt: {prompt_name}"
+                
+                # Extract keywords from prompt name and description
+                keywords = []
+                if prompt_name:
+                    keywords.extend(prompt_name.replace('_', ' ').split())
+                if description:
+                    # Simple keyword extraction from description
+                    words = description.lower().split()
+                    keywords.extend([w for w in words if len(w) > 3])
+                
+                # Remove duplicates and limit
+                keywords = list(set(keywords))[:10]
+                
+                # Categorize based on prompt name patterns
+                category = self._categorize_prompt(prompt_name)
+                
+                self.prompts_info[prompt_name] = {
+                    "description": description,
+                    "keywords": keywords,
+                    "category": category,
+                    "type": "mcp"
+                }
+                
+                logger.info(f"  {prompt_name}: {description[:50]}...")
+                logger.info(f"    Keywords: {keywords}")
+                logger.info(f"    Category: {category}")
+            
+            # If no MCP prompts found, fallback to hardcoded ones
+            if not self.prompts_info:
+                logger.warning("No MCP prompts found, using fallback prompts")
+                await self._load_prompt_info()
+                
+        except Exception as e:
+            logger.error(f"Failed to load prompt info from MCP: {e}")
+            # Fallback to hardcoded prompts
+            await self._load_prompt_info()
+    
+    def _categorize_prompt(self, prompt_name: str) -> str:
+        """Categorize prompt based on name patterns"""
+        prompt_name_lower = prompt_name.lower()
+        
+        if any(word in prompt_name_lower for word in ["security", "analysis", "audit"]):
+            return "security"
+        elif any(word in prompt_name_lower for word in ["memory", "organization", "recall"]):
+            return "memory"
+        elif any(word in prompt_name_lower for word in ["monitoring", "performance", "metrics"]):
+            return "monitoring"
+        elif any(word in prompt_name_lower for word in ["assistance", "help", "support"]):
+            return "assistance"
+        elif any(word in prompt_name_lower for word in ["stylist", "fashion", "style", "outfit"]):
+            return "shopping"
+        elif any(word in prompt_name_lower for word in ["shopping", "product", "comparison"]):
+            return "shopping"
+        elif any(word in prompt_name_lower for word in ["autonomous", "execution", "planning"]):
+            return "autonomous"
+        else:
+            return "general"
     
     async def _compute_prompt_embeddings(self):
         """Compute prompt embeddings"""

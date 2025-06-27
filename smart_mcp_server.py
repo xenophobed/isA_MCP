@@ -76,7 +76,8 @@ class SmartMCPServer:
         print("📦 Auto-discovering and registering capabilities...")
         
         # Use auto-discovery system for registration
-        await self.auto_discovery.auto_register_with_mcp(self.mcp, self.config)
+        if self.mcp is not None:
+            await self.auto_discovery.auto_register_with_mcp(self.mcp, self.config)
         
         print("✅ All capabilities auto-registered")
     
@@ -84,35 +85,37 @@ class SmartMCPServer:
         """Initialize AI-powered capability selectors"""
         print("🧠 Initializing AI selectors...")
         
-        # Tool selector with comprehensive tool metadata
+        # Tool selector with MCP server integration
         try:
             self.tool_selector = ToolSelector()
-            # Use the comprehensive tool info extraction instead of auto-discovery metadata
-            await self.tool_selector.initialize()  # This uses get_all_tool_info()
-            print("  ✅ Tool selector ready")
+            # Initialize with MCP server to read actual registered tools
+            await self.tool_selector.initialize_with_mcp(self.mcp)
+            print("  ✅ Tool selector ready (connected to MCP)")
         except Exception as e:
             print(f"  ⚠️ Tool selector failed: {e}")
             self.tool_selector = None
         
-        # Prompt selector
+        # Prompt selector with MCP server integration
         try:
             self.prompt_selector = PromptSelector()
-            await self.prompt_selector.initialize()
-            print("  ✅ Prompt selector ready")
+            # Initialize with MCP server to read actual registered prompts
+            await self.prompt_selector.initialize_with_mcp(self.mcp)
+            print("  ✅ Prompt selector ready (connected to MCP)")
         except Exception as e:
             print(f"  ⚠️ Prompt selector failed: {e}")
             self.prompt_selector = None
         
-        # Resource selector
+        # Resource selector with MCP server integration
         try:
             self.resource_selector = ResourceSelector()
-            await self.resource_selector.initialize()
-            print("  ✅ Resource selector ready")
+            # Initialize with MCP server to read actual registered resources
+            await self.resource_selector.initialize_with_mcp(self.mcp)
+            print("  ✅ Resource selector ready (connected to MCP)")
         except Exception as e:
             print(f"  ⚠️ Resource selector failed: {e}")
             self.resource_selector = None
         
-        print("✅ AI selectors initialized")
+        print("✅ AI selectors initialized and connected to MCP server")
     
     async def discover_capabilities(self, user_request: str) -> Dict:
         """AI-powered capability discovery based on user request"""
@@ -157,8 +160,25 @@ class SmartMCPServer:
         print(f"✅ Capability discovery completed")
         return result
     
-    def get_server_info(self) -> Dict:
+    async def get_server_info(self) -> Dict:
         """Get comprehensive server information"""
+        # Get actual counts from MCP server
+        tools_count = 0
+        prompts_count = 0
+        resources_count = 0
+        
+        if self.mcp:
+            try:
+                tools = await self.mcp.list_tools()
+                prompts = await self.mcp.list_prompts()
+                resources = await self.mcp.list_resources()
+                
+                tools_count = len(tools)
+                prompts_count = len(prompts)
+                resources_count = len(resources)
+            except Exception as e:
+                logger.error(f"Failed to get MCP capabilities count: {e}")
+        
         return {
             "server_name": "Smart MCP Server",
             "ai_selectors": {
@@ -167,9 +187,9 @@ class SmartMCPServer:
                 "resource_selector": self.resource_selector is not None
             },
             "capabilities_count": {
-                "tools": len(self.auto_discovery.discovered_tools),
-                "prompts": len(self.auto_discovery.discovered_prompts), 
-                "resources": len(self.auto_discovery.discovered_resources)
+                "tools": tools_count,
+                "prompts": prompts_count,
+                "resources": resources_count
             },
             "features": [
                 "AI-powered capability discovery",
@@ -212,7 +232,7 @@ smart_server: Optional[SmartMCPServer] = None
 async def health_check(request):
     """Health check endpoint"""
     global smart_server
-    server_info = smart_server.get_server_info() if smart_server else {}
+    server_info = await smart_server.get_server_info() if smart_server else {}
     
     return JSONResponse({
         "status": "healthy",
@@ -256,7 +276,7 @@ async def stats_endpoint(request):
     
     try:
         if smart_server:
-            server_info = smart_server.get_server_info()
+            server_info = await smart_server.get_server_info()
             selector_stats = await smart_server.get_selector_stats()
             
             return JSONResponse({
@@ -279,36 +299,26 @@ async def stats_endpoint(request):
 async def capabilities_endpoint(request):
     """List all available capabilities"""
     try:
-        if smart_server:
-            # Get tool information
-            tools_info = {}
-            if smart_server.tool_selector and hasattr(smart_server.tool_selector, 'tools_info'):
-                tools_info = smart_server.tool_selector.tools_info
-            
-            # Get prompt information
-            prompts_info = {}
-            if smart_server.prompt_selector and hasattr(smart_server.prompt_selector, 'prompts_info'):
-                prompts_info = smart_server.prompt_selector.prompts_info
-            
-            # Get resource information
-            resources_info = {}
-            if smart_server.resource_selector and hasattr(smart_server.resource_selector, 'resources_info'):
-                resources_info = smart_server.resource_selector.resources_info
+        if smart_server and smart_server.mcp:
+            # Get capabilities from the MCP server using proper API
+            tools = await smart_server.mcp.list_tools()
+            prompts = await smart_server.mcp.list_prompts()
+            resources = await smart_server.mcp.list_resources()
             
             return JSONResponse({
                 "status": "success",
                 "capabilities": {
                     "tools": {
-                        "count": len(tools_info),
-                        "available": list(tools_info.keys())
+                        "count": len(tools),
+                        "available": [tool.name for tool in tools]
                     },
                     "prompts": {
-                        "count": len(prompts_info),
-                        "available": list(prompts_info.keys())
+                        "count": len(prompts),
+                        "available": [prompt.name for prompt in prompts]
                     },
                     "resources": {
-                        "count": len(resources_info),
-                        "available": list(resources_info.keys())
+                        "count": len(resources),
+                        "available": [str(resource.uri) for resource in resources]
                     }
                 }
             })
@@ -361,7 +371,7 @@ async def run_server(port: int = 4321):
     add_endpoints(app)
     
     # Display server information
-    server_info = smart_server.get_server_info()
+    server_info = await smart_server.get_server_info()
     print(f"🌐 Server: {server_info['server_name']}")
     print(f"🧠 AI Selectors: {sum(server_info['ai_selectors'].values())}/3 active")
     print(f"📦 Capabilities: {sum(server_info['capabilities_count'].values())} modules")

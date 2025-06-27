@@ -36,6 +36,23 @@ class ResourceSelector:
         except Exception as e:
             logger.error(f"Failed to initialize resource selector: {e}")
     
+    async def initialize_with_mcp(self, mcp_server):
+        """Initialize resource selector with MCP server integration"""
+        try:
+            logger.info("Initializing resource selector with MCP server...")
+            
+            # Load resource information from MCP server
+            await self._load_resource_info_from_mcp(mcp_server)
+            
+            # Initialize embedding service
+            self.embed_service = AIFactory().get_embed()
+            await self._compute_resource_embeddings()
+            logger.info(f"Resource selector initialized with {len(self.resources_info)} MCP resources")
+        except Exception as e:
+            logger.error(f"Failed to initialize resource selector with MCP: {e}")
+            # Fallback to normal initialization
+            await self.initialize()
+    
     async def _load_resource_info(self):
         """Load resource information dynamically"""
         try:
@@ -164,6 +181,81 @@ class ResourceSelector:
                 
         except Exception as e:
             logger.error(f"Failed to load resource info: {e}")
+    
+    async def _load_resource_info_from_mcp(self, mcp_server):
+        """Load resource information directly from MCP server"""
+        try:
+            logger.info("Loading resource information from MCP server...")
+            
+            # Get resources from MCP server
+            resources = await mcp_server.list_resources()
+            logger.info(f"Found {len(resources)} resources in MCP server")
+            
+            self.resources_info = {}
+            for resource in resources:
+                resource_uri = str(resource.uri)  # Convert AnyUrl to string
+                description = resource.description or f"Resource: {resource_uri}"
+                
+                # Extract keywords from resource URI and description
+                keywords = []
+                if resource_uri:
+                    # Extract from URI pattern (e.g., "memory://category/{category}")
+                    uri_parts = resource_uri.replace('://', ' ').replace('/', ' ').replace('{', ' ').replace('}', ' ')
+                    keywords.extend(uri_parts.split())
+                if description:
+                    # Simple keyword extraction from description
+                    words = description.lower().split()
+                    keywords.extend([w for w in words if len(w) > 3])
+                
+                # Remove duplicates and limit
+                keywords = list(set(keywords))[:10]
+                
+                # Categorize based on resource URI patterns
+                category = self._categorize_resource(resource_uri)
+                
+                self.resources_info[resource_uri] = {
+                    "description": description,
+                    "keywords": keywords,
+                    "category": category,
+                    "type": "mcp"
+                }
+                
+                logger.info(f"  {resource_uri}: {description[:50]}...")
+                logger.info(f"    Keywords: {keywords}")
+                logger.info(f"    Category: {category}")
+            
+            # If no MCP resources found, fallback to hardcoded ones
+            if not self.resources_info:
+                logger.warning("No MCP resources found, using fallback resources")
+                await self._load_resource_info()
+                
+        except Exception as e:
+            logger.error(f"Failed to load resource info from MCP: {e}")
+            # Fallback to hardcoded resources
+            await self._load_resource_info()
+    
+    def _categorize_resource(self, resource_uri: str) -> str:
+        """Categorize resource based on URI patterns"""
+        resource_uri_lower = resource_uri.lower()
+        
+        if resource_uri_lower.startswith("memory://"):
+            return "memory"
+        elif resource_uri_lower.startswith("weather://"):
+            return "weather"
+        elif resource_uri_lower.startswith("event://"):
+            return "event"
+        elif resource_uri_lower.startswith("monitoring://"):
+            return "monitoring"
+        elif resource_uri_lower.startswith("shopify://"):
+            return "shopify"
+        elif resource_uri_lower.startswith("guardrail://"):
+            return "security"
+        elif resource_uri_lower.startswith("symbolic://"):
+            return "reasoning"
+        elif resource_uri_lower.startswith("rag://"):
+            return "rag"
+        else:
+            return "general"
     
     async def _compute_resource_embeddings(self):
         """Compute resource embeddings"""

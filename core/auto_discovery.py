@@ -8,7 +8,7 @@ import os
 import ast
 import inspect
 import importlib.util
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 from pathlib import Path
 import asyncio
 from mcp.server.fastmcp import FastMCP
@@ -116,150 +116,9 @@ class AutoDiscoverySystem:
         
         return functions
 
-    def discover_tools_from_registered_modules(self) -> Dict[str, Dict[str, Any]]:
-        """Alternative approach: Extract tool metadata from registered modules by importing them"""
-        tools = {}
-        
-        logger.info(f"🔍 Discovering tools from registered modules")
-        
-        # Get all Python files in tools directory
-        for python_file in self.tools_dir.rglob("*.py"):
-            if python_file.name.startswith("__"):
-                continue
-                
-            # Skip service files and utility files
-            if any(skip in str(python_file) for skip in ["services", "client", "__pycache__"]):
-                continue
-                
-            try:
-                module_name = python_file.stem
-                register_func_name = f"register_{module_name}"
-                
-                # Dynamic import
-                spec = importlib.util.spec_from_file_location(module_name, python_file)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    
-                    # If module has register function, try to extract tool metadata from it
-                    if hasattr(module, register_func_name):
-                        logger.info(f"  📄 Extracting tools from {module_name}")
-                        
-                        # Parse the file content to find nested tool functions
-                        with open(python_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        
-                        # Look for function definitions inside register function
-                        lines = content.split('\n')
-                        in_register_function = False
-                        found_mcp_tool_decorator = False
-                        current_function_name = None
-                        current_docstring = ""
-                        collecting_docstring = False
-                        
-                        for i, line in enumerate(lines):
-                            stripped = line.strip()
-                            
-                            # Check if we're entering the register function
-                            if f"def {register_func_name}" in line:
-                                in_register_function = True
-                                continue
-                            
-                            if in_register_function:
-                                # Check for end of register function (function at same or lower indent level)
-                                if line and not line.startswith('    ') and line.strip() and not line.strip().startswith('#'):
-                                    in_register_function = False
-                                    continue
-                                
-                                # Look for @mcp.tool() decorator
-                                if "@mcp.tool()" in stripped:
-                                    found_mcp_tool_decorator = True
-                                    continue
-                                
-                                # Look for function definition after @mcp.tool() (may have other decorators in between)
-                                if found_mcp_tool_decorator and ("async def " in stripped or "def " in stripped) and ":" in stripped:
-                                    func_line = stripped
-                                    if "async def " in func_line:
-                                        func_name = func_line.split("async def ")[1].split("(")[0]
-                                    elif "def " in func_line:
-                                        func_name = func_line.split("def ")[1].split("(")[0]
-                                    else:
-                                        continue
-                                    
-                                    current_function_name = func_name
-                                    current_docstring = ""
-                                    collecting_docstring = True
-                                    found_mcp_tool_decorator = False  # Reset for next tool
-                                    
-                                    # Look for docstring after function definition (handle multi-line signatures)
-                                    # First, find the end of the function signature (look for ") -> " or "):")
-                                    signature_complete = False
-                                    search_start = i + 1
-                                    
-                                    for j in range(i+1, min(i+30, len(lines))):
-                                        sig_line = lines[j].strip()
-                                        if ') -> ' in sig_line or sig_line.endswith('):'):
-                                            signature_complete = True
-                                            search_start = j + 1
-                                            break
-                                    
-                                    # Now look for docstring after the complete function signature
-                                    for j in range(search_start, min(search_start+10, len(lines))):
-                                        doc_line = lines[j].strip()
-                                        if '"""' in doc_line:
-                                            # Start collecting docstring
-                                            docstring_content = doc_line.replace('"""', "")
-                                            
-                                            # Check if it's a single line docstring
-                                            if doc_line.count('"""') == 2:
-                                                current_docstring = docstring_content
-                                                break
-                                            else:
-                                                # Multi-line docstring, collect until closing """
-                                                current_docstring = docstring_content
-                                                for k in range(j+1, min(j+30, len(lines))):
-                                                    next_doc_line = lines[k].strip()
-                                                    if '"""' in next_doc_line:
-                                                        current_docstring += " " + next_doc_line.replace('"""', "")
-                                                        break
-                                                    else:
-                                                        current_docstring += " " + next_doc_line
-                                                break
-                                        elif doc_line and not doc_line.startswith('"""') and doc_line != '':
-                                            # Hit some other code, no docstring found
-                                            break
-                                    
-                                    # Process the discovered tool
-                                    self._process_discovered_tool(current_function_name, current_docstring, str(python_file), tools)
-                                    current_function_name = None
-                                    current_docstring = ""
-                                    collecting_docstring = False
-                                    continue
-            
-            except Exception as e:
-                logger.error(f"Error processing {python_file.name}: {e}")
-        
-        logger.info(f"✅ Discovered {len(tools)} tools from registered modules")
-        return tools
+
     
-    def _process_discovered_tool(self, tool_name: str, docstring: str, file_path: str, tools_dict: Dict):
-        """Process a discovered tool and add it to the tools dictionary"""
-        metadata = self.extract_docstring_metadata(docstring)
-        
-        tools_dict[tool_name] = {
-            "name": tool_name,
-            "file": file_path,
-            "docstring": docstring,
-            "description": metadata["description"],
-            "keywords": metadata["keywords"],
-            "usage": metadata["usage"],
-            "type": "tool"
-        }
-        logger.info(f"    🔧 Found tool: {tool_name}")
-        if metadata["description"]:
-            logger.info(f"      Description: {metadata['description'][:60]}...")
-        if metadata["keywords"]:
-            logger.info(f"      Keywords: {metadata['keywords'][:5]}")
+
 
     def discover_tools(self) -> Dict[str, Dict[str, Any]]:
         """Auto-discover all tools in tools directory using multiple approaches"""
@@ -285,21 +144,7 @@ class AutoDiscoverySystem:
                 tools[tool_name] = func_info
                 logger.info(f"    🔧 Found tool: {tool_name}")
         
-        # Approach 2: Use the new method for nested tools in register functions
-        logger.info(f"🔍 Using register function discovery for nested tools...")
-        nested_tools = self.discover_tools_from_registered_modules()
-        
-        # Merge both approaches (nested tools take precedence if there are conflicts)
-        for tool_name, tool_info in nested_tools.items():
-            if tool_name not in tools:
-                tools[tool_name] = tool_info
-            else:
-                # Update with more complete information from nested discovery
-                tools[tool_name].update(tool_info)
-        
         logger.info(f"✅ Discovered {len(tools)} tools total")
-        logger.info(f"    AST discovery: {len(tools) - len(nested_tools)} tools")
-        logger.info(f"    Register function discovery: {len(nested_tools)} tools")
         
         self.discovered_tools = tools
         return tools
@@ -404,15 +249,13 @@ class AutoDiscoverySystem:
         self.discovered_resources = resources
         return resources
 
-    async def auto_register_with_mcp(self, mcp: FastMCP, config: Dict[str, Any] = None):
+    async def auto_register_with_mcp(self, mcp: FastMCP, config: Optional[Dict[str, Any]] = None):
         """Automatically register all discovered items with MCP server"""
         config = config or {}
         
         logger.info("🚀 Auto-registering all discovered items with MCP server")
         
-        # Instead of discovering individual tools, register entire tool modules
-        # This handles both nested and top-level tool patterns
-        
+        # Register tools from tool modules
         registered_count = 0
         tool_files_processed = set()
         
@@ -455,13 +298,92 @@ class AutoDiscoverySystem:
             except Exception as e:
                 logger.error(f"  ❌ Failed to register tools from {python_file.name}: {e}")
         
+        # Register prompts from prompt modules
+        prompt_files_processed = set()
+        for python_file in self.prompts_dir.rglob("*.py"):
+            if python_file.name.startswith("__"):
+                continue
+                
+            try:
+                module_name = python_file.stem
+                register_func_name = f"register_{module_name}"
+                
+                # Dynamic import
+                spec = importlib.util.spec_from_file_location(module_name, python_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    
+                    # Try to find and call register function
+                    if hasattr(module, register_func_name):
+                        register_func = getattr(module, register_func_name)
+                        
+                        # Call the register function with MCP instance
+                        register_func(mcp)
+                        prompt_files_processed.add(python_file.name)
+                        logger.info(f"  ✅ Registered prompts from {module_name}")
+            
+            except Exception as e:
+                logger.error(f"  ❌ Failed to register prompts from {python_file.name}: {e}")
+        
+        # Register resources from resource modules
+        resource_files_processed = set()
+        for python_file in self.resources_dir.rglob("*.py"):
+            if python_file.name.startswith("__"):
+                continue
+                
+            try:
+                module_name = python_file.stem
+                register_func_name = f"register_{module_name}"
+                
+                # Dynamic import
+                spec = importlib.util.spec_from_file_location(module_name, python_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    
+                    # Try to find and call register function
+                    if hasattr(module, register_func_name):
+                        register_func = getattr(module, register_func_name)
+                        
+                        # Call the register function with MCP instance
+                        # Handle both sync and async functions
+                        if asyncio.iscoroutinefunction(register_func):
+                            # If it's an async function, await it
+                            try:
+                                loop = asyncio.get_event_loop()
+                                if loop.is_running():
+                                    # We're in an async context, create a task
+                                    asyncio.create_task(register_func(mcp))
+                                else:
+                                    # Run it in the loop
+                                    loop.run_until_complete(register_func(mcp))
+                            except:
+                                # Fallback: run in new event loop
+                                asyncio.run(register_func(mcp))
+                        else:
+                            # Sync function, call directly
+                            register_func(mcp)
+                        
+                        resource_files_processed.add(python_file.name)
+                        logger.info(f"  ✅ Registered resources from {module_name}")
+            
+            except Exception as e:
+                logger.error(f"  ❌ Failed to register resources from {python_file.name}: {e}")
+        
         # Also discover for metadata purposes
         self.discover_tools()
         self.discover_prompts() 
         self.discover_resources()
         
-        logger.info(f"🎉 Auto-registration complete: {registered_count} tool modules registered")
-        logger.info(f"📁 Tool files processed: {list(tool_files_processed)}")
+        logger.info(f"🎉 Auto-registration complete:")
+        logger.info(f"  🔧 Tool modules: {registered_count}")
+        logger.info(f"  📝 Prompt modules: {len(prompt_files_processed)}")
+        logger.info(f"  📊 Resource modules: {len(resource_files_processed)}")
+        logger.info(f"📁 Files processed:")
+        logger.info(f"  Tools: {list(tool_files_processed)}")
+        logger.info(f"  Prompts: {list(prompt_files_processed)}")
+        logger.info(f"  Resources: {list(resource_files_processed)}")
         logger.info(f"📊 Discovery summary:")
         logger.info(f"  🔧 Tools discovered: {len(self.discovered_tools)}")
         logger.info(f"  📝 Prompts: {len(self.discovered_prompts)}")

@@ -39,7 +39,7 @@ class ProxyManager:
         self.max_failures = 3
         self.proxy_failures: Dict[str, int] = {}
     
-    def add_proxy(self, host: str, port: int, username: str = None, password: str = None, proxy_type: str = "http"):
+    def add_proxy(self, host: str, port: int, username: Optional[str] = None, password: Optional[str] = None, proxy_type: str = "http"):
         """Add a proxy to the pool"""
         proxy = ProxyConfig(
             host=host,

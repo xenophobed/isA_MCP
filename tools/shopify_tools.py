@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 
 from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
-from tools.services.shopify_client import ShopifyClient
+from tools.services.shopify_service.shopify_client import ShopifyClient
 
 logger = get_logger(__name__)
 
@@ -321,7 +321,7 @@ def register_realistic_shopify_tools(mcp):
         try:
             result = await shopify_client.get_cart()
             
-            if "data" in result and result["data"]["cart"]:
+            if "data" in result and result["data"].get("cart"):
                 cart = result["data"]["cart"]
                 
                 # 处理购物车商品
@@ -331,6 +331,11 @@ def register_realistic_shopify_tools(mcp):
                         line = edge["node"]
                         merchandise = line["merchandise"]
                         
+                        # Handle null image safely
+                        image_url = ""
+                        if merchandise.get("image") and isinstance(merchandise["image"], dict):
+                            image_url = merchandise["image"].get("url", "")
+                        
                         items.append({
                             "line_id": line["id"],
                             "quantity": line["quantity"],
@@ -339,7 +344,7 @@ def register_realistic_shopify_tools(mcp):
                                 "variant_title": merchandise["title"],
                                 "price": merchandise["price"]["amount"],
                                 "currency": merchandise["price"]["currencyCode"],
-                                "image_url": merchandise.get("image", {}).get("url", "")
+                                "image_url": image_url
                             },
                             "line_total": line["cost"]["totalAmount"]["amount"]
                         })

@@ -6,7 +6,7 @@ Manages rate limiting across different domains and services with intelligent thr
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
 from core.logging import get_logger
@@ -18,7 +18,7 @@ class RateLimit:
     """Rate limit configuration"""
     requests: int
     window_seconds: int
-    burst_limit: int = None
+    burst_limit: Optional[int] = None
     
     def __post_init__(self):
         if self.burst_limit is None:
@@ -210,7 +210,7 @@ class RateLimiter:
         if current_delay > 1.0:
             self.adaptive_delays[identifier] = current_delay * 0.95
     
-    def add_custom_limit(self, identifier: str, requests: int, window_seconds: int, burst_limit: int = None):
+    def add_custom_limit(self, identifier: str, requests: int, window_seconds: int, burst_limit: Optional[int] = None):
         """Add custom rate limit configuration"""
         self.rate_limits[identifier] = RateLimit(
             requests=requests,

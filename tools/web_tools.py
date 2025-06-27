@@ -23,13 +23,13 @@ from tools.services.web_services.utils.human_behavior import HumanBehavior
 logger = get_logger(__name__)
 
 # Global service instances
-_browser_manager = None
-_session_manager = None
-_stealth_manager = None
-_vision_analyzer = None
-_rate_limiter = None
-_proxy_manager = None
-_human_behavior = None
+_browser_manager: Optional[BrowserManager] = None
+_session_manager: Optional[SessionManager] = None
+_stealth_manager: Optional[StealthManager] = None
+_vision_analyzer: Optional[VisionAnalyzer] = None
+_rate_limiter: Optional[RateLimiter] = None
+_proxy_manager: Optional[ProxyManager] = None
+_human_behavior: Optional[HumanBehavior] = None
 
 async def _initialize_services():
     """Initialize all web service instances"""
@@ -100,10 +100,9 @@ def register_web_tools(mcp):
         """
         await _initialize_services()
         
-        # DEBUG: Check if services are actually initialized
-        print(f"🔍 DEBUG: After init - _vision_analyzer: {_vision_analyzer}")
-        print(f"🔍 DEBUG: After init - _session_manager: {_session_manager}")
-        print(f"🔍 DEBUG: After init - _human_behavior: {_human_behavior}")
+        # Ensure services are initialized
+        if _human_behavior is None or _vision_analyzer is None or _session_manager is None:
+            raise Exception("Web services failed to initialize properly")
         
         try:
             # Parse credentials - handle multiple formats
@@ -173,11 +172,15 @@ def register_web_tools(mcp):
                 login_elements = json.loads(login_selectors)
             
             # Perform login with human-like behavior
-            await _human_behavior.human_type(page, login_elements['username'], creds['username'])
+            username_selector = login_elements.get('username', '')
+            password_selector = login_elements.get('password', '')
+            submit_selector = login_elements.get('submit', '')
+            
+            await _human_behavior.human_type(page, username_selector, creds.get('username', ''))
             await _human_behavior.random_delay(500, 1500)
-            await _human_behavior.human_type(page, login_elements['password'], creds['password'])
+            await _human_behavior.human_type(page, password_selector, creds.get('password', ''))
             await _human_behavior.random_delay(500, 1500)
-            await _human_behavior.human_click(page, login_elements['submit'])
+            await _human_behavior.human_click(page, submit_selector)
             
             # Wait for login completion
             await page.wait_for_load_state('networkidle')
@@ -230,6 +233,10 @@ def register_web_tools(mcp):
         Category: web-automation
         """
         await _initialize_services()
+        
+        # Ensure services are initialized
+        if _human_behavior is None or _vision_analyzer is None or _session_manager is None:
+            raise Exception("Web services failed to initialize properly")
         
         try:
             config = json.loads(search_config) if search_config else {}
@@ -298,6 +305,10 @@ def register_web_tools(mcp):
         Category: web-automation
         """
         await _initialize_services()
+        
+        # Ensure services are initialized
+        if _session_manager is None or _vision_analyzer is None:
+            raise Exception("Web services failed to initialize properly")
         
         try:
             config = json.loads(download_config)
@@ -382,6 +393,10 @@ def register_web_tools(mcp):
         """
         await _initialize_services()
         
+        # Ensure services are initialized
+        if _rate_limiter is None or _session_manager is None:
+            raise Exception("Web services failed to initialize properly")
+        
         try:
             engines = json.loads(search_engines)
             all_results = []
@@ -461,6 +476,10 @@ def register_web_tools(mcp):
         Category: web-crawling
         """
         await _initialize_services()
+        
+        # Ensure services are initialized
+        if _session_manager is None or _rate_limiter is None or _vision_analyzer is None or _human_behavior is None:
+            raise Exception("Web services failed to initialize properly")
         
         try:
             config = json.loads(crawl_config)
@@ -547,6 +566,10 @@ def register_web_tools(mcp):
         """
         await _initialize_services()
         
+        # Ensure services are initialized
+        if _session_manager is None or _vision_analyzer is None:
+            raise Exception("Web services failed to initialize properly")
+        
         try:
             config = json.loads(monitor_config)
             
@@ -627,6 +650,10 @@ def register_web_tools(mcp):
         
         await _initialize_services()
         
+        # Ensure services are initialized
+        if _browser_manager is None or _session_manager is None or _rate_limiter is None:
+            raise Exception("Web services failed to initialize properly")
+        
         try:
             status_data = {
                 "browser_manager": await _browser_manager.get_status(),
@@ -656,6 +683,10 @@ def register_web_tools(mcp):
 # Helper functions for search engines
 async def _perform_google_search(page, query: str, max_results: int) -> List[Dict]:
     """Perform Google search and extract results"""
+    # Ensure vision analyzer is available
+    if _vision_analyzer is None:
+        raise Exception("Vision analyzer not initialized")
+    
     search_url = f"https://www.google.com/search?q={query}"
     await page.goto(search_url, wait_until='networkidle')
     
@@ -664,6 +695,10 @@ async def _perform_google_search(page, query: str, max_results: int) -> List[Dic
 
 async def _perform_bing_search(page, query: str, max_results: int) -> List[Dict]:
     """Perform Bing search and extract results"""
+    # Ensure vision analyzer is available
+    if _vision_analyzer is None:
+        raise Exception("Vision analyzer not initialized")
+    
     search_url = f"https://www.bing.com/search?q={query}"
     await page.goto(search_url, wait_until='networkidle')
     

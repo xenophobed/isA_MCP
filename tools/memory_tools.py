@@ -4,13 +4,13 @@ Memory Tools for MCP Server
 Handles remember, forget, and search_memories operations with security
 """
 import json
-import sqlite3
 from datetime import datetime
 from typing import Dict, Any
 
 from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
 from core.monitoring import monitor_manager
+from core.supabase_client import get_supabase_client
 
 logger = get_logger(__name__)
 
@@ -32,42 +32,32 @@ def register_memory_tools(mcp):
         Keywords: memory, remember, store, save, information, data, persist
         Category: memory
         """
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            now = datetime.now().isoformat()
+            success = await supabase.set_memory(key, value, category, importance, user_id)
             
-            cursor = conn.execute("""
-                UPDATE memories 
-                SET value = ?, category = ?, importance = ?, updated_at = ?
-                WHERE key = ?
-            """, (value, category, importance, now, key))
-            
-            if cursor.rowcount == 0:
-                conn.execute("""
-                    INSERT INTO memories (key, value, category, importance, created_at, updated_at, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (key, value, category, importance, now, now, user_id))
-            
-            conn.commit()
-            
-            # Return structured JSON
-            result = {
-                "status": "success",
-                "action": "remember",
-                "data": {
-                    "key": key,
-                    "value": value,
-                    "category": category,
-                    "importance": importance,
-                    "created_by": user_id
-                },
-                "timestamp": now
-            }
-            
-            logger.info(f"Memory stored: {key} by {user_id}")
-            return json.dumps(result)
-        finally:
-            conn.close()
+            if success:
+                # Return structured JSON
+                result = {
+                    "status": "success",
+                    "action": "remember",
+                    "data": {
+                        "key": key,
+                        "value": value,
+                        "category": category,
+                        "importance": importance,
+                        "created_by": user_id
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                logger.info(f"Memory stored: {key} by {user_id}")
+                return json.dumps(result)
+            else:
+                raise Exception("Failed to store memory in Supabase")
+        except Exception as e:
+            logger.error(f"Error storing memory: {e}")
+            raise
 
     @mcp.tool()
     @security_manager.security_check
@@ -81,12 +71,10 @@ def register_memory_tools(mcp):
         Keywords: memory, forget, delete, remove, erase, clear, security
         Category: memory
         """
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            cursor = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
-            conn.commit()
+            success = await supabase.delete_memory(key)
             
-            success = cursor.rowcount > 0
             result = {
                 "status": "success" if success else "not_found",
                 "action": "forget",
@@ -96,8 +84,9 @@ def register_memory_tools(mcp):
             
             logger.info(f"Memory {'deleted' if success else 'not found'}: {key} by {user_id}")
             return json.dumps(result)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error(f"Error deleting memory: {e}")
+            raise
 
     @mcp.tool()
     @security_manager.security_check
@@ -171,34 +160,28 @@ def register_memory_tools(mcp):
         Keywords: memory, search, find, query, lookup, retrieve, filter
         Category: memory
         """
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            sql = """
-                SELECT key, value, category, importance, created_at, updated_at, created_by
-                FROM memories 
-                WHERE (key LIKE ? OR value LIKE ?) AND importance >= ?
-            """
-            params = [f"%{query}%", f"%{query}%", min_importance]
+            # Use Supabase search with filtering
+            search_category = category if category and category.strip() else None
+            memories_data = await supabase.search_memories(query, search_category, limit=10)
             
-            if category and category.strip():
-                sql += " AND category = ?"
-                params.append(category)
-            
-            sql += " ORDER BY importance DESC, updated_at DESC LIMIT 10"
-            
-            cursor = conn.execute(sql, params)
-            results = cursor.fetchall()
+            # Filter by minimum importance
+            filtered_memories = [
+                mem for mem in memories_data 
+                if mem.get('importance', 1) >= min_importance
+            ]
             
             memories = []
-            for key, value, cat, importance, created_at, updated_at, created_by in results:
+            for mem in filtered_memories:
                 memories.append({
-                    "key": key,
-                    "value": value,
-                    "category": cat,
-                    "importance": importance,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "created_by": created_by
+                    "key": mem.get('key'),
+                    "value": mem.get('value'),
+                    "category": mem.get('category'),
+                    "importance": mem.get('importance'),
+                    "created_at": mem.get('created_at'),
+                    "updated_at": mem.get('updated_at'),
+                    "created_by": mem.get('created_by')
                 })
             
             result = {
@@ -214,5 +197,6 @@ def register_memory_tools(mcp):
             
             logger.info(f"Memory search: '{query}' found {len(memories)} results")
             return json.dumps(result)
-        finally:
-            conn.close() 
+        except Exception as e:
+            logger.error(f"Error searching memories: {e}")
+            raise 

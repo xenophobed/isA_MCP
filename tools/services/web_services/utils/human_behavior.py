@@ -6,6 +6,7 @@ Provides human-like interactions to avoid detection during web automation
 import asyncio
 import random
 import math
+from typing import Optional
 
 from playwright.async_api import Page
 
@@ -29,25 +30,55 @@ class HumanBehavior:
         self.medium_delay_range = (500, 1500)
         self.long_delay_range = (1000, 3000)
     
-    async def random_delay(self, min_ms: int = None, max_ms: int = None):
+    async def random_delay(self, min_ms: Optional[int] = None, max_ms: Optional[int] = None):
         """Add random delay to simulate human thinking/reaction time"""
-        if min_ms is None:
+        if min_ms is None or max_ms is None:
             min_ms, max_ms = self.short_delay_range
         
         delay = random.randint(min_ms, max_ms) / 1000.0
         await asyncio.sleep(delay)
     
-    async def human_type(self, page: Page, selector: str, text: str, clear_first: bool = True):
-        """Type text with human-like behavior including errors and corrections"""
+    async def human_type(self, page: Page, element_ref, text: str, clear_first: bool = True):
+        """Type text with human-like behavior including errors and corrections
+        
+        Args:
+            element_ref: Either a CSS selector string or coordinate dict with x,y
+        """
         try:
-            # Focus on the element
-            await page.focus(selector)
-            await self.random_delay(200, 800)
-            
-            # Clear existing text if requested
-            if clear_first:
-                await page.fill(selector, "")
-                await self.random_delay(100, 300)
+            # Handle both selector and coordinate-based element references
+            if isinstance(element_ref, dict) and element_ref.get('type') == 'coordinate':
+                # Coordinate-based approach
+                x, y = element_ref['x'], element_ref['y']
+                logger.info(f"🎯 Typing at coordinates ({x}, {y}) - {element_ref.get('description', 'field')}")
+                
+                # Click at coordinates to focus
+                await page.mouse.click(x, y)
+                await self.random_delay(200, 800)
+                
+                # Clear existing text if requested (using keyboard shortcuts)
+                if clear_first:
+                    await page.keyboard.press('Control+a')  # Select all
+                    await self.random_delay(100, 300)
+                    await page.keyboard.press('Delete')  # Delete selected text
+                    await self.random_delay(100, 300)
+                
+                # Use keyboard.type for coordinate-based typing
+                typing_target = 'coordinates'
+            else:
+                # Traditional selector-based approach
+                selector = element_ref if isinstance(element_ref, str) else str(element_ref)
+                logger.info(f"🎯 Typing with selector: {selector}")
+                
+                # Focus on the element
+                await page.focus(selector)
+                await self.random_delay(200, 800)
+                
+                # Clear existing text if requested
+                if clear_first:
+                    await page.fill(selector, "")
+                    await self.random_delay(100, 300)
+                
+                typing_target = selector
             
             # Calculate typing speed (characters per minute to milliseconds per character)
             chars_per_minute = self.typing_speed_wpm * 5  # Average 5 chars per word
@@ -59,20 +90,33 @@ class HumanBehavior:
                 if random.random() < self.typing_errors_rate and char.isalpha():
                     # Type wrong character
                     wrong_char = random.choice('abcdefghijklmnopqrstuvwxyz')
-                    await page.type(selector, wrong_char, delay=ms_per_char * random.uniform(0.8, 1.2))
+                    
+                    if typing_target == 'coordinates':
+                        # Use keyboard for coordinate-based typing
+                        await page.keyboard.type(wrong_char, delay=ms_per_char * random.uniform(0.8, 1.2))
+                    else:
+                        await page.type(typing_target, wrong_char, delay=ms_per_char * random.uniform(0.8, 1.2))
                     typed_text += wrong_char
                     
                     # Pause to "notice" the error
                     await self.random_delay(300, 1000)
                     
                     # Backspace to correct
-                    await page.press(selector, 'Backspace')
+                    if typing_target == 'coordinates':
+                        await page.keyboard.press('Backspace')
+                    else:
+                        await page.press(typing_target, 'Backspace')
                     typed_text = typed_text[:-1]
                     await self.random_delay(100, 300)
                 
                 # Type the correct character
                 char_delay = ms_per_char * random.uniform(0.5, 1.8)
-                await page.type(selector, char, delay=char_delay)
+                
+                if typing_target == 'coordinates':
+                    # Use keyboard for coordinate-based typing
+                    await page.keyboard.type(char, delay=char_delay)
+                else:
+                    await page.type(typing_target, char, delay=char_delay)
                 typed_text += char
                 
                 # Occasional longer pauses (thinking)
@@ -85,41 +129,64 @@ class HumanBehavior:
         except Exception as e:
             logger.error(f"Failed to type text humanly: {e}")
             # Fallback to regular typing
-            await page.fill(selector, text)
-    
-    async def human_click(self, page: Page, selector: str, click_count: int = 1):
-        """Click with human-like mouse movement and timing"""
-        try:
-            # Get element bounding box for realistic mouse movement
-            element = await page.query_selector(selector)
-            if not element:
-                raise Exception(f"Element not found: {selector}")
-            
-            bbox = await element.bounding_box()
-            if not bbox:
-                # Element might not be visible, try scrolling
-                await element.scroll_into_view_if_needed()
-                bbox = await element.bounding_box()
-            
-            if bbox:
-                # Calculate random click position within element
-                click_x = bbox['x'] + random.uniform(0.2, 0.8) * bbox['width']
-                click_y = bbox['y'] + random.uniform(0.2, 0.8) * bbox['height']
-                
-                # Move mouse to position with human-like movement
-                await self.human_mouse_move(page, click_x, click_y)
-                
-                # Small delay before clicking
-                await self.random_delay(100, 500)
-                
-                # Perform the click(s)
-                for _ in range(click_count):
-                    await page.mouse.click(click_x, click_y)
-                    if click_count > 1:
-                        await self.random_delay(50, 200)
+            if isinstance(element_ref, dict) and element_ref.get('type') == 'coordinate':
+                # For coordinates, just use keyboard typing
+                await page.keyboard.type(text)
             else:
-                # Fallback to element click
-                await element.click()
+                selector = element_ref if isinstance(element_ref, str) else str(element_ref)
+                await page.fill(selector, text)
+    
+    async def human_click(self, page: Page, element_ref, click_count: int = 1):
+        """Click with human-like mouse movement and timing
+        
+        Args:
+            element_ref: Either a CSS selector string or coordinate dict with x,y
+        """
+        try:
+            # Handle both selector and coordinate-based element references
+            if isinstance(element_ref, dict) and element_ref.get('type') == 'coordinate':
+                # Direct coordinate-based clicking
+                click_x, click_y = element_ref['x'], element_ref['y']
+                logger.info(f"🎯 Clicking at coordinates ({click_x}, {click_y}) - {element_ref.get('description', 'element')}")
+                
+                # Add small random offset for more human-like behavior
+                click_x += random.uniform(-3, 3)
+                click_y += random.uniform(-3, 3)
+                
+            else:
+                # Traditional selector-based approach
+                selector = element_ref if isinstance(element_ref, str) else str(element_ref)
+                logger.info(f"🎯 Clicking with selector: {selector}")
+                
+                # Get element bounding box for realistic mouse movement
+                element = await page.query_selector(selector)
+                if not element:
+                    raise Exception(f"Element not found: {selector}")
+                
+                bbox = await element.bounding_box()
+                if not bbox:
+                    # Element might not be visible, try scrolling
+                    await element.scroll_into_view_if_needed()
+                    bbox = await element.bounding_box()
+                
+                if bbox:
+                    # Calculate random click position within element
+                    click_x = bbox['x'] + random.uniform(0.2, 0.8) * bbox['width']
+                    click_y = bbox['y'] + random.uniform(0.2, 0.8) * bbox['height']
+                else:
+                    raise Exception(f"Could not get bounding box for element: {selector}")
+            
+            # Move mouse to position with human-like movement
+            await self.human_mouse_move(page, click_x, click_y)
+            
+            # Small delay before clicking
+            await self.random_delay(100, 500)
+            
+            # Perform the click(s)
+            for i in range(click_count):
+                await page.mouse.click(click_x, click_y)
+                if i < click_count - 1:  # Don't delay after the last click
+                    await self.random_delay(50, 200)
             
             # Post-click delay
             await self.random_delay(200, 800)
@@ -127,7 +194,12 @@ class HumanBehavior:
         except Exception as e:
             logger.error(f"Failed to click humanly: {e}")
             # Fallback to regular click
-            await page.click(selector)
+            if isinstance(element_ref, dict) and element_ref.get('type') == 'coordinate':
+                # For coordinates, just click at the position
+                await page.mouse.click(element_ref['x'], element_ref['y'])
+            else:
+                selector = element_ref if isinstance(element_ref, str) else str(element_ref)
+                await page.click(selector)
     
     async def human_mouse_move(self, page: Page, target_x: float, target_y: float):
         """Move mouse with human-like curved trajectory"""
@@ -294,9 +366,9 @@ class HumanBehavior:
         }
     
     def update_human_profile(self, 
-                           typing_speed_wpm: int = None,
-                           typing_errors_rate: float = None,
-                           mouse_movement_speed: float = None):
+                           typing_speed_wpm: Optional[int] = None,
+                           typing_errors_rate: Optional[float] = None,
+                           mouse_movement_speed: Optional[float] = None):
         """Update human behavior profile"""
         if typing_speed_wpm:
             self.typing_speed_wpm = max(20, min(120, typing_speed_wpm))

@@ -11,7 +11,7 @@ from typing import Dict, Any
 from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
 from core.monitoring import monitor_manager
-from tools.services.event_sourcing_services import get_event_sourcing_service, EventSourceTaskType
+from tools.services.event_sourcing_service.event_sourcing_services import get_event_sourcing_service, EventSourceTaskType
 
 logger = get_logger(__name__)
 

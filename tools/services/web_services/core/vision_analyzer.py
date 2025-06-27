@@ -110,20 +110,37 @@ class VisionAnalyzer:
             vision = AIFactory().get_vision()
             logger.info(f"✅ Vision service initialized: {type(vision)}")
             
-            # Enhanced analysis prompt for better vision detection
+            # Enhanced analysis prompt for coordinate-based vision detection
             analysis_prompt = """
-            Analyze this webpage screenshot carefully and identify login form elements.
+            Analyze this webpage screenshot carefully and identify login form elements with their exact positions.
             Look for these specific elements:
             1. Username/email input fields (text boxes for entering email or username)
             2. Password input fields (hidden text boxes for entering passwords) 
             3. Login/submit/sign-in buttons (clickable buttons to submit the form)
             
+            For each element found, provide the CENTER coordinates (x, y) where a user would click or type.
+            
             IMPORTANT: You must return EXACTLY this JSON format with NO additional text:
             {
                 "login_form_found": true,
-                "username_field": "exact visible placeholder text or label near username field",
-                "password_field": "exact visible placeholder text or label near password field", 
-                "submit_button": "exact visible text on the login button",
+                "username_field": {
+                    "x": 150,
+                    "y": 200,
+                    "label": "Username",
+                    "description": "text input field for username"
+                },
+                "password_field": {
+                    "x": 150,
+                    "y": 250,
+                    "label": "Password", 
+                    "description": "password input field"
+                },
+                "submit_button": {
+                    "x": 150,
+                    "y": 300,
+                    "label": "Login",
+                    "description": "login submit button"
+                },
                 "confidence": 0.95
             }
             
@@ -132,6 +149,8 @@ class VisionAnalyzer:
                 "login_form_found": false,
                 "confidence": 0.0
             }
+            
+            CRITICAL: Provide actual pixel coordinates based on what you see in the image.
             """
             
             # Save screenshot temporarily for vision analysis
@@ -202,33 +221,43 @@ class VisionAnalyzer:
                 import re
                 import json
                 
-                # Look for JSON in the response with multiple patterns
-                json_patterns = [
-                    r'\{[^{}]*"login_form_found"[^{}]*\}',  # Original pattern
-                    r'\{.*?"login_form_found".*?\}',       # More flexible
-                    r'\{[\s\S]*?"login_form_found"[\s\S]*?\}' # Multi-line
-                ]
-                
+                # Try to parse the JSON directly first (since it should be clean JSON)
                 vision_data = None
-                for pattern in json_patterns:
-                    json_match = re.search(pattern, analysis_text, re.DOTALL)
-                    if json_match:
-                        try:
-                            vision_data = json.loads(json_match.group())
-                            logger.info(f"✅ Successfully parsed vision JSON: {vision_data}")
-                            break
-                        except json.JSONDecodeError as json_error:
-                            logger.warning(f"❌ Failed to parse JSON with pattern {pattern}: {json_error}")
-                            logger.warning(f"JSON text: {json_match.group()}")
-                            continue
+                try:
+                    # Try parsing the full response as JSON first
+                    vision_data = json.loads(analysis_text.strip())
+                    logger.info(f"✅ Successfully parsed vision JSON directly: {vision_data}")
+                except json.JSONDecodeError:
+                    # If that fails, try to extract JSON with patterns
+                    logger.info("🔍 Direct JSON parsing failed, trying pattern extraction...")
+                    
+                    # Look for JSON in the response with patterns for nested objects
+                    json_patterns = [
+                        # Match balanced braces for nested objects
+                        r'\{(?:[^{}]|{[^{}]*})*\}',                     # Balanced braces
+                        r'\{[\s\S]*?"login_form_found"[\s\S]*?\}',      # Multi-line
+                        r'\{.*?"login_form_found".*?\}',                # Flexible
+                    ]
+                    
+                    for pattern in json_patterns:
+                        json_match = re.search(pattern, analysis_text, re.DOTALL)
+                        if json_match:
+                            try:
+                                vision_data = json.loads(json_match.group())
+                                logger.info(f"✅ Successfully parsed vision JSON with pattern: {vision_data}")
+                                break
+                            except json.JSONDecodeError as json_error:
+                                logger.warning(f"❌ Failed to parse JSON with pattern {pattern}: {json_error}")
+                                logger.warning(f"JSON text snippet: {json_match.group()[:200]}...")
+                                continue
                 
                 if vision_data:
                     if vision_data.get('login_form_found') and vision_data.get('confidence', 0) > 0.5:
                         logger.info("🎯 Login form detected by vision with sufficient confidence")
-                        # Convert vision descriptions to actual selectors by scanning page
-                        selectors = await self._convert_vision_to_selectors(page, vision_data)
-                        logger.info(f"🔧 Generated selectors from vision data: {selectors}")
-                        return selectors
+                        # Convert vision coordinate data to element references
+                        element_refs = await self._convert_coordinates_to_elements(page, vision_data)
+                        logger.info(f"🔧 Generated element references from vision coordinates: {element_refs}")
+                        return element_refs
                     else:
                         logger.warning(f"⚠️ Vision detected low confidence or no login form: {vision_data}")
                 else:
@@ -737,62 +766,58 @@ class VisionAnalyzer:
             logger.error(f"Failed to extract monitoring data: {e}")
             return {}
     
-    async def _convert_vision_to_selectors(self, page: Page, vision_data: Dict[str, Any]) -> Dict[str, str]:
-        """Convert vision analysis descriptions to actual CSS selectors"""
-        selectors = {}
+    async def _convert_coordinates_to_elements(self, page: Page, vision_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert vision coordinate data to element references using actual coordinates"""
+        element_refs = {}
         
-        # Try to find elements based on vision descriptions
-        # This is a simplified approach - in production, you'd use more sophisticated matching
-        username_selectors = [
-            'input[type="email"]',
-            'input[type="text"]',
-            'input[name*="user"]',
-            'input[name*="email"]',
-            'input[placeholder*="email" i]',
-            'input[placeholder*="username" i]'
-        ]
+        logger.info("🎯 Converting vision coordinates to actionable element references")
         
-        password_selectors = [
-            'input[type="password"]'
-        ]
+        # Extract coordinate data from vision analysis
+        username_data = vision_data.get('username_field', {})
+        password_data = vision_data.get('password_field', {})
+        submit_data = vision_data.get('submit_button', {})
         
-        submit_selectors = [
-            'button[type="submit"]',
-            'input[type="submit"]',
-            'button:has-text("Login")',
-            'button:has-text("Sign in")',
-            'button:has-text("Log in")'
-        ]
+        # For username field
+        if username_data and 'x' in username_data and 'y' in username_data:
+            element_refs['username'] = {
+                'type': 'coordinate',
+                'x': username_data['x'],
+                'y': username_data['y'],
+                'label': username_data.get('label', 'Username'),
+                'description': username_data.get('description', 'username field')
+            }
+            logger.info(f"📍 Username field: ({username_data['x']}, {username_data['y']}) - {username_data.get('label')}")
         
-        # Find working selectors
-        for selector in username_selectors:
-            try:
-                element = await page.query_selector(selector)
-                if element:
-                    selectors['username'] = selector
-                    break
-            except:
-                continue
+        # For password field  
+        if password_data and 'x' in password_data and 'y' in password_data:
+            element_refs['password'] = {
+                'type': 'coordinate',
+                'x': password_data['x'],
+                'y': password_data['y'],
+                'label': password_data.get('label', 'Password'),
+                'description': password_data.get('description', 'password field')
+            }
+            logger.info(f"📍 Password field: ({password_data['x']}, {password_data['y']}) - {password_data.get('label')}")
         
-        for selector in password_selectors:
-            try:
-                element = await page.query_selector(selector)
-                if element:
-                    selectors['password'] = selector
-                    break
-            except:
-                continue
+        # For submit button
+        if submit_data and 'x' in submit_data and 'y' in submit_data:
+            element_refs['submit'] = {
+                'type': 'coordinate',
+                'x': submit_data['x'],
+                'y': submit_data['y'],
+                'label': submit_data.get('label', 'Submit'),
+                'description': submit_data.get('description', 'submit button')
+            }
+            logger.info(f"📍 Submit button: ({submit_data['x']}, {submit_data['y']}) - {submit_data.get('label')}")
         
-        for selector in submit_selectors:
-            try:
-                element = await page.query_selector(selector)
-                if element:
-                    selectors['submit'] = selector
-                    break
-            except:
-                continue
+        # Validate that we found the essential elements
+        if len(element_refs) < 2:
+            logger.warning(f"⚠️ Insufficient elements found via coordinates: {len(element_refs)} (need at least username + password or submit)")
+            logger.error("❌ Pure vision detection failed - insufficient elements detected")
+            return {}
         
-        return selectors
+        logger.info(f"✅ Vision coordinate conversion completed: {len(element_refs)} elements")
+        return element_refs
     
     async def _convert_search_vision_to_selectors(self, page: Page, vision_data: Dict[str, Any]) -> Dict[str, str]:
         """Convert search vision analysis to actual CSS selectors"""
