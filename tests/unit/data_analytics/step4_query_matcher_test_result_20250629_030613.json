@@ -1,0 +1,20 @@
+{
+  "test_time": "2025-06-29T03:06:13.882733",
+  "total_tests": 7,
+  "passed_tests": 2,
+  "failed_tests": 5,
+  "success_rate": 28.57142857142857,
+  "test_queries": [
+    "Show me all companies with their codes",
+    "Find customs declarations from last month",
+    "Get products that have been shipped recently",
+    "How many companies are registered?",
+    "List all shipping containers and their contents",
+    "Show trade volume by country",
+    "Find all transactions above 100000",
+    "Get customer details for company_code ABC123",
+    "Show recent import declarations",
+    "List all products with their categories"
+  ],
+  "database_source": "customs_trade_db"
+}

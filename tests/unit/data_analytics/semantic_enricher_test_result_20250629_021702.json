@@ -1,0 +1,790 @@
+{
+  "business_entities": [
+    {
+      "entity_name": "companies",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [
+        "company_code",
+        "company_name"
+      ],
+      "relationships": [],
+      "record_count": 1000,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "containers",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [],
+      "relationships": [],
+      "record_count": 2521,
+      "business_importance": "medium"
+    },
+    {
+      "entity_name": "declarations",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [
+        "company_code",
+        "currency_code"
+      ],
+      "relationships": [],
+      "record_count": 10000,
+      "business_importance": "medium"
+    },
+    {
+      "entity_name": "goods_details",
+      "entity_type": "entity",
+      "confidence": 0.7,
+      "key_attributes": [
+        "hs_code",
+        "goods_name",
+        "currency_code"
+      ],
+      "relationships": [],
+      "record_count": 30292,
+      "business_importance": "high"
+    },
+    {
+      "entity_name": "hs_codes",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [
+        "hs_code",
+        "hs_description_cn",
+        "hs_description_en",
+        "chapter_code",
+        "chapter_name"
+      ],
+      "relationships": [],
+      "record_count": -1,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "metadata_embeddings",
+      "entity_type": "entity",
+      "confidence": 0.7,
+      "key_attributes": [
+        "entity_name",
+        "confidence_score"
+      ],
+      "relationships": [],
+      "record_count": -1,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "ports",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [
+        "port_code",
+        "port_name",
+        "country_code",
+        "country_name"
+      ],
+      "relationships": [],
+      "record_count": -1,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "price_monitoring",
+      "entity_type": "entity",
+      "confidence": 0.7,
+      "key_attributes": [
+        "hs_code",
+        "reference_price"
+      ],
+      "relationships": [],
+      "record_count": 5000,
+      "business_importance": "medium"
+    },
+    {
+      "entity_name": "risk_alerts",
+      "entity_type": "entity",
+      "confidence": 0.6,
+      "key_attributes": [
+        "alert_id",
+        "company_code",
+        "risk_description"
+      ],
+      "relationships": [
+        {
+          "type": "foreign_key",
+          "target_table": "risk_alerts",
+          "column": "alert_id",
+          "confidence": 0.8
+        }
+      ],
+      "record_count": 500,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "trade_relationships",
+      "entity_type": "entity",
+      "confidence": 0.7,
+      "key_attributes": [
+        "exporter_code",
+        "importer_code"
+      ],
+      "relationships": [],
+      "record_count": 100,
+      "business_importance": "low"
+    },
+    {
+      "entity_name": "vehicles",
+      "entity_type": "entity",
+      "confidence": 0.7,
+      "key_attributes": [
+        "vehicle_id",
+        "vehicle_name"
+      ],
+      "relationships": [
+        {
+          "type": "foreign_key",
+          "target_table": "vehicles",
+          "column": "vehicle_id",
+          "confidence": 0.8
+        }
+      ],
+      "record_count": -1,
+      "business_importance": "low"
+    }
+  ],
+  "semantic_tags": {
+    "table:companies": [],
+    "table:containers": [],
+    "table:declarations": [],
+    "table:goods_details": [],
+    "table:hs_codes": [
+      "domain:identifier"
+    ],
+    "table:metadata_embeddings": [],
+    "table:ports": [],
+    "table:price_monitoring": [
+      "domain:financial"
+    ],
+    "table:risk_alerts": [],
+    "table:trade_relationships": [],
+    "table:vehicles": [],
+    "column:companies.company_code": [
+      "business:identifier"
+    ],
+    "column:companies.company_name": [],
+    "column:companies.company_type": [],
+    "column:companies.credit_level": [],
+    "column:companies.registration_address": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:companies.business_scope": [],
+    "column:companies.established_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:companies.annual_trade_volume": [],
+    "column:companies.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:companies.updated_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:containers.container_no": [],
+    "column:containers.declaration_no": [],
+    "column:containers.container_type": [],
+    "column:containers.container_size": [],
+    "column:containers.seal_no": [],
+    "column:containers.gross_weight": [],
+    "column:containers.loading_port": [],
+    "column:containers.discharge_port": [],
+    "column:containers.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:declarations.declaration_no": [],
+    "column:declarations.company_code": [
+      "business:identifier"
+    ],
+    "column:declarations.trade_type": [],
+    "column:declarations.trade_mode": [],
+    "column:declarations.transport_mode": [],
+    "column:declarations.departure_port": [],
+    "column:declarations.arrival_port": [],
+    "column:declarations.destination_country": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:declarations.origin_country": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:declarations.declare_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:declarations.customs_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:declarations.release_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:declarations.total_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:declarations.currency_code": [
+      "business:identifier"
+    ],
+    "column:declarations.exchange_rate": [],
+    "column:declarations.rmb_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:declarations.total_tax": [],
+    "column:declarations.customs_officer": [],
+    "column:declarations.status": [
+      "business:status"
+    ],
+    "column:declarations.risk_level": [],
+    "column:declarations.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:declarations.updated_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:goods_details.id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:goods_details.declaration_no": [],
+    "column:goods_details.seq_no": [],
+    "column:goods_details.hs_code": [
+      "business:identifier"
+    ],
+    "column:goods_details.goods_name": [],
+    "column:goods_details.specifications": [],
+    "column:goods_details.origin_country": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:goods_details.quantity_1": [],
+    "column:goods_details.unit_1": [],
+    "column:goods_details.quantity_2": [],
+    "column:goods_details.unit_2": [],
+    "column:goods_details.unit_price": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:goods_details.total_price": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:goods_details.currency_code": [
+      "business:identifier"
+    ],
+    "column:goods_details.brand": [],
+    "column:goods_details.model": [],
+    "column:goods_details.manufacturer": [],
+    "column:goods_details.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:hs_codes.hs_code": [
+      "business:identifier"
+    ],
+    "column:hs_codes.hs_description_cn": [],
+    "column:hs_codes.hs_description_en": [],
+    "column:hs_codes.chapter_code": [
+      "business:identifier"
+    ],
+    "column:hs_codes.chapter_name": [],
+    "column:hs_codes.unit_1": [],
+    "column:hs_codes.unit_2": [],
+    "column:hs_codes.import_tax_rate": [],
+    "column:hs_codes.export_tax_rate": [],
+    "column:hs_codes.supervision_condition": [
+      "business:status"
+    ],
+    "column:hs_codes.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:metadata_embeddings.id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:metadata_embeddings.entity_type": [],
+    "column:metadata_embeddings.entity_name": [],
+    "column:metadata_embeddings.content": [],
+    "column:metadata_embeddings.embedding": [],
+    "column:metadata_embeddings.metadata": [],
+    "column:metadata_embeddings.semantic_tags": [],
+    "column:metadata_embeddings.confidence_score": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:metadata_embeddings.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:metadata_embeddings.updated_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:ports.port_code": [
+      "business:identifier"
+    ],
+    "column:ports.port_name": [],
+    "column:ports.port_type": [],
+    "column:ports.country_code": [
+      "semantic:geospatial",
+      "business:location",
+      "business:identifier"
+    ],
+    "column:ports.country_name": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:ports.province": [],
+    "column:ports.city": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:ports.latitude": [],
+    "column:ports.longitude": [],
+    "column:ports.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:price_monitoring.id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:price_monitoring.hs_code": [
+      "business:identifier"
+    ],
+    "column:price_monitoring.reference_price": [
+      "semantic:monetary",
+      "business:financial",
+      "business:identifier"
+    ],
+    "column:price_monitoring.price_date": [
+      "semantic:temporal",
+      "semantic:monetary",
+      "business:financial",
+      "business:temporal"
+    ],
+    "column:price_monitoring.price_source": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:price_monitoring.market_region": [
+      "business:location"
+    ],
+    "column:price_monitoring.price_type": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:price_monitoring.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:risk_alerts.alert_id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:risk_alerts.declaration_no": [],
+    "column:risk_alerts.company_code": [
+      "business:identifier"
+    ],
+    "column:risk_alerts.risk_type": [],
+    "column:risk_alerts.risk_level": [],
+    "column:risk_alerts.risk_description": [],
+    "column:risk_alerts.alert_time": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:risk_alerts.handled": [],
+    "column:risk_alerts.handler": [],
+    "column:risk_alerts.handle_time": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:trade_relationships.id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:trade_relationships.exporter_code": [
+      "business:identifier"
+    ],
+    "column:trade_relationships.importer_code": [
+      "business:identifier"
+    ],
+    "column:trade_relationships.trade_frequency": [],
+    "column:trade_relationships.total_trade_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:trade_relationships.main_products": [
+      "business:product"
+    ],
+    "column:trade_relationships.relationship_start_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:trade_relationships.relationship_strength": [],
+    "column:trade_relationships.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:v_company_trade_stats.company_code": [
+      "business:identifier"
+    ],
+    "column:v_company_trade_stats.company_name": [],
+    "column:v_company_trade_stats.company_type": [],
+    "column:v_company_trade_stats.declaration_count": [],
+    "column:v_company_trade_stats.total_trade_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:v_company_trade_stats.avg_trade_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:v_company_trade_stats.last_trade_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:v_trade_summary.declaration_no": [],
+    "column:v_trade_summary.company_name": [],
+    "column:v_trade_summary.trade_type": [],
+    "column:v_trade_summary.origin_country": [
+      "semantic:geospatial",
+      "business:location"
+    ],
+    "column:v_trade_summary.declare_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:v_trade_summary.rmb_amount": [
+      "semantic:monetary",
+      "business:financial"
+    ],
+    "column:v_trade_summary.status": [
+      "business:status"
+    ],
+    "column:v_trade_summary.goods_count": [],
+    "column:vehicles.vehicle_id": [
+      "semantic:identifier",
+      "business:identifier"
+    ],
+    "column:vehicles.vehicle_name": [],
+    "column:vehicles.vehicle_type": [],
+    "column:vehicles.transport_company": [],
+    "column:vehicles.nationality": [],
+    "column:vehicles.voyage_no": [],
+    "column:vehicles.arrival_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:vehicles.departure_date": [
+      "semantic:temporal",
+      "business:temporal"
+    ],
+    "column:vehicles.created_at": [
+      "semantic:temporal",
+      "business:temporal"
+    ]
+  },
+  "data_patterns": [
+    {
+      "pattern_type": "hierarchical",
+      "description": "Hierarchical data structure detected",
+      "columns_involved": [
+        "companies.credit_level",
+        "declarations.risk_level",
+        "risk_alerts.risk_level"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: declarations -> containers",
+      "tables_involved": [
+        "declarations",
+        "containers"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: declarations -> goods_details",
+      "tables_involved": [
+        "declarations",
+        "goods_details"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: declarations -> risk_alerts",
+      "tables_involved": [
+        "declarations",
+        "risk_alerts"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: ports -> containers",
+      "tables_involved": [
+        "ports",
+        "containers"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: ports -> containers",
+      "tables_involved": [
+        "ports",
+        "containers"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: ports -> declarations",
+      "tables_involved": [
+        "ports",
+        "declarations"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: ports -> declarations",
+      "tables_involved": [
+        "ports",
+        "declarations"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: companies -> declarations",
+      "tables_involved": [
+        "companies",
+        "declarations"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: companies -> risk_alerts",
+      "tables_involved": [
+        "companies",
+        "risk_alerts"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: companies -> trade_relationships",
+      "tables_involved": [
+        "companies",
+        "trade_relationships"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: companies -> trade_relationships",
+      "tables_involved": [
+        "companies",
+        "trade_relationships"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: hs_codes -> goods_details",
+      "tables_involved": [
+        "hs_codes",
+        "goods_details"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "pattern_type": "master_detail",
+      "description": "Master-detail relationship: hs_codes -> price_monitoring",
+      "tables_involved": [
+        "hs_codes",
+        "price_monitoring"
+      ],
+      "confidence": 0.7
+    }
+  ],
+  "business_rules": [
+    {
+      "rule_type": "referential_integrity",
+      "description": "containers.declaration_no must reference valid declarations.declaration_no",
+      "confidence": 0.9,
+      "tables_involved": [
+        "containers",
+        "declarations"
+      ],
+      "sql_constraint": "FOREIGN KEY (declaration_no) REFERENCES declarations(declaration_no)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "containers.discharge_port must reference valid ports.port_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "containers",
+        "ports"
+      ],
+      "sql_constraint": "FOREIGN KEY (discharge_port) REFERENCES ports(port_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "containers.loading_port must reference valid ports.port_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "containers",
+        "ports"
+      ],
+      "sql_constraint": "FOREIGN KEY (loading_port) REFERENCES ports(port_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "declarations.arrival_port must reference valid ports.port_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "declarations",
+        "ports"
+      ],
+      "sql_constraint": "FOREIGN KEY (arrival_port) REFERENCES ports(port_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "declarations.company_code must reference valid companies.company_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "declarations",
+        "companies"
+      ],
+      "sql_constraint": "FOREIGN KEY (company_code) REFERENCES companies(company_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "declarations.departure_port must reference valid ports.port_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "declarations",
+        "ports"
+      ],
+      "sql_constraint": "FOREIGN KEY (departure_port) REFERENCES ports(port_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "goods_details.declaration_no must reference valid declarations.declaration_no",
+      "confidence": 0.9,
+      "tables_involved": [
+        "goods_details",
+        "declarations"
+      ],
+      "sql_constraint": "FOREIGN KEY (declaration_no) REFERENCES declarations(declaration_no)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "goods_details.hs_code must reference valid hs_codes.hs_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "goods_details",
+        "hs_codes"
+      ],
+      "sql_constraint": "FOREIGN KEY (hs_code) REFERENCES hs_codes(hs_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "price_monitoring.hs_code must reference valid hs_codes.hs_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "price_monitoring",
+        "hs_codes"
+      ],
+      "sql_constraint": "FOREIGN KEY (hs_code) REFERENCES hs_codes(hs_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "risk_alerts.company_code must reference valid companies.company_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "risk_alerts",
+        "companies"
+      ],
+      "sql_constraint": "FOREIGN KEY (company_code) REFERENCES companies(company_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "risk_alerts.declaration_no must reference valid declarations.declaration_no",
+      "confidence": 0.9,
+      "tables_involved": [
+        "risk_alerts",
+        "declarations"
+      ],
+      "sql_constraint": "FOREIGN KEY (declaration_no) REFERENCES declarations(declaration_no)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "trade_relationships.exporter_code must reference valid companies.company_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "trade_relationships",
+        "companies"
+      ],
+      "sql_constraint": "FOREIGN KEY (exporter_code) REFERENCES companies(company_code)"
+    },
+    {
+      "rule_type": "referential_integrity",
+      "description": "trade_relationships.importer_code must reference valid companies.company_code",
+      "confidence": 0.9,
+      "tables_involved": [
+        "trade_relationships",
+        "companies"
+      ],
+      "sql_constraint": "FOREIGN KEY (importer_code) REFERENCES companies(company_code)"
+    }
+  ],
+  "domain_classification": {
+    "primary_domain": "ecommerce",
+    "confidence": 0.0,
+    "domain_scores": {
+      "ecommerce": 0.0,
+      "hr": 0.0,
+      "finance": 0.0,
+      "crm": 0.0
+    },
+    "is_multi_domain": false
+  },
+  "confidence_scores": {
+    "entity_extraction": 0.6454545454545454,
+    "semantic_tagging": 0.27631578947368424,
+    "pattern_detection": 0.7,
+    "business_rules": 0.9000000000000002,
+    "overall": 0.6304425837320574
+  },
+  "test_summary": {
+    "total_tests": 7,
+    "passed_tests": 7,
+    "failed_tests": 0,
+    "success_rate": 100.0
+  }
+}

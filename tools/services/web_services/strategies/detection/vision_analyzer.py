@@ -2,9 +2,12 @@
 """
 Vision Analyzer for Web Services
 Provides vision-guided web automation using AI models to understand page layouts
+Integrated with stacked AI model for precise coordinate detection
 """
 import json
 import base64
+import tempfile
+import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -16,37 +19,52 @@ from isa_model.inference import AIFactory
 logger = get_logger(__name__)
 
 class VisionAnalyzer:
-    """Vision-guided web automation using AI models"""
+    """Vision-guided web automation using AI models with stacked architecture"""
     
     def __init__(self):
         self.screenshots_path = Path("screenshots")
         self.screenshots_path.mkdir(exist_ok=True)
         self.monitoring_path = Path("monitoring")
         self.monitoring_path.mkdir(exist_ok=True)
+        self.ai_factory = AIFactory()
+        self.ui_service = None
     
-    async def identify_login_form(self, page: Page) -> Dict[str, str]:
-        """Identify login form elements using PURE vision analysis - no traditional detection"""
+    async def identify_login_form(self, page: Page) -> Dict[str, Any]:
+        """Identify login form elements using stacked AI model for precise coordinate detection"""
         try:
-            logger.info("Starting PURE VISION login form identification")
+            logger.info("🎯 Starting stacked AI model login form identification")
             
             # Take screenshot for analysis
             screenshot = await page.screenshot(full_page=False)
-            logger.info(f"Screenshot taken: {len(screenshot)} bytes")
+            logger.info(f"📸 Screenshot taken: {len(screenshot)} bytes")
             
-            # FORCE AI VISION USAGE - skip all traditional detection
-            logger.info("Using ONLY vision-based detection...")
-            login_elements = await self._vision_based_login_detection(screenshot, page)
-            logger.info(f"Vision detection result: {login_elements}")
+            # Save screenshot temporarily
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                tmp_file.write(screenshot)
+                screenshot_path = tmp_file.name
             
-            if login_elements:
-                logger.info(f"Successfully identified login elements via AI vision: {login_elements}")
-                return login_elements
-            else:
-                logger.error("AI vision failed to detect login elements - no fallback available")
-                raise Exception("Pure vision detection failed - unable to identify login form")
+            logger.info(f"📁 Screenshot saved: {screenshot_path}")
+            
+            try:
+                # Use stacked AI model for login analysis
+                login_elements = await self._stacked_ai_login_analysis(screenshot_path)
+                logger.info(f"🤖 Stacked AI analysis result: {login_elements}")
+                
+                if login_elements and len(login_elements) >= 2:
+                    logger.info(f"✅ Successfully identified login elements via stacked AI: {len(login_elements)} elements")
+                    return login_elements
+                else:
+                    logger.error("❌ Stacked AI failed to detect sufficient login elements")
+                    raise Exception("Stacked AI detection failed - unable to identify login form")
+                    
+            finally:
+                # Clean up temporary file
+                if os.path.exists(screenshot_path):
+                    os.unlink(screenshot_path)
+                    logger.info("🧹 Cleaned up temporary screenshot")
             
         except Exception as e:
-            logger.error(f"Pure vision login form identification failed: {e}")
+            logger.error(f"❌ Stacked AI login form identification failed: {e}")
             import traceback
             logger.error(f"Full traceback: {traceback.format_exc()}")
             raise
@@ -102,180 +120,58 @@ class VisionAnalyzer:
         
         return login_elements if len(login_elements) >= 2 else {}
     
-    async def _vision_based_login_detection(self, screenshot: bytes, page: Page) -> Dict[str, str]:
-        """Vision-based login form detection using AIFactory vision service"""
+    async def _stacked_ai_login_analysis(self, screenshot_path: str) -> Dict[str, Any]:
+        """Use stacked AI model for login form analysis similar to demo test"""
         try:
-            logger.info("🔍 Initializing vision service...")
-            # Get vision service
-            vision = AIFactory().get_vision()
-            logger.info(f"✅ Vision service initialized: {type(vision)}")
+            logger.info("🔧 Initializing stacked AI UI analysis service...")
             
-            # Enhanced analysis prompt for coordinate-based vision detection
-            analysis_prompt = """
-            Analyze this webpage screenshot carefully and identify login form elements with their exact positions.
-            Look for these specific elements:
-            1. Username/email input fields (text boxes for entering email or username)
-            2. Password input fields (hidden text boxes for entering passwords) 
-            3. Login/submit/sign-in buttons (clickable buttons to submit the form)
+            # Create UI analysis service like in the demo
+            if self.ui_service is None:
+                self.ui_service = self.ai_factory.get_ui_analysis(task_type="login")
+                logger.info(f"✅ UI analysis service created: {type(self.ui_service)}")
             
-            For each element found, provide the CENTER coordinates (x, y) where a user would click or type.
+            # Invoke the stacked model analysis
+            logger.info("🤖 Starting stacked AI analysis...")
+            result = await self.ui_service.invoke({
+                "image_path": screenshot_path
+            })
             
-            IMPORTANT: You must return EXACTLY this JSON format with NO additional text:
-            {
-                "login_form_found": true,
-                "username_field": {
-                    "x": 150,
-                    "y": 200,
-                    "label": "Username",
-                    "description": "text input field for username"
-                },
-                "password_field": {
-                    "x": 150,
-                    "y": 250,
-                    "label": "Password", 
-                    "description": "password input field"
-                },
-                "submit_button": {
-                    "x": 150,
-                    "y": 300,
-                    "label": "Login",
-                    "description": "login submit button"
-                },
-                "confidence": 0.95
-            }
+            logger.info(f"📊 Stacked AI analysis completed")
+            logger.info(f"🔍 Result structure: {list(result.keys()) if isinstance(result, dict) else type(result)}")
             
-            If no login form is found, return:
-            {
-                "login_form_found": false,
-                "confidence": 0.0
-            }
-            
-            CRITICAL: Provide actual pixel coordinates based on what you see in the image.
-            """
-            
-            # Save screenshot temporarily for vision analysis
-            import tempfile
-            import os
-            
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
-                tmp_file.write(screenshot)
-                temp_path = tmp_file.name
-            
-            logger.info(f"📸 Screenshot saved temporarily: {temp_path}")
-            
-            try:
-                logger.info("🤖 Calling vision service to analyze screenshot...")
-                result = await vision.analyze_image(
-                    image=temp_path,
-                    prompt=analysis_prompt
-                )
-                logger.info(f"✅ Vision service completed analysis")
-                logger.info(f"🔍 Vision result type: {type(result)}")
-                logger.info(f"📄 Vision result content: {result}")
-                
-            except Exception as vision_error:
-                logger.error(f"❌ Vision service failed to analyze screenshot: {vision_error}")
-                import traceback
-                logger.error(f"Full vision error traceback: {traceback.format_exc()}")
-                # Clean up and return empty result
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-                await vision.close()
-                return {}
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-                    logger.info("🧹 Cleaned up temporary screenshot file")
-            
-            await vision.close()
-            logger.info("🔒 Vision service closed")
-            
-            # Parse AI response to extract form selectors
-            logger.info(f"🔍 Parsing vision analysis response...")
-            
-            # Handle different response formats from vision service
-            analysis_text = ""
-            if result:
-                if isinstance(result, dict):
-                    # Try different common field names
-                    analysis_text = (result.get('text') or 
-                                   result.get('content') or 
-                                   result.get('response') or 
-                                   result.get('answer') or
-                                   result.get('message') or
-                                   str(result))
-                elif isinstance(result, str):
-                    analysis_text = result
-                else:
-                    analysis_text = str(result)
-            
-            logger.info(f"📄 Extracted analysis text ({len(analysis_text)} chars): {analysis_text[:500]}...")
-            
-            if not analysis_text:
-                logger.error("❌ No text returned from vision analysis")
+            if not result.get("success"):
+                logger.error(f"❌ Stacked AI analysis failed: {result}")
                 return {}
             
-            # Try to extract JSON from response with enhanced parsing
-            try:
-                import re
-                import json
-                
-                # Try to parse the JSON directly first (since it should be clean JSON)
-                vision_data = None
-                try:
-                    # Try parsing the full response as JSON first
-                    vision_data = json.loads(analysis_text.strip())
-                    logger.info(f"✅ Successfully parsed vision JSON directly: {vision_data}")
-                except json.JSONDecodeError:
-                    # If that fails, try to extract JSON with patterns
-                    logger.info("🔍 Direct JSON parsing failed, trying pattern extraction...")
-                    
-                    # Look for JSON in the response with patterns for nested objects
-                    json_patterns = [
-                        # Match balanced braces for nested objects
-                        r'\{(?:[^{}]|{[^{}]*})*\}',                     # Balanced braces
-                        r'\{[\s\S]*?"login_form_found"[\s\S]*?\}',      # Multi-line
-                        r'\{.*?"login_form_found".*?\}',                # Flexible
-                    ]
-                    
-                    for pattern in json_patterns:
-                        json_match = re.search(pattern, analysis_text, re.DOTALL)
-                        if json_match:
-                            try:
-                                vision_data = json.loads(json_match.group())
-                                logger.info(f"✅ Successfully parsed vision JSON with pattern: {vision_data}")
-                                break
-                            except json.JSONDecodeError as json_error:
-                                logger.warning(f"❌ Failed to parse JSON with pattern {pattern}: {json_error}")
-                                logger.warning(f"JSON text snippet: {json_match.group()[:200]}...")
-                                continue
-                
-                if vision_data:
-                    if vision_data.get('login_form_found') and vision_data.get('confidence', 0) > 0.5:
-                        logger.info("🎯 Login form detected by vision with sufficient confidence")
-                        # Convert vision coordinate data to element references
-                        element_refs = await self._convert_coordinates_to_elements(page, vision_data)
-                        logger.info(f"🔧 Generated element references from vision coordinates: {element_refs}")
-                        return element_refs
-                    else:
-                        logger.warning(f"⚠️ Vision detected low confidence or no login form: {vision_data}")
-                else:
-                    logger.error("❌ No valid JSON found in vision response")
-                    logger.info(f"📄 Full response content: {analysis_text}")
-                    
-            except Exception as parse_error:
-                logger.error(f"❌ Failed to parse vision analysis: {parse_error}")
-                import traceback
-                logger.error(f"Parse error traceback: {traceback.format_exc()}")
+            # Extract the analysis results similar to demo
+            final_output = result.get("final_output", {})
+            action_plan = final_output.get("action_plan", {})
+            ui_elements = final_output.get("ui_elements", {})
+            automation_ready = final_output.get("automation_ready", {})
             
-            logger.error("❌ Vision-based login detection returned empty result")
-            return {}
+            logger.info(f"🎯 Analysis results:")
+            logger.info(f"   Page type: {automation_ready.get('page_type', 'unknown')}")
+            logger.info(f"   Automation ready: {automation_ready.get('ready', False)}")
+            logger.info(f"   Confidence: {automation_ready.get('confidence', 0):.2f}")
             
+            # Extract action steps with coordinates
+            steps = action_plan.get("action_plan", [])
+            logger.info(f"🚀 Found {len(steps)} action steps")
+            
+            # Convert stacked AI results to element references
+            element_refs = await self._convert_stacked_ai_to_elements(steps, ui_elements)
+            
+            if element_refs and len(element_refs) >= 2:
+                logger.info(f"✅ Successfully converted to {len(element_refs)} element references")
+                return element_refs
+            else:
+                logger.error(f"❌ Insufficient elements extracted from stacked AI: {len(element_refs)}")
+                return {}
+                
         except Exception as e:
-            logger.error(f"❌ Vision-based login detection failed with exception: {e}")
+            logger.error(f"❌ Stacked AI login analysis failed: {e}")
             import traceback
-            logger.error(f"Full exception traceback: {traceback.format_exc()}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return {}
     
     async def identify_search_form(self, page: Page) -> Dict[str, str]:
@@ -766,57 +662,101 @@ class VisionAnalyzer:
             logger.error(f"Failed to extract monitoring data: {e}")
             return {}
     
-    async def _convert_coordinates_to_elements(self, page: Page, vision_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert vision coordinate data to element references using actual coordinates"""
+    async def _convert_stacked_ai_to_elements(self, action_steps: List[Dict], ui_elements: Dict) -> Dict[str, Any]:
+        """Convert stacked AI analysis results to element references with coordinates"""
         element_refs = {}
         
-        logger.info("🎯 Converting vision coordinates to actionable element references")
+        logger.info("🎯 Converting stacked AI results to actionable element references")
         
-        # Extract coordinate data from vision analysis
-        username_data = vision_data.get('username_field', {})
-        password_data = vision_data.get('password_field', {})
-        submit_data = vision_data.get('submit_button', {})
+        # Map action types to element keys
+        action_map = {
+            'type': ['username', 'email', 'user'],
+            'fill': ['password', 'pass'],
+            'click': ['submit', 'login', 'button']
+        }
         
-        # For username field
-        if username_data and 'x' in username_data and 'y' in username_data:
-            element_refs['username'] = {
-                'type': 'coordinate',
-                'x': username_data['x'],
-                'y': username_data['y'],
-                'label': username_data.get('label', 'Username'),
-                'description': username_data.get('description', 'username field')
-            }
-            logger.info(f"📍 Username field: ({username_data['x']}, {username_data['y']}) - {username_data.get('label')}")
+        for i, step in enumerate(action_steps):
+            action = step.get("action", "").lower()
+            coords = step.get("actual_coordinates", step.get("target_coordinates", [0, 0]))
+            description = step.get("description", "")
+            
+            logger.info(f"📋 Step {i+1}: {action} at {coords} - {description}")
+            
+            # Determine element type based on action and description
+            element_key = None
+            if action in ['type', 'fill'] and any(word in description.lower() for word in ['username', 'email', 'user']):
+                element_key = 'username'
+            elif action in ['type', 'fill'] and any(word in description.lower() for word in ['password', 'pass']):
+                element_key = 'password'
+            elif action == 'click' and any(word in description.lower() for word in ['submit', 'login', 'button']):
+                element_key = 'submit'
+            
+            if element_key and len(coords) >= 2:
+                element_refs[element_key] = {
+                    'type': 'coordinate',
+                    'x': int(coords[0]),
+                    'y': int(coords[1]),
+                    'action': action,
+                    'description': description,
+                    'step_index': i
+                }
+                logger.info(f"📍 {element_key} field: ({coords[0]}, {coords[1]}) - {description}")
         
-        # For password field  
-        if password_data and 'x' in password_data and 'y' in password_data:
-            element_refs['password'] = {
-                'type': 'coordinate',
-                'x': password_data['x'],
-                'y': password_data['y'],
-                'label': password_data.get('label', 'Password'),
-                'description': password_data.get('description', 'password field')
-            }
-            logger.info(f"📍 Password field: ({password_data['x']}, {password_data['y']}) - {password_data.get('label')}")
+        # Also extract interactive elements for additional context
+        interactive_elements = ui_elements.get("interactive_elements", [])
+        logger.info(f"🔴 Found {len(interactive_elements)} interactive elements")
         
-        # For submit button
-        if submit_data and 'x' in submit_data and 'y' in submit_data:
-            element_refs['submit'] = {
-                'type': 'coordinate',
-                'x': submit_data['x'],
-                'y': submit_data['y'],
-                'label': submit_data.get('label', 'Submit'),
-                'description': submit_data.get('description', 'submit button')
-            }
-            logger.info(f"📍 Submit button: ({submit_data['x']}, {submit_data['y']}) - {submit_data.get('label')}")
+        # If we don't have enough elements from action plan, try interactive elements
+        if len(element_refs) < 2 and interactive_elements:
+            logger.info("⚠️ Attempting to extract elements from interactive_elements list")
+            
+            for elem in interactive_elements:
+                elem_type = elem.get("type", "").lower()
+                content = elem.get("content", "").lower()
+                center = elem.get("center", [0, 0])
+                
+                if len(center) >= 2:
+                    if elem_type == "input" and "username" not in element_refs:
+                        if any(word in content for word in ['username', 'email', 'user']):
+                            element_refs['username'] = {
+                                'type': 'coordinate',
+                                'x': int(center[0]),
+                                'y': int(center[1]),
+                                'action': 'type',
+                                'description': f"Input field: {content}",
+                                'source': 'interactive_elements'
+                            }
+                    elif elem_type == "input" and "password" not in element_refs:
+                        if any(word in content for word in ['password', 'pass']):
+                            element_refs['password'] = {
+                                'type': 'coordinate',
+                                'x': int(center[0]),
+                                'y': int(center[1]),
+                                'action': 'type',
+                                'description': f"Input field: {content}",
+                                'source': 'interactive_elements'
+                            }
+                    elif elem_type == "button" and "submit" not in element_refs:
+                        if any(word in content for word in ['login', 'submit', 'sign in']):
+                            element_refs['submit'] = {
+                                'type': 'coordinate',
+                                'x': int(center[0]),
+                                'y': int(center[1]),
+                                'action': 'click',
+                                'description': f"Button: {content}",
+                                'source': 'interactive_elements'
+                            }
         
         # Validate that we found the essential elements
         if len(element_refs) < 2:
-            logger.warning(f"⚠️ Insufficient elements found via coordinates: {len(element_refs)} (need at least username + password or submit)")
-            logger.error("❌ Pure vision detection failed - insufficient elements detected")
+            logger.warning(f"⚠️ Insufficient elements found: {len(element_refs)} (need at least username + password or submit)")
+            logger.error("❌ Stacked AI detection failed - insufficient elements detected")
             return {}
         
-        logger.info(f"✅ Vision coordinate conversion completed: {len(element_refs)} elements")
+        logger.info(f"✅ Stacked AI conversion completed: {len(element_refs)} elements")
+        for key, elem in element_refs.items():
+            logger.info(f"   {key}: ({elem['x']}, {elem['y']}) - {elem['description']}")
+        
         return element_refs
     
     async def _convert_search_vision_to_selectors(self, page: Page, vision_data: Dict[str, Any]) -> Dict[str, str]:

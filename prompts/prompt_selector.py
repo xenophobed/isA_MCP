@@ -173,9 +173,7 @@ class PromptSelector:
                     "type": "mcp"
                 }
                 
-                logger.info(f"  {prompt_name}: {description[:50]}...")
-                logger.info(f"    Keywords: {keywords}")
-                logger.info(f"    Category: {category}")
+                # 减少初始化日志
             
             # If no MCP prompts found, fallback to hardcoded ones
             if not self.prompts_info:
@@ -249,10 +247,18 @@ class PromptSelector:
         try:
             result = self.supabase.client.table('prompt_embeddings').select('prompt_name, embedding').execute()
             
-            if result.data and len(result.data) == len(self.prompts_info):
+            if result.data and len(result.data) >= len(self.prompts_info) * 0.8:
                 for row in result.data:
                     prompt_name = row['prompt_name']
                     embedding = row['embedding']
+                    
+                    # 确保embedding是List[float]格式
+                    if isinstance(embedding, str):
+                        import json
+                        embedding = json.loads(embedding)
+                    elif isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], str):
+                        embedding = [float(x) for x in embedding]
+                    
                     self.embeddings_cache[prompt_name] = embedding
                 
                 logger.info(f"Loaded cached embeddings for {len(result.data)} prompts")
@@ -324,8 +330,7 @@ class PromptSelector:
                 if score >= self.threshold and len(selected) < max_prompts:
                     selected.append(prompt_name)
                     logger.info(f"  Selected {prompt_name} (score: {score:.4f} >= {self.threshold})")
-                else:
-                    logger.info(f"  Skipped {prompt_name} (score: {score:.4f} < {self.threshold} or max reached)")
+                # 移除冗长的跳过日志
             
             # If no prompts above threshold, select at least one most relevant
             if not selected and sorted_prompts:

@@ -2,6 +2,10 @@ import os
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 @dataclass
 class SecuritySettings:
@@ -62,6 +66,30 @@ class MCPSettings:
     # External service configurations
     openweather_api_key: Optional[str] = None
     
+    # AI/ML Service APIs
+    openai_api_key: Optional[str] = None
+    openai_api_base: Optional[str] = None
+    replicate_api_token: Optional[str] = None
+    hf_token: Optional[str] = None
+    runpod_api_key: Optional[str] = None
+    
+    # Search APIs
+    brave_api_key: Optional[str] = None
+    
+    # Development/Package APIs
+    pypi_api_token: Optional[str] = None
+    
+    # E-commerce APIs
+    shopify_store_domain: Optional[str] = None
+    shopify_storefront_access_token: Optional[str] = None
+    shopify_admin_api_key: Optional[str] = None
+    
+    # Database/Storage APIs
+    supabase_url: Optional[str] = None
+    supabase_anon_key: Optional[str] = None
+    supabase_service_role_key: Optional[str] = None
+    supabase_pwd: Optional[str] = None
+    
     # Sub-configurations
     security: SecuritySettings = field(default_factory=SecuritySettings)
     database: DatabaseSettings = field(default_factory=DatabaseSettings)
@@ -112,6 +140,33 @@ class MCPSettings:
         # Logging settings
         self.logging.log_level = os.getenv("MCP_LOG_LOG_LEVEL", self.logging.log_level)
         self.logging.log_file = os.getenv("MCP_LOG_LOG_FILE", self.logging.log_file)
+        
+        # External service API keys
+        self.openweather_api_key = os.getenv("OPENWEATHER_API_KEY", self.openweather_api_key)
+        
+        # AI/ML Service APIs
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", self.openai_api_key)
+        self.openai_api_base = os.getenv("OPENAI_API_BASE", self.openai_api_base)
+        self.replicate_api_token = os.getenv("REPLICATE_API_TOKEN", self.replicate_api_token)
+        self.hf_token = os.getenv("HF_TOKEN", self.hf_token)
+        self.runpod_api_key = os.getenv("RUNPOD_API_KEY", self.runpod_api_key)
+        
+        # Search APIs (note: using BRAVE_TOKEN from .env)
+        self.brave_api_key = os.getenv("BRAVE_TOKEN", self.brave_api_key)
+        
+        # Development/Package APIs
+        self.pypi_api_token = os.getenv("PYPI_API_TOKEN", self.pypi_api_token)
+        
+        # E-commerce APIs
+        self.shopify_store_domain = os.getenv("SHOPIFY_STORE_DOMAIN", self.shopify_store_domain)
+        self.shopify_storefront_access_token = os.getenv("SHOPIFY_STOREFRONT_ACCESS_TOKEN", self.shopify_storefront_access_token)
+        self.shopify_admin_api_key = os.getenv("SHOPIFY_ADMIN_API_KEY", self.shopify_admin_api_key)
+        
+        # Database/Storage APIs
+        self.supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL", self.supabase_url)
+        self.supabase_anon_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", self.supabase_anon_key)
+        self.supabase_service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", self.supabase_service_role_key)
+        self.supabase_pwd = os.getenv("SUPABASE_PWD", self.supabase_pwd)
         
         return self
 

@@ -136,13 +136,13 @@ class AutoDiscoverySystem:
             if python_file.name.startswith("__"):
                 continue
                 
-            logger.info(f"  📄 Scanning {python_file.name}")
+            # logger.info(f"  📄 Scanning {python_file.name}")  # 减少冷余日志
             functions = self.discover_functions_in_file(python_file)
             
             for func_info in functions:
                 tool_name = func_info["name"]
                 tools[tool_name] = func_info
-                logger.info(f"    🔧 Found tool: {tool_name}")
+                # logger.info(f"    🔧 Found tool: {tool_name}")  # 减少冷余日志
         
         logger.info(f"✅ Discovered {len(tools)} tools total")
         
@@ -164,7 +164,7 @@ class AutoDiscoverySystem:
             if python_file.name.startswith("__"):
                 continue
                 
-            logger.info(f"  📄 Scanning {python_file.name}")
+            # logger.info(f"  📄 Scanning {python_file.name}")  # 减少冷余日志
             
             try:
                 # Import module to get prompt variables
@@ -217,7 +217,7 @@ class AutoDiscoverySystem:
             if python_file.name.startswith("__"):
                 continue
                 
-            logger.info(f"  📄 Scanning {python_file.name}")
+            # logger.info(f"  📄 Scanning {python_file.name}")  # 减少冷余日志
             functions = self.discover_functions_in_file(python_file)
             
             # Also look for resource variables or classes
@@ -240,7 +240,7 @@ class AutoDiscoverySystem:
                                     "keywords": metadata["keywords"] or attr_name.split("_"),
                                     "type": "resource"
                                 }
-                                logger.info(f"    📊 Found resource: {attr_name}")
+                                # logger.info(f"    📊 Found resource: {attr_name}")  # 减少冷余日志
             
             except Exception as e:
                 logger.error(f"Error processing resources file {python_file}: {e}")

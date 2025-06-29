@@ -221,9 +221,7 @@ class ResourceSelector:
                     "type": "mcp"
                 }
                 
-                logger.info(f"  {resource_uri}: {description[:50]}...")
-                logger.info(f"    Keywords: {keywords}")
-                logger.info(f"    Category: {category}")
+                # 减少初始化日志
             
             # If no MCP resources found, fallback to hardcoded ones
             if not self.resources_info:
@@ -299,10 +297,18 @@ class ResourceSelector:
         try:
             result = self.supabase.client.table('resource_embeddings').select('resource_uri, embedding').execute()
             
-            if result.data and len(result.data) == len(self.resources_info):
+            if result.data and len(result.data) >= len(self.resources_info) * 0.8:
                 for row in result.data:
                     resource_uri = row['resource_uri']
                     embedding = row['embedding']
+                    
+                    # 确保embedding是List[float]格式
+                    if isinstance(embedding, str):
+                        import json
+                        embedding = json.loads(embedding)
+                    elif isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], str):
+                        embedding = [float(x) for x in embedding]
+                    
                     self.embeddings_cache[resource_uri] = embedding
                 
                 logger.info(f"Loaded cached embeddings for {len(result.data)} resources")
@@ -374,8 +380,7 @@ class ResourceSelector:
                 if score >= self.threshold and len(selected) < max_resources:
                     selected.append(resource_name)
                     logger.info(f"  Selected {resource_name} (score: {score:.4f} >= {self.threshold})")
-                else:
-                    logger.info(f"  Skipped {resource_name} (score: {score:.4f} < {self.threshold} or max reached)")
+                # 移除冗长的跳过日志
             
             # If no resources above threshold, select at least one most relevant
             if not selected and sorted_resources:
@@ -399,25 +404,15 @@ class ResourceSelector:
     async def _log_selection(self, request: str, similarities: Dict[str, float], selected: List[str]):
         """Log selection history"""
         try:
-            conn = self.supabase.client
+            # Use Supabase for logging
+            data = {
+                "user_request": request,
+                "similarities": similarities,
+                "selected_resources": selected,
+                "timestamp": datetime.now().isoformat()
+            }
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS resource_selections (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_request TEXT NOT NULL,
-                    similarities TEXT NOT NULL,
-                    selected_resources TEXT NOT NULL,
-                    timestamp TEXT NOT NULL
-                )
-            """)
-            
-            conn.execute(
-                "INSERT INTO resource_selections (user_request, similarities, selected_resources, timestamp) VALUES (?, ?, ?, ?)",
-                (request, json.dumps(similarities), json.dumps(selected), datetime.now().isoformat())
-            )
-            
-            conn.commit()
-            conn.close()
+            self.supabase.client.table('selection_history').insert(data).execute()
             
         except Exception as e:
             logger.error(f"Failed to log resource selection: {e}")

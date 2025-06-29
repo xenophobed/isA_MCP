@@ -96,9 +96,7 @@ class ToolSelector:
                     "category": category
                 }
                 
-                logger.info(f"  {tool_name}: {description[:50]}...")
-                logger.info(f"    Keywords: {keywords}")
-                logger.info(f"    Category: {category}")
+                # 减少初始化日志
                 
         except Exception as e:
             logger.error(f"Failed to load tool info from MCP: {e}")
@@ -130,38 +128,80 @@ class ToolSelector:
     async def _compute_tool_embeddings(self):
         """Compute tool embeddings"""
         try:
-            # Check cache
+            # Check cache first
             if await self._load_cached_embeddings():
                 logger.info("Loaded cached embeddings")
+                # 只计算缺失的embeddings
+                missing_tools = [name for name in self.tools_info.keys() if name not in self.embeddings_cache]
+                if missing_tools:
+                    logger.info(f"Computing embeddings for {len(missing_tools)} new tools")
+                    await self._compute_missing_embeddings(missing_tools)
                 return
             
-            # Compute new embeddings
-            descriptions = []
-            tool_names = []
-            
-            for tool_name, info in self.tools_info.items():
-                combined_text = f"{info['description']} {' '.join(info['keywords'])}"
-                descriptions.append(combined_text)
-                tool_names.append(tool_name)
-            
-            # Batch compute
-            if not self.embed_service:
-                raise Exception("Embedding service not initialized")
-                
-            embeddings = []
-            for desc in descriptions:
-                embedding = await self.embed_service.create_text_embedding(desc)
-                embeddings.append(embedding)
-            
-            # Cache results
-            for tool_name, embedding in zip(tool_names, embeddings):
-                self.embeddings_cache[tool_name] = embedding
-            
-            await self._save_embeddings_cache()
-            logger.info(f"Computed embeddings for {len(embeddings)} tools")
+            # Compute all embeddings if no cache
+            logger.info(f"Computing embeddings for all {len(self.tools_info)} tools")
+            await self._compute_all_embeddings()
             
         except Exception as e:
             logger.error(f"Failed to compute embeddings: {e}")
+    
+    async def _compute_missing_embeddings(self, missing_tools: List[str]):
+        """只计算缺失的embeddings"""
+        try:
+            if not self.embed_service:
+                raise Exception("Embedding service not initialized")
+            
+            new_embeddings = {}
+            for tool_name in missing_tools:
+                tool_info = self.tools_info[tool_name]
+                combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
+                embedding = await self.embed_service.create_text_embedding(combined_text)
+                new_embeddings[tool_name] = embedding
+                self.embeddings_cache[tool_name] = embedding
+            
+            # 只保存新的embeddings
+            await self._save_new_embeddings(new_embeddings)
+            
+        except Exception as e:
+            logger.error(f"Failed to compute missing embeddings: {e}")
+    
+    async def _compute_all_embeddings(self):
+        """计算所有embeddings"""
+        try:
+            if not self.embed_service:
+                raise Exception("Embedding service not initialized")
+                
+            for tool_name, tool_info in self.tools_info.items():
+                combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
+                embedding = await self.embed_service.create_text_embedding(combined_text)
+                self.embeddings_cache[tool_name] = embedding
+            
+            await self._save_embeddings_cache()
+            logger.info(f"Computed embeddings for {len(self.embeddings_cache)} tools")
+            
+        except Exception as e:
+            logger.error(f"Failed to compute all embeddings: {e}")
+    
+    async def _save_new_embeddings(self, new_embeddings: Dict[str, List[float]]):
+        """只保存新的embeddings"""
+        try:
+            batch_data = []
+            for tool_name, embedding in new_embeddings.items():
+                tool_info = self.tools_info.get(tool_name, {})
+                batch_data.append({
+                    'tool_name': tool_name,
+                    'description': tool_info.get('description', ''),
+                    'keywords': tool_info.get('keywords', []),
+                    'category': tool_info.get('category', 'general'),
+                    'embedding': embedding
+                })
+            
+            if batch_data:
+                self.supabase.client.table('tool_embeddings').upsert(batch_data).execute()
+                logger.info(f"Saved {len(new_embeddings)} new embeddings to Supabase")
+            
+        except Exception as e:
+            logger.error(f"Failed to save new embeddings: {e}")
     
     async def _load_cached_embeddings(self) -> bool:
         """从Supabase加载缓存的嵌入向量"""
@@ -169,11 +209,26 @@ class ToolSelector:
             # 查询工具嵌入向量
             result = self.supabase.client.table('tool_embeddings').select('tool_name, embedding').execute()
             
-            if result.data and len(result.data) == len(self.tools_info):
+            if result.data and len(result.data) >= len(self.tools_info) * 0.8:  # 80%的工具有缓存就认为有效
                 for row in result.data:
                     tool_name = row['tool_name']
                     embedding = row['embedding']
-                    self.embeddings_cache[tool_name] = embedding
+                    
+                    # 确保embedding是List[float]格式，跳过None值
+                    if embedding is None:
+                        logger.warning(f"Skipping tool {tool_name} with None embedding")
+                        continue
+                    elif isinstance(embedding, str):
+                        import json
+                        embedding = json.loads(embedding)
+                    elif isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], str):
+                        embedding = [float(x) for x in embedding]
+                    
+                    # 只保存有效的embedding
+                    if embedding and isinstance(embedding, list) and len(embedding) > 0:
+                        self.embeddings_cache[tool_name] = embedding
+                    else:
+                        logger.warning(f"Skipping tool {tool_name} with invalid embedding: {type(embedding)}")
                 
                 logger.info(f"Loaded cached embeddings for {len(result.data)} tools")
                 return True
@@ -246,8 +301,7 @@ class ToolSelector:
                 if score >= self.threshold and len(selected) < max_tools:
                     selected.append(tool_name)
                     logger.info(f"  Selected {tool_name} (score: {score:.4f} >= {self.threshold})")
-                else:
-                    logger.info(f"  Skipped {tool_name} (score: {score:.4f} < {self.threshold} or max reached)")
+                # 移除冗长的跳过日志
             
             # If no tools above threshold, select at least one most relevant
             if not selected and sorted_tools:
