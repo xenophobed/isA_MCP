@@ -33,17 +33,30 @@ class LLMSQLGenerator:
         self.domain_templates = self._load_domain_templates()
         self.sql_patterns = self._load_sql_patterns()
         self.business_rules = self._load_business_rules()
+    
+    async def close(self):
+        """Close LLM model resources"""
+        if self.llm_model:
+            try:
+                await self.llm_model.close()
+            except Exception as e:
+                logger.warning(f"Error closing LLM model: {e}")
+            finally:
+                self.llm_model = None
         
     async def initialize(self, llm_model=None):
         """Initialize with LLM model"""
         if llm_model:
             self.llm_model = llm_model
         else:
-            # Fallback to importing isa_model
+            # Use isa_model AIFactory
             try:
-                from isa_model import get_model
-                self.llm_model = get_model()
-                logger.info("LLM model initialized successfully")
+                from isa_model.inference import AIFactory
+                self.llm_model = AIFactory().get_llm(
+                    model_name="gpt-4o-mini",
+                    config={"temperature": 0.1, "streaming": False}  # 低温度确保准确性
+                )
+                logger.info("LLM model initialized successfully with isa_model AIFactory")
             except ImportError:
                 logger.warning("isa_model not available, using fallback generation")
                 self.llm_model = None
@@ -196,20 +209,21 @@ class LLMSQLGenerator:
     async def _generate_with_llm(self, prompt: str) -> SQLGenerationResult:
         """Generate SQL using LLM model"""
         try:
-            # Call LLM model
-            response = await self.llm_model.generate(prompt)
+            # Call LLM model using isa_model interface
+            response = await self.llm_model.ainvoke(prompt)
             
-            # Parse response
+            # Parse response - isa_model returns string
             if isinstance(response, str):
                 try:
+                    # Try to parse as JSON first
                     response_data = json.loads(response)
                 except json.JSONDecodeError:
                     # If not JSON, extract SQL from text
                     sql = self._extract_sql_from_text(response)
                     response_data = {
                         "sql": sql,
-                        "explanation": "Generated from text response",
-                        "confidence": 0.7,
+                        "explanation": "Generated from LLM text response",
+                        "confidence": 0.8,
                         "complexity": "medium"
                     }
             else:
@@ -218,7 +232,7 @@ class LLMSQLGenerator:
             return SQLGenerationResult(
                 sql=response_data.get("sql", ""),
                 explanation=response_data.get("explanation", ""),
-                confidence_score=response_data.get("confidence", 0.7),
+                confidence_score=response_data.get("confidence", 0.8),
                 complexity_level=response_data.get("complexity", "medium"),
                 estimated_rows=response_data.get("estimated_rows"),
                 alternative_sqls=response_data.get("alternatives", [])

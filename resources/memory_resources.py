@@ -4,11 +4,11 @@ Memory Resources for MCP Server
 Provides access to memory data as resources
 """
 import json
-import sqlite3
 from datetime import datetime
 
 from core.logging import get_logger
 from core.monitoring import monitor_manager
+from core.supabase_client import get_supabase_client
 
 logger = get_logger(__name__)
 
@@ -20,24 +20,20 @@ def register_memory_resources(mcp):
         """Get all memories with monitoring"""
         monitor_manager.log_request("get_all_memories", "system", True, 0.1, "LOW")
         
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            cursor = conn.execute("""
-                SELECT key, value, category, importance, created_at, updated_at, created_by
-                FROM memories ORDER BY importance DESC, created_at DESC
-            """)
-            memories = cursor.fetchall()
+            memories_data = await supabase.get_all_memories()
             
             memory_list = []
-            for key, value, category, importance, created_at, updated_at, created_by in memories:
+            for mem in memories_data:
                 memory_list.append({
-                    "key": key,
-                    "value": value,
-                    "category": category,
-                    "importance": importance,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "created_by": created_by
+                    "key": mem.get('key'),
+                    "value": mem.get('value'),
+                    "category": mem.get('category'),
+                    "importance": mem.get('importance'),
+                    "created_at": mem.get('created_at'),
+                    "updated_at": mem.get('updated_at'),
+                    "created_by": mem.get('created_by')
                 })
             
             result = {
@@ -48,32 +44,27 @@ def register_memory_resources(mcp):
             
             logger.info(f"All memories resource accessed: {len(memory_list)} items")
             return json.dumps(result)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error(f"Error getting all memories: {e}")
+            raise
 
     @mcp.resource("memory://category/{category}")
     async def get_memories_by_category(category: str) -> str:
         """Get memories filtered by category"""
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            cursor = conn.execute("""
-                SELECT key, value, category, importance, created_at, updated_at, created_by
-                FROM memories 
-                WHERE category = ?
-                ORDER BY importance DESC, created_at DESC
-            """, (category,))
-            memories = cursor.fetchall()
+            memories_data = await supabase.search_memories("", category, limit=100)
             
             memory_list = []
-            for key, value, cat, importance, created_at, updated_at, created_by in memories:
+            for mem in memories_data:
                 memory_list.append({
-                    "key": key,
-                    "value": value,
-                    "category": cat,
-                    "importance": importance,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "created_by": created_by
+                    "key": mem.get('key'),
+                    "value": mem.get('value'),
+                    "category": mem.get('category'),
+                    "importance": mem.get('importance'),
+                    "created_at": mem.get('created_at'),
+                    "updated_at": mem.get('updated_at'),
+                    "created_by": mem.get('created_by')
                 })
             
             result = {
@@ -88,35 +79,36 @@ def register_memory_resources(mcp):
             
             logger.info(f"Category '{category}' memories resource accessed: {len(memory_list)} items")
             return json.dumps(result)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error(f"Error getting memories by category: {e}")
+            raise
 
     @mcp.resource("weather://cache")
     async def get_weather_cache() -> str:
         """Get cached weather data"""
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
-            cursor = conn.execute("""
-                SELECT city, weather_data, updated_at
-                FROM weather_cache 
-                ORDER BY updated_at DESC
-            """)
-            cache_entries = cursor.fetchall()
+            cache_entries = await supabase.get_weather_cache()
             
             cache_list = []
-            for city, weather_data, updated_at in cache_entries:
+            for entry in cache_entries:
                 try:
-                    weather_info = json.loads(weather_data)
+                    weather_data = entry.get('weather_data')
+                    if isinstance(weather_data, str):
+                        weather_info = json.loads(weather_data)
+                    else:
+                        weather_info = weather_data
+                    
                     cache_list.append({
-                        "city": city,
+                        "city": entry.get('city'),
                         "weather": weather_info,
-                        "cached_at": updated_at
+                        "cached_at": entry.get('updated_at')
                     })
                 except json.JSONDecodeError:
                     cache_list.append({
-                        "city": city,
-                        "weather": weather_data,
-                        "cached_at": updated_at,
+                        "city": entry.get('city'),
+                        "weather": entry.get('weather_data'),
+                        "cached_at": entry.get('updated_at'),
                         "error": "Invalid JSON data"
                     })
             
@@ -128,7 +120,8 @@ def register_memory_resources(mcp):
             
             logger.info(f"Weather cache resource accessed: {len(cache_list)} entries")
             return json.dumps(result)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error(f"Error getting weather cache: {e}")
+            raise
 
     logger.info("Memory resources registered successfully") 

@@ -242,9 +242,9 @@ class Complete5StepWorkflowTest:
             }
             
             # 执行语义增强
-            semantic_enricher = SemanticEnricher("customs_trade_db")
+            semantic_enricher = SemanticEnricher()
             
-            semantic_result = await semantic_enricher.enrich_metadata(metadata)
+            semantic_result = semantic_enricher.enrich_metadata(metadata)
             
             # 输出数据
             output_data = {
@@ -395,7 +395,20 @@ class Complete5StepWorkflowTest:
                 }
             }
             
-            # 执行SQL生成和执行
+            # Step 5a: SQL生成 - 使用LLMSQLGenerator
+            llm_sql_generator = LLMSQLGenerator()
+            await llm_sql_generator.initialize()
+            
+            try:
+                # 生成SQL
+                llm_result = await llm_sql_generator.generate_sql_from_context(
+                    query_context, metadata_matches, semantic_metadata, original_query
+                )
+            finally:
+                # 确保清理LLM资源
+                await llm_sql_generator.close()
+            
+            # Step 5b: SQL执行 - 使用SQLExecutor和真实数据库
             sql_executor = SQLExecutor({
                 'type': 'postgresql',
                 'host': 'localhost',
@@ -405,25 +418,21 @@ class Complete5StepWorkflowTest:
                 'password': 'password'
             })
             
-            await sql_executor.initialize_llm()
-            
-            # 生成SQL
-            llm_result = await sql_executor.llm_generator.generate_sql_from_context(
-                query_context, metadata_matches, semantic_metadata, original_query
+            # 执行SQL并获取真实结果
+            execution_result, fallback_attempts = await sql_executor.execute_sql_with_fallbacks(
+                llm_result, original_query
             )
             
-            # 模拟SQL执行结果（因为没有真实数据库连接）
-            mock_execution_result = {
-                'success': True,
-                'data': [
-                    {'company_name': '上海贸易有限公司', 'company_code': 'COMP001', 'total_amount': 156800.00},
-                    {'company_name': '北京进出口公司', 'company_code': 'COMP002', 'total_amount': 98750.50},
-                    {'company_name': '深圳科技贸易公司', 'company_code': 'COMP003', 'total_amount': 234560.75}
-                ],
-                'column_names': ['company_name', 'company_code', 'total_amount'],
-                'row_count': 3,
-                'execution_time_ms': 245.6,
-                'sql_executed': llm_result.sql
+            # 转换为字典格式以保持兼容性
+            execution_result_dict = {
+                'success': execution_result.success,
+                'data': execution_result.data,
+                'column_names': execution_result.column_names,
+                'row_count': execution_result.row_count,
+                'execution_time_ms': execution_result.execution_time_ms,
+                'sql_executed': execution_result.sql_executed,
+                'error_message': execution_result.error_message,
+                'fallback_attempts': len(fallback_attempts)
             }
             
             # 输出数据
@@ -431,16 +440,20 @@ class Complete5StepWorkflowTest:
                 'generated_sql': llm_result.sql,
                 'sql_explanation': llm_result.explanation,
                 'llm_confidence': llm_result.confidence_score,
-                'execution_result': mock_execution_result,
+                'execution_result': execution_result_dict,
                 'query_performance': {
-                    'execution_time_ms': mock_execution_result['execution_time_ms'],
-                    'rows_returned': mock_execution_result['row_count'],
-                    'columns_returned': len(mock_execution_result['column_names'])
-                }
+                    'execution_time_ms': execution_result_dict['execution_time_ms'],
+                    'rows_returned': execution_result_dict['row_count'],
+                    'columns_returned': len(execution_result_dict['column_names'])
+                },
+                'fallback_attempts': len(fallback_attempts)
             }
             
-            self.log_step_result("SQL生成和执行", input_data, output_data, True)
-            return llm_result, mock_execution_result
+            # 检查执行是否成功
+            execution_success = execution_result_dict['success']
+            
+            self.log_step_result("SQL生成和执行", input_data, output_data, execution_success)
+            return llm_result, execution_result_dict
             
         except Exception as e:
             print(f"❌ 第5步失败: {e}")

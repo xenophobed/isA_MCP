@@ -30,7 +30,6 @@ class SecuritySettings:
 @dataclass
 class DatabaseSettings:
     """Database configuration"""
-    database_path: str = "memory.db"
     connection_timeout: int = 30
     max_connections: int = 10
 
@@ -110,9 +109,6 @@ class MCPSettings:
     # Cache settings
     weather_cache_hours: int = 1
         
-    def get_database_path(self) -> Path:
-        """Get database path as Path object"""
-        return Path(self.database.database_path)
     
     def get_log_file_path(self) -> Optional[Path]:
         """Get log file path as Path object"""
@@ -134,8 +130,6 @@ class MCPSettings:
         self.security.require_authorization = os.getenv("MCP_SECURITY_REQUIRE_AUTHORIZATION", "true").lower() == "true"
         self.security.auto_approve_low_security = os.getenv("MCP_SECURITY_AUTO_APPROVE_LOW", "true").lower() == "true"
         
-        # Database settings
-        self.database.database_path = os.getenv("MCP_DB_DATABASE_PATH", self.database.database_path)
         
         # Logging settings
         self.logging.log_level = os.getenv("MCP_LOG_LOG_LEVEL", self.logging.log_level)

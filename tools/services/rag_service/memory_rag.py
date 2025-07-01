@@ -166,13 +166,15 @@ class MemoryRAGService:
                 chunk_id = f"{doc_id}_chunk_{i}"
                 chunk_ids.append(chunk_id)
                 chunk_contents.append(chunk.content)
-                chunk_metadatas.append({
+                chunk_metadata = {
                     "doc_id": doc_id,
                     "title": title,
                     "chunk_index": i,
-                    "page_number": chunk.page_number,
-                    **metadata or {}
-                })
+                    "page_number": chunk.page_number
+                }
+                if metadata:
+                    chunk_metadata.update(metadata)
+                chunk_metadatas.append(chunk_metadata)
             
             # Generate embeddings and add to collection
             if self.use_sentence_transformers:

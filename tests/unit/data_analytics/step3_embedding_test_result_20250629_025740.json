@@ -1,8 +1,0 @@
-{
-  "test_time": "2025-06-29T02:57:40.355656",
-  "total_tests": 4,
-  "passed_tests": 3,
-  "failed_tests": 1,
-  "success_rate": 75.0,
-  "database_source": "customs_trade_db"
-}

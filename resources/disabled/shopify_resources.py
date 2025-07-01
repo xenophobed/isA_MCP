@@ -4,14 +4,13 @@ Shopify Resources for MCP Server
 Provides access to Shopify data and AI-enhanced shopping knowledge as resources
 """
 import json
-import sqlite3
 from datetime import datetime
 from typing import Dict, List
 
 from core.logging import get_logger
 from core.monitoring import monitor_manager
-from tools.services.shopify_client import ShopifyClient
-from tools.services.ai_shopping_assistant import AIShoppingAssistant
+from core.supabase_client import get_supabase_client
+from tools.services.shopify_service.shopify_client import ShopifyClient
 
 logger = get_logger(__name__)
 
@@ -20,7 +19,7 @@ def register_shopify_resources(mcp):
     
     # Initialize services
     shopify_client = ShopifyClient()
-    ai_assistant = AIShoppingAssistant()
+    supabase = get_supabase_client()
     
     @mcp.resource("shopify://catalog/collections")
     async def get_collections_catalog() -> str:

@@ -5,17 +5,17 @@ Realistic Shopify Tools for Real Shopping Experience
 """
 import json
 import os
-import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
+from core.supabase_client import get_supabase_client
 from tools.services.shopify_service.shopify_client import ShopifyClient
 
 logger = get_logger(__name__)
 
-def register_realistic_shopify_tools(mcp):
+def register_shopify_tools(mcp):
     """注册实际的 Shopify 工具集"""
     
     security_manager = get_security_manager()
@@ -27,35 +27,8 @@ def register_realistic_shopify_tools(mcp):
         logger.error(f"Failed to initialize Shopify client: {e}")
         shopify_client = None
     
-    # 初始化用户数据库
-    def init_user_db():
-        conn = sqlite3.connect("user_data.db")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                user_id TEXT PRIMARY KEY,
-                email TEXT,
-                phone TEXT,
-                shipping_addresses TEXT,  -- JSON
-                payment_methods TEXT,     -- JSON (tokenized)
-                preferences TEXT,         -- JSON
-                created_at TEXT,
-                updated_at TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                session_id TEXT PRIMARY KEY,
-                user_id TEXT,
-                cart_data TEXT,  -- JSON
-                checkout_data TEXT,  -- JSON
-                created_at TEXT,
-                expires_at TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
-    
-    init_user_db()
+    # Supabase 客户端
+    supabase = get_supabase_client()
     
     # ====== 产品搜索和浏览工具 ======
     
@@ -395,24 +368,24 @@ def register_realistic_shopify_tools(mcp):
             user_id: 用户ID
             info_type: 信息类型 (all, shipping, payment, preferences)
         """
-        conn = sqlite3.connect("user_data.db")
         try:
-            cursor = conn.execute("""
-                SELECT email, phone, shipping_addresses, payment_methods, preferences
-                FROM users WHERE user_id = ?
-            """, (user_id,))
+            # 查询用户信息，用 auth0_id 或 email 作为查找条件
+            result = supabase.client.table('users').select('*').or_(f'auth0_id.eq.{user_id},email.eq.{user_id}').execute()
             
-            row = cursor.fetchone()
-            if row:
-                email, phone, shipping_json, payment_json, prefs_json = row
+            if result.data:
+                user = result.data[0]
                 
                 user_data = {
-                    "user_id": user_id,
-                    "email": email,
-                    "phone": phone,
-                    "shipping_addresses": json.loads(shipping_json or "[]"),
-                    "payment_methods": json.loads(payment_json or "[]"),
-                    "preferences": json.loads(prefs_json or "{}")
+                    "user_id": user.get('id'),
+                    "auth0_id": user.get('auth0_id'),
+                    "email": user.get('email'),
+                    "name": user.get('name'),
+                    "phone": user.get('phone'),
+                    "shipping_addresses": user.get('shipping_addresses', []),
+                    "payment_methods": user.get('payment_methods', []),
+                    "preferences": user.get('preferences', {}),
+                    "credits_remaining": user.get('credits_remaining'),
+                    "subscription_status": user.get('subscription_status')
                 }
                 
                 if info_type != "all":
@@ -436,8 +409,6 @@ def register_realistic_shopify_tools(mcp):
         except Exception as e:
             logger.error(f"Error getting user info: {e}")
             return json.dumps({"status": "error", "message": str(e)})
-        finally:
-            conn.close()
 
     @mcp.tool()
     @security_manager.security_check
@@ -474,51 +445,47 @@ def register_realistic_shopify_tools(mcp):
             phone: 电话
             is_default: 是否为默认地址
         """
-        conn = sqlite3.connect("user_data.db")
         try:
-            # 获取现有地址
-            cursor = conn.execute("""
-                SELECT shipping_addresses FROM users WHERE user_id = ?
-            """, (user_id,))
+            # 查询用户信息，用 auth0_id 或 email 作为查找条件
+            result = supabase.client.table('users').select('*').or_(f'auth0_id.eq.{user_id},email.eq.{user_id}').execute()
             
-            row = cursor.fetchone()
-            addresses = json.loads(row[0] if row and row[0] else "[]")
-            
-            # 新地址
-            new_address = {
-                "id": f"addr_{len(addresses) + 1}",
-                "name": name,
-                "address_line1": address_line1,
-                "address_line2": address_line2,
-                "city": city,
-                "state": state,
-                "postal_code": postal_code,
-                "country": country,
-                "phone": phone,
-                "is_default": is_default,
-                "created_at": datetime.now().isoformat()
-            }
-            
-            # 如果设为默认，清除其他默认标记
-            if is_default:
-                for addr in addresses:
-                    addr["is_default"] = False
-            
-            addresses.append(new_address)
-            
-            # 保存到数据库
-            if row:
-                conn.execute("""
-                    UPDATE users SET shipping_addresses = ?, updated_at = ?
-                    WHERE user_id = ?
-                """, (json.dumps(addresses), datetime.now().isoformat(), user_id))
+            if result.data:
+                user = result.data[0]
+                addresses = user.get('shipping_addresses', [])
+                
+                # 新地址
+                new_address = {
+                    "id": f"addr_{len(addresses) + 1}",
+                    "name": name,
+                    "address_line1": address_line1,
+                    "address_line2": address_line2,
+                    "city": city,
+                    "state": state,
+                    "postal_code": postal_code,
+                    "country": country,
+                    "phone": phone,
+                    "is_default": is_default,
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                # 如果设为默认，清除其他默认标记
+                if is_default:
+                    for addr in addresses:
+                        addr["is_default"] = False
+                
+                addresses.append(new_address)
+                
+                # 更新用户地址
+                supabase.client.table('users').update({
+                    'shipping_addresses': addresses,
+                    'updated_at': datetime.now().isoformat()
+                }).eq('id', user['id']).execute()
             else:
-                conn.execute("""
-                    INSERT INTO users (user_id, shipping_addresses, created_at, updated_at)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, json.dumps(addresses), datetime.now().isoformat(), datetime.now().isoformat()))
-            
-            conn.commit()
+                # 用户不存在，创建新用户（这种情况比较少见）
+                return json.dumps({
+                    "status": "error", 
+                    "message": "User not found. Please register first."
+                })
             
             return json.dumps({
                 "status": "success",
@@ -531,8 +498,6 @@ def register_realistic_shopify_tools(mcp):
         except Exception as e:
             logger.error(f"Error saving shipping address: {e}")
             return json.dumps({"status": "error", "message": str(e)})
-        finally:
-            conn.close()
 
     # ====== 结账工具 ======
     
@@ -649,19 +614,15 @@ def register_realistic_shopify_tools(mcp):
             # 如果使用已保存的支付方式
             if payment_method_id:
                 # 从数据库获取支付方式（实际中应该是tokenized的）
-                conn = sqlite3.connect("user_data.db")
                 try:
-                    cursor = conn.execute("""
-                        SELECT payment_methods FROM users WHERE user_id = ?
-                    """, (user_id,))
-                    row = cursor.fetchone()
-                    if row:
-                        payment_methods = json.loads(row[0] or "[]")
+                    result = supabase.client.table('users').select('payment_methods').or_(f'auth0_id.eq.{user_id},email.eq.{user_id}').execute()
+                    if result.data:
+                        payment_methods = result.data[0].get('payment_methods', [])
                         payment_method = next((pm for pm in payment_methods if pm["id"] == payment_method_id), None)
                         if payment_method:
                             card_number = payment_method["masked_number"]
-                finally:
-                    conn.close()
+                except Exception as e:
+                    logger.error(f"Error getting payment method: {e}")
             
             # 验证测试卡号
             test_cards = {
@@ -710,60 +671,51 @@ def register_realistic_shopify_tools(mcp):
     
     def _save_cart_session(user_id: str, cart_id: str, cart_data: dict):
         """保存购物车会话"""
-        conn = sqlite3.connect("user_data.db")
         try:
             session_id = f"sess_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             expires_at = datetime.now().replace(hour=23, minute=59, second=59).isoformat()
             
-            conn.execute("""
-                INSERT OR REPLACE INTO user_sessions 
-                (session_id, user_id, cart_data, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (session_id, user_id, json.dumps(cart_data), datetime.now().isoformat(), expires_at))
-            conn.commit()
+            # 先检查是否存在该用户的会话，如果存在则更新，否则插入
+            supabase.client.table('user_sessions').upsert({
+                'session_id': session_id,
+                'user_id': user_id,
+                'cart_data': cart_data,
+                'created_at': datetime.now().isoformat(),
+                'expires_at': expires_at
+            }).execute()
         except Exception as e:
             logger.error(f"Error saving cart session: {e}")
-        finally:
-            conn.close()
     
     async def _save_payment_method(user_id: str, card_number: str, expiry_month: str, expiry_year: str, billing_name: str, card_type: str):
         """保存支付方式（实际中应该tokenize）"""
-        conn = sqlite3.connect("user_data.db")
         try:
-            cursor = conn.execute("""
-                SELECT payment_methods FROM users WHERE user_id = ?
-            """, (user_id,))
+            # 查询用户信息，用 auth0_id 或 email 作为查找条件
+            result = supabase.client.table('users').select('*').or_(f'auth0_id.eq.{user_id},email.eq.{user_id}').execute()
             
-            row = cursor.fetchone()
-            payment_methods = json.loads(row[0] if row and row[0] else "[]")
-            
-            new_payment_method = {
-                "id": f"pm_{len(payment_methods) + 1}",
-                "card_type": card_type,
-                "masked_number": f"****-****-****-{card_number[-4:]}",
-                "expiry": f"{expiry_month}/{expiry_year}",
-                "billing_name": billing_name,
-                "created_at": datetime.now().isoformat()
-            }
-            
-            payment_methods.append(new_payment_method)
-            
-            if row:
-                conn.execute("""
-                    UPDATE users SET payment_methods = ?, updated_at = ?
-                    WHERE user_id = ?
-                """, (json.dumps(payment_methods), datetime.now().isoformat(), user_id))
+            if result.data:
+                user = result.data[0]
+                payment_methods = user.get('payment_methods', [])
+                
+                new_payment_method = {
+                    "id": f"pm_{len(payment_methods) + 1}",
+                    "card_type": card_type,
+                    "masked_number": f"****-****-****-{card_number[-4:]}",
+                    "expiry": f"{expiry_month}/{expiry_year}",
+                    "billing_name": billing_name,
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                payment_methods.append(new_payment_method)
+                
+                # 更新用户支付方式
+                supabase.client.table('users').update({
+                    'payment_methods': payment_methods,
+                    'updated_at': datetime.now().isoformat()
+                }).eq('id', user['id']).execute()
             else:
-                conn.execute("""
-                    INSERT INTO users (user_id, payment_methods, created_at, updated_at)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, json.dumps(payment_methods), datetime.now().isoformat(), datetime.now().isoformat()))
-            
-            conn.commit()
+                logger.warning(f"User {user_id} not found when saving payment method")
         except Exception as e:
             logger.error(f"Error saving payment method: {e}")
-        finally:
-            conn.close()
     
     def _truncate_text(text: str, max_length: int) -> str:
         """截断文本"""

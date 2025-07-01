@@ -100,11 +100,10 @@ def register_memory_tools(mcp):
         Keywords: memory, update, modify, change, edit, metadata
         Category: memory
         """
-        conn = sqlite3.connect("memory.db")
+        supabase = get_supabase_client()
         try:
             # First check if the key exists
-            cursor = conn.execute("SELECT key, value, category, importance FROM memories WHERE key = ?", (key,))
-            existing = cursor.fetchone()
+            existing = await supabase.get_memory(key)
             
             if not existing:
                 result = {
@@ -117,37 +116,39 @@ def register_memory_tools(mcp):
                 return json.dumps(result)
             
             # Use existing values if not provided
-            old_key, old_value, old_category, old_importance = existing
+            old_value = existing.get('value')
+            old_category = existing.get('category')
+            old_importance = existing.get('importance')
+            
             update_category = category if category is not None else old_category
             update_importance = importance if importance is not None else old_importance
             now = datetime.now().isoformat()
             
             # Update the memory
-            conn.execute("""
-                UPDATE memories 
-                SET value = ?, category = ?, importance = ?, updated_at = ?
-                WHERE key = ?
-            """, (value, update_category, update_importance, now, key))
-            conn.commit()
+            success = await supabase.update_memory(key, value, update_category, update_importance)
             
-            result = {
-                "status": "success",
-                "action": "update_memory",
-                "data": {
-                    "key": key,
-                    "old_value": old_value,
-                    "new_value": value,
-                    "category": update_category,
-                    "importance": update_importance,
-                    "updated_by": user_id
-                },
-                "timestamp": now
-            }
-            
-            logger.info(f"Memory updated: {key} by {user_id}")
-            return json.dumps(result)
-        finally:
-            conn.close()
+            if success:
+                result = {
+                    "status": "success",
+                    "action": "update_memory",
+                    "data": {
+                        "key": key,
+                        "old_value": old_value,
+                        "new_value": value,
+                        "category": update_category,
+                        "importance": update_importance,
+                        "updated_by": user_id
+                    },
+                    "timestamp": now
+                }
+                
+                logger.info(f"Memory updated: {key} by {user_id}")
+                return json.dumps(result)
+            else:
+                raise Exception("Failed to update memory in Supabase")
+        except Exception as e:
+            logger.error(f"Error updating memory: {e}")
+            raise
 
     @mcp.tool()
     @security_manager.security_check

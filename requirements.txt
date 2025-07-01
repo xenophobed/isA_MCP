@@ -19,7 +19,7 @@ pyodbc>=4.0.0             # SQL Server adapter (optional)
 sentence-transformers>=2.2.0
 openai>=1.0.0
 tiktoken>=0.5.0
-isa_model>=0.3.4          # Our internal AI model
+isa_model>=0.3.5        # Our internal AI model
 
 # Vector database for embeddings
 pgvector>=0.2.0           # PostgreSQL vector extension
@@ -28,6 +28,7 @@ pgvector>=0.2.0           # PostgreSQL vector extension
 pandas>=1.5.0             # For CSV/Excel processing
 openpyxl>=3.1.0           # For Excel files
 numpy>=1.24.0             # Numerical computing
+PyMuPDF>=1.23.0           # For PDF processing (fitz module)
 
 # Web automation
 playwright>=1.40.0

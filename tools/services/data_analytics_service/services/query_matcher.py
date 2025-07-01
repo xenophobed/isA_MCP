@@ -75,7 +75,7 @@ class QueryMatcher:
         query_context = await self._extract_query_context(query)
         
         # Find metadata matches
-        metadata_matches = await self._find_metadata_matches(query_context, semantic_metadata)
+        metadata_matches = await self._find_metadata_matches(query, query_context, semantic_metadata)
         
         # Rank and filter matches
         filtered_matches = self._rank_and_filter_matches(metadata_matches, query_context)
@@ -232,7 +232,7 @@ class QueryMatcher:
             confidence_score=confidence_score
         )
     
-    async def _find_metadata_matches(self, query_context: QueryContext, 
+    async def _find_metadata_matches(self, query: str, query_context: QueryContext, 
                                    semantic_metadata: SemanticMetadata) -> List[MetadataMatch]:
         """Find metadata that matches the query context"""
         matches = []
@@ -256,6 +256,16 @@ class QueryMatcher:
             attribute_matches = await self._find_attribute_matches(attribute, semantic_metadata)
             matches.extend(attribute_matches)
         
+        # Fallback: If no entities or attributes found, do direct embedding search with full query
+        if not query_context.entities_mentioned and not query_context.attributes_mentioned:
+            logger.info(f"No entities/attributes extracted, using full query embedding search")
+            fallback_matches = await self._find_direct_query_matches(query, semantic_metadata)
+            matches.extend(fallback_matches)
+        
+        # Always try direct query search for better coverage
+        direct_matches = await self._find_direct_query_matches(query, semantic_metadata)
+        matches.extend(direct_matches)
+        
         # Remove duplicates and rank
         unique_matches = self._deduplicate_matches(matches)
         
@@ -265,8 +275,8 @@ class QueryMatcher:
         """Extract potential entity names from query"""
         entities = []
         
-        # Common business entities
-        business_entities = [
+        # English business entities
+        english_entities = [
             'customer', 'customers', 'client', 'clients', 'user', 'users',
             'order', 'orders', 'purchase', 'purchases', 'sale', 'sales',
             'product', 'products', 'item', 'items', 'inventory',
@@ -275,7 +285,24 @@ class QueryMatcher:
             'employee', 'employees', 'staff', 'department', 'departments'
         ]
         
-        for entity in business_entities:
+        # Chinese business entities (customs/trade specific)
+        chinese_entities = [
+            '公司', '企业', '公司企业', '企业公司',
+            '申报', '申报单', '报关', '报关单', '海关申报',
+            '货物', '商品', '物品', '商品编码', 'HS编码',
+            '进口', '出口', '贸易', '进出口',
+            '金额', '总金额', '价值', '价格', '费用',
+            '数量', '重量', '单价',
+            '客户', '用户', '买家', '卖家'
+        ]
+        
+        # Check English entities
+        for entity in english_entities:
+            if entity in query:
+                entities.append(entity)
+        
+        # Check Chinese entities
+        for entity in chinese_entities:
             if entity in query:
                 entities.append(entity)
         
@@ -294,15 +321,33 @@ class QueryMatcher:
         """Extract potential attribute/column names from query"""
         attributes = []
         
-        # Common attributes
-        common_attributes = [
+        # English attributes
+        english_attributes = [
             'name', 'id', 'email', 'phone', 'address', 'city', 'state', 'country',
             'price', 'cost', 'amount', 'value', 'quantity', 'count', 'total',
             'date', 'time', 'created', 'updated', 'modified',
             'status', 'type', 'category', 'description'
         ]
         
-        for attr in common_attributes:
+        # Chinese attributes (customs/trade specific)
+        chinese_attributes = [
+            '名称', '姓名', '公司名称', '企业名称',
+            '代码', '编码', '公司代码', '企业代码', 'HS编码',
+            '金额', '总金额', '价值', '价格', '单价', '费用',
+            '数量', '重量', '体积',
+            '日期', '时间', '申报日期', '创建时间',
+            '状态', '类型', '贸易类型', '进出口类型',
+            '地址', '联系方式', '电话', '邮箱',
+            '描述', '说明', '备注'
+        ]
+        
+        # Check English attributes
+        for attr in english_attributes:
+            if attr in query:
+                attributes.append(attr)
+        
+        # Check Chinese attributes
+        for attr in chinese_attributes:
             if attr in query:
                 attributes.append(attr)
         
@@ -483,7 +528,7 @@ class QueryMatcher:
             f"entity {entity} table database",
             entity_type=None,
             limit=5,
-            similarity_threshold=0.6
+            similarity_threshold=0.3
         )
         
         for result in search_results:
@@ -496,6 +541,37 @@ class QueryMatcher:
                 suggested_joins=[],
                 metadata=result.metadata
             ))
+        
+        return matches
+    
+    async def _find_direct_query_matches(self, query: str, semantic_metadata: SemanticMetadata) -> List[MetadataMatch]:
+        """Find matches by searching embeddings directly with the full query"""
+        matches = []
+        
+        try:
+            # Search with full query - lower threshold for better coverage
+            search_results = await self.embedding_storage.search_similar_entities(
+                query,
+                entity_type=None,
+                limit=10,
+                similarity_threshold=0.3  # Lower threshold for better Chinese query coverage
+            )
+            
+            for result in search_results:
+                matches.append(MetadataMatch(
+                    entity_name=result.entity_name,
+                    entity_type=result.entity_type,
+                    match_type='direct_query',
+                    similarity_score=result.similarity_score,
+                    relevant_attributes=[],
+                    suggested_joins=[],
+                    metadata=result.metadata
+                ))
+                
+            logger.info(f"Direct query search found {len(matches)} matches")
+            
+        except Exception as e:
+            logger.error(f"Direct query search failed: {e}")
         
         return matches
     
@@ -532,7 +608,7 @@ class QueryMatcher:
             f"column attribute {attribute} field",
             entity_type='column',
             limit=5,
-            similarity_threshold=0.6
+            similarity_threshold=0.3
         )
         
         for result in search_results:
@@ -568,7 +644,7 @@ class QueryMatcher:
         sorted_matches = sorted(matches, key=lambda x: x.similarity_score, reverse=True)
         
         # Filter by minimum threshold
-        filtered_matches = [m for m in sorted_matches if m.similarity_score >= 0.5]
+        filtered_matches = [m for m in sorted_matches if m.similarity_score >= 0.3]
         
         # Limit to top N matches
         return filtered_matches[:10]

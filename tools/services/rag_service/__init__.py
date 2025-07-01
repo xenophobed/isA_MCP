@@ -7,12 +7,13 @@ using ChromaDB as the vector store and local embedding models.
 """
 
 from .memory_rag import MemoryRAGService, RAGSession
-from .document_processor import DocumentProcessor as RAGDocumentProcessor
+from .rag_client import RAGClient, get_rag_client
 
 __all__ = [
     "MemoryRAGService",
-    "RAGSession", 
-    "RAGDocumentProcessor"
+    "RAGSession",
+    "RAGClient", 
+    "get_rag_client"
 ]
 
 __version__ = "1.0.0"

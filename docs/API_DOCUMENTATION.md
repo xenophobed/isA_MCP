@@ -4,7 +4,7 @@
 
 The Smart MCP Server is an AI-powered Model Context Protocol (MCP) server with automatic capability discovery and intelligent routing. It provides both MCP-compliant endpoints and REST API endpoints.
 
-**Base URL:** `http://localhost:4321`
+**Base URL:** `http://localhost:8081`
 
 **Current Capabilities:**
 - **Tools:** 36 registered MCP tools
@@ -106,7 +106,7 @@ Uses AI to discover relevant capabilities based on natural language requests.
 
 **Example - Weather Request:**
 ```bash
-curl -X POST http://localhost:4321/discover \
+curl -X POST http://localhost:8081/discover \
   -H "Content-Type: application/json" \
   -d '{"request": "I need to check the weather in New York"}'
 ```
@@ -126,7 +126,7 @@ curl -X POST http://localhost:4321/discover \
 
 **Example - Memory Management:**
 ```bash
-curl -X POST http://localhost:4321/discover \
+curl -X POST http://localhost:8081/discover \
   -H "Content-Type: application/json" \
   -d '{"request": "Help me remember important information"}'
 ```
@@ -146,7 +146,7 @@ curl -X POST http://localhost:4321/discover \
 
 **Example - Web Automation:**
 ```bash
-curl -X POST http://localhost:4321/discover \
+curl -X POST http://localhost:8081/discover \
   -H "Content-Type: application/json" \
   -d '{"request": "I want to automate website login and search"}'
 ```
@@ -258,18 +258,18 @@ Main MCP protocol endpoint for Model Context Protocol communication. Requires Se
 
 ```bash
 # Check server health
-curl http://localhost:4321/health
+curl http://localhost:8081/health
 
 # List all capabilities
-curl http://localhost:4321/capabilities
+curl http://localhost:8081/capabilities
 
 # Discover capabilities for a task
-curl -X POST http://localhost:4321/discover \
+curl -X POST http://localhost:8081/discover \
   -H "Content-Type: application/json" \
   -d '{"request": "I need help with data analysis"}'
 
 # Get usage statistics
-curl http://localhost:4321/stats
+curl http://localhost:8081/stats
 ```
 
 ---

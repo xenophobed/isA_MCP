@@ -264,8 +264,11 @@ class AutoDiscoverySystem:
             if python_file.name.startswith("__"):
                 continue
                 
-            # Skip service files and utility files
-            if any(skip in str(python_file) for skip in ["services", "client", "__pycache__"]):
+            # Skip service files, utility files, and disabled directories
+            if any(skip in str(python_file) for skip in ["services", "__pycache__", "disabled"]):
+                continue
+            # Skip client folder but not client_interaction_tools.py
+            if "/client" in str(python_file) and "client_interaction_tools.py" not in str(python_file):
                 continue
                 
             try:

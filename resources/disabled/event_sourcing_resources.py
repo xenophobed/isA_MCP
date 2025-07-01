@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from core.logging import get_logger
-from tools.services.event_sourcing_services import get_event_sourcing_service
+from tools.services.event_sourcing_service.event_sourcing_services import get_event_sourcing_service
 
 logger = get_logger(__name__)
 
