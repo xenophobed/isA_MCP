@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # Main MCP Server - Testing
+  isa_mcp_staging:
+    build: .
+    ports:
+      - "8083:8081"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - ENV=staging
+      - DEBUG=true
+      - REQUIRE_AUTH=false
+    env_file:
+      - ../.env.staging
+    volumes:
+      - ./logs:/app/logs
+      - ./tests:/app/tests
+      - ./tools:/app/tools
+      - ./prompts:/app/prompts
+      - ./resources:/app/resources
+      - ./core:/app/core
+    networks:
+      - isa_staging_network
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - isa_service_user_staging
+      - isa_service_event_staging
+
+  # User Management Service - Testing
+  isa_service_user_staging:
+    build:
+      context: .
+      dockerfile: tools/services/user_service/Dockerfile
+    ports:
+      - "8104:8100"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - ENV=staging
+      - DEBUG=true
+      - REQUIRE_AUTH=false
+    env_file:
+      - ../.env.staging
+    volumes:
+      - ./tools/services/user_service:/app/tools/services/user_service
+      - ./logs:/app/logs
+      - ./tests:/app/tests
+    networks:
+      - isa_staging_network
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Event Sourcing Service - Testing
+  isa_service_event_staging:
+    build:
+      context: .
+      dockerfile: tools/services/event_sourcing_service/Dockerfile
+    ports:
+      - "8105:8101"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - ENV=staging
+      - DEBUG=true
+      - REQUIRE_AUTH=false
+    env_file:
+      - ../.env.staging
+    volumes:
+      - ./tools/services/event_sourcing_service:/app/tools/services/event_sourcing_service
+      - ./logs:/app/logs
+      - ./tests:/app/tests
+    networks:
+      - isa_staging_network
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Test Database (Optional)
+  postgres_staging:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: isa_mcp_staging
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    networks:
+      - isa_staging_network
+    restart: "no"
+    profiles:
+      - with-db
+
+  # Test Redis (Optional)
+  redis_staging:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    networks:
+      - isa_staging_network
+    restart: "no"
+    profiles:
+      - with-redis
+
+networks:
+  isa_staging_network:
+    driver: bridge
+    name: isa_staging_network
+
+volumes:
+  postgres_staging_data:

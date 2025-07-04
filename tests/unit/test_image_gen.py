@@ -16,35 +16,43 @@ async def test_image_generation():
     print("=" * 50)
     
     try:
-        # Import isa_model directly
-        from isa_model.inference import AIFactory
+        # Import ISA Model client directly
+        from core.isa_client import get_isa_client
         
-        print("📋 Test 1: Text-to-Image (t2i) generation")
+        print("📋 Test 1: Text-to-Image (t2i) generation using ISA Model client")
         print("   Prompt: 'A beautiful sunset over mountains'")
-        print("   Creating t2i service...")
+        print("   Getting ISA Model client...")
         
-        # Get T2I service directly
-        img = AIFactory().get_img(type="t2i")
-        print(f"   ✅ Service created: {type(img).__name__}")
+        # Get ISA Model client
+        client = get_isa_client()
+        print(f"   ✅ Client obtained: {type(client).__name__}")
         
         # Generate image
         print("   Generating image...")
-        result = await img.generate_image(
-            prompt="A beautiful sunset over mountains",
-            width=512,
-            height=512
+        result = await client.invoke(
+            input_data="A beautiful sunset over mountains",
+            task="generate_image",
+            service_type="image",
+            parameters={
+                "width": 512,
+                "height": 512
+            }
         )
         
         print(f"   Result type: {type(result)}")
         print(f"   Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
         
-        # Close service
-        await img.close()
+        # Extract data from ISA Model result
+        if result.get('success'):
+            result_data = result.get('result', {})
+            image_urls = result_data.get('urls', [])
+            if isinstance(image_urls, str):
+                image_urls = [image_urls]
+        else:
+            image_urls = []
         
-        # Extract data
-        image_urls = result.get('urls', [])
-        cost = result.get('cost_usd', 0.0)
-        count = result.get('count', len(image_urls))
+        cost = result.get('result', {}).get('cost_usd', 0.0)
+        count = len(image_urls)
         
         print(f"   ✅ Generated {count} image(s)")
         print(f"   💰 Cost: ${cost}")

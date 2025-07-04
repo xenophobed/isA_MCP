@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from core.logging import get_logger
-from isa_model.inference.ai_factory import AIFactory
+from tools.base_service import BaseService
 from .entity_extractor import Entity, EntityType
 
 logger = get_logger(__name__)
@@ -55,7 +55,7 @@ class Relation:
         if self.temporal_info is None:
             self.temporal_info = {}
 
-class RelationExtractor:
+class RelationExtractor(BaseService):
     """Extract relationships between entities from text"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -64,9 +64,8 @@ class RelationExtractor:
         Args:
             config: Configuration dict with extractor settings
         """
+        super().__init__("RelationExtractor")
         self.config = config or {}
-        self.ai_factory = AIFactory()
-        self.llm_service = self.ai_factory.get_llm_service()
         
         # Relation patterns for quick extraction
         self.relation_patterns = {
@@ -176,18 +175,25 @@ class RelationExtractor:
             Only include relationships explicitly mentioned or strongly implied in the text.
             """
             
-            response = await self.llm_service.generate_text(
-                prompt,
-                max_tokens=2000,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 2000, "temperature": 0.1},
+                operation_name="relation_extraction"
             )
+            
+            if 'text' in response:
+                response_text = response['text']
+            else:
+                raise Exception("Invalid response format from ISA API")
             
             # Parse LLM response
             try:
-                json_start = response.find('[')
-                json_end = response.rfind(']') + 1
+                json_start = response_text.find('[')
+                json_end = response_text.rfind(']') + 1
                 if json_start != -1 and json_end != -1:
-                    json_str = response[json_start:json_end]
+                    json_str = response_text[json_start:json_end]
                     relations_data = json.loads(json_str)
                     
                     relations = []
@@ -332,10 +338,12 @@ class RelationExtractor:
         """
         
         try:
-            response = await self.llm_service.generate_text(
-                temporal_prompt,
-                max_tokens=1000,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=temporal_prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 1000, "temperature": 0.1},
+                operation_name="temporal_relation_extraction"
             )
             
             # Parse and process temporal relations
@@ -361,10 +369,12 @@ class RelationExtractor:
         """
         
         try:
-            response = await self.llm_service.generate_text(
-                causal_prompt,
-                max_tokens=1000,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=causal_prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 1000, "temperature": 0.1},
+                operation_name="causal_relation_extraction"
             )
             
             # Parse and process causal relations

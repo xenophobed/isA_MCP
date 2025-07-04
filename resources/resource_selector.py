@@ -3,12 +3,12 @@
 Resource Selector using isa_model embeddings
 Similar to tool_selector but for resources
 """
-from core.supabase_client import get_supabase_client
+from core.database.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
-from isa_model.inference import AIFactory
+from core.isa_client import get_isa_client
 
 from core.logging import get_logger
 
@@ -18,7 +18,7 @@ class ResourceSelector:
     """AI-powered resource selector"""
     
     def __init__(self):
-        self.embed_service = None
+        self.client = None
         self.resources_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
@@ -31,7 +31,7 @@ class ResourceSelector:
             await self._load_resource_info()
             
             # Initialize embedding service
-            self.embed_service = AIFactory().get_embed()
+            self.client = get_isa_client()
             await self._compute_resource_embeddings()
             logger.info("Resource selector initialized")
         except Exception as e:
@@ -46,7 +46,7 @@ class ResourceSelector:
             await self._load_resource_info_from_mcp(mcp_server)
             
             # Initialize embedding service
-            self.embed_service = AIFactory().get_embed()
+            self.client = get_isa_client()
             await self._compute_resource_embeddings()
             logger.info(f"Resource selector initialized with {len(self.resources_info)} MCP resources")
         except Exception as e:
@@ -274,12 +274,18 @@ class ResourceSelector:
                 resource_names.append(resource_name)
             
             # Batch compute
-            if not self.embed_service:
+            if not self.client:
                 raise Exception("Embedding service not initialized")
                 
             embeddings = []
             for desc in descriptions:
-                embedding = await self.embed_service.create_text_embedding(desc)
+                result = await self.client.invoke(
+                    input_data=desc,
+                    task="embed",
+                    service_type="embedding"
+                )
+                if result.get('success'):
+                    embedding = result.get('result', [])
                 embeddings.append(embedding)
             
             # Cache results
@@ -295,7 +301,7 @@ class ResourceSelector:
     async def _load_cached_embeddings(self) -> bool:
         """从Supabase加载缓存的资源嵌入向量"""
         try:
-            result = self.supabase.client.table('resource_embeddings').select('resource_uri, embedding').execute()
+            result = self.supabase.table('resource_embeddings').select('resource_uri, embedding').execute()
             
             if result.data and len(result.data) >= len(self.resources_info) * 0.8:
                 for row in result.data:
@@ -328,13 +334,15 @@ class ResourceSelector:
                 
                 data = {
                     'resource_uri': resource_uri,
-                    'description': resource_info.get('description', ''),
-                    'keywords': resource_info.get('keywords', []),
                     'category': resource_info.get('category', 'general'),
+                    'name': resource_info.get('name', resource_uri),
+                    'description': resource_info.get('description', ''),
                     'embedding': embedding
                 }
                 
-                self.supabase.client.table('resource_embeddings').upsert(data).execute()
+                # 先删除已存在的记录，然后插入新的
+                self.supabase.table('resource_embeddings').delete().eq('resource_uri', resource_uri).execute()
+                self.supabase.table('resource_embeddings').insert(data).execute()
             
             logger.info(f"Saved resource embeddings cache for {len(self.embeddings_cache)} resources to Supabase")
             
@@ -344,11 +352,11 @@ class ResourceSelector:
     async def select_resources(self, user_request: str, max_resources: int = 3) -> List[str]:
         """Select relevant resources"""
         logger.info(f"Resource selector: analyzing request '{user_request}'")
-        logger.info(f"Embed service ready: {self.embed_service is not None}")
+        logger.info(f"Embed service ready: {self.client is not None}")
         logger.info(f"Embeddings cache ready: {bool(self.embeddings_cache)}")
         logger.info(f"Max resources: {max_resources}, Threshold: {self.threshold}")
         
-        if not self.embed_service or not self.embeddings_cache:
+        if not self.client or not self.embeddings_cache:
             logger.warning("Resource selector not ready, returning default resources")
             fallback_resources = ["memory://all", "monitoring://health"]
             logger.warning(f"Fallback resources: {fallback_resources}")
@@ -357,17 +365,26 @@ class ResourceSelector:
         try:
             # Compute user request embedding
             logger.info("Computing user request embedding...")
-            user_embedding = await self.embed_service.create_text_embedding(user_request)
+            result = await self.client.invoke(
+                input_data=user_request,
+                task="embed",
+                service_type="embedding"
+            )
+            if not result.get('success'):
+                raise Exception(f"Failed to create user embedding: {result.get('error')}")
+            user_embedding = result.get('result', [])
             logger.info(f"User embedding computed, length: {len(user_embedding) if user_embedding else 0}")
             
-            # Compute similarities
+            # Compute similarities using simple cosine similarity
             logger.info(f"Computing similarities with {len(self.embeddings_cache)} resources...")
             similarities = {}
             for resource_name, resource_embedding in self.embeddings_cache.items():
-                similarity = await self.embed_service.compute_similarity(
-                    user_embedding, resource_embedding
+                # Simple cosine similarity calculation
+                import numpy as np
+                similarity = np.dot(user_embedding, resource_embedding) / (
+                    np.linalg.norm(user_embedding) * np.linalg.norm(resource_embedding)
                 )
-                similarities[resource_name] = similarity
+                similarities[resource_name] = float(similarity)
                 logger.info(f"  {resource_name}: {similarity:.4f}")
             
             # Select most relevant resources
@@ -412,7 +429,7 @@ class ResourceSelector:
                 "timestamp": datetime.now().isoformat()
             }
             
-            self.supabase.client.table('selection_history').insert(data).execute()
+            self.supabase.table('selection_history').insert(data).execute()
             
         except Exception as e:
             logger.error(f"Failed to log resource selection: {e}")
@@ -450,8 +467,9 @@ class ResourceSelector:
     
     async def close(self):
         """Close service"""
-        if self.embed_service:
-            await self.embed_service.close()
+        if self.client:
+            # ISA client doesn't need explicit close in this context
+            self.client = None
 
 # Global instance
 _resource_selector = None

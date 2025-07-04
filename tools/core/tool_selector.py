@@ -3,12 +3,12 @@
 Tool Selector using isa_model embeddings
 Based on embedding-based simple tool selection
 """
-from core.supabase_client import get_supabase_client
+from core.database.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from isa_model.inference import AIFactory
+from core.isa_client import get_isa_client
 
 from core.logging import get_logger
 
@@ -18,7 +18,7 @@ class ToolSelector:
     """AI-powered tool selector"""
     
     def __init__(self):
-        self.embed_service = None
+        self.client = None
         self.tools_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
@@ -30,8 +30,8 @@ class ToolSelector:
             # Load tool information dynamically
             await self._load_tool_info()
             
-            # Initialize embedding service
-            self.embed_service = AIFactory().get_embed()
+            # Initialize ISA client
+            self.client = get_isa_client()
             await self._compute_tool_embeddings()
             logger.info("Tool selector initialized")
         except Exception as e:
@@ -45,8 +45,8 @@ class ToolSelector:
             # Load tool information from MCP server
             await self._load_tool_info_from_mcp(mcp_server)
             
-            # Initialize embedding service
-            self.embed_service = AIFactory().get_embed()
+            # Initialize ISA client
+            self.client = get_isa_client()
             await self._compute_tool_embeddings()
             logger.info(f"Tool selector initialized with {len(self.tools_info)} MCP tools")
         except Exception as e:
@@ -148,15 +148,21 @@ class ToolSelector:
     async def _compute_missing_embeddings(self, missing_tools: List[str]):
         """只计算缺失的embeddings"""
         try:
-            if not self.embed_service:
-                raise Exception("Embedding service not initialized")
+            if not self.client:
+                raise Exception("ISA client not initialized")
             
             new_embeddings = {}
             for tool_name in missing_tools:
                 tool_info = self.tools_info[tool_name]
                 combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
-                embedding = await self.embed_service.create_text_embedding(combined_text)
-                new_embeddings[tool_name] = embedding
+                result = await self.client.invoke(
+                    input_data=combined_text,
+                    task="embed",
+                    service_type="embedding"
+                )
+                if result.get('success'):
+                    embedding = result.get('result', [])
+                    new_embeddings[tool_name] = embedding
                 self.embeddings_cache[tool_name] = embedding
             
             # 只保存新的embeddings
@@ -168,13 +174,19 @@ class ToolSelector:
     async def _compute_all_embeddings(self):
         """计算所有embeddings"""
         try:
-            if not self.embed_service:
-                raise Exception("Embedding service not initialized")
+            if not self.client:
+                raise Exception("ISA client not initialized")
                 
             for tool_name, tool_info in self.tools_info.items():
                 combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
-                embedding = await self.embed_service.create_text_embedding(combined_text)
-                self.embeddings_cache[tool_name] = embedding
+                result = await self.client.invoke(
+                    input_data=combined_text,
+                    task="embed",
+                    service_type="embedding"
+                )
+                if result.get('success'):
+                    embedding = result.get('result', [])
+                    self.embeddings_cache[tool_name] = embedding
             
             await self._save_embeddings_cache()
             logger.info(f"Computed embeddings for {len(self.embeddings_cache)} tools")
@@ -191,13 +203,16 @@ class ToolSelector:
                 batch_data.append({
                     'tool_name': tool_name,
                     'description': tool_info.get('description', ''),
-                    'keywords': tool_info.get('keywords', []),
-                    'category': tool_info.get('category', 'general'),
                     'embedding': embedding
                 })
             
             if batch_data:
-                self.supabase.client.table('tool_embeddings').upsert(batch_data).execute()
+                # 先删除已存在的记录，然后插入新的
+                for data in batch_data:
+                    # 删除已存在的记录
+                    self.supabase.table('tool_embeddings').delete().eq('tool_name', data['tool_name']).execute()
+                    # 插入新记录
+                    self.supabase.table('tool_embeddings').insert(data).execute()
                 logger.info(f"Saved {len(new_embeddings)} new embeddings to Supabase")
             
         except Exception as e:
@@ -207,7 +222,7 @@ class ToolSelector:
         """从Supabase加载缓存的嵌入向量"""
         try:
             # 查询工具嵌入向量
-            result = self.supabase.client.table('tool_embeddings').select('tool_name, embedding').execute()
+            result = self.supabase.table('tool_embeddings').select('tool_name, embedding').execute()
             
             if result.data and len(result.data) >= len(self.tools_info) * 0.8:  # 80%的工具有缓存就认为有效
                 for row in result.data:
@@ -249,13 +264,12 @@ class ToolSelector:
                 data = {
                     'tool_name': tool_name,
                     'description': tool_info.get('description', ''),
-                    'keywords': tool_info.get('keywords', []),
-                    'category': tool_info.get('category', 'general'),
                     'embedding': embedding
                 }
                 
-                # 使用upsert进行插入或更新
-                self.supabase.client.table('tool_embeddings').upsert(data).execute()
+                # 先删除已存在的记录，然后插入新的
+                self.supabase.table('tool_embeddings').delete().eq('tool_name', tool_name).execute()
+                self.supabase.table('tool_embeddings').insert(data).execute()
             
             logger.info(f"Saved embeddings cache for {len(self.embeddings_cache)} tools to Supabase")
             
@@ -265,11 +279,11 @@ class ToolSelector:
     async def select_tools(self, user_request: str, max_tools: int = 3) -> List[str]:
         """Select relevant tools"""
         logger.info(f"Tool selector: analyzing request '{user_request}'")
-        logger.info(f"Embed service ready: {self.embed_service is not None}")
+        logger.info(f"ISA client ready: {self.client is not None}")
         logger.info(f"Embeddings cache ready: {bool(self.embeddings_cache)}")
         logger.info(f"Max tools: {max_tools}, Threshold: {self.threshold}")
         
-        if not self.embed_service or not self.embeddings_cache:
+        if not self.client or not self.embeddings_cache:
             logger.warning("Tool selector not ready, returning all tools")
             fallback_tools = list(self.tools_info.keys())
             logger.warning(f"Fallback tools: {fallback_tools}")
@@ -278,17 +292,27 @@ class ToolSelector:
         try:
             # Compute user request embedding
             logger.info("Computing user request embedding...")
-            user_embedding = await self.embed_service.create_text_embedding(user_request)
-            logger.info(f"User embedding computed, length: {len(user_embedding) if user_embedding else 0}")
+            result = await self.client.invoke(
+                input_data=user_request,
+                task="embed", 
+                service_type="embedding"
+            )
+            if not result.get('success'):
+                raise Exception(f"Failed to create user embedding: {result.get('error')}")
             
-            # Compute similarities
+            user_embedding = result.get('result', [])
+            logger.info(f"User embedding computed, length: {len(user_embedding)}")
+            
+            # Compute similarities using simple cosine similarity
             logger.info(f"Computing similarities with {len(self.embeddings_cache)} tools...")
             similarities = {}
             for tool_name, tool_embedding in self.embeddings_cache.items():
-                similarity = await self.embed_service.compute_similarity(
-                    user_embedding, tool_embedding
+                # Simple cosine similarity calculation
+                import numpy as np
+                similarity = np.dot(user_embedding, tool_embedding) / (
+                    np.linalg.norm(user_embedding) * np.linalg.norm(tool_embedding)
                 )
-                similarities[tool_name] = similarity
+                similarities[tool_name] = float(similarity)
                 logger.info(f"  {tool_name}: {similarity:.4f}")
             
             # Select most relevant tools
@@ -333,7 +357,7 @@ class ToolSelector:
                 'user_id': 'system'
             }
             
-            self.supabase.client.table('selection_history').insert(data).execute()
+            self.supabase.table('selection_history').insert(data).execute()
             logger.info(f"Logged tool selection for query: {request}")
             
         except Exception as e:
@@ -343,7 +367,7 @@ class ToolSelector:
         """从Supabase获取统计信息"""
         try:
             # 查询最近的工具选择历史
-            result = self.supabase.client.table('selection_history').select('selected_items').eq('selection_type', 'tool').order('created_at', desc=True).limit(50).execute()
+            result = self.supabase.table('selection_history').select('selected_items').eq('selection_type', 'tool').order('created_at', desc=True).limit(50).execute()
             
             # 统计工具使用频率
             tool_usage = {}
@@ -365,8 +389,9 @@ class ToolSelector:
     
     async def close(self):
         """Close service"""
-        if self.embed_service:
-            await self.embed_service.close()
+        if self.client:
+            # ISA client doesn't need explicit close in this context
+            self.client = None
 
 # Global instance
 _tool_selector = None

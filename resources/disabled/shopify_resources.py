@@ -9,7 +9,7 @@ from typing import Dict, List
 
 from core.logging import get_logger
 from core.monitoring import monitor_manager
-from core.supabase_client import get_supabase_client
+from core.database.supabase_client import get_supabase_client
 from tools.services.shopify_service.shopify_client import ShopifyClient
 
 logger = get_logger(__name__)

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "tools/services/event_sourcing_service/Dockerfile.production"
+  },
+  "deploy": {
+    "startCommand": "python tools/services/event_sourcing_service/event_feedback_server.py",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "numReplicas": 1
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production",
+        "PYTHONPATH": ".",
+        "PYTHONUNBUFFERED": "1",
+        "SERVICE_NAME": "isa_service_event"
+      },
+      "serviceConnect": true
+    }
+  }
+}

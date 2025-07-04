@@ -7,9 +7,9 @@ Provides resource management for Graph-based RAG services
 import os
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
-import spacy
 from neo4j import GraphDatabase
 from sentence_transformers import SentenceTransformer
+from core.isa_client import get_isa_client
 
 class GraphRAGResource:
     """Resource manager for GraphRAG operations"""
@@ -18,13 +18,13 @@ class GraphRAGResource:
         self.driver = GraphDatabase.driver(
             os.getenv("NEO4J_URI", "bolt://localhost:7687"),
             auth=(
-                os.getenv("NEO4J_USER", "neo4j"),
-                os.getenv("NEO4J_PASSWORD", "your_password")
+                os.getenv("NEO4J_USERNAME", "neo4j"),
+                os.getenv("NEO4J_PASSWORD", "your-neo4j-password")
             )
         )
         model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
         self.model = SentenceTransformer(model_name)
-        self.nlp = spacy.load("en_core_web_sm")
+        self.isa_client = get_isa_client()
         self._ensure_constraints()
     
     def _ensure_constraints(self):
@@ -82,45 +82,72 @@ class GraphRAGResource:
                 entity_count = 0
                 
                 if extract_entities:
-                    # Process text with spaCy
-                    doc = self.nlp(text)
+                    # Extract entities using ISA client
+                    entity_extraction_prompt = f"""
+                    Extract named entities from the following text. Return a JSON list of entities with their type and position.
                     
-                    # Extract and create entities
-                    for ent in doc.ents:
-                        # Create or merge entity node
-                        entity_result = session.write_transaction(
-                            lambda tx: tx.run(
-                                """
-                                MERGE (e:Entity {text: $text})
-                                ON CREATE SET 
-                                    e.type = $type,
-                                    e.embedding = $embedding
-                                RETURN id(e) as node_id
-                                """,
-                                text=ent.text,
-                                type=ent.label_,
-                                embedding=self.model.encode(ent.text).tolist()
-                            ).single()
+                    Text: {text}
+                    
+                    Return format:
+                    [
+                        {{
+                            "text": "entity_name",
+                            "type": "PERSON|ORGANIZATION|LOCATION|MISC",
+                            "start": start_position,
+                            "end": end_position
+                        }}
+                    ]
+                    """
+                    
+                    try:
+                        entities_response = await self.isa_client.generate_text(
+                            entity_extraction_prompt,
+                            max_tokens=1000
                         )
                         
-                        # Create relationship
-                        session.write_transaction(
-                            lambda tx: tx.run(
-                                """
-                                MATCH (d:Document), (e:Entity)
-                                WHERE id(d) = $doc_id AND id(e) = $entity_id
-                                CREATE (d)-[r:HAS_ENTITY {
-                                    start: $start,
-                                    end: $end
-                                }]->(e)
-                                """,
-                                doc_id=doc_id,
-                                entity_id=entity_result["node_id"],
-                                start=ent.start_char,
-                                end=ent.end_char
+                        import json
+                        entities = json.loads(entities_response)
+                        
+                        # Create entities from ISA client response
+                        for ent in entities:
+                            # Create or merge entity node
+                            entity_result = session.write_transaction(
+                                lambda tx: tx.run(
+                                    """
+                                    MERGE (e:Entity {text: $text})
+                                    ON CREATE SET 
+                                        e.type = $type,
+                                        e.embedding = $embedding
+                                    RETURN id(e) as node_id
+                                    """,
+                                    text=ent["text"],
+                                    type=ent["type"],
+                                    embedding=self.model.encode(ent["text"]).tolist()
+                                ).single()
                             )
-                        )
-                        entity_count += 1
+                            
+                            # Create relationship
+                            session.write_transaction(
+                                lambda tx: tx.run(
+                                    """
+                                    MATCH (d:Document), (e:Entity)
+                                    WHERE id(d) = $doc_id AND id(e) = $entity_id
+                                    CREATE (d)-[r:HAS_ENTITY {
+                                        start: $start,
+                                        end: $end
+                                    }]->(e)
+                                    """,
+                                    doc_id=doc_id,
+                                    entity_id=entity_result["node_id"],
+                                    start=ent.get("start", 0),
+                                    end=ent.get("end", 0)
+                                )
+                            )
+                            entity_count += 1
+                    except Exception as e:
+                        # If entity extraction fails, continue without entities
+                        print(f"Entity extraction failed: {e}")
+                        pass
             
             return {
                 "status": "success",

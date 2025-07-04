@@ -12,7 +12,7 @@ from datetime import datetime
 import json
 
 from core.logging import get_logger
-from core.supabase_client import get_supabase_client
+from core.database.supabase_client import get_supabase_client
 
 try:
     from neo4j import GraphDatabase, Driver, Result
@@ -111,6 +111,152 @@ class Neo4jClient:
                 
         except Exception as e:
             logger.warning(f"Could not create vector indexes (may not be supported): {e}")
+    
+    async def store_entity(self, 
+                         name: str,
+                         entity_type: str,
+                         properties: Dict[str, Any] = None,
+                         embedding: List[float] = None) -> Dict[str, Any]:
+        """Store a single entity in Neo4j
+        
+        Args:
+            name: Entity name/text
+            entity_type: Type of entity
+            properties: Additional properties
+            embedding: Optional embedding vector
+            
+        Returns:
+            Storage result
+        """
+        if not self.driver:
+            raise RuntimeError("Neo4j client not available")
+        
+        properties = properties or {}
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                # Prepare entity properties
+                entity_props = {
+                    'name': name,
+                    'type': entity_type,
+                    'created_at': datetime.now().isoformat(),
+                    **properties
+                }
+                
+                # Add embedding if provided
+                if embedding:
+                    entity_props['embedding'] = embedding
+                
+                # Create or update entity
+                cypher = f"""
+                MERGE (e:Entity {{name: $name}})
+                SET e += $props
+                RETURN e
+                """
+                
+                result = session.run(cypher, name=name, props=entity_props)
+                record = result.single()
+                
+                if record:
+                    return {"success": True, "entity": dict(record["e"])}
+                else:
+                    return {"success": False, "error": "Failed to store entity"}
+                    
+        except Exception as e:
+            logger.error(f"Failed to store entity {name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def store_relationship(self,
+                               source_entity: str,
+                               target_entity: str,
+                               relationship_type: str,
+                               properties: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Store a relationship between entities
+        
+        Args:
+            source_entity: Source entity name
+            target_entity: Target entity name
+            relationship_type: Type of relationship
+            properties: Additional properties
+            
+        Returns:
+            Storage result
+        """
+        if not self.driver:
+            raise RuntimeError("Neo4j client not available")
+        
+        properties = properties or {}
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                # Prepare relationship properties
+                rel_props = {
+                    'type': relationship_type,
+                    'created_at': datetime.now().isoformat(),
+                    **properties
+                }
+                
+                # Create relationship
+                cypher = f"""
+                MATCH (source:Entity {{name: $source_name}})
+                MATCH (target:Entity {{name: $target_name}})
+                MERGE (source)-[r:{relationship_type}]->(target)
+                SET r += $props
+                RETURN r
+                """
+                
+                result = session.run(cypher, 
+                                   source_name=source_entity,
+                                   target_name=target_entity,
+                                   props=rel_props)
+                record = result.single()
+                
+                if record:
+                    return {"success": True, "relationship": dict(record["r"])}
+                else:
+                    return {"success": False, "error": "Failed to store relationship"}
+                    
+        except Exception as e:
+            logger.error(f"Failed to store relationship {source_entity}->{target_entity}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def get_entity(self, entity_name: str) -> Dict[str, Any]:
+        """Get entity by name"""
+        if not self.driver:
+            raise RuntimeError("Neo4j client not available")
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run("MATCH (e:Entity {name: $name}) RETURN e", name=entity_name)
+                record = result.single()
+                
+                if record:
+                    return dict(record["e"])
+                else:
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Failed to get entity {entity_name}: {e}")
+            return None
+    
+    async def execute_query(self, query: str, parameters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """Execute a Cypher query"""
+        if not self.driver:
+            raise RuntimeError("Neo4j client not available")
+        
+        parameters = parameters or {}
+        
+        try:
+            with self.driver.session(database=self.database) as session:
+                result = session.run(query, parameters)
+                records = []
+                for record in result:
+                    records.append(dict(record))
+                return records
+                
+        except Exception as e:
+            logger.error(f"Query execution failed: {e}")
+            raise
     
     async def store_knowledge_graph(self, graph_data: Dict[str, Any], 
                                    graph_id: str = None) -> str:
@@ -261,15 +407,16 @@ class Neo4jClient:
             logger.error(f"Query execution failed: {e}")
             raise
     
-    async def vector_similarity_search(self, query_embedding: List[float], 
+    async def vector_similarity_search(self, 
+                                     embedding: List[float], 
                                      limit: int = 10, 
-                                     threshold: float = 0.8) -> List[Dict[str, Any]]:
+                                     similarity_threshold: float = 0.8) -> List[Dict[str, Any]]:
         """Perform vector similarity search on entity embeddings
         
         Args:
-            query_embedding: Query vector embedding
+            embedding: Query vector embedding
             limit: Maximum number of results
-            threshold: Similarity threshold
+            similarity_threshold: Similarity threshold
             
         Returns:
             List of similar entities with scores
@@ -292,20 +439,20 @@ class Neo4jClient:
             """
             
             parameters = {
-                'query_vector': query_embedding,
+                'query_vector': embedding,
                 'k': limit * 2,  # Query more to filter by threshold
-                'threshold': threshold,
+                'threshold': similarity_threshold,
                 'limit': limit
             }
             
-            return await self.query_graph(cypher, parameters)
+            return await self.execute_query(cypher, parameters)
             
         except Exception as e:
             logger.warning(f"Vector search not available or failed: {e}")
             # Fallback to text-based search
-            return await self._fallback_text_search(query_embedding, limit)
+            return await self._fallback_text_search(embedding, limit)
     
-    async def _fallback_text_search(self, query_embedding: List[float], 
+    async def _fallback_text_search(self, embedding: List[float], 
                                    limit: int) -> List[Dict[str, Any]]:
         """Fallback text-based search when vector search is not available"""
         # This is a placeholder - in practice, you'd need a way to convert
@@ -320,99 +467,79 @@ class Neo4jClient:
         LIMIT $limit
         """
         
-        return await self.query_graph(cypher, {'limit': limit})
+        return await self.execute_query(cypher, {'limit': limit})
     
-    async def get_entity_neighbors(self, entity_id: str, 
-                                 max_depth: int = 2, 
-                                 relation_types: List[str] = None) -> Dict[str, Any]:
-        """Get neighboring entities and relationships
+    async def get_entity_neighbors(self, 
+                                 entity_name: str, 
+                                 depth: int = 2) -> List[str]:
+        """Get neighboring entity names
         
         Args:
-            entity_id: Entity ID to start from
-            max_depth: Maximum traversal depth
-            relation_types: Filter by specific relation types
+            entity_name: Entity name to start from
+            depth: Maximum traversal depth
             
         Returns:
-            Subgraph around the entity
+            List of neighbor entity names
         """
         if not self.driver:
             raise RuntimeError("Neo4j client not available")
         
-        relation_filter = ""
-        if relation_types:
-            relation_filter = f"AND r.relation_type IN {relation_types}"
-        
         cypher = f"""
-        MATCH path = (start:Entity {{id: $entity_id}})-[r:RELATES_TO*1..{max_depth}]-(neighbor:Entity)
-        WHERE true {relation_filter}
-        RETURN path, 
-               relationships(path) as rels,
-               nodes(path) as nodes
+        MATCH (start:Entity {{name: $entity_name}})-[*1..{depth}]-(neighbor:Entity)
+        WHERE neighbor.name <> $entity_name
+        RETURN DISTINCT neighbor.name as name
         LIMIT 100
         """
         
         try:
-            results = await self.query_graph(cypher, {'entity_id': entity_id})
-            
-            # Process results into subgraph format
-            nodes = {}
-            edges = {}
-            
-            for result in results:
-                for node in result.get('nodes', []):
-                    node_id = node.get('id')
-                    if node_id:
-                        nodes[node_id] = dict(node)
-                
-                for rel in result.get('rels', []):
-                    rel_id = rel.get('id')
-                    if rel_id:
-                        edges[rel_id] = dict(rel)
-            
-            return {
-                'nodes': nodes,
-                'edges': edges,
-                'center_entity': entity_id
-            }
+            results = await self.execute_query(cypher, {'entity_name': entity_name})
+            return [record['name'] for record in results]
             
         except Exception as e:
             logger.error(f"Failed to get entity neighbors: {e}")
-            return {'nodes': {}, 'edges': {}, 'center_entity': entity_id}
+            return []
     
-    async def get_shortest_path(self, source_id: str, target_id: str, 
-                              max_length: int = 6) -> List[Dict[str, Any]]:
+    async def find_shortest_path(self, 
+                               source_entity: str, 
+                               target_entity: str) -> Dict[str, Any]:
         """Find shortest path between two entities
         
         Args:
-            source_id: Source entity ID
-            target_id: Target entity ID
-            max_length: Maximum path length
+            source_entity: Source entity name
+            target_entity: Target entity name
             
         Returns:
-            Shortest path as list of nodes and relationships
+            Shortest path information
         """
         if not self.driver:
             raise RuntimeError("Neo4j client not available")
         
-        cypher = f"""
-        MATCH path = shortestPath((source:Entity {{id: $source_id}})-[r:RELATES_TO*1..{max_length}]-(target:Entity {{id: $target_id}}))
+        cypher = """
+        MATCH path = shortestPath((source:Entity {name: $source_name})-[*1..6]-(target:Entity {name: $target_name}))
         RETURN path,
                length(path) as path_length,
-               nodes(path) as nodes,
-               relationships(path) as relationships
+               [node in nodes(path) | node.name] as node_names
         """
         
         try:
-            results = await self.query_graph(cypher, {
-                'source_id': source_id,
-                'target_id': target_id
+            results = await self.execute_query(cypher, {
+                'source_name': source_entity,
+                'target_name': target_entity
             })
             
-            return results
+            if results:
+                result = results[0]
+                return {
+                    "found": True,
+                    "length": result["path_length"],
+                    "nodes": result["node_names"]
+                }
+            else:
+                return {"found": False, "length": 0, "nodes": []}
             
         except Exception as e:
             logger.error(f"Failed to find shortest path: {e}")
-            return []
+            return {"found": False, "length": 0, "nodes": [], "error": str(e)}
     
     async def get_graph_statistics(self, graph_id: str = None) -> Dict[str, Any]:
         """Get statistics about the stored graph
@@ -441,7 +568,7 @@ class Neo4jClient:
         """
         
         try:
-            results = await self.query_graph(cypher)
+            results = await self.execute_query(cypher)
             if results:
                 return results[0]
             return {}
@@ -453,7 +580,7 @@ class Neo4jClient:
 # Global instance
 _neo4j_client = None
 
-def get_neo4j_client(config: Optional[Dict[str, Any]] = None) -> Neo4jClient:
+async def get_neo4j_client(config: Optional[Dict[str, Any]] = None) -> Optional[Neo4jClient]:
     """Get the global Neo4j client instance"""
     global _neo4j_client
     if _neo4j_client is None:

@@ -1,38 +1,44 @@
+# 生产级Docker镜像 - 多阶段构建，安全优化
+FROM python:3.11-slim as builder
 
+# 构建阶段 - 安装依赖
+WORKDIR /build
+COPY requirements.production.txt .
+RUN pip install --no-cache-dir --user -r requirements.production.txt
+
+# 生产阶段 - 最小化镜像
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
+# 创建非root用户
+RUN groupadd -r mcpuser && useradd -r -g mcpuser mcpuser
+
+# 复制Python包
+COPY --from=builder /root/.local /home/mcpuser/.local
+ENV PATH=/home/mcpuser/.local/bin:$PATH
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制应用代码
+COPY --chown=mcpuser:mcpuser . .
+
+# 安全配置
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# 移除不需要的文件
+RUN rm -rf tests/ docs/ scripts/ *.md .git* .env*
 
-# Set work directory
-WORKDIR /app
+# 切换到非root用户
+USER mcpuser
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project
-COPY . .
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
-USER app
-
-# Health check
+# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:4321/health || exit 1
+    CMD curl -f http://localhost:${PORT:-4321}/health || exit 1
 
-# Expose port
-EXPOSE 4321
+# 暴露端口
+EXPOSE ${PORT:-4321}
 
-# Run application
-CMD ["python", "-m", "uvicorn", "smart_mcp_server:app", "--host", "0.0.0.0", "--port", "4321", "--workers", "4"]
+# 启动命令
+CMD ["python", "smart_mcp_server.py", "--port", "${PORT:-4321}"]

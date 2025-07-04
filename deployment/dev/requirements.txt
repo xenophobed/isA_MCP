@@ -1,0 +1,84 @@
+# Core dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+httpx>=0.25.0
+
+# MCP Framework
+mcp>=1.0.0
+
+# Database
+supabase>=1.0.0
+asyncpg>=0.29.0
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.0    # PostgreSQL adapter for data analytics
+mysql-connector-python>=8.0.0  # MySQL adapter (optional)
+pyodbc>=4.0.0             # SQL Server adapter (optional)
+neo4j>=5.0.0              # Neo4j graph database driver
+
+# AI and ML
+sentence-transformers>=2.2.0
+openai>=1.0.0
+tiktoken>=0.5.0
+
+# Vector database for embeddings
+pgvector>=0.2.0           # PostgreSQL vector extension
+
+# Data processing
+pandas>=1.5.0             # For CSV/Excel processing
+openpyxl>=3.1.0           # For Excel files
+numpy>=1.24.0             # Numerical computing
+PyMuPDF>=1.23.0           # For PDF processing (fitz module)
+
+# Web automation
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+requests>=2.31.0
+
+# Security and Auth
+cryptography>=41.0.0
+PyJWT>=2.8.0
+bcrypt>=4.1.0
+passlib>=1.7.0
+
+# Payment processing
+stripe>=7.0.0
+
+# Monitoring and Logging
+structlog>=23.2.0
+prometheus-client>=0.19.0
+sentry-sdk>=1.38.0
+
+# Redis and Caching
+redis>=5.0.0
+hiredis>=2.2.0
+
+# Image processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0
+click>=8.1.0
+rich>=13.6.0
+
+# Testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-postgresql>=3.1.0  # For PostgreSQL testing
+pytest-cov>=4.0.0         # Coverage reporting
+pytest-benchmark>=4.0.0   # Performance testing
+
+# Test utilities
+responses>=0.23.0         # For HTTP mocking
+factory-boy>=3.2.0        # For test data generation
+freezegun>=1.2.0          # For time mocking
+memory-profiler>=0.60.0   # For memory profiling
+
+# Code quality (development)
+flake8>=5.0.0
+black>=22.0.0
+isort>=5.10.0

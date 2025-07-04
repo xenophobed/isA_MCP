@@ -21,10 +21,10 @@ except ImportError:
     CHROMADB_AVAILABLE = False
 
 try:
-    from isa_model.inference.ai_factory import AIFactory
-    AIFACTORY_AVAILABLE = True
+    from core.isa_client import get_isa_client
+    ISACLIENT_AVAILABLE = True
 except ImportError:
-    AIFACTORY_AVAILABLE = False
+    ISACLIENT_AVAILABLE = False
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -79,20 +79,19 @@ class ChromaService:
             persist_directory=None  # 纯内存模式
         ))
         
-        # 初始化嵌入模型 - 优先使用现有的 AIFactory
+        # 初始化嵌入模型 - 使用 ISA Client
         self.embedding_model_name = embedding_model
         self.use_openai_embedding = False
         self.use_sentence_transformers = False
         
-        # 1. 优先使用 AIFactory (OpenAI embedding)
-        if AIFACTORY_AVAILABLE:
+        # 1. 优先使用 ISA Client embedding
+        if ISACLIENT_AVAILABLE:
             try:
-                self.ai_factory = AIFactory()
-                self.embedding_service = self.ai_factory.get_embedding_service()
+                self.isa_client = get_isa_client()
                 self.use_openai_embedding = True
-                logger.info("ChromaService: Using OpenAI embedding via AIFactory")
+                logger.info("ChromaService: Using ISA Model embedding")
             except Exception as e:
-                logger.warning(f"ChromaService: Failed to load AIFactory: {e}")
+                logger.warning(f"ChromaService: Failed to load ISA Client: {e}")
         
         # 2. 后备使用 SentenceTransformers
         if not self.use_openai_embedding and SENTENCE_TRANSFORMERS_AVAILABLE:
@@ -187,7 +186,16 @@ class ChromaService:
                 embeddings = []
                 for doc in documents:
                     try:
-                        embedding = await self.embedding_service.create_text_embedding(doc)
+                        result = await self.isa_client.invoke(
+                            input_data=doc,
+                            task="embed",
+                            service_type="embedding"
+                        )
+                        
+                        if result.get('success'):
+                            embedding = result.get('result', [])
+                        else:
+                            raise Exception(f"Embedding failed: {result.get('error')}")
                         embeddings.append(embedding)
                     except Exception as e:
                         logger.error(f"OpenAI embedding failed for document: {e}")
@@ -257,7 +265,16 @@ class ChromaService:
                 query_embeddings = []
                 for query_text in query_texts:
                     try:
-                        embedding = await self.embedding_service.create_text_embedding(query_text)
+                        result = await self.isa_client.invoke(
+                            input_data=query_text,
+                            task="embed",
+                            service_type="embedding"
+                        )
+                        
+                        if result.get('success'):
+                            embedding = result.get('result', [])
+                        else:
+                            raise Exception(f"Query embedding failed: {result.get('error')}")
                         query_embeddings.append(embedding)
                     except Exception as e:
                         logger.error(f"OpenAI embedding failed for query: {e}")
@@ -373,7 +390,7 @@ class ChromaService:
             "cleanup_interval_seconds": self.cleanup_interval,
             "collection_ttl_seconds": self.collection_ttl,
             "chromadb_available": CHROMADB_AVAILABLE,
-            "aifactory_available": AIFACTORY_AVAILABLE,
+            "isaclient_available": ISACLIENT_AVAILABLE,
             "sentence_transformers_available": SENTENCE_TRANSFORMERS_AVAILABLE
         }
 

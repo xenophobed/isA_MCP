@@ -14,7 +14,7 @@ from pathlib import Path
 from playwright.async_api import Page
 
 from core.logging import get_logger
-from isa_model.inference import AIFactory
+from core.isa_client import get_isa_client
 
 logger = get_logger(__name__)
 
@@ -26,8 +26,7 @@ class VisionAnalyzer:
         self.screenshots_path.mkdir(exist_ok=True)
         self.monitoring_path = Path("monitoring")
         self.monitoring_path.mkdir(exist_ok=True)
-        self.ai_factory = AIFactory()
-        self.ui_service = None
+        self.client = None
     
     async def identify_login_form(self, page: Page) -> Dict[str, Any]:
         """Identify login form elements using stacked AI model for precise coordinate detection"""
@@ -125,16 +124,19 @@ class VisionAnalyzer:
         try:
             logger.info("🔧 Initializing stacked AI UI analysis service...")
             
-            # Create UI analysis service like in the demo
-            if self.ui_service is None:
-                self.ui_service = self.ai_factory.get_ui_analysis(task_type="login")
-                logger.info(f"✅ UI analysis service created: {type(self.ui_service)}")
+            # Use ISA Model client for vision analysis
+            if self.client is None:
+                self.client = get_isa_client()
+                logger.info(f"✅ ISA Model client initialized")
             
-            # Invoke the stacked model analysis
-            logger.info("🤖 Starting stacked AI analysis...")
-            result = await self.ui_service.invoke({
-                "image_path": screenshot_path
-            })
+            # Invoke vision analysis using client.invoke
+            logger.info("🤖 Starting vision analysis...")
+            result = await self.client.invoke(
+                input_data=screenshot_path,
+                task="analyze",
+                service_type="vision",
+                parameters={"task_type": "login"}
+            )
             
             logger.info(f"📊 Stacked AI analysis completed")
             logger.info(f"🔍 Result structure: {list(result.keys()) if isinstance(result, dict) else type(result)}")
@@ -238,10 +240,10 @@ class VisionAnalyzer:
         return search_elements if len(search_elements) >= 1 else {}
     
     async def _vision_based_search_detection(self, screenshot: bytes, page: Page) -> Dict[str, str]:
-        """Vision-based search form detection using AIFactory vision service"""
+        """Vision-based search form detection using ISA vision service"""
         try:
             # Get vision service
-            vision = AIFactory().get_vision()
+            client = get_isa_client()
             
             # Analyze screenshot for search form elements
             analysis_prompt = """
@@ -808,7 +810,7 @@ class VisionAnalyzer:
             screenshot = await page.screenshot(full_page=False)
             
             # Get vision service
-            vision = AIFactory().get_vision()
+            client = get_isa_client()
             
             # Analyze screenshot for download elements
             analysis_prompt = """

@@ -15,7 +15,7 @@ from pathlib import Path
 from playwright.async_api import Page
 
 from core.logging import get_logger
-from isa_model.inference import AIFactory
+from core.isa_client import get_isa_client
 from .vision_analyzer import VisionAnalyzer
 from .selector_analyzer import SelectorAnalyzer
 
@@ -82,7 +82,7 @@ class IntelligentElementDetector:
     """Multi-strategy intelligent element detection with precise coordinate positioning"""
     
     def __init__(self):
-        self.ai_factory = AIFactory()
+        self.client = get_isa_client()
         self.vision_analyzer = VisionAnalyzer()
         self.selector_analyzer = SelectorAnalyzer()
         self.ui_service = None
@@ -262,16 +262,21 @@ class IntelligentElementDetector:
             screenshot_path = tmp_file.name
         
         try:
-            # Initialize UI analysis service
-            if self.ui_service is None:
-                self.ui_service = self.ai_factory.get_ui_analysis(task_type=context)
+            # Perform stacked AI analysis using ISA client
+            result = await self.client.invoke(
+                input_data={
+                    "image_path": screenshot_path,
+                    "target_elements": target_elements,
+                    "context": context
+                },
+                task="vision",
+                service_type="vision"
+            )
             
-            # Perform stacked AI analysis
-            analysis_result = await self.ui_service.invoke({
-                "image_path": screenshot_path,
-                "target_elements": target_elements,
-                "context": context
-            })
+            if result.get('success'):
+                analysis_result = result.get('result', {})
+            else:
+                analysis_result = {"success": False, "error": result.get('error')}
             
             if not analysis_result.get("success"):
                 logger.error(f"❌ Stacked AI analysis failed: {analysis_result}")
@@ -329,9 +334,6 @@ class IntelligentElementDetector:
             screenshot_path = tmp_file.name
         
         try:
-            # Get vision service
-            vision = self.ai_factory.get_vision()
-            
             # Create analysis prompt
             analysis_prompt = f"""
             Analyze this webpage screenshot and identify the following UI elements: {', '.join(target_elements)}
@@ -356,13 +358,20 @@ class IntelligentElementDetector:
             }}
             """
             
-            # Analyze with vision service
-            analysis_result = await vision.analyze_image(
-                image=screenshot_path,
-                prompt=analysis_prompt
+            # Analyze with ISA vision service
+            result = await self.client.invoke(
+                input_data={
+                    "image_path": screenshot_path,
+                    "prompt": analysis_prompt
+                },
+                task="vision",
+                service_type="vision"
             )
             
-            await vision.close()
+            if result.get('success'):
+                analysis_result = result.get('result', {})
+            else:
+                analysis_result = {}
             
             # Parse results
             analysis_text = analysis_result.get('text', '')
@@ -592,9 +601,6 @@ class IntelligentElementDetector:
                 screenshot_path = tmp_file.name
             
             try:
-                # Use vision service to find element
-                vision = self.ai_factory.get_vision()
-                
                 analysis_prompt = f"""
                 Find the UI element described as: "{description}"
                 
@@ -611,15 +617,23 @@ class IntelligentElementDetector:
                 }}
                 """
                 
-                result = await vision.analyze_image(
-                    image=screenshot_path,
-                    prompt=analysis_prompt
+                # Use ISA vision service
+                result = await self.client.invoke(
+                    input_data={
+                        "image_path": screenshot_path,
+                        "prompt": analysis_prompt
+                    },
+                    task="vision",
+                    service_type="vision"
                 )
                 
-                await vision.close()
+                if result.get('success'):
+                    analysis_result = result.get('result', {})
+                else:
+                    analysis_result = {}
                 
                 # Parse result
-                analysis_text = result.get('text', '')
+                analysis_text = analysis_result.get('text', '')
                 
                 import re
                 json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)

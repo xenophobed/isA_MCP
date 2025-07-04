@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from core.logging import get_logger
-from isa_model.inference.ai_factory import AIFactory
+from tools.base_service import BaseService
 from .entity_extractor import Entity, EntityType
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ class Attribute:
         if self.normalized_value is None:
             self.normalized_value = self.value
 
-class AttributeExtractor:
+class AttributeExtractor(BaseService):
     """Extract attributes and properties of entities from text"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -60,9 +60,8 @@ class AttributeExtractor:
         Args:
             config: Configuration dict with extractor settings
         """
+        super().__init__("AttributeExtractor")
         self.config = config or {}
-        self.ai_factory = AIFactory()
-        self.llm_service = self.ai_factory.get_llm_service()
         
         # Attribute patterns for different types
         self.attribute_patterns = {
@@ -177,18 +176,25 @@ class AttributeExtractor:
             - For EVENT: date, location, duration, participants
             """
             
-            response = await self.llm_service.generate_text(
-                prompt,
-                max_tokens=1500,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 1500, "temperature": 0.1},
+                operation_name="attribute_extraction"
             )
+            
+            if 'text' in response:
+                response_text = response['text']
+            else:
+                raise Exception("Invalid response format from ISA API")
             
             # Parse LLM response
             try:
-                json_start = response.find('{')
-                json_end = response.rfind('}') + 1
+                json_start = response_text.find('{')
+                json_end = response_text.rfind('}') + 1
                 if json_start != -1 and json_end != -1:
-                    json_str = response[json_start:json_end]
+                    json_str = response_text[json_start:json_end]
                     attributes_data = json.loads(json_str)
                     
                     attributes = {}

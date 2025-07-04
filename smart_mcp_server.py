@@ -19,7 +19,6 @@ import logging
 from core.security import initialize_security
 from core.monitoring import monitor_manager
 from core.auto_discovery import AutoDiscoverySystem
-from resources.database_init import initialize_database
 
 # AI selectors
 from tools.core.tool_selector import ToolSelector
@@ -66,9 +65,8 @@ class SmartMCPServer:
         initialize_security(monitor_manager)
         print("  ✅ Security manager initialized")
         
-        # Database
-        await initialize_database()
-        print("  ✅ Database initialized")
+        # Database tables are created via migrations, no init needed
+        print("  ✅ Database ready (tables created via migrations)")
         
         print("✅ Core services ready")
     
@@ -351,7 +349,7 @@ def add_endpoints(app: Starlette):
     # 添加安全认证端点
     add_auth_endpoints(app)
 
-async def run_server(port: int = 4321):
+async def run_server(port: int = 8081):
     """Run the Smart MCP Server"""
     global smart_server
     
@@ -403,7 +401,7 @@ async def run_server(port: int = 4321):
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="Smart MCP Server with AI-powered capability discovery")
-    parser.add_argument("--port", "-p", type=int, default=4321, help="Port to run server on")
+    parser.add_argument("--port", "-p", type=int, default=8081, help="Port to run server on")
     args = parser.parse_args()
     
     # Run server

@@ -128,20 +128,21 @@ def register_data_analytics_tools(mcp):
             embedding_storage = EmbeddingStorage(storage_config)
             await embedding_storage.initialize()
             
-            storage_result = await embedding_storage.store_metadata_embeddings(semantic_metadata)
+            storage_result = await embedding_storage.store_semantic_metadata(semantic_metadata)
             
             step3_time = (datetime.now() - step3_start).total_seconds()
             workflow_results["steps_completed"].append("embedding_storage")
             workflow_results["step_results"]["step3_embedding_storage"] = {
                 "execution_time_seconds": step3_time,
-                "embeddings_generated": storage_result.get("embeddings_count", 0),
-                "vectors_stored": storage_result.get("vectors_stored", 0),
-                "collection_id": storage_result.get("collection_id"),
+                "embeddings_generated": storage_result.get("stored_embeddings", 0),
+                "vectors_stored": storage_result.get("stored_embeddings", 0),
+                "failed_embeddings": storage_result.get("failed_embeddings", 0),
                 "storage_config": storage_config,
-                "status": "completed" if storage_result.get("success", False) else "failed"
+                "billing_info": storage_result.get("billing_info", {}),
+                "status": "completed" if storage_result.get("stored_embeddings", 0) > 0 else "failed"
             }
             
-            logger.info(f"✅ Step 3 completed in {step3_time:.2f}s - Stored {storage_result.get('vectors_stored', 0)} vectors")
+            logger.info(f"✅ Step 3 completed in {step3_time:.2f}s - Stored {storage_result.get('stored_embeddings', 0)} vectors")
             
             # === WORKFLOW COMPLETION ===
             total_time = (datetime.now() - datetime.fromisoformat(workflow_results["start_time"])).total_seconds()
@@ -150,6 +151,20 @@ def register_data_analytics_tools(mcp):
             workflow_results["status"] = "success"
             
             logger.info(f"🎉 Data sourcing workflow completed successfully in {total_time:.2f}s")
+            
+            # Collect all billing information
+            total_billing = {
+                "total_cost_usd": 0.0,
+                "service_breakdown": {},
+                "operations_count": 0
+            }
+            
+            # Add embedding storage billing
+            embedding_billing = storage_result.get("billing_info", {})
+            if embedding_billing:
+                total_billing["total_cost_usd"] += embedding_billing.get("total_cost_usd", 0.0)
+                total_billing["service_breakdown"]["embedding_storage"] = embedding_billing
+                total_billing["operations_count"] += embedding_billing.get("operation_count", 0)
             
             response = {
                 "status": "success",
@@ -166,6 +181,7 @@ def register_data_analytics_tools(mcp):
                     "storage_result": storage_result,
                     "message": f"Data sourcing completed: {len(raw_metadata.get('tables', []))} tables processed and stored in vector database"
                 },
+                "billing": total_billing,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -308,6 +324,7 @@ def register_data_analytics_tools(mcp):
                 "complexity_level": sql_generation_result.complexity_level,
                 "estimated_execution_time": sql_generation_result.estimated_execution_time,
                 "estimated_rows": sql_generation_result.estimated_rows,
+                "billing_info": sql_generator.get_service_billing_info(),
                 "status": "completed"
             }
             
@@ -379,6 +396,20 @@ def register_data_analytics_tools(mcp):
             
             logger.info(f"🎉 Data query workflow completed in {total_time:.2f}s")
             
+            # Collect all billing information
+            total_billing = {
+                "total_cost_usd": 0.0,
+                "service_breakdown": {},
+                "operations_count": 0
+            }
+            
+            # Add SQL generator billing
+            sql_generator_billing = sql_generator.get_service_billing_info()
+            if sql_generator_billing:
+                total_billing["total_cost_usd"] += sql_generator_billing.get("total_cost_usd", 0.0)
+                total_billing["service_breakdown"]["sql_generator"] = sql_generator_billing
+                total_billing["operations_count"] += sql_generator_billing.get("operation_count", 0)
+            
             response = {
                 "status": "success",
                 "action": "data_query",
@@ -415,6 +446,7 @@ def register_data_analytics_tools(mcp):
                     ],
                     "message": f"Query processed: {'Success' if execution_result.success else 'Failed'} - {execution_result.row_count} rows returned with {viz_result.get('visualization', {}).get('type', 'unknown')} visualization"
                 },
+                "billing": total_billing,
                 "timestamp": datetime.now().isoformat()
             }
             

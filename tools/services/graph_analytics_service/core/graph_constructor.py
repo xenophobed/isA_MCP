@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 from core.logging import get_logger
+from tools.base_service import BaseService
 from .entity_extractor import Entity, EntityType
 from .relation_extractor import Relation, RelationType
 from .attribute_extractor import Attribute, AttributeType
@@ -59,7 +60,7 @@ class KnowledgeGraph:
         if not hasattr(self, 'created_at'):
             self.created_at = datetime.now().isoformat()
 
-class GraphConstructor:
+class GraphConstructor(BaseService):
     """Construct knowledge graphs from extracted information"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -68,6 +69,7 @@ class GraphConstructor:
         Args:
             config: Configuration dict with constructor settings
         """
+        super().__init__("GraphConstructor")
         self.config = config or {}
         self.node_id_counter = 0
         self.edge_id_counter = 0

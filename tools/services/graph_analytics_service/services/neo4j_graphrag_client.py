@@ -14,6 +14,7 @@ import json
 from .neo4j_client import Neo4jClient
 from ..core.entity_extractor import EntityExtractor
 from ..core.relation_extractor import RelationExtractor
+from ..utils.embedding_utils import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class Neo4jGraphRAGClient:
         self.neo4j_client = neo4j_client
         self.entity_extractor = EntityExtractor()
         self.relation_extractor = RelationExtractor()
+        self.embedding_service = get_embedding_service()
         
     async def semantic_search(
         self,
@@ -199,34 +201,41 @@ class Neo4jGraphRAGClient:
             for entity in entities:
                 try:
                     # Generate embedding for entity
-                    entity_text = f"{entity['name']} {entity.get('description', '')}"
-                    # Note: In real implementation, you'd use your embedding model here
-                    # embedding = await generate_embedding(entity_text)
+                    entity_text = f"{entity.text} {entity.entity_type.value}"
+                    if hasattr(entity, 'properties') and entity.properties:
+                        entity_text += f" {str(entity.properties)}"
+                    
+                    embedding = await self.embedding_service.generate_single_embedding(entity_text)
                     
                     result = await self.neo4j_client.store_entity(
-                        name=entity["name"],
-                        entity_type=entity["type"],
+                        name=entity.text,
+                        entity_type=entity.entity_type.value,
                         properties={
-                            **entity,
+                            "canonical_form": entity.canonical_form,
+                            "confidence": entity.confidence,
+                            "properties": entity.properties,
                             "source_id": source_id,
                             "chunk_id": chunk_id
-                        }
-                        # embedding=embedding  # Uncomment when embedding generation is available
+                        },
+                        embedding=embedding
                     )
                     stored_entities.append(result)
                 except Exception as e:
-                    logger.warning(f"Failed to store entity {entity['name']}: {e}")
+                    logger.warning(f"Failed to store entity {entity.text}: {e}")
                     
             # Store relationships
             stored_relationships = []
             for rel in relationships:
                 try:
                     result = await self.neo4j_client.store_relationship(
-                        source_entity=rel["source"],
-                        target_entity=rel["target"],
-                        relationship_type=rel["relation"],
+                        source_entity=rel.subject.text,
+                        target_entity=rel.object.text,
+                        relationship_type=rel.relation_type.value,
                         properties={
-                            **rel.get("properties", {}),
+                            "predicate": rel.predicate,
+                            "confidence": rel.confidence,
+                            "context": rel.context,
+                            **rel.properties,
                             "source_id": source_id,
                             "chunk_id": chunk_id
                         }

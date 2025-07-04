@@ -9,12 +9,12 @@ from typing import Dict, Any, List, Optional
 from playwright.async_api import Page
 
 from core.logging import get_logger
-from isa_model.inference import AIFactory
+from tools.base_service import BaseService
 from ..base import ExtractionStrategy
 
 logger = get_logger(__name__)
 
-class LLMExtractionStrategy(ExtractionStrategy):
+class LLMExtractionStrategy(ExtractionStrategy, BaseService):
     """Extract structured data using Large Language Models for intelligent content understanding"""
     
     def __init__(self, schema: Dict[str, Any]):
@@ -39,25 +39,21 @@ class LLMExtractionStrategy(ExtractionStrategy):
                        }
                    }
         """
+        BaseService.__init__(self, "LLMExtractionStrategy")
         self.schema = schema
         self.name = schema.get("name", "LLM Extraction")
         self.content_type = schema.get("content_type", "general")
         self.fields = schema.get("fields", [])
         self.extraction_prompt = schema.get("extraction_prompt")
         self.llm_config = schema.get("llm_config", {"temperature": 0.1, "max_tokens": 2000})
-        
-        self.ai_factory = AIFactory()
-        self.llm = None
     
     async def extract(self, page: Page, html: str) -> List[Dict[str, Any]]:
         """Extract data using LLM-based intelligent analysis"""
         logger.info(f"🧠 Extracting data using LLM strategy: {self.name}")
         
         try:
-            # Initialize LLM service
-            if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
-                logger.info(f"✅ LLM service initialized: {self.llm.get_model_info()['name']}")
+            # Use ISA client from BaseService
+            logger.info(f"✅ ISA Model client ready")
             
             # Get clean text content from page
             clean_text = await self._extract_clean_text(page)
@@ -69,22 +65,27 @@ class LLMExtractionStrategy(ExtractionStrategy):
             # Build extraction prompt
             extraction_prompt = self._build_extraction_prompt(clean_text)
             
-            logger.info(f"📝 Sending extraction request to LLM...")
+            logger.info(f"📝 Sending extraction request to ISA Model...")
             logger.info(f"   Content length: {len(clean_text)} characters")
             logger.info(f"   Fields to extract: {[f['name'] for f in self.fields]}")
             
-            # Get LLM response
-            response = await self.llm.ainvoke(extraction_prompt)
+            # Get LLM response using ISA client with billing collection
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=extraction_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="llm_extraction"
+            )
+            
+            # Extract response content
+            response = result_data.get('text', '') or result_data.get('content', '') or result_data.get('response', '') or str(result_data)
+            logger.info(f"📝 LLM response received: {response[:200]}...")
             
             # Parse LLM response into structured data
             extracted_data = await self._parse_llm_response(response)
             
             logger.info(f"✅ LLM extraction completed: {len(extracted_data)} items extracted")
-            
-            # Get token usage statistics
-            usage = self.llm.get_last_token_usage()
-            cost = self.llm.get_last_usage_with_cost()
-            logger.info(f"💰 Token usage: {usage['total_tokens']} tokens, Cost: ${cost['cost_usd']:.6f}")
             
             return extracted_data
             
@@ -261,10 +262,12 @@ Return only a valid JSON array in this format:
         return f"llm_extraction_{self.name.lower().replace(' ', '_')}"
     
     async def close(self):
-        """Clean up LLM service"""
-        if self.llm:
-            await self.llm.close()
-            self.llm = None
+        """Clean up client service"""
+        pass
+    
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()
 
 class PredefinedLLMSchemas:
     """Predefined LLM extraction schemas for common content types"""

@@ -5,16 +5,17 @@ Advanced content filtering using embeddings for semantic similarity
 Based on isa_model inference framework
 """
 import json
+import math
 from typing import Dict, Any, Optional, List
 from bs4 import BeautifulSoup
 
 from core.logging import get_logger
-from isa_model.inference import AIFactory
+from tools.base_service import BaseService
 from ..base import FilterStrategy
 
 logger = get_logger(__name__)
 
-class SemanticFilter(FilterStrategy):
+class SemanticFilter(FilterStrategy, BaseService):
     """Content filter using embeddings for semantic similarity and relevance"""
     
     def __init__(self, 
@@ -33,15 +34,42 @@ class SemanticFilter(FilterStrategy):
             max_chunks: Maximum number of chunks to process (for performance)
             embedding_config: Configuration for embedding service
         """
+        BaseService.__init__(self, "SemanticFilter")
         self.user_query = user_query
         self.similarity_threshold = similarity_threshold
         self.min_chunk_length = min_chunk_length
         self.max_chunks = max_chunks
         self.embedding_config = embedding_config or {}
         
-        self.ai_factory = AIFactory()
-        self.embed = None
         self.query_embedding = None
+    
+    async def _create_embedding(self, text: str) -> List[float]:
+        """Create embedding for text using ISA client"""
+        try:
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=text,
+                task="embed",
+                service_type="embedding",
+                operation_name="create_embedding"
+            )
+            return result_data
+        except Exception as e:
+            logger.error(f"Error creating embedding: {e}")
+            return []
+    
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Calculate cosine similarity between two vectors"""
+        if len(vec1) != len(vec2) or len(vec1) == 0:
+            return 0.0
+        
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        magnitude1 = math.sqrt(sum(a * a for a in vec1))
+        magnitude2 = math.sqrt(sum(a * a for a in vec2))
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+        
+        return dot_product / (magnitude1 * magnitude2)
     
     async def filter(self, content: str, criteria: Optional[Dict[str, Any]] = None) -> str:
         """Filter content based on semantic similarity to query"""
@@ -56,14 +84,12 @@ class SemanticFilter(FilterStrategy):
             return content
         
         try:
-            # Initialize embedding service
-            if self.embed is None:
-                self.embed = self.ai_factory.get_embed()
-                logger.info(f"✅ Embedding service initialized: {self.embed.get_embedding_dimension()} dimensions")
-            
             # Get query embedding
             if self.query_embedding is None:
-                self.query_embedding = await self.embed.create_text_embedding(self.user_query)
+                self.query_embedding = await self._create_embedding(self.user_query)
+                if not self.query_embedding:
+                    logger.error("Failed to create query embedding, returning original content")
+                    return content
                 logger.info(f"📊 Query embedding created for: '{self.user_query}'")
             
             # Process content based on type
@@ -107,24 +133,14 @@ class SemanticFilter(FilterStrategy):
             
             # Get embeddings for text blocks
             logger.info(f"📊 Creating embeddings for {len(text_blocks)} text blocks...")
-            block_embeddings = await self.embed.create_text_embeddings(text_blocks)
-            
-            # Calculate similarities
-            similar_results = await self.embed.find_similar_texts(
-                query_embedding=self.query_embedding,
-                candidate_embeddings=block_embeddings,
-                top_k=len(text_blocks)
-            )
-            
-            # Filter elements based on similarity
             elements_to_keep = set()
-            filtered_count = 0
             
-            for result in similar_results:
-                if result["similarity"] >= self.similarity_threshold:
-                    elements_to_keep.add(result["index"])
-                else:
-                    filtered_count += 1
+            for i, text in enumerate(text_blocks):
+                embedding = await self._create_embedding(text)
+                if embedding:
+                    similarity = self._cosine_similarity(self.query_embedding, embedding)
+                    if similarity >= self.similarity_threshold:
+                        elements_to_keep.add(i)
             
             # Remove low-similarity elements
             elements_to_remove = []
@@ -149,33 +165,27 @@ class SemanticFilter(FilterStrategy):
         """Filter text content using semantic similarity"""
         try:
             # Split content into chunks
-            chunks = await self._create_content_chunks(content)
+            chunks = self._create_content_chunks(content)
             
             if not chunks:
                 logger.warning("⚠️ No chunks created for semantic filtering")
                 return content
             
-            # Get embeddings for chunks
-            chunk_texts = [chunk['text'] for chunk in chunks]
-            logger.info(f"📊 Creating embeddings for {len(chunk_texts)} text chunks...")
-            
-            chunk_embeddings = await self.embed.create_text_embeddings(chunk_texts)
-            
-            # Calculate similarities
-            similar_results = await self.embed.find_similar_texts(
-                query_embedding=self.query_embedding,
-                candidate_embeddings=chunk_embeddings,
-                top_k=len(chunks)
-            )
-            
-            # Filter chunks based on similarity
+            # Process chunks and calculate similarities
+            logger.info(f"📊 Processing {len(chunks)} text chunks...")
             relevant_chunks = []
-            for result in similar_results:
-                if result["similarity"] >= self.similarity_threshold:
-                    chunk_index = result["index"]
-                    chunk = chunks[chunk_index]
-                    chunk['similarity'] = result["similarity"]
-                    relevant_chunks.append(chunk)
+            
+            for i, chunk in enumerate(chunks):
+                embedding = await self._create_embedding(chunk['text'])
+                if embedding:
+                    similarity = self._cosine_similarity(self.query_embedding, embedding)
+                    if similarity >= self.similarity_threshold:
+                        chunk['similarity'] = similarity
+                        relevant_chunks.append(chunk)
+            
+            if not relevant_chunks:
+                logger.warning("⚠️ No chunks met similarity threshold")
+                return content
             
             # Sort by similarity (highest first) and reconstruct content
             relevant_chunks.sort(key=lambda x: x['similarity'], reverse=True)
@@ -188,62 +198,51 @@ class SemanticFilter(FilterStrategy):
             logger.error(f"❌ Text semantic filtering failed: {e}")
             return content
     
-    async def _create_content_chunks(self, content: str) -> List[Dict[str, Any]]:
-        """Create semantic chunks from content"""
+    def _create_content_chunks(self, content: str) -> List[Dict[str, Any]]:
+        """Create chunks from content"""
         try:
-            # Use the embedding service's built-in chunking
-            chunks = await self.embed.create_chunks(
-                text=content,
-                metadata={"source": "semantic_filter"}
-            )
-            
-            # Filter chunks by minimum length and limit count
-            filtered_chunks = []
-            for chunk in chunks:
-                if len(chunk['text']) >= self.min_chunk_length:
-                    filtered_chunks.append(chunk)
-                    if len(filtered_chunks) >= self.max_chunks:
-                        break
-            
-            return filtered_chunks
+            # Simple text chunking - split by paragraphs
+            paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) >= self.min_chunk_length]
+            chunks = [{'text': p} for p in paragraphs[:self.max_chunks]]
+            return chunks
             
         except Exception as e:
             logger.error(f"❌ Failed to create content chunks: {e}")
-            
-            # Fallback: simple paragraph splitting
-            paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) >= self.min_chunk_length]
-            return [{'text': p, 'embedding': None} for p in paragraphs[:self.max_chunks]]
+            return []
     
     async def rank_content_by_relevance(self, content_items: List[str], top_k: int = 10) -> List[Dict[str, Any]]:
         """Rank multiple content items by semantic relevance to query"""
         try:
-            if not self.embed:
-                self.embed = self.ai_factory.get_embed()
-            
             if not self.query_embedding:
-                self.query_embedding = await self.embed.create_text_embedding(self.user_query)
+                self.query_embedding = await self._create_embedding(self.user_query)
+                if not self.query_embedding:
+                    logger.error("Failed to create query embedding")
+                    return []
             
-            # Get embeddings for all content items
-            content_embeddings = await self.embed.create_text_embeddings(content_items)
-            
-            # Find most similar items
-            similar_results = await self.embed.find_similar_texts(
-                query_embedding=self.query_embedding,
-                candidate_embeddings=content_embeddings,
-                top_k=min(top_k, len(content_items))
-            )
-            
-            # Format results with content
+            # Process and rank content items
             ranked_items = []
-            for result in similar_results:
-                ranked_items.append({
-                    'content': content_items[result['index']],
-                    'similarity': result['similarity'],
-                    'rank': len(ranked_items) + 1
+            for i, content in enumerate(content_items):
+                embedding = await self._create_embedding(content)
+                if embedding:
+                    similarity = self._cosine_similarity(self.query_embedding, embedding)
+                    ranked_items.append({
+                        'content': content,
+                        'similarity': similarity,
+                        'index': i
+                    })
+            
+            # Sort by similarity and take top_k
+            ranked_items.sort(key=lambda x: x['similarity'], reverse=True)
+            result = []
+            for i, item in enumerate(ranked_items[:top_k]):
+                result.append({
+                    'content': item['content'],
+                    'similarity': item['similarity'],
+                    'rank': i + 1
                 })
             
-            logger.info(f"✅ Content ranking completed: {len(ranked_items)} items ranked")
-            return ranked_items
+            logger.info(f"✅ Content ranking completed: {len(result)} items ranked")
+            return result
             
         except Exception as e:
             logger.error(f"❌ Content ranking failed: {e}")
@@ -256,29 +255,28 @@ class SemanticFilter(FilterStrategy):
             if not content_items:
                 return []
             
-            if not self.embed:
-                self.embed = self.ai_factory.get_embed()
-            
             # Get embeddings for all content
-            embeddings = await self.embed.create_text_embeddings(content_items)
+            embeddings = []
+            for content in content_items:
+                embedding = await self._create_embedding(content)
+                embeddings.append(embedding)
             
             # Find unique content
             unique_content = []
             unique_embeddings = []
             
             for i, (content, embedding) in enumerate(zip(content_items, embeddings)):
+                if not embedding:  # Skip if embedding failed
+                    continue
+                    
                 is_duplicate = False
                 
                 # Check against existing unique content
-                if unique_embeddings:
-                    similarities = []
-                    for unique_emb in unique_embeddings:
-                        similarity = await self.embed.compute_similarity(embedding, unique_emb)
-                        similarities.append(similarity)
-                    
-                    # If too similar to any existing content, consider it duplicate
-                    if max(similarities) >= similarity_threshold:
+                for unique_emb in unique_embeddings:
+                    similarity = self._cosine_similarity(embedding, unique_emb)
+                    if similarity >= similarity_threshold:
                         is_duplicate = True
+                        break
                 
                 if not is_duplicate:
                     unique_content.append(content)
@@ -295,29 +293,59 @@ class SemanticFilter(FilterStrategy):
         return "semantic"
     
     async def close(self):
-        """Clean up embedding service"""
-        if self.embed:
-            await self.embed.close()
-            self.embed = None
+        """Clean up resources"""
+        pass
+    
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()
 
-class SemanticSearchEnhancer:
+
+class SemanticSearchEnhancer(BaseService):
     """Semantic search enhancement using embeddings"""
     
     def __init__(self):
-        self.ai_factory = AIFactory()
-        self.embed = None
+        super().__init__("SemanticSearchEnhancer")
+    
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Calculate cosine similarity between two vectors"""
+        if len(vec1) != len(vec2) or len(vec1) == 0:
+            return 0.0
+        
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        magnitude1 = math.sqrt(sum(a * a for a in vec1))
+        magnitude2 = math.sqrt(sum(a * a for a in vec2))
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+        
+        return dot_product / (magnitude1 * magnitude2)
+    
+    async def _create_embedding(self, text: str) -> List[float]:
+        """Create embedding for text using ISA client"""
+        try:
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=text,
+                task="embed",
+                service_type="embedding",
+                operation_name="create_embedding"
+            )
+            return result_data
+        except Exception as e:
+            logger.error(f"Error creating embedding: {e}")
+            return []
     
     async def enhance_search_query(self, original_query: str, 
                                  context: Optional[str] = None) -> Dict[str, Any]:
         """Enhance search query using semantic understanding"""
         try:
-            if not self.embed:
-                self.embed = self.ai_factory.get_embed()
+            # Create embedding for the query using ISA client
+            query_embedding = await self._create_embedding(original_query)
             
-            # Create embedding for the query
-            query_embedding = await self.embed.create_text_embedding(original_query)
+            if not query_embedding:
+                raise Exception("Failed to create query embedding")
             
-            # Generate related terms and concepts (this would use LLM in practice)
+            # Generate enhanced query
             enhanced_query = {
                 'original_query': original_query,
                 'embedding': query_embedding,
@@ -340,11 +368,11 @@ class SemanticSearchEnhancer:
             if not results:
                 return []
             
-            if not self.embed:
-                self.embed = self.ai_factory.get_embed()
-            
             # Create query embedding
-            query_embedding = await self.embed.create_text_embedding(query)
+            query_embedding = await self._create_embedding(query)
+            if not query_embedding:
+                logger.error("Failed to create query embedding")
+                return results
             
             # Extract text content from results for embedding
             result_texts = []
@@ -358,22 +386,16 @@ class SemanticSearchEnhancer:
                 result_text = ' '.join(text_parts) if text_parts else str(result)
                 result_texts.append(result_text)
             
-            # Get embeddings for result texts
-            result_embeddings = await self.embed.create_text_embeddings(result_texts)
-            
-            # Calculate similarities
-            similarities = []
-            for embedding in result_embeddings:
-                similarity = await self.embed.compute_similarity(query_embedding, embedding)
-                similarities.append(similarity)
-            
-            # Combine results with similarity scores and rank
+            # Get embeddings and calculate similarities
             ranked_results = []
-            for i, (result, similarity) in enumerate(zip(results, similarities)):
-                enhanced_result = result.copy()
-                enhanced_result['semantic_similarity'] = similarity
-                enhanced_result['original_rank'] = i + 1
-                ranked_results.append(enhanced_result)
+            for i, (result, text) in enumerate(zip(results, result_texts)):
+                embedding = await self._create_embedding(text)
+                if embedding:
+                    similarity = self._cosine_similarity(query_embedding, embedding)
+                    enhanced_result = result.copy()
+                    enhanced_result['semantic_similarity'] = similarity
+                    enhanced_result['original_rank'] = i + 1
+                    ranked_results.append(enhanced_result)
             
             # Sort by semantic similarity
             ranked_results.sort(key=lambda x: x['semantic_similarity'], reverse=True)
@@ -390,7 +412,9 @@ class SemanticSearchEnhancer:
             return results
     
     async def close(self):
-        """Clean up embedding service"""
-        if self.embed:
-            await self.embed.close()
-            self.embed = None
+        """Clean up resources"""
+        pass
+    
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()

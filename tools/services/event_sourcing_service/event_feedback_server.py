@@ -14,13 +14,18 @@ import uvicorn
 import aiohttp
 
 # Configure logging
+import os
+handlers = [logging.StreamHandler()]
+
+# Only add file handler if logs directory exists
+log_dir = 'logs'
+if os.path.exists(log_dir):
+    handlers.append(logging.FileHandler(os.path.join(log_dir, 'event_feedback.log')))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/event_feedback.log'),
-        logging.StreamHandler()
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 
@@ -146,15 +151,15 @@ async def root():
 def main():
     """Run the event feedback server"""
     print("🚀 Starting Event Feedback Server...")
-    print("📡 Server will listen on http://localhost:8000")
-    print("📥 Event callback endpoint: http://localhost:8000/process_background_feedback")
+    print("📡 Server will listen on http://localhost:8101")
+    print("📥 Event callback endpoint: http://localhost:8101/process_background_feedback")
     print(f"📤 Will forward events to: {LANGGRAPH_AGENT_URL}")
-    print("📊 Monitor at: http://localhost:8000/events/recent")
+    print("📊 Monitor at: http://localhost:8101/events/recent")
     
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=8101,
         log_level="info"
     )
 

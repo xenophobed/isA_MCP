@@ -11,6 +11,7 @@ import logging
 
 from .query_matcher import QueryContext, MetadataMatch, QueryPlan
 from .semantic_enricher import SemanticMetadata
+from tools.base_service import BaseService
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,11 @@ class SQLGenerationResult:
     estimated_rows: Optional[str] = None
     alternative_sqls: List[str] = None
 
-class LLMSQLGenerator:
+class LLMSQLGenerator(BaseService):
     """LLM-powered SQL generation with domain expertise"""
     
     def __init__(self):
+        super().__init__("LLMSQLGenerator")
         self.llm_model = None
         self.domain_templates = self._load_domain_templates()
         self.sql_patterns = self._load_sql_patterns()
@@ -38,7 +40,8 @@ class LLMSQLGenerator:
         """Close LLM model resources"""
         if self.llm_model:
             try:
-                await self.llm_model.close()
+                # ISA client doesn't need explicit close
+                pass
             except Exception as e:
                 logger.warning(f"Error closing LLM model: {e}")
             finally:
@@ -49,16 +52,12 @@ class LLMSQLGenerator:
         if llm_model:
             self.llm_model = llm_model
         else:
-            # Use isa_model AIFactory
+            # Use ISA Model client from BaseService
             try:
-                from isa_model.inference import AIFactory
-                self.llm_model = AIFactory().get_llm(
-                    model_name="gpt-4o-mini",
-                    config={"temperature": 0.1, "streaming": False}  # 低温度确保准确性
-                )
-                logger.info("LLM model initialized successfully with isa_model AIFactory")
-            except ImportError:
-                logger.warning("isa_model not available, using fallback generation")
+                self.llm_model = self.isa_client  # Using the client from BaseService
+                logger.info("LLM model initialized successfully with ISA Model client")
+            except Exception as e:
+                logger.warning(f"ISA client not available: {e}, using fallback generation")
                 self.llm_model = None
     
     async def generate_sql_from_context(self, query_context: QueryContext, 
@@ -75,7 +74,7 @@ class LLMSQLGenerator:
             original_query: Original user query
             
         Returns:
-            SQL generation result
+            SQL generation result with billing information
         """
         try:
             # Build enhanced prompt
@@ -143,6 +142,10 @@ class LLMSQLGenerator:
                 complexity_level="medium"
             )
     
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()
+    
     async def _build_enhanced_prompt(self, original_query: str, 
                                    query_context: QueryContext,
                                    metadata_matches: List[MetadataMatch],
@@ -209,8 +212,16 @@ class LLMSQLGenerator:
     async def _generate_with_llm(self, prompt: str) -> SQLGenerationResult:
         """Generate SQL using LLM model"""
         try:
-            # Call LLM model using isa_model interface
-            response = await self.llm_model.ainvoke(prompt)
+            # Call LLM model using ISA Model client with billing collection
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=prompt,
+                task="chat",
+                service_type="text",
+                parameters={"temperature": 0.1},
+                operation_name="generate_sql"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else result_data
             
             # Parse response - isa_model returns string
             if isinstance(response, str):

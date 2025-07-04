@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 
 from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
-from core.supabase_client import get_supabase_client
+from core.database.supabase_client import get_supabase_client
 from tools.services.shopify_service.shopify_client import ShopifyClient
 
 logger = get_logger(__name__)

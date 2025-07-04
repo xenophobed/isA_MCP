@@ -1,0 +1,238 @@
+{
+  "summary": {
+    "total_tools": 45,
+    "successful": 0,
+    "failed": 45,
+    "success_rate": 0.0,
+    "successful_tools": [],
+    "failed_tools": [
+      "plan_autonomous_task",
+      "get_autonomous_status",
+      "get_weather",
+      "clear_weather_cache",
+      "get_weather_cache_status",
+      "crawl_and_extract",
+      "synthesize_and_generate",
+      "web_search",
+      "get_authorization_requests",
+      "approve_authorization",
+      "get_monitoring_metrics",
+      "get_audit_log",
+      "remember",
+      "forget",
+      "update_memory",
+      "search_memories",
+      "search_products",
+      "get_product_details",
+      "add_to_cart",
+      "view_cart",
+      "get_user_info",
+      "save_shipping_address",
+      "start_checkout",
+      "process_payment",
+      "create_background_task",
+      "list_background_tasks",
+      "pause_background_task",
+      "resume_background_task",
+      "delete_background_task",
+      "get_event_sourcing_status",
+      "search_rag_documents",
+      "add_rag_documents",
+      "list_rag_collections",
+      "get_rag_collection_stats",
+      "delete_rag_documents",
+      "generate_rag_embeddings",
+      "data_sourcing",
+      "data_query",
+      "generate_visualization",
+      "ask_human",
+      "request_authorization",
+      "check_security_status",
+      "format_response",
+      "quick_rag_question",
+      "generate_image"
+    ]
+  },
+  "detailed_results": {
+    "plan_autonomous_task": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_autonomous_status": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_weather": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "clear_weather_cache": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_weather_cache_status": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "crawl_and_extract": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "synthesize_and_generate": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "web_search": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_authorization_requests": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "approve_authorization": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_monitoring_metrics": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_audit_log": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "remember": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "forget": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "update_memory": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "search_memories": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "search_products": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_product_details": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "add_to_cart": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "view_cart": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_user_info": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "save_shipping_address": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "start_checkout": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "process_payment": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "create_background_task": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "list_background_tasks": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "pause_background_task": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "resume_background_task": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "delete_background_task": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_event_sourcing_status": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "search_rag_documents": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "add_rag_documents": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "list_rag_collections": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "get_rag_collection_stats": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "delete_rag_documents": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "generate_rag_embeddings": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "data_sourcing": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "data_query": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "generate_visualization": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "ask_human": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "request_authorization": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "check_security_status": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "format_response": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "quick_rag_question": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    },
+    "generate_image": {
+      "error": "HTTP 406",
+      "text": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+    }
+  }
+}

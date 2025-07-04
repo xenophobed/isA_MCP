@@ -10,7 +10,7 @@ from enum import Enum
 import re
 
 from core.logging import get_logger
-from isa_model.inference import AIFactory
+from tools.base_service import BaseService
 from ..base import FilterStrategy
 
 logger = get_logger(__name__)
@@ -39,15 +39,15 @@ class Sentiment(Enum):
     NEUTRAL = "neutral"
     NEGATIVE = "negative"
 
-class AIRelevanceFilter(FilterStrategy):
+class AIRelevanceFilter(FilterStrategy, BaseService):
     """LLM-based content relevance scoring and filtering"""
     
     def __init__(self, user_query: str = "", relevance_threshold: float = 0.6, 
                  llm_config: Dict[str, Any] = None):
+        BaseService.__init__(self, "AIRelevanceFilter")
         self.user_query = user_query
         self.relevance_threshold = relevance_threshold
         self.llm_config = llm_config or {"temperature": 0.1, "max_tokens": 200}
-        self.ai_factory = AIFactory()
         self.llm = None
     
     async def filter(self, content: str, criteria: Optional[Dict[str, Any]] = None) -> str:
@@ -61,7 +61,7 @@ class AIRelevanceFilter(FilterStrategy):
             
             # Initialize LLM if needed
             if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
+                self.llm = self.isa_client  # Use ISA client from BaseService
                 logger.info("✅ LLM service initialized for relevance scoring")
             
             # Split content into chunks for processing
@@ -113,7 +113,15 @@ class AIRelevanceFilter(FilterStrategy):
             Respond with only a single number between 0.0 and 1.0 (e.g., 0.85)
             """
             
-            response = await self.llm.ainvoke(scoring_prompt)
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=scoring_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="score_relevance"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
             
             # Extract numeric score from response
             import re
@@ -136,16 +144,21 @@ class AIRelevanceFilter(FilterStrategy):
     async def close(self):
         """Clean up LLM resources"""
         if self.llm:
-            await self.llm.close()
+            # ISA client doesn't need explicit close
+            pass
+    
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()
 
-class AIQualityFilter(FilterStrategy):
+class AIQualityFilter(FilterStrategy, BaseService):
     """AI-based content quality assessment and filtering"""
     
     def __init__(self, min_quality: ContentQuality = ContentQuality.MEDIUM,
                  llm_config: Dict[str, Any] = None):
+        BaseService.__init__(self, "AIQualityFilter")
         self.min_quality = min_quality
         self.llm_config = llm_config or {"temperature": 0.1, "max_tokens": 150}
-        self.ai_factory = AIFactory()
         self.llm = None
         
         # Quality threshold mapping
@@ -163,7 +176,7 @@ class AIQualityFilter(FilterStrategy):
             
             # Initialize LLM if needed
             if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
+                self.llm = self.isa_client  # Use ISA client from BaseService
                 logger.info("✅ LLM service initialized for quality assessment")
             
             # Split and assess content chunks
@@ -218,7 +231,15 @@ class AIQualityFilter(FilterStrategy):
             Respond with only a single number between 0.0 and 1.0 (e.g., 0.75)
             """
             
-            response = await self.llm.ainvoke(quality_prompt)
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=quality_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="assess_quality"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
             
             # Extract numeric score
             import re
@@ -239,16 +260,21 @@ class AIQualityFilter(FilterStrategy):
     async def close(self):
         """Clean up LLM resources"""
         if self.llm:
-            await self.llm.close()
+            # ISA client doesn't need explicit close
+            pass
+    
+    def get_service_billing_info(self) -> Dict[str, Any]:
+        """Get billing information for this service"""
+        return self.get_billing_summary()
 
-class AITopicClassificationFilter(FilterStrategy):
+class AITopicClassificationFilter(FilterStrategy, BaseService):
     """AI-based topic classification and filtering"""
     
     def __init__(self, target_categories: List[ContentCategory] = None,
                  llm_config: Dict[str, Any] = None):
+        BaseService.__init__(self, "AITopicClassificationFilter")
         self.target_categories = target_categories or [ContentCategory.NEWS, ContentCategory.TECHNICAL, ContentCategory.EDUCATIONAL]
         self.llm_config = llm_config or {"temperature": 0.1, "max_tokens": 100}
-        self.ai_factory = AIFactory()
         self.llm = None
     
     async def filter(self, content: str, criteria: Optional[Dict[str, Any]] = None) -> str:
@@ -259,7 +285,7 @@ class AITopicClassificationFilter(FilterStrategy):
             
             # Initialize LLM if needed
             if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
+                self.llm = self.isa_client  # Use ISA client from BaseService
                 logger.info("✅ LLM service initialized for topic classification")
             
             # Split and classify content chunks
@@ -312,7 +338,15 @@ class AITopicClassificationFilter(FilterStrategy):
             Respond with only the category name (e.g., "technical")
             """
             
-            response = await self.llm.ainvoke(classification_prompt)
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=classification_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="classify_topic"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
             category_name = response.strip().lower()
             
             # Map response to enum
@@ -333,16 +367,17 @@ class AITopicClassificationFilter(FilterStrategy):
     async def close(self):
         """Clean up LLM resources"""
         if self.llm:
-            await self.llm.close()
+            # ISA client doesn't need explicit close
+            pass
 
-class AISentimentFilter(FilterStrategy):
+class AISentimentFilter(FilterStrategy, BaseService):
     """AI-based sentiment analysis and filtering"""
     
     def __init__(self, target_sentiments: List[Sentiment] = None,
                  llm_config: Dict[str, Any] = None):
+        BaseService.__init__(self, "AISentimentFilter")
         self.target_sentiments = target_sentiments or [Sentiment.POSITIVE, Sentiment.NEUTRAL]
         self.llm_config = llm_config or {"temperature": 0.1, "max_tokens": 50}
-        self.ai_factory = AIFactory()
         self.llm = None
     
     async def filter(self, content: str, criteria: Optional[Dict[str, Any]] = None) -> str:
@@ -353,7 +388,7 @@ class AISentimentFilter(FilterStrategy):
             
             # Initialize LLM if needed
             if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
+                self.llm = self.isa_client  # Use ISA client from BaseService
                 logger.info("✅ LLM service initialized for sentiment analysis")
             
             # Split and analyze sentiment of chunks
@@ -398,7 +433,15 @@ class AISentimentFilter(FilterStrategy):
             Respond with only one word: "positive", "neutral", or "negative"
             """
             
-            response = await self.llm.ainvoke(sentiment_prompt)
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=sentiment_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="analyze_sentiment"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
             sentiment_text = response.strip().lower()
             
             if "positive" in sentiment_text:
@@ -419,16 +462,17 @@ class AISentimentFilter(FilterStrategy):
     async def close(self):
         """Clean up LLM resources"""
         if self.llm:
-            await self.llm.close()
+            # ISA client doesn't need explicit close
+            pass
 
-class AILanguageFilter(FilterStrategy):
+class AILanguageFilter(FilterStrategy, BaseService):
     """AI-based language detection and filtering"""
     
     def __init__(self, target_languages: List[str] = None,
                  llm_config: Dict[str, Any] = None):
+        BaseService.__init__(self, "AILanguageFilter")
         self.target_languages = target_languages or ['english', 'chinese']
         self.llm_config = llm_config or {"temperature": 0.1, "max_tokens": 30}
-        self.ai_factory = AIFactory()
         self.llm = None
     
     async def filter(self, content: str, criteria: Optional[Dict[str, Any]] = None) -> str:
@@ -439,7 +483,7 @@ class AILanguageFilter(FilterStrategy):
             
             # Initialize LLM if needed
             if self.llm is None:
-                self.llm = self.ai_factory.get_llm(config=self.llm_config)
+                self.llm = self.isa_client  # Use ISA client from BaseService
                 logger.info("✅ LLM service initialized for language detection")
             
             # Split and detect language of chunks
@@ -481,7 +525,15 @@ class AILanguageFilter(FilterStrategy):
             Respond with only the language name (e.g., "English")
             """
             
-            response = await self.llm.ainvoke(language_prompt)
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=language_prompt,
+                task="chat",
+                service_type="text",
+                parameters=self.llm_config,
+                operation_name="detect_language"
+            )
+            
+            response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
             return response.strip()
                 
         except Exception as e:
@@ -495,7 +547,8 @@ class AILanguageFilter(FilterStrategy):
     async def close(self):
         """Clean up LLM resources"""
         if self.llm:
-            await self.llm.close()
+            # ISA client doesn't need explicit close
+            pass
 
 class AICompositeFilter(FilterStrategy):
     """Composite AI filter that combines multiple AI filtering strategies"""

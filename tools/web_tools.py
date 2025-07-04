@@ -300,6 +300,29 @@ def register_web_tools(mcp):
                     logger.error(f"❌ Failed to extract from {url}: {e}")
                     continue
             
+            # Collect billing information from services
+            total_billing = {
+                "total_cost_usd": 0.0,
+                "service_breakdown": {},
+                "operations_count": 0
+            }
+            
+            # Add LLM extraction billing
+            if _shared_llm_extractor and hasattr(_shared_llm_extractor, 'get_service_billing_info'):
+                extraction_billing = _shared_llm_extractor.get_service_billing_info()
+                if extraction_billing:
+                    total_billing["total_cost_usd"] += extraction_billing.get("total_cost_usd", 0.0)
+                    total_billing["service_breakdown"]["llm_extraction"] = extraction_billing
+                    total_billing["operations_count"] += extraction_billing.get("operation_count", 0)
+            
+            # Add semantic filter billing
+            if semantic_filter and hasattr(semantic_filter, 'get_service_billing_info'):
+                filter_billing = semantic_filter.get_service_billing_info()
+                if filter_billing:
+                    total_billing["total_cost_usd"] += filter_billing.get("total_cost_usd", 0.0)
+                    total_billing["service_breakdown"]["semantic_filter"] = filter_billing
+                    total_billing["operations_count"] += filter_billing.get("operation_count", 0)
+            
             # Clean up semantic filter
             if semantic_filter:
                 await semantic_filter.close()
@@ -332,6 +355,7 @@ def register_web_tools(mcp):
                         "success_rate": round(processing_stats["successful_extractions"] / processing_stats["total_urls"] * 100, 1) if processing_stats["total_urls"] > 0 else 0
                     }
                 },
+                "billing": total_billing,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -399,7 +423,7 @@ def register_web_tools(mcp):
             # Import synthesis components
             from tools.services.web_services.strategies.filtering import SemanticFilter
             from tools.services.web_services.strategies.generation import MarkdownGenerator
-            from isa_model.inference import AIFactory
+            from core.isa_client import get_isa_client
             
             # 1. DATA AGGREGATION
             print("📊 Step 1: Data Aggregation & Deduplication")
@@ -427,6 +451,20 @@ def register_web_tools(mcp):
             )
             print(f"   ✅ Ranked {len(ranked_content)} content items")
             
+            # Collect billing information
+            total_billing = {
+                "total_cost_usd": 0.0,
+                "service_breakdown": {},
+                "operations_count": 0
+            }
+            
+            # Add analysis billing
+            analysis_billing = analysis_results.get('billing_info', {})
+            if analysis_billing:
+                total_billing["total_cost_usd"] += analysis_billing.get("total_cost_usd", 0.0)
+                total_billing["service_breakdown"]["intelligent_analysis"] = analysis_billing
+                total_billing["operations_count"] += analysis_billing.get("operation_count", 0)
+            
             # Compile final response
             response = {
                 "status": "success",
@@ -450,6 +488,7 @@ def register_web_tools(mcp):
                         "synthesis_method": "llm_powered_analysis"
                     }
                 },
+                "billing": total_billing,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -749,7 +788,7 @@ async def _aggregate_and_deduplicate(data_items: List[Dict], query: str) -> List
 async def _perform_intelligent_analysis(data_items: List[Dict], query: str, analysis_depth: str) -> Dict:
     """Perform LLM-powered intelligent analysis on aggregated data"""
     try:
-        from isa_model.inference.ai_factory import AIFactory
+        from tools.base_service import BaseService
         
         # Prepare analysis prompt based on depth
         if analysis_depth == "basic":
@@ -779,23 +818,31 @@ Data: {json.dumps(data_items[:20], indent=2)[:4000]}..."""
 
 Data: {json.dumps(data_items[:15], indent=2)[:3000]}..."""
         
-        # Get LLM and perform analysis
-        ai_factory = AIFactory()
-        llm = ai_factory.get_llm()
-        analysis_response = await llm.ainvoke(analysis_prompt)
+        # Create temporary service for analysis
+        analysis_service = BaseService("WebAnalysisService")
+        result_data, billing_info = await analysis_service.call_isa_with_billing(
+            input_data=analysis_prompt,
+            task="chat",
+            service_type="text",
+            parameters={"temperature": 0.1},
+            operation_name="intelligent_analysis"
+        )
+        
+        analysis_response = result_data.get('text', '') if isinstance(result_data, dict) else str(result_data)
         
         # Parse analysis into structured format
         analysis_results = {
             'query_context': query,
             'analysis_depth': analysis_depth,
-            'raw_analysis': analysis_response.content if hasattr(analysis_response, 'content') else str(analysis_response),
+            'raw_analysis': str(analysis_response),
             'insights': [],
             'themes': [],
             'quality_score': 0.8,  # Default score
             'metadata': {
                 'items_analyzed': len(data_items),
                 'analysis_timestamp': datetime.now().isoformat()
-            }
+            },
+            'billing_info': analysis_service.get_billing_summary()
         }
         
         # Extract insights and themes from raw analysis

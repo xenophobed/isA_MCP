@@ -4,8 +4,17 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables based on ENV
+env = os.getenv("ENV", "development")
+
+# Determine environment file path
+if env == "development":
+    env_file = "deployment/dev/.env"
+else:
+    env_file = f"deployment/.env.{env}"
+
+# Load the appropriate environment file (override existing env vars)
+load_dotenv(env_file, override=True)
 
 @dataclass
 class SecuritySettings:
@@ -88,6 +97,15 @@ class MCPSettings:
     supabase_anon_key: Optional[str] = None
     supabase_service_role_key: Optional[str] = None
     supabase_pwd: Optional[str] = None
+    db_schema: Optional[str] = None
+    
+    # Local and Cloud Supabase URLs
+    supabase_local_url: Optional[str] = None
+    supabase_local_anon_key: Optional[str] = None
+    supabase_local_service_role_key: Optional[str] = None
+    supabase_cloud_url: Optional[str] = None
+    supabase_cloud_anon_key: Optional[str] = None
+    supabase_cloud_service_role_key: Optional[str] = None
     
     # Sub-configurations
     security: SecuritySettings = field(default_factory=SecuritySettings)
@@ -156,11 +174,29 @@ class MCPSettings:
         self.shopify_storefront_access_token = os.getenv("SHOPIFY_STOREFRONT_ACCESS_TOKEN", self.shopify_storefront_access_token)
         self.shopify_admin_api_key = os.getenv("SHOPIFY_ADMIN_API_KEY", self.shopify_admin_api_key)
         
-        # Database/Storage APIs
-        self.supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL", self.supabase_url)
-        self.supabase_anon_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", self.supabase_anon_key)
-        self.supabase_service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", self.supabase_service_role_key)
+        # Database/Storage APIs - Load both local and cloud configurations
+        self.supabase_local_url = os.getenv("SUPABASE_LOCAL_URL", self.supabase_local_url)
+        self.supabase_local_anon_key = os.getenv("SUPABASE_LOCAL_ANON_KEY", self.supabase_local_anon_key)
+        self.supabase_local_service_role_key = os.getenv("SUPABASE_LOCAL_SERVICE_ROLE_KEY", self.supabase_local_service_role_key)
+        self.supabase_cloud_url = os.getenv("SUPABASE_CLOUD_URL", self.supabase_cloud_url)
+        self.supabase_cloud_anon_key = os.getenv("SUPABASE_CLOUD_ANON_KEY", self.supabase_cloud_anon_key)
+        self.supabase_cloud_service_role_key = os.getenv("SUPABASE_CLOUD_SERVICE_ROLE_KEY", self.supabase_cloud_service_role_key)
+        
+        # Determine which Supabase instance to use based on environment
+        current_env = os.getenv("ENV", "development")
+        if current_env in ["development", "test"]:
+            # Use local Supabase for dev and test
+            self.supabase_url = self.supabase_local_url
+            self.supabase_anon_key = self.supabase_local_anon_key
+            self.supabase_service_role_key = self.supabase_local_service_role_key
+        else:
+            # Use cloud Supabase for staging and production
+            self.supabase_url = self.supabase_cloud_url
+            self.supabase_anon_key = self.supabase_cloud_anon_key
+            self.supabase_service_role_key = self.supabase_cloud_service_role_key
+        
         self.supabase_pwd = os.getenv("SUPABASE_PWD", self.supabase_pwd)
+        self.db_schema = os.getenv("DB_SCHEMA", self.db_schema)
         
         return self
 

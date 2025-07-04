@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from core.logging import get_logger
-from isa_model.inference.ai_factory import AIFactory
+from tools.base_service import BaseService
 
 logger = get_logger(__name__)
 
@@ -53,7 +53,7 @@ class Entity:
         if self.canonical_form is None:
             self.canonical_form = self.text
 
-class EntityExtractor:
+class EntityExtractor(BaseService):
     """Extract entities from text using multiple methods"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -62,9 +62,8 @@ class EntityExtractor:
         Args:
             config: Configuration dict with extractor settings
         """
+        super().__init__("EntityExtractor")
         self.config = config or {}
-        self.ai_factory = AIFactory()
-        self.llm_service = self.ai_factory.get_llm_service()
         
         # Entity patterns for quick extraction
         self.patterns = {
@@ -148,19 +147,26 @@ class EntityExtractor:
             Be precise with positions and comprehensive with entity identification.
             """
             
-            response = await self.llm_service.generate_text(
-                prompt,
-                max_tokens=2000,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 2000, "temperature": 0.1},
+                operation_name="entity_extraction"
             )
+            
+            if 'text' in response:
+                response_text = response['text']
+            else:
+                raise Exception("Invalid response format from ISA API")
             
             # Parse LLM response
             try:
                 # Extract JSON from response
-                json_start = response.find('[')
-                json_end = response.rfind(']') + 1
+                json_start = response_text.find('[')
+                json_end = response_text.rfind(']') + 1
                 if json_start != -1 and json_end != -1:
-                    json_str = response[json_start:json_end]
+                    json_str = response_text[json_start:json_end]
                     entities_data = json.loads(json_str)
                     
                     entities = []
@@ -298,14 +304,16 @@ class EntityExtractor:
         """
         
         try:
-            response = await self.llm_service.generate_text(
-                prompt,
-                max_tokens=1500,
-                temperature=0.1
+            response, billing_info = await self.call_isa_with_billing(
+                input_data=prompt,
+                task="chat",
+                service_type="text",
+                parameters={"max_tokens": 1500, "temperature": 0.1},
+                operation_name="domain_entity_extraction"
             )
             
             # Parse response similar to _extract_with_llm
-            # Implementation similar to above
+            # For now, delegate to the main extraction method
             return await self._extract_with_llm(text)
             
         except Exception as e:

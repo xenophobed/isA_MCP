@@ -12,8 +12,8 @@ from dataclasses import dataclass, asdict
 import logging
 from datetime import datetime
 
-from core.supabase_client import get_supabase_client
-from isa_model.inference.ai_factory import AIFactory
+from core.database.supabase_client import get_supabase_client
+from tools.base_service import BaseService
 from .semantic_enricher import SemanticMetadata
 
 logger = logging.getLogger(__name__)
@@ -43,14 +43,14 @@ class SearchResult:
     metadata: Dict[str, Any]
     semantic_tags: List[str]
 
-class EmbeddingStorage:
+class EmbeddingStorage(BaseService):
     """Step 3: Generate embeddings and store in pgvector"""
     
     def __init__(self, database_source: str = "customs_trade_db"):
+        super().__init__("EmbeddingStorage")
         self.database_source = database_source
         self.supabase = get_supabase_client()
-        self.ai_factory = AIFactory()
-        self.embedding_service = self.ai_factory.get_embedding_service()
+        # No separate embedding service needed, using isa_client from BaseService
         self.embedding_cache = {}
         
         logger.info(f"EmbeddingStorage initialized for database: {database_source}")
@@ -83,7 +83,7 @@ class EmbeddingStorage:
             semantic_metadata: Enriched semantic metadata from step 2
             
         Returns:
-            Storage results with statistics
+            Storage results with statistics and billing information
         """
         results = {
             'stored_embeddings': 0,
@@ -116,6 +116,9 @@ class EmbeddingStorage:
             results['stored_embeddings'] += patterns_results['stored']
             results['failed_embeddings'] += patterns_results['failed']
             results['errors'].extend(patterns_results['errors'])
+            
+            # Add billing information to results
+            results['billing_info'] = self.get_billing_summary()
             
             logger.info(f"Stored {results['stored_embeddings']} embeddings, {results['failed_embeddings']} failed")
             
@@ -419,8 +422,15 @@ class EmbeddingStorage:
             if text_hash in self.embedding_cache:
                 return self.embedding_cache[text_hash]
             
-            # Generate embedding
-            embedding = await self.embedding_service.create_text_embedding(text)
+            # Generate embedding using ISA client with billing collection
+            result_data, billing_info = await self.call_isa_with_billing(
+                input_data=text,
+                task="embed",
+                service_type="embedding",
+                operation_name="generate_embedding"
+            )
+            
+            embedding = result_data
             
             # Cache the result
             self.embedding_cache[text_hash] = embedding
