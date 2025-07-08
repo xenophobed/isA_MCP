@@ -266,7 +266,7 @@ class KnowledgeGraph:
             # Calculate average degree
             degree_query = """
             MATCH (n:Entity)
-            RETURN avg(size((n)--()) ) as avg_degree
+            RETURN avg(COUNT { (n)--() }) as avg_degree
             """
             
             degree_results = await self.neo4j_client.execute_query(degree_query)

@@ -24,20 +24,10 @@ class ISAClientManager:
     
     def _initialize_client(self):
         """根据环境变量初始化客户端"""
-        # Simple environment variable approach
-        api_url = os.getenv('ISA_API_URL', 'http://localhost:8082')
-        
+        # Simple approach - just use ISAModelClient directly
         try:
-            # Try with service_endpoint first, fallback to basic initialization
-            try:
-                self._client = ISAModelClient(service_endpoint=api_url)
-                logger.info(f"✅ ISA Client initialized with endpoint: {api_url}")
-            except Exception as endpoint_error:
-                logger.warning(f"Failed to initialize with service_endpoint: {endpoint_error}")
-                # Fallback to basic initialization
-                self._client = ISAModelClient()
-                logger.info("✅ ISA Client initialized with default configuration")
-            
+            self._client = ISAModelClient()
+            logger.info("✅ ISA Client initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize ISA Client: {e}")
             raise
@@ -53,13 +43,23 @@ class ISAClientManager:
         """清除缓存"""
         if self._client:
             self._client.clear_cache()
+    
+    async def invoke(self, input_data, task, service_type, model=None, provider=None, **kwargs):
+        """Forward invoke calls to the wrapped ISAModelClient"""
+        client = self.get_client()
+        return await client.invoke(input_data, task, service_type, model, provider, **kwargs)
+    
+    async def close(self):
+        """关闭客户端"""
+        if self._client:
+            await self._client.close()
 
 # 全局实例
 _isa_manager = ISAClientManager()
 
-def get_isa_client() -> ISAModelClient:
-    """获取ISA Model客户端"""
-    return _isa_manager.get_client()
+def get_isa_client():
+    """获取ISA Manager（支持HTTP fallback）"""
+    return _isa_manager
 
 async def isa_health_check():
     """ISA健康检查"""

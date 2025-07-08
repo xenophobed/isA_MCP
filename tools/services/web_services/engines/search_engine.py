@@ -69,13 +69,13 @@ class BraveSearchStrategy(SearchStrategy):
         
         params = {
             'q': query,
-            'count': kwargs.get('count', 10),
+            'count': min(kwargs.get('count', 10), 20),  # Brave API max count is 20
             'offset': kwargs.get('offset', 0),
             'mkt': kwargs.get('market', 'en-US'),
             'safesearch': kwargs.get('safesearch', 'moderate'),
             'freshness': kwargs.get('freshness', None),
-            'text_decorations': kwargs.get('text_decorations', True),
-            'spellcheck': kwargs.get('spellcheck', True)
+            'text_decorations': str(kwargs.get('text_decorations', True)).lower(),
+            'spellcheck': str(kwargs.get('spellcheck', True)).lower()
         }
         
         # Remove None values
@@ -124,6 +124,9 @@ class BraveSearchStrategy(SearchStrategy):
             
         except httpx.HTTPStatusError as e:
             logger.error(f"❌ Brave API error {e.response.status_code}: {e.response.text}")
+            logger.error(f"❌ Request URL: {e.request.url}")
+            logger.error(f"❌ Request params: {params}")
+            logger.error(f"❌ Request headers: {headers}")
             raise Exception(f"Brave search failed: {e.response.status_code}")
         except Exception as e:
             logger.error(f"❌ Brave search error: {e}")

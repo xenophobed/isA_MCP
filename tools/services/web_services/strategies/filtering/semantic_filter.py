@@ -201,9 +201,24 @@ class SemanticFilter(FilterStrategy, BaseService):
     def _create_content_chunks(self, content: str) -> List[Dict[str, Any]]:
         """Create chunks from content"""
         try:
-            # Simple text chunking - split by paragraphs
+            # Try multiple chunking strategies
+            chunks = []
+            
+            # Strategy 1: Split by double newlines (paragraphs)
             paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) >= self.min_chunk_length]
-            chunks = [{'text': p} for p in paragraphs[:self.max_chunks]]
+            if paragraphs:
+                chunks = [{'text': p} for p in paragraphs[:self.max_chunks]]
+            
+            # Strategy 2: If no paragraphs found, try single newlines
+            if not chunks:
+                lines = [l.strip() for l in content.split('\n') if len(l.strip()) >= self.min_chunk_length]
+                if lines:
+                    chunks = [{'text': l} for l in lines[:self.max_chunks]]
+            
+            # Strategy 3: If still no chunks, treat entire content as one chunk if it's long enough
+            if not chunks and len(content.strip()) >= self.min_chunk_length:
+                chunks = [{'text': content.strip()}]
+            
             return chunks
             
         except Exception as e:

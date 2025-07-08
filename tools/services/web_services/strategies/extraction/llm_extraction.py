@@ -78,8 +78,12 @@ class LLMExtractionStrategy(ExtractionStrategy, BaseService):
                 operation_name="llm_extraction"
             )
             
-            # Extract response content
-            response = result_data.get('text', '') or result_data.get('content', '') or result_data.get('response', '') or str(result_data)
+            # Extract response content - handle both dict and string responses
+            if isinstance(result_data, dict):
+                response = result_data.get('text', '') or result_data.get('content', '') or result_data.get('response', '') or str(result_data)
+            else:
+                response = str(result_data) if result_data else ""
+            
             logger.info(f"📝 LLM response received: {response[:200]}...")
             
             # Parse LLM response into structured data

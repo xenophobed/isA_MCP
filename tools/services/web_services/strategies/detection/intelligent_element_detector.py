@@ -250,9 +250,142 @@ class IntelligentElementDetector:
         
         return results
     
+    async def detect_link_elements(self, page: Page, target_links: List[str] = None) -> Dict[str, DetectionResult]:
+        """
+        Detect clickable link elements on the page
+        
+        Args:
+            page: Playwright page object
+            target_links: List of link descriptions or text content to find
+            
+        Returns:
+            Dictionary mapping link identifiers to DetectionResult objects
+        """
+        logger.info(f"🔗 Starting intelligent link detection for: {target_links or 'all links'}")
+        
+        results = {}
+        
+        # Default target links if none provided
+        if not target_links:
+            target_links = ['product_links', 'navigation_links', 'action_links']
+        
+        # Try stacked AI first
+        try:
+            stacked_results = await self._detect_using_stacked_ai(page, target_links, 'links')
+            for link_name, result in stacked_results.items():
+                if result.confidence >= self.confidence_thresholds[DetectionStrategy.STACKED_AI]:
+                    results[link_name] = result
+                    
+            if len(results) >= len(target_links):
+                return results
+        except Exception as e:
+            logger.warning(f"Stacked AI link detection failed: {e}")
+        
+        # Fallback to traditional link detection
+        missing_links = [link for link in target_links if link not in results]
+        if missing_links:
+            traditional_results = await self._detect_links_traditional(page, missing_links)
+            results.update(traditional_results)
+        
+        return results
+    
+    async def _detect_links_traditional(self, page: Page, target_links: List[str]) -> Dict[str, DetectionResult]:
+        """Use traditional selectors to detect links"""
+        logger.info(f"🔍 Using traditional link detection for: {target_links}")
+        
+        results = {}
+        
+        # Common link selectors
+        link_selectors = [
+            'a[href]',  # All links with href
+            'a[href^="http"]',  # External links
+            'a[href^="/"]',  # Internal links
+            'button[onclick*="location"]',  # Button links
+            '[role="link"]',  # ARIA links
+            '.link',  # Common link classes
+            '.btn-link',
+            '.nav-link'
+        ]
+        
+        for link_name in target_links:
+            try:
+                # Try to find links based on text content or common patterns
+                if 'product' in link_name.lower():
+                    # Product-specific link patterns
+                    selectors = [
+                        'a[href*="product"]',
+                        'a[href*="item"]', 
+                        'a[href*="/p/"]',
+                        '.product-link',
+                        '[data-testid*="product"]'
+                    ]
+                elif 'navigation' in link_name.lower() or 'nav' in link_name.lower():
+                    # Navigation link patterns
+                    selectors = [
+                        'nav a',
+                        '.nav a',
+                        '.navbar a',
+                        '.menu a',
+                        '[role="navigation"] a'
+                    ]
+                elif 'action' in link_name.lower():
+                    # Action link patterns
+                    selectors = [
+                        'a.btn',
+                        'a.button',
+                        'a[role="button"]',
+                        '.call-to-action a',
+                        '.cta a'
+                    ]
+                else:
+                    # Generic link detection
+                    selectors = link_selectors
+                
+                # Find the first matching link
+                for selector in selectors:
+                    try:
+                        element = page.locator(selector).first
+                        if await element.count() > 0:
+                            bounding_box = await element.bounding_box()
+                            if bounding_box:
+                                # Get link text and href
+                                text_content = await element.text_content() or ""
+                                href = await element.get_attribute('href') or ""
+                                
+                                result = DetectionResult(
+                                    element_type=ElementType.LINK,
+                                    strategy=DetectionStrategy.TRADITIONAL,
+                                    x=bounding_box['x'] + bounding_box['width'] / 2,
+                                    y=bounding_box['y'] + bounding_box['height'] / 2,
+                                    width=bounding_box['width'],
+                                    height=bounding_box['height'],
+                                    selector=selector,
+                                    confidence=0.7,  # Traditional detection confidence
+                                    description=f"Link: {text_content[:50]}...",
+                                    metadata={
+                                        'text': text_content,
+                                        'href': href,
+                                        'link_type': link_name
+                                    }
+                                )
+                                results[link_name] = result
+                                logger.info(f"   ✅ Found {link_name} via selector: {selector}")
+                                break
+                    except Exception as e:
+                        logger.debug(f"Selector '{selector}' failed: {e}")
+                        continue
+                        
+                if link_name not in results:
+                    logger.warning(f"   ❌ Could not find {link_name}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to detect {link_name}: {e}")
+        
+        return results
+    
     async def _detect_using_stacked_ai(self, page: Page, target_elements: List[str], context: str) -> Dict[str, DetectionResult]:
-        """Use stacked AI model for high-precision element detection"""
-        logger.info(f"🤖 Initializing stacked AI detection for {context} context...")
+        """Use two-layer AI analysis: ISA Vision + OpenAI Vision for high-precision element detection"""
+        logger.info(f"🤖 Initializing two-layer AI detection for {context} context...")
         
         # Take screenshot for analysis
         screenshot = await page.screenshot(full_page=False)
@@ -262,28 +395,34 @@ class IntelligentElementDetector:
             screenshot_path = tmp_file.name
         
         try:
-            # Perform stacked AI analysis using ISA client
-            result = await self.client.invoke(
-                input_data={
-                    "image_path": screenshot_path,
-                    "target_elements": target_elements,
-                    "context": context
-                },
-                task="vision",
-                service_type="vision"
+            # Step 1: Use ISA Vision (OmniParser) to get all UI element coordinates
+            logger.info("🎯 Step 1: Getting UI element coordinates with ISA OmniParser...")
+            isa_result = await self.client.invoke(
+                input_data=screenshot_path,
+                task="detect_ui_elements",
+                service_type="vision", 
+                model="isa-omniparser-ui-detection",
+                provider="isa"
             )
             
-            if result.get('success'):
-                analysis_result = result.get('result', {})
-            else:
-                analysis_result = {"success": False, "error": result.get('error')}
-            
-            if not analysis_result.get("success"):
-                logger.error(f"❌ Stacked AI analysis failed: {analysis_result}")
+            if not isa_result.get("success"):
+                logger.error(f"❌ ISA Vision detection failed: {isa_result}")
                 return {}
             
-            # Convert stacked AI results to DetectionResult objects
-            return await self._convert_stacked_ai_results(analysis_result, target_elements, context)
+            ui_elements = isa_result.get("result", {}).get("ui_elements", [])
+            logger.info(f"📋 ISA detected {len(ui_elements)} UI elements for {context}")
+            
+            # Step 2: Use OpenAI Vision for semantic understanding 
+            logger.info("🧠 Step 2: Getting semantic element mapping with OpenAI Vision...")
+            semantic_result = await self._openai_semantic_analysis(screenshot_path, ui_elements, target_elements, context)
+            
+            if semantic_result:
+                logger.info(f"✅ Two-layer {context} analysis completed successfully")
+                return semantic_result
+            else:
+                logger.error(f"❌ Semantic analysis failed, falling back to ISA-only mapping")
+                # Fallback to basic ISA mapping
+                return await self._fallback_isa_mapping(ui_elements, target_elements, context)
             
         finally:
             # Clean up temporary file
@@ -321,8 +460,8 @@ class IntelligentElementDetector:
         return results
     
     async def _detect_using_vision_only(self, page: Page, target_elements: List[str]) -> Dict[str, DetectionResult]:
-        """Use vision-only analysis for element detection"""
-        logger.info(f"👁️ Using vision-only detection...")
+        """Use ISA Vision-only analysis for element detection (no OpenAI semantic layer)"""
+        logger.info(f"👁️ Using ISA vision-only detection...")
         
         results = {}
         
@@ -334,38 +473,13 @@ class IntelligentElementDetector:
             screenshot_path = tmp_file.name
         
         try:
-            # Create analysis prompt
-            analysis_prompt = f"""
-            Analyze this webpage screenshot and identify the following UI elements: {', '.join(target_elements)}
-            
-            For each element found, provide:
-            1. Element type and description
-            2. Approximate center coordinates (x, y)
-            3. Confidence level (0.0-1.0)
-            
-            Return results in JSON format:
-            {{
-                "elements": [
-                    {{
-                        "name": "element_name",
-                        "type": "input/button/etc",
-                        "x": 123,
-                        "y": 456,
-                        "confidence": 0.85,
-                        "description": "brief description"
-                    }}
-                ]
-            }}
-            """
-            
-            # Analyze with ISA vision service
+            # Use ISA Vision (OmniParser) to get UI element coordinates
             result = await self.client.invoke(
-                input_data={
-                    "image_path": screenshot_path,
-                    "prompt": analysis_prompt
-                },
-                task="vision",
-                service_type="vision"
+                input_data=screenshot_path,
+                task="detect_ui_elements",
+                service_type="vision",
+                model="isa-omniparser-ui-detection",
+                provider="isa"
             )
             
             if result.get('success'):
@@ -373,33 +487,58 @@ class IntelligentElementDetector:
             else:
                 analysis_result = {}
             
-            # Parse results
-            analysis_text = analysis_result.get('text', '')
+            # Parse ISA UI detection results
+            ui_elements = analysis_result.get("ui_elements", [])
             
             try:
-                import re
-                json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
-                if json_match:
-                    vision_data = json.loads(json_match.group())
+                for element in ui_elements:
+                    element_type_str = element.get('type', '').lower()
+                    content = element.get('content', '')
+                    center = element.get('center', [0, 0])
+                    confidence = element.get('confidence', 0.6)
+                    interactable = element.get('interactable', False)
                     
-                    for element_info in vision_data.get('elements', []):
-                        element_name = element_info.get('name')
-                        if element_name in target_elements:
-                            element_type = self.login_element_map.get(element_name, ElementType.BUTTON_GENERIC)
-                            
-                            result = DetectionResult(
-                                element_type=element_type,
-                                strategy=DetectionStrategy.VISION_ONLY,
-                                x=element_info.get('x', 0),
-                                y=element_info.get('y', 0),
-                                confidence=element_info.get('confidence', 0.6),
-                                description=element_info.get('description', ''),
-                                metadata=element_info
-                            )
-                            
-                            results[element_name] = result
+                    # Map to target elements
+                    element_name = None
+                    element_type = ElementType.BUTTON_GENERIC
+                    
+                    if 'input' in element_type_str:
+                        if any(word in content.lower() for word in ['username', 'email', 'user']):
+                            element_name = 'username'
+                            element_type = ElementType.INPUT_TEXT
+                        elif any(word in content.lower() for word in ['password', 'pass']):
+                            element_name = 'password'
+                            element_type = ElementType.INPUT_PASSWORD
+                        elif any(word in content.lower() for word in ['search', 'query']):
+                            element_name = 'search_input'
+                            element_type = ElementType.INPUT_SEARCH
+                    elif 'button' in element_type_str:
+                        if any(word in content.lower() for word in ['submit', 'login', 'sign']):
+                            element_name = 'submit'
+                            element_type = ElementType.BUTTON_SUBMIT
+                        elif any(word in content.lower() for word in ['search', 'find']):
+                            element_name = 'search_button'
+                            element_type = ElementType.BUTTON_GENERIC
+                    
+                    if element_name and element_name in target_elements and len(center) >= 2:
+                        result = DetectionResult(
+                            element_type=element_type,
+                            strategy=DetectionStrategy.VISION_ONLY,
+                            x=int(center[0]),
+                            y=int(center[1]),
+                            confidence=confidence,
+                            description=f"{element_type_str}: {content}",
+                            metadata={
+                                'isa_type': element_type_str,
+                                'content': content,
+                                'interactable': interactable
+                            }
+                        )
+                        
+                        results[element_name] = result
+                        
             except Exception as parse_error:
-                logger.warning(f"Failed to parse vision analysis: {parse_error}")
+                logger.warning(f"Failed to parse ISA vision analysis: {parse_error}")
             
         finally:
             if os.path.exists(screenshot_path):
@@ -463,66 +602,77 @@ class IntelligentElementDetector:
     
     async def _convert_stacked_ai_results(self, analysis_result: Dict[str, Any], 
                                          target_elements: List[str], context: str) -> Dict[str, DetectionResult]:
-        """Convert stacked AI analysis results to DetectionResult objects"""
-        logger.info("🔄 Converting stacked AI results to detection objects...")
+        """Convert ISA UI detection results to DetectionResult objects (legacy method, now unused)"""
+        logger.warning("🔄 Using legacy _convert_stacked_ai_results method - this should be replaced by two-layer analysis")
         
         results = {}
         
-        final_output = analysis_result.get("final_output", {})
-        action_plan = final_output.get("action_plan", {})
-        ui_elements = final_output.get("ui_elements", {})
-        automation_ready = final_output.get("automation_ready", {})
+        # Process ISA OmniParser UI detection format
+        ui_elements = analysis_result.get("ui_elements", [])
         
-        confidence_base = automation_ready.get("confidence", 0.8)
+        logger.info(f"📋 Processing {len(ui_elements)} detected UI elements...")
         
-        # Extract action steps with coordinates
-        steps = action_plan.get("action_plan", [])
-        
-        for step in steps:
-            action = step.get("action", "").lower()
-            coords = step.get("actual_coordinates", step.get("target_coordinates", [0, 0]))
-            description = step.get("description", "")
+        for element in ui_elements:
+            element_type_str = element.get('type', '').lower()
+            content = element.get('content', '')
+            center = element.get('center', [0, 0])
+            confidence = element.get('confidence', 0.8)
+            interactable = element.get('interactable', False)
             
-            # Map actions to element names
+            # Map ISA element types to our element names and types
             element_name = None
             element_type = ElementType.BUTTON_GENERIC
             
-            if action in ['type', 'fill']:
-                if any(word in description.lower() for word in ['username', 'email', 'user']):
+            # Match based on element type and content (basic mapping)
+            if 'input' in element_type_str or 'textbox' in element_type_str:
+                if any(word in content.lower() for word in ['username', 'email', 'user', 'login']):
                     element_name = 'username'
                     element_type = ElementType.INPUT_TEXT
-                elif any(word in description.lower() for word in ['password', 'pass']):
+                elif any(word in content.lower() for word in ['password', 'pass']):
                     element_name = 'password'
                     element_type = ElementType.INPUT_PASSWORD
-                elif any(word in description.lower() for word in ['search', 'query']):
+                elif any(word in content.lower() for word in ['search', 'query', 'find']):
                     element_name = 'search_input'
                     element_type = ElementType.INPUT_SEARCH
-            elif action == 'click':
-                if any(word in description.lower() for word in ['submit', 'login', 'sign']):
+            elif 'button' in element_type_str:
+                if any(word in content.lower() for word in ['submit', 'login', 'sign in', 'log in']):
                     element_name = 'submit'
                     element_type = ElementType.BUTTON_SUBMIT
-                elif any(word in description.lower() for word in ['search', 'find']):
+                elif any(word in content.lower() for word in ['search', 'find', 'go']):
                     element_name = 'search_button'
                     element_type = ElementType.BUTTON_GENERIC
+            elif 'link' in element_type_str:
+                # Handle different link categories
+                if any(word in content.lower() for word in ['product', 'item', 'buy']):
+                    element_name = 'product_links'
+                elif any(word in content.lower() for word in ['nav', 'menu', 'home', 'about']):
+                    element_name = 'navigation_links'
+                else:
+                    element_name = 'action_links'
+                element_type = ElementType.LINK
             
-            if element_name and element_name in target_elements and len(coords) >= 2:
+            # Only add if we found a matching target element and it's interactable
+            if element_name and element_name in target_elements and interactable and len(center) >= 2:
                 result = DetectionResult(
                     element_type=element_type,
-                    strategy=DetectionStrategy.STACKED_AI,
-                    x=int(coords[0]),
-                    y=int(coords[1]),
-                    confidence=confidence_base,
-                    description=description,
+                    strategy=DetectionStrategy.VISION_ONLY,  # Changed from STACKED_AI since it's just ISA
+                    x=int(center[0]),
+                    y=int(center[1]),
+                    confidence=confidence,
+                    description=f"ISA-only: {element_type_str} - {content}",
                     metadata={
-                        'action': action,
-                        'step_index': len(results),
-                        'ai_analysis': step
+                        'isa_type': element_type_str,
+                        'content': content,
+                        'interactable': interactable,
+                        'isa_element': element,
+                        'source': 'isa_only_legacy'
                     }
                 )
                 
                 results[element_name] = result
-                logger.info(f"   ✅ {element_name}: ({coords[0]}, {coords[1]}) - {description}")
+                logger.info(f"   ✅ {element_name}: ({center[0]}, {center[1]}) - {content} (confidence: {confidence:.3f})")
         
+        logger.info(f"🎯 Mapped {len(results)} UI elements to target elements")
         return results
     
     async def _detect_search_traditional(self, page: Page, target_elements: List[str]) -> Dict[str, DetectionResult]:
@@ -591,7 +741,7 @@ class IntelligentElementDetector:
         return results
     
     async def _detect_generic_element_ai(self, page: Page, description: str) -> Optional[DetectionResult]:
-        """Detect a generic element using AI with natural language description"""
+        """Detect a generic element using two-layer AI with natural language description"""
         try:
             # Take screenshot
             screenshot = await page.screenshot(full_page=False)
@@ -601,68 +751,29 @@ class IntelligentElementDetector:
                 screenshot_path = tmp_file.name
             
             try:
-                analysis_prompt = f"""
-                Find the UI element described as: "{description}"
-                
-                Analyze the screenshot and locate this element. Return the center coordinates and confidence level.
-                
-                Response format:
-                {{
-                    "found": true/false,
-                    "x": center_x_coordinate,
-                    "y": center_y_coordinate,
-                    "confidence": 0.0-1.0,
-                    "element_type": "button/input/link/etc",
-                    "description": "what you found"
-                }}
-                """
-                
-                # Use ISA vision service
-                result = await self.client.invoke(
-                    input_data={
-                        "image_path": screenshot_path,
-                        "prompt": analysis_prompt
-                    },
-                    task="vision",
-                    service_type="vision"
+                # Step 1: Use ISA Vision to get all UI elements
+                isa_result = await self.client.invoke(
+                    input_data=screenshot_path,
+                    task="detect_ui_elements",
+                    service_type="vision",
+                    model="isa-omniparser-ui-detection",
+                    provider="isa"
                 )
                 
-                if result.get('success'):
-                    analysis_result = result.get('result', {})
+                if not isa_result.get('success'):
+                    logger.error(f"❌ ISA Vision detection failed: {isa_result}")
+                    return None
+                
+                ui_elements = isa_result.get("result", {}).get("ui_elements", [])
+                
+                # Step 2: Use OpenAI Vision for semantic understanding
+                semantic_result = await self._openai_generic_element_analysis(screenshot_path, ui_elements, description)
+                
+                if semantic_result:
+                    return semantic_result
                 else:
-                    analysis_result = {}
-                
-                # Parse result
-                analysis_text = analysis_result.get('text', '')
-                
-                import re
-                json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
-                if json_match:
-                    data = json.loads(json_match.group())
-                    
-                    if data.get('found') and data.get('confidence', 0) > 0.5:
-                        # Map element type string to enum
-                        element_type_str = data.get('element_type', 'generic').lower()
-                        element_type = ElementType.BUTTON_GENERIC  # default
-                        
-                        if 'input' in element_type_str:
-                            element_type = ElementType.INPUT_TEXT
-                        elif 'button' in element_type_str:
-                            element_type = ElementType.BUTTON_GENERIC
-                        elif 'link' in element_type_str:
-                            element_type = ElementType.LINK
-                        
-                        return DetectionResult(
-                            element_type=element_type,
-                            strategy=DetectionStrategy.VISION_ONLY,
-                            x=data.get('x', 0),
-                            y=data.get('y', 0),
-                            confidence=data.get('confidence', 0.6),
-                            description=data.get('description', description),
-                            metadata={'original_description': description}
-                        )
-                
-                return None
+                    # Fallback to ISA-only matching
+                    return await self._fallback_generic_element_matching(ui_elements, description)
                 
             finally:
                 if os.path.exists(screenshot_path):
@@ -672,6 +783,392 @@ class IntelligentElementDetector:
             logger.error(f"Generic element AI detection failed: {e}")
             return None
     
+    async def _openai_semantic_analysis(self, screenshot_path: str, ui_elements: List[Dict], 
+                                       target_elements: List[str], context: str) -> Dict[str, DetectionResult]:
+        """Use OpenAI Vision to semantically map UI elements to target elements"""
+        try:
+            logger.info(f"🧠 Starting OpenAI semantic analysis for {context} elements...")
+            
+            # Prepare element coordinate information
+            element_info = []
+            for i, elem in enumerate(ui_elements):
+                center = elem.get('center', [0, 0])
+                content = elem.get('content', '')
+                elem_type = elem.get('type', '')
+                element_info.append(f"Element {i}: {elem_type} at ({center[0]}, {center[1]}) with content '{content}'")
+            
+            elements_text = "\n".join(element_info)
+            
+            # Create context-specific prompt
+            if context == 'login':
+                prompt = f"""Looking at this login page, I need you to map the detected UI elements to login form fields.
+
+Here are the detected UI elements with their coordinates:
+{elements_text}
+
+Please identify which elements correspond to:
+- username/email input field
+- password input field  
+- submit/login button
+
+IMPORTANT: Respond ONLY with this JSON format, no other text:
+{{
+    "username": {{"element_index": X, "confidence": 0.9, "reasoning": "explanation"}},
+    "password": {{"element_index": Y, "confidence": 0.9, "reasoning": "explanation"}},
+    "submit": {{"element_index": Z, "confidence": 0.9, "reasoning": "explanation"}}
+}}
+
+Only include elements you are confident about (confidence > 0.7). Start your response with {{ and end with }}."""
+
+            elif context == 'search':
+                prompt = f"""Looking at this search page, I need you to map the detected UI elements to search form fields.
+
+Here are the detected UI elements with their coordinates:
+{elements_text}
+
+Please identify which elements correspond to:
+- search input field (text box where users type queries)
+- search button (button to submit the search)
+
+IMPORTANT: Respond ONLY with this JSON format, no other text:
+{{
+    "search_input": {{"element_index": X, "confidence": 0.9, "reasoning": "explanation"}},
+    "search_button": {{"element_index": Y, "confidence": 0.9, "reasoning": "explanation"}}
+}}
+
+Only include elements you are confident about (confidence > 0.7). Start your response with {{ and end with }}."""
+
+            else:
+                # Generic context
+                prompt = f"""Looking at this webpage, I need you to map the detected UI elements to the requested elements: {target_elements}.
+
+Here are the detected UI elements with their coordinates:
+{elements_text}
+
+Please identify which elements correspond to the requested target elements.
+
+IMPORTANT: Respond ONLY with this JSON format, no other text:
+{{
+    "element_name": {{"element_index": X, "confidence": 0.9, "reasoning": "explanation"}}
+}}
+
+Only include elements you are confident about (confidence > 0.7). Start your response with {{ and end with }}."""
+            
+            # Use OpenAI Vision service
+            openai_result = await self.client.invoke(
+                screenshot_path,
+                "analyze", 
+                "vision",
+                prompt=prompt
+            )
+            
+            if not openai_result.get("success"):
+                logger.warning(f"⚠️ OpenAI semantic analysis failed: {openai_result}")
+                return {}
+            
+            # Parse OpenAI response
+            analysis_text = openai_result.get("result", {}).get("text", "")
+            logger.info(f"🔍 OpenAI {context.title()} Response: {analysis_text[:200]}...")
+            
+            # Extract JSON from response
+            import json
+            import re
+            json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
+            if not json_match:
+                logger.warning(f"⚠️ No JSON found in OpenAI response. Full response: {analysis_text}")
+                return {}
+            
+            try:
+                semantic_mapping = json.loads(json_match.group())
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ Failed to parse JSON: {e}")
+                return {}
+            
+            # Convert semantic mapping to DetectionResult objects
+            results = {}
+            
+            for field_name, mapping in semantic_mapping.items():
+                if mapping.get("confidence", 0) > 0.7:
+                    element_index = mapping.get("element_index")
+                    if 0 <= element_index < len(ui_elements):
+                        element = ui_elements[element_index]
+                        center = element.get('center', [0, 0])
+                        
+                        # Map field name to element type
+                        element_type = self._map_field_to_element_type(field_name)
+                        
+                        result = DetectionResult(
+                            element_type=element_type,
+                            strategy=DetectionStrategy.STACKED_AI,
+                            x=int(center[0]),
+                            y=int(center[1]),
+                            confidence=mapping.get('confidence', 0.8),
+                            description=f"OpenAI semantic {context}: {mapping.get('reasoning', '')}",
+                            metadata={
+                                'field_name': field_name,
+                                'isa_element': element,
+                                'semantic_reasoning': mapping.get('reasoning', ''),
+                                'source': 'openai_semantic'
+                            }
+                        )
+                        
+                        results[field_name] = result
+                        logger.info(f"🎯 Mapped {field_name}: ({center[0]}, {center[1]}) - {mapping.get('reasoning', '')}")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ OpenAI semantic analysis failed: {e}")
+            return {}
+    
+    async def _fallback_isa_mapping(self, ui_elements: List[Dict], target_elements: List[str], 
+                                   context: str) -> Dict[str, DetectionResult]:
+        """Fallback ISA-only mapping when OpenAI semantic analysis fails"""
+        try:
+            logger.info(f"🔄 Using fallback ISA-only mapping for {context} elements...")
+            
+            results = {}
+            
+            for element in ui_elements:
+                element_type_str = element.get('type', '').lower()
+                content = element.get('content', '').lower()
+                center = element.get('center', [0, 0])
+                confidence = element.get('confidence', 0.8)
+                interactable = element.get('interactable', False)
+                
+                if not interactable or len(center) < 2:
+                    continue
+                
+                # Map based on content and type
+                field_name = None
+                element_type = ElementType.BUTTON_GENERIC
+                
+                if 'input' in element_type_str or 'textbox' in element_type_str:
+                    if any(word in content for word in ['username', 'email', 'user', 'login']):
+                        field_name = 'username'
+                        element_type = ElementType.INPUT_TEXT
+                    elif any(word in content for word in ['password', 'pass']):
+                        field_name = 'password'
+                        element_type = ElementType.INPUT_PASSWORD
+                    elif any(word in content for word in ['search', 'query', 'find']):
+                        field_name = 'search_input'
+                        element_type = ElementType.INPUT_SEARCH
+                elif 'button' in element_type_str:
+                    if any(word in content for word in ['login', 'sign in', 'submit', 'log in']):
+                        field_name = 'submit'
+                        element_type = ElementType.BUTTON_SUBMIT
+                    elif any(word in content for word in ['search', 'find', 'go']):
+                        field_name = 'search_button'
+                        element_type = ElementType.BUTTON_GENERIC
+                
+                if field_name and field_name in target_elements and field_name not in results:
+                    result = DetectionResult(
+                        element_type=element_type,
+                        strategy=DetectionStrategy.VISION_ONLY,
+                        x=int(center[0]),
+                        y=int(center[1]),
+                        confidence=confidence,
+                        description=f"ISA fallback {context}: {element_type_str} - {content}",
+                        metadata={
+                            'field_name': field_name,
+                            'isa_element': element,
+                            'source': 'isa_fallback'
+                        }
+                    )
+                    results[field_name] = result
+                    logger.info(f"🔄 Fallback mapped {field_name}: ({center[0]}, {center[1]})")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ ISA fallback mapping failed: {e}")
+            return {}
+    
+    async def _openai_generic_element_analysis(self, screenshot_path: str, ui_elements: List[Dict], 
+                                             description: str) -> Optional[DetectionResult]:
+        """Use OpenAI Vision to find a generic element by description"""
+        try:
+            # Prepare element coordinate information
+            element_info = []
+            for i, elem in enumerate(ui_elements):
+                center = elem.get('center', [0, 0])
+                content = elem.get('content', '')
+                elem_type = elem.get('type', '')
+                element_info.append(f"Element {i}: {elem_type} at ({center[0]}, {center[1]}) with content '{content}'")
+            
+            elements_text = "\n".join(element_info)
+            
+            prompt = f"""Looking at this webpage, I need you to find the UI element that matches this description: "{description}"
+
+Here are the detected UI elements with their coordinates:
+{elements_text}
+
+Please identify which element best matches the description.
+
+IMPORTANT: Respond ONLY with this JSON format, no other text:
+{{
+    "found": true/false,
+    "element_index": X,
+    "confidence": 0.9,
+    "reasoning": "explanation of why this element matches"
+}}
+
+Only respond with found=true if you are confident (confidence > 0.7). Start your response with {{ and end with }}."""
+            
+            # Use OpenAI Vision service
+            openai_result = await self.client.invoke(
+                screenshot_path,
+                "analyze", 
+                "vision",
+                prompt=prompt
+            )
+            
+            if not openai_result.get("success"):
+                logger.warning(f"⚠️ OpenAI generic element analysis failed: {openai_result}")
+                return None
+            
+            # Parse OpenAI response
+            analysis_text = openai_result.get("result", {}).get("text", "")
+            logger.info(f"🔍 OpenAI Generic Response: {analysis_text[:200]}...")
+            
+            # Extract JSON from response
+            import json
+            import re
+            json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
+            if not json_match:
+                logger.warning(f"⚠️ No JSON found in OpenAI response. Full response: {analysis_text}")
+                return None
+            
+            try:
+                result_data = json.loads(json_match.group())
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ Failed to parse JSON: {e}")
+                return None
+            
+            if result_data.get("found") and result_data.get("confidence", 0) > 0.7:
+                element_index = result_data.get("element_index")
+                if 0 <= element_index < len(ui_elements):
+                    element = ui_elements[element_index]
+                    center = element.get('center', [0, 0])
+                    
+                    # Determine element type from ISA detection
+                    element_type_str = element.get('type', 'generic').lower()
+                    element_type = ElementType.BUTTON_GENERIC  # default
+                    
+                    if 'input' in element_type_str:
+                        element_type = ElementType.INPUT_TEXT
+                    elif 'button' in element_type_str:
+                        element_type = ElementType.BUTTON_GENERIC
+                    elif 'link' in element_type_str:
+                        element_type = ElementType.LINK
+                    
+                    return DetectionResult(
+                        element_type=element_type,
+                        strategy=DetectionStrategy.STACKED_AI,
+                        x=int(center[0]),
+                        y=int(center[1]),
+                        confidence=result_data.get('confidence', 0.8),
+                        description=f"OpenAI generic: {result_data.get('reasoning', description)}",
+                        metadata={
+                            'original_description': description,
+                            'isa_element': element,
+                            'semantic_reasoning': result_data.get('reasoning', ''),
+                            'source': 'openai_semantic'
+                        }
+                    )
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ OpenAI generic element analysis failed: {e}")
+            return None
+    
+    async def _fallback_generic_element_matching(self, ui_elements: List[Dict], 
+                                               description: str) -> Optional[DetectionResult]:
+        """Fallback method to find generic elements using content matching"""
+        try:
+            logger.info(f"🔄 Using fallback matching for generic element: {description}")
+            
+            description_lower = description.lower()
+            best_match = None
+            best_score = 0.0
+            
+            for element in ui_elements:
+                element_type_str = element.get('type', '').lower()
+                content = element.get('content', '').lower()
+                center = element.get('center', [0, 0])
+                confidence = element.get('confidence', 0.6)
+                interactable = element.get('interactable', False)
+                
+                # Score based on description match
+                score = 0.0
+                
+                # Check content match
+                if content and any(word in content for word in description_lower.split()):
+                    score += 0.5
+                
+                # Check type match
+                if any(word in element_type_str for word in description_lower.split()):
+                    score += 0.3
+                    
+                # Boost score for interactable elements
+                if interactable:
+                    score += 0.2
+                
+                # Weighted by confidence
+                final_score = score * confidence
+                
+                if final_score > best_score and final_score > 0.3:  # Minimum threshold
+                    best_score = final_score
+                    best_match = element
+            
+            if best_match and len(best_match.get('center', [])) >= 2:
+                # Map element type string to enum
+                element_type_str = best_match.get('type', 'generic').lower()
+                element_type = ElementType.BUTTON_GENERIC  # default
+                
+                if 'input' in element_type_str:
+                    element_type = ElementType.INPUT_TEXT
+                elif 'button' in element_type_str:
+                    element_type = ElementType.BUTTON_GENERIC
+                elif 'link' in element_type_str:
+                    element_type = ElementType.LINK
+                
+                center = best_match.get('center', [0, 0])
+                return DetectionResult(
+                    element_type=element_type,
+                    strategy=DetectionStrategy.VISION_ONLY,
+                    x=int(center[0]),
+                    y=int(center[1]),
+                    confidence=best_score,
+                    description=f"ISA fallback: {element_type_str} - {best_match.get('content', description)}",
+                    metadata={
+                        'original_description': description,
+                        'isa_element': best_match,
+                        'match_score': best_score,
+                        'source': 'isa_fallback'
+                    }
+                )
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Fallback generic element matching failed: {e}")
+            return None
+    
+    def _map_field_to_element_type(self, field_name: str) -> ElementType:
+        """Map field name to ElementType enum"""
+        field_mapping = {
+            'username': ElementType.INPUT_TEXT,
+            'email': ElementType.INPUT_EMAIL,
+            'password': ElementType.INPUT_PASSWORD,
+            'submit': ElementType.BUTTON_SUBMIT,
+            'search_input': ElementType.INPUT_SEARCH,
+            'search_button': ElementType.BUTTON_GENERIC,
+            'login': ElementType.BUTTON_SUBMIT
+        }
+        return field_mapping.get(field_name, ElementType.BUTTON_GENERIC)
+
     async def close(self):
         """Clean up resources"""
         if self.ui_service:

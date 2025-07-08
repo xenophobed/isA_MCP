@@ -6,6 +6,7 @@
 set -e
 
 PROJECT_NAME="isa_mcp"
+PROJECT_ROOT="$(pwd)"
 
 echo "🚀 Starting local development environment..."
 echo "============================================"
@@ -36,6 +37,12 @@ uv pip install -e /Users/xenodennis/Documents/Fun/isA_Model
 
 # Set environment variables
 export $(cat deployment/dev/.env | grep -v '^#' | xargs)
+
+# Load User Service specific environment variables
+if [[ -f "deployment/dev/.env.user_service" ]]; then
+    echo "🔧 Loading User Service environment variables..."
+    export $(cat deployment/dev/.env.user_service | grep -v '^#' | xargs)
+fi
 
 # Debug: Show loaded environment variables
 echo "🔍 Environment variables loaded:"
@@ -72,7 +79,7 @@ fi
 # 2. 启动 User Service (端口 8100)
 echo "👤 启动 User Service (端口 8100)..."
 cd tools/services/user_service
-python start_server.py --port 8100 &
+PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH" python start_server.py --dev --port ${USER_SERVICE_PORT:-8100} > ../../../logs/user_service.log 2>&1 &
 USER_SERVICE_PID=$!
 echo "User Service PID: $USER_SERVICE_PID"
 cd ../../..

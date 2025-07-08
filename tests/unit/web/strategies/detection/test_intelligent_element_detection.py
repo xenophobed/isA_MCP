@@ -8,7 +8,7 @@ import os
 import sys
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
 
 async def test_intelligent_login_detection():
     """Test intelligent login form detection with multi-strategy approach"""

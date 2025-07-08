@@ -1,0 +1,32 @@
+{
+  "domain": "example.com",
+  "site_name": "Example Test Site",
+  "login_elements": {
+    "username": {
+      "type": "css_selector",
+      "selector": "input#email",
+      "x": 400,
+      "y": 300,
+      "description": "Email input field"
+    },
+    "password": {
+      "type": "css_selector",
+      "selector": "input#password",
+      "x": 400,
+      "y": 350,
+      "description": "Password input field"
+    },
+    "submit": {
+      "type": "css_selector",
+      "selector": "button[type='submit']",
+      "x": 400,
+      "y": 400,
+      "description": "Login button"
+    }
+  },
+  "search_elements": {},
+  "special_selectors": {},
+  "confidence": 0.95,
+  "last_verified": "2025-07-05T04:02:17.999461",
+  "notes": "Test configuration for example.com"
+}

@@ -60,6 +60,75 @@ class MonitoringSettings:
     enable_audit_log: bool = True
 
 @dataclass
+class GraphAnalyticsSettings:
+    """Graph Analytics configuration"""
+    # LLM Configuration for Graph Analytics
+    max_tokens: int = 4000
+    temperature: float = 0.1
+    default_confidence: float = 0.8
+    
+    # Text Processing Configuration
+    long_text_threshold: int = 50000
+    chunk_size: int = 100000
+    chunk_overlap: int = 5000
+    
+    # Processing Configuration
+    max_concurrent: int = 5
+    batch_size: int = 10
+    
+    # Similarity and Search Configuration
+    similarity_threshold: float = 0.7
+    embedding_dimension: int = 1536
+    
+    # Performance and Logging
+    debug: bool = False
+    perf_log: bool = True
+    slow_threshold: float = 5.0
+    max_retries: int = 3
+    retry_delay: float = 1.0
+    enable_fallback: bool = True
+    
+    # Neo4j Configuration
+    neo4j_uri: Optional[str] = None
+    neo4j_username: Optional[str] = None
+    neo4j_password: Optional[str] = None
+    neo4j_database: Optional[str] = None
+    
+    # Pattern Matching Configuration
+    pattern_confidence: float = 0.9
+    min_entity_length: int = 2
+    max_entity_length: int = 200
+    
+    # Entity Type Mapping
+    entity_type_mappings: Dict[str, List[str]] = field(default_factory=lambda: {
+        'PERSON': ['PERSON', 'PEOPLE', 'INDIVIDUAL', 'AUTHOR', 'RESEARCHER'],
+        'ORG': ['ORG', 'ORGANIZATION', 'COMPANY', 'INSTITUTION', 'UNIVERSITY'],
+        'LOC': ['LOC', 'LOCATION', 'PLACE', 'COUNTRY', 'CITY', 'ADDRESS'],
+        'EVENT': ['EVENT', 'MEETING', 'CONFERENCE', 'OCCURRENCE'],
+        'PRODUCT': ['PRODUCT', 'TOOL', 'SOFTWARE', 'TECHNOLOGY'],
+        'CONCEPT': ['CONCEPT', 'METHOD', 'ALGORITHM', 'THEORY', 'IDEA'],
+        'DATE': ['DATE', 'TIME', 'TEMPORAL', 'WHEN'],
+        'MONEY': ['MONEY', 'CURRENCY', 'FINANCIAL', 'AMOUNT'],
+        'CUSTOM': ['CUSTOM', 'ENTITY', 'MISC', 'OTHER', 'UNKNOWN']
+    })
+    
+    # Relation Type Mapping
+    relation_type_mappings: Dict[str, List[str]] = field(default_factory=lambda: {
+        'IS_A': ['IS_A', 'TYPE_OF', 'KIND_OF'],
+        'PART_OF': ['PART_OF', 'COMPONENT_OF', 'BELONGS_TO'],
+        'LOCATED_IN': ['LOCATED_IN', 'IN', 'AT', 'BASED_IN'],
+        'WORKS_FOR': ['WORKS_FOR', 'EMPLOYED_BY', 'AFFILIATED_WITH'],
+        'OWNS': ['OWNS', 'HAS', 'POSSESSES'],
+        'CREATED_BY': ['CREATED_BY', 'AUTHORED_BY', 'DEVELOPED_BY'],
+        'HAPPENED_AT': ['HAPPENED_AT', 'OCCURRED_AT', 'TOOK_PLACE'],
+        'CAUSED_BY': ['CAUSED_BY', 'RESULTED_FROM', 'DUE_TO'],
+        'SIMILAR_TO': ['SIMILAR_TO', 'LIKE', 'COMPARABLE_TO'],
+        'RELATES_TO': ['RELATES_TO', 'CONNECTED_TO', 'ASSOCIATED_WITH'],
+        'DEPENDS_ON': ['DEPENDS_ON', 'REQUIRES', 'NEEDS'],
+        'CUSTOM': ['CUSTOM', 'RELATION', 'CONNECTS_TO']
+    })
+
+@dataclass
 class MCPSettings:
     """Main configuration settings for MCP services"""
     # Server settings
@@ -112,6 +181,7 @@ class MCPSettings:
     database: DatabaseSettings = field(default_factory=DatabaseSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
     monitoring: MonitoringSettings = field(default_factory=MonitoringSettings)
+    graph_analytics: GraphAnalyticsSettings = field(default_factory=GraphAnalyticsSettings)
     
     # Tool-specific settings
     tool_policies: Dict[str, str] = field(default_factory=lambda: {
@@ -197,6 +267,30 @@ class MCPSettings:
         
         self.supabase_pwd = os.getenv("SUPABASE_PWD", self.supabase_pwd)
         self.db_schema = os.getenv("DB_SCHEMA", self.db_schema)
+        
+        # Graph Analytics settings
+        self.graph_analytics.max_tokens = int(os.getenv("GRAPH_MAX_TOKENS", str(self.graph_analytics.max_tokens)))
+        self.graph_analytics.temperature = float(os.getenv("GRAPH_TEMPERATURE", str(self.graph_analytics.temperature)))
+        self.graph_analytics.default_confidence = float(os.getenv("GRAPH_DEFAULT_CONFIDENCE", str(self.graph_analytics.default_confidence)))
+        self.graph_analytics.long_text_threshold = int(os.getenv("GRAPH_LONG_TEXT_THRESHOLD", str(self.graph_analytics.long_text_threshold)))
+        self.graph_analytics.chunk_size = int(os.getenv("GRAPH_CHUNK_SIZE", str(self.graph_analytics.chunk_size)))
+        self.graph_analytics.chunk_overlap = int(os.getenv("GRAPH_CHUNK_OVERLAP", str(self.graph_analytics.chunk_overlap)))
+        self.graph_analytics.max_concurrent = int(os.getenv("GRAPH_MAX_CONCURRENT", str(self.graph_analytics.max_concurrent)))
+        self.graph_analytics.batch_size = int(os.getenv("GRAPH_BATCH_SIZE", str(self.graph_analytics.batch_size)))
+        self.graph_analytics.similarity_threshold = float(os.getenv("GRAPH_SIMILARITY_THRESHOLD", str(self.graph_analytics.similarity_threshold)))
+        self.graph_analytics.embedding_dimension = int(os.getenv("GRAPH_EMBEDDING_DIMENSION", str(self.graph_analytics.embedding_dimension)))
+        self.graph_analytics.debug = os.getenv("GRAPH_DEBUG", "false").lower() == "true"
+        self.graph_analytics.perf_log = os.getenv("GRAPH_PERF_LOG", "true").lower() == "true"
+        self.graph_analytics.slow_threshold = float(os.getenv("GRAPH_SLOW_THRESHOLD", str(self.graph_analytics.slow_threshold)))
+        self.graph_analytics.max_retries = int(os.getenv("GRAPH_MAX_RETRIES", str(self.graph_analytics.max_retries)))
+        self.graph_analytics.retry_delay = float(os.getenv("GRAPH_RETRY_DELAY", str(self.graph_analytics.retry_delay)))
+        self.graph_analytics.enable_fallback = os.getenv("GRAPH_ENABLE_FALLBACK", "true").lower() == "true"
+        
+        # Neo4j configuration
+        self.graph_analytics.neo4j_uri = os.getenv("NEO4J_URI", self.graph_analytics.neo4j_uri)
+        self.graph_analytics.neo4j_username = os.getenv("NEO4J_USERNAME", self.graph_analytics.neo4j_username)
+        self.graph_analytics.neo4j_password = os.getenv("NEO4J_PASSWORD", self.graph_analytics.neo4j_password)
+        self.graph_analytics.neo4j_database = os.getenv("NEO4J_DATABASE", self.graph_analytics.neo4j_database)
         
         return self
 

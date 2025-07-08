@@ -1,0 +1,226 @@
+{
+  "elements": {
+    "ui_elements": {
+      "navigation_links": [
+        {
+          "type": "coordinate",
+          "x": 381,
+          "y": 87,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 1 with 'home' likely functions as a page link in the navigation menu.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_1",
+            "type": "button",
+            "content": "home",
+            "center": [
+              381,
+              87
+            ],
+            "bbox": [
+              359,
+              77,
+              403,
+              98
+            ],
+            "confidence": 0.6634286046028137,
+            "interactable": true
+          }
+        },
+        {
+          "type": "coordinate",
+          "x": 458,
+          "y": 87,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 2 with 'services' is a page link in the navigation menu.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_2",
+            "type": "button",
+            "content": "services",
+            "center": [
+              458,
+              87
+            ],
+            "bbox": [
+              422,
+              77,
+              495,
+              98
+            ],
+            "confidence": 0.6033341884613037,
+            "interactable": true
+          }
+        },
+        {
+          "type": "coordinate",
+          "x": 829,
+          "y": 32,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 4 with 'about' is a page link in the navigation menu.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_4",
+            "type": "button",
+            "content": "about",
+            "center": [
+              829,
+              32
+            ],
+            "bbox": [
+              772,
+              0,
+              887,
+              64
+            ],
+            "confidence": 0.3028528690338135,
+            "interactable": true
+          }
+        },
+        {
+          "type": "coordinate",
+          "x": 951,
+          "y": 32,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 5 with 'services' is a page link in the navigation menu.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_5",
+            "type": "button",
+            "content": "services",
+            "center": [
+              951,
+              32
+            ],
+            "bbox": [
+              886,
+              0,
+              1017,
+              64
+            ],
+            "confidence": 0.2970968782901764,
+            "interactable": true
+          }
+        },
+        {
+          "type": "coordinate",
+          "x": 1210,
+          "y": 32,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 6 with 'contact' is a page link in the navigation menu.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_6",
+            "type": "button",
+            "content": "contact",
+            "center": [
+              1210,
+              32
+            ],
+            "bbox": [
+              1149,
+              0,
+              1271,
+              65
+            ],
+            "confidence": 0.2310314029455185,
+            "interactable": true
+          }
+        }
+      ],
+      "navigation_buttons": [
+        {
+          "type": "coordinate",
+          "x": 1505,
+          "y": 31,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 0 with 'get started' is a call-to-action button, likely used for navigation.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_0",
+            "type": "button",
+            "content": "get started",
+            "center": [
+              1505,
+              31
+            ],
+            "bbox": [
+              1449,
+              13,
+              1562,
+              50
+            ],
+            "confidence": 0.8955029845237732,
+            "interactable": true
+          }
+        },
+        {
+          "type": "coordinate",
+          "x": 453,
+          "y": 32,
+          "action": "click",
+          "description": "OpenAI semantic nav: Element 7 with 'mywebsite' is a logo or home link button.",
+          "confidence": 0.9,
+          "source": "openai_semantic",
+          "isa_element": {
+            "id": "omni_7",
+            "type": "button",
+            "content": "mywebsite",
+            "center": [
+              453,
+              32
+            ],
+            "bbox": [
+              306,
+              0,
+              601,
+              65
+            ],
+            "confidence": 0.22878992557525635,
+            "interactable": true
+          }
+        }
+      ],
+      "logo_link": {
+        "type": "coordinate",
+        "x": 453,
+        "y": 32,
+        "action": "click",
+        "description": "OpenAI semantic nav: Element 7 with 'mywebsite' resembles a logo/home link based on content and positioning.",
+        "confidence": 0.9,
+        "source": "openai_semantic",
+        "isa_element": {
+          "id": "omni_7",
+          "type": "button",
+          "content": "mywebsite",
+          "center": [
+            453,
+            32
+          ],
+          "bbox": [
+            306,
+            0,
+            601,
+            65
+          ],
+          "confidence": 0.22878992557525635,
+          "interactable": true
+        }
+      },
+      "menu_containers": []
+    }
+  },
+  "detection_type": "navigation",
+  "confidence": 0.85,
+  "timestamp": "2025-07-08T02:04:09.527461",
+  "url_pattern": "",
+  "page_hash": "b1475d44db69",
+  "expires_at": "2025-07-09T02:04:09.527484",
+  "hit_count": 2
+}

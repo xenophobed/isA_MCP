@@ -77,30 +77,38 @@ class EmbeddingService(BaseService):
                         operation_name="batch_embedding_generation"
                     )
                     
-                    if 'embeddings' in response:
-                        batch_embeddings = response['embeddings']
-                        
-                        # Cache new embeddings
-                        for text, embedding in zip(uncached_texts, batch_embeddings):
-                            self.cache[hash(text)] = embedding
-                        
-                        # Combine cached and new embeddings
-                        all_batch_embeddings = [None] * len(batch)
-                        
-                        # Add cached embeddings
-                        for idx, embedding in cached_embeddings:
-                            all_batch_embeddings[idx - i] = embedding
-                        
-                        # Add new embeddings
-                        for local_idx, embedding in zip(range(len(uncached_indices)), batch_embeddings):
-                            global_idx = uncached_indices[local_idx]
-                            all_batch_embeddings[global_idx - i] = embedding
-                        
-                        embeddings.extend(all_batch_embeddings)
+                    # Handle different response formats
+                    if isinstance(response, dict):
+                        if 'embeddings' in response:
+                            batch_embeddings = response['embeddings']
+                        elif 'data' in response:
+                            batch_embeddings = response['data']
+                        else:
+                            logger.error(f"Unexpected embedding response format: {response}")
+                            batch_embeddings = []
+                    elif isinstance(response, list):
+                        batch_embeddings = response
                     else:
-                        logger.error("Invalid response format from embedding API")
-                        # Return zero embeddings for this batch
-                        embeddings.extend([[0.0] * 1536] * len(batch))
+                        logger.error(f"Invalid embedding response format: {type(response)}")
+                        batch_embeddings = []
+                    
+                    # Cache new embeddings
+                    for text, embedding in zip(uncached_texts, batch_embeddings):
+                        self.cache[hash(text)] = embedding
+                    
+                    # Combine cached and new embeddings
+                    all_batch_embeddings = [None] * len(batch)
+                    
+                    # Add cached embeddings
+                    for idx, embedding in cached_embeddings:
+                        all_batch_embeddings[idx - i] = embedding
+                    
+                    # Add new embeddings
+                    for local_idx, embedding in zip(range(len(uncached_indices)), batch_embeddings):
+                        global_idx = uncached_indices[local_idx]
+                        all_batch_embeddings[global_idx - i] = embedding
+                    
+                    embeddings.extend(all_batch_embeddings)
                         
                 except Exception as e:
                     logger.error(f"Failed to generate embeddings for batch: {e}")

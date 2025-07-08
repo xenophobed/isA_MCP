@@ -684,6 +684,278 @@ class CognitiveMemoryManager(BaseTool):
             logger.error(f"Error managing memory lifecycle: {e}")
             raise
 
+    async def store_session_message(self, session_id: str, user_id: str, message_type: str, 
+                                   role: str, content: str, tool_calls: Dict = None, 
+                                   tool_call_id: str = None, tokens_used: int = 0, 
+                                   cost_usd: float = 0.0, importance_score: float = 0.5) -> Dict[str, Any]:
+        """存储会话消息"""
+        try:
+            result = self.supabase.table('session_messages').insert({
+                'session_id': session_id,
+                'user_id': user_id,
+                'message_type': message_type,
+                'role': role,
+                'content': content,
+                'tool_calls': tool_calls,
+                'tool_call_id': tool_call_id,
+                'tokens_used': tokens_used,
+                'cost_usd': cost_usd,
+                'importance_score': importance_score
+            }).execute()
+            
+            if result.data:
+                # 更新会话记忆的消息计数
+                await self._update_session_message_count(session_id, user_id)
+                
+                return {
+                    'status': 'success',
+                    'message_id': result.data[0]['id'],
+                    'data': result.data[0]
+                }
+            else:
+                raise Exception("Failed to insert session message")
+                
+        except Exception as e:
+            logger.error(f"Error storing session message: {e}")
+            raise
+
+    async def summarize_session(self, session_id: str, user_id: str, 
+                               force_update: bool = False) -> Dict[str, Any]:
+        """总结会话信息"""
+        try:
+            # 检查是否需要更新总结
+            existing_memory = self.supabase.table('session_memories')\
+                .select('*')\
+                .eq('session_id', session_id)\
+                .execute()
+            
+            should_update = force_update
+            if existing_memory.data:
+                memory = existing_memory.data[0]
+                messages_since_last = memory.get('messages_since_last_summary', 0)
+                # 如果消息数量超过阈值，触发更新
+                should_update = should_update or messages_since_last >= 20
+            
+            if not should_update and existing_memory.data:
+                return {
+                    'status': 'no_update_needed',
+                    'existing_summary': existing_memory.data[0]
+                }
+            
+            # 获取会话消息
+            messages = self.supabase.table('session_messages')\
+                .select('*')\
+                .eq('session_id', session_id)\
+                .eq('user_id', user_id)\
+                .eq('is_summary_candidate', True)\
+                .order('created_at', desc=False)\
+                .execute()
+            
+            if not messages.data or len(messages.data) < 3:
+                return {
+                    'status': 'insufficient_messages',
+                    'message_count': len(messages.data) if messages.data else 0
+                }
+            
+            # 构建对话文本
+            conversation_text = ""
+            for msg in messages.data:
+                role_prefix = {
+                    'user': 'User',
+                    'assistant': 'Assistant',
+                    'system': 'System'
+                }.get(msg['role'], msg['role'].capitalize())
+                
+                conversation_text += f"{role_prefix}: {msg['content']}\n\n"
+            
+            # 使用ISA模型进行会话总结
+            summary_prompt = f"""
+            请分析以下会话并提取结构化的会话记忆信息。返回JSON格式：
+            {{
+                "conversation_summary": "整体会话总结",
+                "user_context": {{
+                    "current_project": "当前项目",
+                    "technical_stack": ["技术栈"],
+                    "working_directory": "工作目录",
+                    "main_goals": ["主要目标"]
+                }},
+                "key_decisions": [
+                    {{
+                        "decision": "决策内容",
+                        "reasoning": "决策理由",
+                        "timestamp": "时间"
+                    }}
+                ],
+                "ongoing_tasks": [
+                    {{
+                        "task": "任务描述",
+                        "status": "pending/in_progress/completed",
+                        "priority": "high/medium/low",
+                        "next_steps": ["下一步行动"]
+                    }}
+                ],
+                "user_preferences": {{
+                    "coding_style": "编程风格偏好",
+                    "preferred_tools": ["偏好工具"],
+                    "communication_style": "交流风格"
+                }},
+                "important_facts": [
+                    {{
+                        "fact": "重要事实",
+                        "category": "类别",
+                        "confidence": 0.9
+                    }}
+                ]
+            }}
+            
+            会话内容：
+            {conversation_text}
+            """
+            
+            # 调用ISA客户端
+            isa_response = await self.call_isa_with_billing(
+                input_data=summary_prompt,
+                task="summarize_session",
+                service_type="text_generation"
+            )
+            
+            if not isa_response or not isinstance(isa_response, tuple) or len(isa_response) < 1:
+                raise Exception("ISA client returned invalid response")
+            
+            # 解析返回的JSON
+            summary_data = json.loads(isa_response[0])
+            
+            # 更新或创建会话记忆
+            memory_data = {
+                'session_id': session_id,
+                'user_id': user_id,
+                'conversation_summary': summary_data.get('conversation_summary', ''),
+                'user_context': summary_data.get('user_context', {}),
+                'key_decisions': summary_data.get('key_decisions', []),
+                'ongoing_tasks': summary_data.get('ongoing_tasks', []),
+                'user_preferences': summary_data.get('user_preferences', {}),
+                'important_facts': summary_data.get('important_facts', []),
+                'total_messages': len(messages.data),
+                'messages_since_last_summary': 0,
+                'last_summary_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            if existing_memory.data:
+                # 更新现有记忆
+                result = self.supabase.table('session_memories')\
+                    .update(memory_data)\
+                    .eq('session_id', session_id)\
+                    .execute()
+                action = 'updated'
+            else:
+                # 创建新记忆
+                memory_data['created_at'] = datetime.now().isoformat()
+                result = self.supabase.table('session_memories')\
+                    .insert(memory_data)\
+                    .execute()
+                action = 'created'
+            
+            return {
+                'status': 'success',
+                'action': action,
+                'session_id': session_id,
+                'messages_processed': len(messages.data),
+                'summary_data': result.data[0] if result.data else None,
+                'billing_info': isa_response[1] if len(isa_response) > 1 else None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error summarizing session: {e}")
+            raise
+
+    async def get_session_memory(self, session_id: str, user_id: str = None) -> Dict[str, Any]:
+        """获取会话记忆"""
+        try:
+            query = self.supabase.table('session_memories')\
+                .select('*')\
+                .eq('session_id', session_id)
+            
+            if user_id:
+                query = query.eq('user_id', user_id)
+            
+            result = query.execute()
+            
+            if result.data:
+                return {
+                    'status': 'success',
+                    'session_memory': result.data[0]
+                }
+            else:
+                return {
+                    'status': 'not_found',
+                    'session_id': session_id
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting session memory: {e}")
+            raise
+
+    async def get_user_session_memories(self, user_id: str, active_only: bool = True, 
+                                       limit: int = 20) -> Dict[str, Any]:
+        """获取用户的所有会话记忆"""
+        try:
+            query = self.supabase.table('session_memories')\
+                .select('*')\
+                .eq('user_id', user_id)
+            
+            if active_only:
+                query = query.eq('is_active', True)
+            
+            result = query.order('updated_at', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            return {
+                'status': 'success',
+                'user_id': user_id,
+                'session_memories': result.data or [],
+                'count': len(result.data) if result.data else 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting user session memories: {e}")
+            raise
+
+    async def _update_session_message_count(self, session_id: str, user_id: str):
+        """更新会话消息计数"""
+        try:
+            # 获取当前会话记忆
+            existing = self.supabase.table('session_memories')\
+                .select('messages_since_last_summary')\
+                .eq('session_id', session_id)\
+                .execute()
+            
+            if existing.data:
+                # 增加计数
+                current_count = existing.data[0].get('messages_since_last_summary', 0)
+                self.supabase.table('session_memories')\
+                    .update({
+                        'messages_since_last_summary': current_count + 1,
+                        'updated_at': datetime.now().isoformat()
+                    })\
+                    .eq('session_id', session_id)\
+                    .execute()
+            else:
+                # 创建新的会话记忆记录
+                self.supabase.table('session_memories')\
+                    .insert({
+                        'session_id': session_id,
+                        'user_id': user_id,
+                        'messages_since_last_summary': 1,
+                        'created_at': datetime.now().isoformat(),
+                        'updated_at': datetime.now().isoformat()
+                    })\
+                    .execute()
+                    
+        except Exception as e:
+            logger.error(f"Error updating session message count: {e}")
+
     # 辅助方法
     async def _get_memory_embedding(self, memory_type: str, memory_id: str) -> Optional[List[float]]:
         """获取记忆的embedding向量"""
@@ -1161,5 +1433,138 @@ def register_memory_tools(mcp):
         except Exception as e:
             logger.error(f"Error discovering memory associations: {e}")
             raise
+
+    @mcp.tool()
+    @security_manager.security_check
+    @security_manager.require_authorization(SecurityLevel.MEDIUM)
+    async def store_session_message(session_id: str, user_id: str, message_type: str, 
+                                   role: str, content: str, tool_calls: str = None, 
+                                   tool_call_id: str = None, tokens_used: int = 0, 
+                                   cost_usd: float = 0.0, importance_score: float = 0.5) -> str:
+        """Store session message
+        
+        Store individual messages from a conversation session for later summarization.
+        
+        Keywords: session, message, store, conversation, chat
+        Category: memory
+        """
+        try:
+            _memory_manager.reset_billing()
+            
+            # Parse tool_calls if provided
+            tool_calls_dict = json.loads(tool_calls) if tool_calls else None
+            
+            result = await _memory_manager.store_session_message(
+                session_id, user_id, message_type, role, content, 
+                tool_calls_dict, tool_call_id, tokens_used, cost_usd, importance_score
+            )
+            
+            logger.info(f"Session message stored for session {session_id}")
+            return _memory_manager.create_response(
+                status="success",
+                action="store_session_message",
+                data=result
+            )
+        except Exception as e:
+            logger.error(f"Error storing session message: {e}")
+            return _memory_manager.create_response(
+                status="error",
+                action="store_session_message",
+                data={"session_id": session_id, "user_id": user_id},
+                error_message=str(e)
+            )
+
+    @mcp.tool()
+    @security_manager.security_check
+    @security_manager.require_authorization(SecurityLevel.MEDIUM)
+    async def summarize_session(session_id: str, user_id: str, force_update: bool = False) -> str:
+        """Summarize session conversation
+        
+        Generate structured summary of session messages including context, tasks, and decisions.
+        
+        Keywords: session, summarize, conversation, memory, context
+        Category: memory
+        """
+        try:
+            _memory_manager.reset_billing()
+            
+            result = await _memory_manager.summarize_session(session_id, user_id, force_update)
+            
+            logger.info(f"Session summary completed for session {session_id}")
+            return _memory_manager.create_response(
+                status="success",
+                action="summarize_session",
+                data=result
+            )
+        except Exception as e:
+            logger.error(f"Error summarizing session: {e}")
+            return _memory_manager.create_response(
+                status="error",
+                action="summarize_session",
+                data={"session_id": session_id, "user_id": user_id},
+                error_message=str(e)
+            )
+
+    @mcp.tool()
+    @security_manager.security_check
+    @security_manager.require_authorization(SecurityLevel.LOW)
+    async def get_session_memory(session_id: str, user_id: str = None) -> str:
+        """Get session memory
+        
+        Retrieve stored session memory including conversation summary and context.
+        
+        Keywords: session, memory, get, retrieve, context
+        Category: memory
+        """
+        try:
+            _memory_manager.reset_billing()
+            
+            result = await _memory_manager.get_session_memory(session_id, user_id)
+            
+            logger.info(f"Session memory retrieved for session {session_id}")
+            return _memory_manager.create_response(
+                status="success",
+                action="get_session_memory",
+                data=result
+            )
+        except Exception as e:
+            logger.error(f"Error getting session memory: {e}")
+            return _memory_manager.create_response(
+                status="error",
+                action="get_session_memory",
+                data={"session_id": session_id},
+                error_message=str(e)
+            )
+
+    @mcp.tool()
+    @security_manager.security_check
+    @security_manager.require_authorization(SecurityLevel.LOW)
+    async def get_user_session_memories(user_id: str, active_only: bool = True, limit: int = 20) -> str:
+        """Get user session memories
+        
+        Retrieve all session memories for a user with optional filtering.
+        
+        Keywords: session, memories, user, list, history
+        Category: memory
+        """
+        try:
+            _memory_manager.reset_billing()
+            
+            result = await _memory_manager.get_user_session_memories(user_id, active_only, limit)
+            
+            logger.info(f"User session memories retrieved for user {user_id}: {result['count']} found")
+            return _memory_manager.create_response(
+                status="success",
+                action="get_user_session_memories", 
+                data=result
+            )
+        except Exception as e:
+            logger.error(f"Error getting user session memories: {e}")
+            return _memory_manager.create_response(
+                status="error",
+                action="get_user_session_memories",
+                data={"user_id": user_id},
+                error_message=str(e)
+            )
 
     logger.info("Cognitive memory tools registered successfully")

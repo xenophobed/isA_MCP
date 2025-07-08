@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """
-Relation Extractor for Graph Analytics
+Relation Extractor for Graph Analytics - Refactored Version
 
 Extracts relationships between entities from text using:
-1. Dependency parsing for grammatical relationships
-2. LLM-based relation extraction for semantic relationships
-3. Pattern-based extraction for structured relationships
-4. Coreference resolution for entity linking
+1. LLM-based relation extraction with structured output
+2. Pattern-based extraction for fallback
+3. Configurable relationship types and confidence thresholds
 """
 
 import re
-import json
-from typing import List, Dict, Any, Optional, Set, Tuple
-from datetime import datetime
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 from core.logging import get_logger
-from tools.base_service import BaseService
+from .base_extractor import BaseExtractor
 from .entity_extractor import Entity, EntityType
 
 logger = get_logger(__name__)
@@ -55,15 +52,11 @@ class Relation:
         if self.temporal_info is None:
             self.temporal_info = {}
 
-class RelationExtractor(BaseService):
+class RelationExtractor(BaseExtractor):
     """Extract relationships between entities from text"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize relation extractor
-        
-        Args:
-            config: Configuration dict with extractor settings
-        """
+        """Initialize relation extractor"""
         super().__init__("RelationExtractor")
         self.config = config or {}
         
@@ -92,20 +85,15 @@ class RelationExtractor(BaseService):
         
         logger.info("RelationExtractor initialized")
     
-    async def extract_relations(self, text: str, entities: List[Entity], 
-                              methods: List[str] = None) -> List[Relation]:
-        """Extract relationships between entities
-        
-        Args:
-            text: Input text to analyze
-            entities: List of entities found in the text
-            methods: List of extraction methods ['llm', 'pattern', 'hybrid']
-            
-        Returns:
-            List of extracted relationships
-        """
+    async def extract_relations(self, text: str, entities: List[Entity], methods: List[str] = None) -> List[Relation]:
+        """Extract relationships between entities"""
         if methods is None:
-            methods = ['hybrid']
+            methods = ['llm']  # Default to LLM for better accuracy
+            
+        # For long text, prioritize LLM long context capabilities
+        if self.should_use_llm_for_text(text):
+            logger.info(f"🔗 Long text ({len(text):,} chars) relation extraction, using LLM long context processing")
+            methods = ['llm']
         
         all_relations = []
         
@@ -115,7 +103,6 @@ class RelationExtractor(BaseService):
             elif method == 'pattern':
                 relations = self._extract_with_patterns(text, entities)
             elif method == 'hybrid':
-                # Combine LLM and pattern-based extraction
                 llm_relations = await self._extract_with_llm(text, entities)
                 pattern_relations = self._extract_with_patterns(text, entities)
                 relations = self._merge_relations(llm_relations + pattern_relations)
@@ -132,108 +119,121 @@ class RelationExtractor(BaseService):
         return final_relations
     
     async def _extract_with_llm(self, text: str, entities: List[Entity]) -> List[Relation]:
-        """Extract relationships using LLM"""
+        """Extract relationships using LLM with structured output"""
         if len(entities) < 2:
             return []
         
+        # Create entity context for LLM
+        entity_context = []
+        for i, entity in enumerate(entities):
+            entity_context.append(f"{i}: {entity.text} ({entity.entity_type.value})")
+        
+        prompt = f"""Extract relationships between the given entities from the text. Analyze the text to identify semantic relationships, dependencies, and connections.
+
+**Text to analyze:**
+{text}
+
+**Entities (reference by index):**
+{chr(10).join(entity_context)}
+
+**Relationship Types:**
+- IS_A: Taxonomic/classification relationships
+- PART_OF: Component/compositional relationships  
+- LOCATED_IN: Spatial/location relationships
+- WORKS_FOR: Employment/affiliation relationships
+- OWNS: Ownership relationships
+- CREATED_BY: Creation/authorship relationships
+- HAPPENED_AT: Temporal/event relationships
+- CAUSED_BY: Causal relationships
+- SIMILAR_TO: Similarity relationships
+- RELATES_TO: General semantic relationships
+- DEPENDS_ON: Dependency relationships
+- CUSTOM: Domain-specific relationships
+
+**Required JSON format:**
+{{
+  "relations": [
+    {{
+      "subject_idx": 0,
+      "predicate": "clear relationship description",
+      "object_idx": 1,
+      "relation_type": "IS_A|PART_OF|LOCATED_IN|WORKS_FOR|OWNS|CREATED_BY|HAPPENED_AT|CAUSED_BY|SIMILAR_TO|RELATES_TO|DEPENDS_ON|CUSTOM",
+      "confidence": 0.9,
+      "context": "relevant text snippet supporting this relationship",
+      "properties": {{}},
+      "temporal_info": {{}}
+    }}
+  ]
+}}
+
+Return only valid JSON with the relations array."""
+        
+        # Use base class method for LLM extraction
+        items_data = await self.extract_with_llm(
+            text=text,
+            prompt=prompt,
+            expected_wrapper="relations",
+            operation_name="relation_extraction"
+        )
+        
+        # Convert to Relation objects
+        relations = []
+        for item_data in items_data:
+            relation = self._create_relation_from_data(item_data, entities)
+            if relation:
+                relations.append(relation)
+        
+        return relations
+    
+    def _create_relation_from_data(self, item_data: Dict[str, Any], entities: List[Entity]) -> Optional[Relation]:
+        """Create Relation object from LLM response data"""
         try:
-            # Create entity context for LLM
-            entity_context = []
-            for i, entity in enumerate(entities):
-                entity_context.append(f"{i}: {entity.text} ({entity.entity_type.value})")
+            subject_idx = self._get_safe_field(item_data, 'subject_idx', 0)
+            object_idx = self._get_safe_field(item_data, 'object_idx', 1)
             
-            prompt = f"""
-            Given the following text and entities, extract all meaningful relationships between the entities.
+            # Validate indices
+            if (subject_idx >= len(entities) or object_idx >= len(entities) or subject_idx == object_idx):
+                logger.warning(f"Invalid entity indices: subject={subject_idx}, object={object_idx}, total={len(entities)}")
+                return None
             
-            Text: "{text}"
+            # Map relation type
+            rel_type_str = self._get_safe_field(item_data, 'relation_type', 'RELATES_TO')
+            relation_type = self._map_relation_type(str(rel_type_str).upper())
             
-            Entities:
-            {chr(10).join(entity_context)}
-            
-            For each relationship, identify:
-            1. Subject entity (use entity index)
-            2. Relationship type (IS_A, PART_OF, LOCATED_IN, WORKS_FOR, OWNS, CREATED_BY, HAPPENED_AT, CAUSED_BY, SIMILAR_TO, RELATES_TO, DEPENDS_ON, CUSTOM)
-            3. Predicate (the relationship description)
-            4. Object entity (use entity index)
-            5. Confidence score (0.0-1.0)
-            6. Context (relevant text snippet)
-            
-            Return as JSON array:
-            [
-                {{
-                    "subject_idx": 0,
-                    "predicate": "relationship description",
-                    "object_idx": 1,
-                    "relation_type": "RELATION_TYPE",
-                    "confidence": 0.9,
-                    "context": "relevant text snippet",
-                    "properties": {{"key": "value"}},
-                    "temporal_info": {{"when": "time info"}}
-                }}
-            ]
-            
-            Only include relationships explicitly mentioned or strongly implied in the text.
-            """
-            
-            response, billing_info = await self.call_isa_with_billing(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                parameters={"max_tokens": 2000, "temperature": 0.1},
-                operation_name="relation_extraction"
+            return Relation(
+                subject=entities[subject_idx],
+                predicate=self._clean_text_field(item_data.get('predicate', '')),
+                object=entities[object_idx],
+                relation_type=relation_type,
+                confidence=self._standardize_confidence(item_data.get('confidence')),
+                context=self._clean_text_field(item_data.get('context', '')),
+                properties=self._get_safe_field(item_data, 'properties', {}),
+                temporal_info=self._get_safe_field(item_data, 'temporal_info', {})
             )
-            
-            if 'text' in response:
-                response_text = response['text']
-            else:
-                raise Exception("Invalid response format from ISA API")
-            
-            # Parse LLM response
-            try:
-                json_start = response_text.find('[')
-                json_end = response_text.rfind(']') + 1
-                if json_start != -1 and json_end != -1:
-                    json_str = response_text[json_start:json_end]
-                    relations_data = json.loads(json_str)
-                    
-                    relations = []
-                    for rel_data in relations_data:
-                        try:
-                            subject_idx = rel_data.get('subject_idx', 0)
-                            object_idx = rel_data.get('object_idx', 1)
-                            
-                            if (subject_idx < len(entities) and 
-                                object_idx < len(entities) and 
-                                subject_idx != object_idx):
-                                
-                                relation_type = RelationType(rel_data.get('relation_type', 'RELATES_TO'))
-                                relation = Relation(
-                                    subject=entities[subject_idx],
-                                    predicate=rel_data.get('predicate', ''),
-                                    object=entities[object_idx],
-                                    relation_type=relation_type,
-                                    confidence=rel_data.get('confidence', 0.7),
-                                    context=rel_data.get('context', ''),
-                                    properties=rel_data.get('properties', {}),
-                                    temporal_info=rel_data.get('temporal_info', {})
-                                )
-                                relations.append(relation)
-                        except (ValueError, IndexError) as e:
-                            logger.warning(f"Skipping invalid relation: {e}")
-                            continue
-                    
-                    return relations
-                else:
-                    logger.warning("No valid JSON found in LLM relation response")
-                    return []
-                    
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM relation response: {e}")
-                return []
-                
         except Exception as e:
-            logger.error(f"LLM relation extraction failed: {e}")
-            return []
+            logger.warning(f"Failed to create relation from data: {e}")
+            return None
+    
+    def _map_relation_type(self, type_str: str) -> RelationType:
+        """Map LLM relation type string to RelationType enum"""
+        type_mapping = {
+            'IS_A': RelationType.IS_A,
+            'PART_OF': RelationType.PART_OF,
+            'LOCATED_IN': RelationType.LOCATED_IN,
+            'WORKS_FOR': RelationType.WORKS_FOR,
+            'OWNS': RelationType.OWNS,
+            'CREATED_BY': RelationType.CREATED_BY,
+            'HAPPENED_AT': RelationType.HAPPENED_AT,
+            'CAUSED_BY': RelationType.CAUSED_BY,
+            'SIMILAR_TO': RelationType.SIMILAR_TO,
+            'RELATES_TO': RelationType.RELATES_TO,
+            'DEPENDS_ON': RelationType.DEPENDS_ON,
+            'CUSTOM': RelationType.CUSTOM,
+            'RELATION': RelationType.RELATES_TO,
+            'CONNECTS_TO': RelationType.RELATES_TO,
+            'ASSOCIATED_WITH': RelationType.RELATES_TO
+        }
+        return type_mapping.get(type_str, RelationType.RELATES_TO)
     
     def _extract_with_patterns(self, text: str, entities: List[Entity]) -> List[Relation]:
         """Extract relationships using regex patterns"""
@@ -322,67 +322,22 @@ class RelationExtractor(BaseService):
         
         return merged
     
-    async def extract_temporal_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
-        """Extract temporal relationships between entities and events"""
-        temporal_prompt = f"""
-        Extract temporal relationships from the text. Focus on:
-        - When events happened
-        - Duration of events or states
-        - Sequence of events
-        - Temporal dependencies
-        
-        Text: "{text}"
-        Entities: {[f"{e.text} ({e.entity_type.value})" for e in entities]}
-        
-        Return temporal relations as JSON array.
-        """
-        
-        try:
-            response, billing_info = await self.call_isa_with_billing(
-                input_data=temporal_prompt,
-                task="chat",
-                service_type="text",
-                parameters={"max_tokens": 1000, "temperature": 0.1},
-                operation_name="temporal_relation_extraction"
-            )
-            
-            # Parse and process temporal relations
-            return await self._extract_with_llm(text, entities)
-            
-        except Exception as e:
-            logger.error(f"Temporal relation extraction failed: {e}")
-            return []
+    # Base class implementations
+    def _validate_item_data(self, item_data: Dict[str, Any]) -> bool:
+        """Validate relation data from LLM response"""
+        return (isinstance(item_data, dict) and 
+                'subject_idx' in item_data and 
+                'object_idx' in item_data)
     
-    async def extract_causal_relations(self, text: str, entities: List[Entity]) -> List[Relation]:
-        """Extract causal relationships between entities"""
-        causal_prompt = f"""
-        Extract causal relationships from the text. Focus on:
-        - Cause and effect relationships
-        - Dependencies and prerequisites
-        - Enabling conditions
-        - Consequences and outcomes
-        
-        Text: "{text}"
-        Entities: {[f"{e.text} ({e.entity_type.value})" for e in entities]}
-        
-        Return causal relations as JSON array.
-        """
-        
-        try:
-            response, billing_info = await self.call_isa_with_billing(
-                input_data=causal_prompt,
-                task="chat",
-                service_type="text",
-                parameters={"max_tokens": 1000, "temperature": 0.1},
-                operation_name="causal_relation_extraction"
-            )
-            
-            # Parse and process causal relations
-            return await self._extract_with_llm(text, entities)
-            
-        except Exception as e:
-            logger.error(f"Causal relation extraction failed: {e}")
-            return []
+    def _process_item_data(self, item_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Process relation data - just return as-is since _create_relation_from_data handles conversion"""
+        return item_data
+    
+    def _fallback_extraction(self, text: str) -> List[Dict[str, Any]]:
+        """Fallback to pattern-based extraction"""
+        logger.info("Falling back to pattern-based relation extraction")
+        # Pattern extraction needs entities, so return empty for now
+        return []
     
     def get_relation_statistics(self, relations: List[Relation]) -> Dict[str, Any]:
         """Get statistics about extracted relations"""

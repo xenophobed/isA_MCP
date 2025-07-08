@@ -13,6 +13,7 @@ import json
 
 from core.logging import get_logger
 from core.database.supabase_client import get_supabase_client
+from core.config import get_settings
 
 try:
     from neo4j import GraphDatabase, Driver, Result
@@ -37,16 +38,17 @@ class Neo4jClient:
         self.config = config or {}
         self.driver: Optional[Driver] = None
         self.supabase = get_supabase_client()
+        self.settings = get_settings()
         
         if not NEO4J_AVAILABLE:
             logger.warning("Neo4j driver not available. Install with: pip install neo4j")
             return
         
-        # Get Neo4j connection details from environment or config
-        self.uri = self.config.get('uri') or os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        self.username = self.config.get('username') or os.getenv('NEO4J_USERNAME', 'neo4j')
-        self.password = self.config.get('password') or os.getenv('NEO4J_PASSWORD', 'password')
-        self.database = self.config.get('database') or os.getenv('NEO4J_DATABASE', 'neo4j')
+        # Get Neo4j connection details from centralized settings
+        self.uri = self.config.get('uri') or self.settings.graph_analytics.neo4j_uri or 'bolt://localhost:7687'
+        self.username = self.config.get('username') or self.settings.graph_analytics.neo4j_username or 'neo4j'
+        self.password = self.config.get('password') or self.settings.graph_analytics.neo4j_password or 'password'
+        self.database = self.config.get('database') or self.settings.graph_analytics.neo4j_database or 'neo4j'
         
         try:
             self.driver = GraphDatabase.driver(
@@ -430,8 +432,8 @@ class Neo4jClient:
             YIELD node, score
             WHERE score >= $threshold
             RETURN node.id as id, 
-                   node.text as text,
-                   node.entity_type as entity_type,
+                   node.canonical_form as text,  // 使用canonical_form作text
+                   node.type as entity_type,
                    node.canonical_form as canonical_form,
                    score
             ORDER BY score DESC
@@ -461,7 +463,7 @@ class Neo4jClient:
         MATCH (n:Entity)
         RETURN n.id as id,
                n.text as text,
-               n.entity_type as entity_type,
+               n.type as entity_type,
                n.canonical_form as canonical_form,
                0.5 as score
         LIMIT $limit
@@ -561,8 +563,8 @@ class Neo4jClient:
         RETURN 
             count(DISTINCT n) as total_nodes,
             count(DISTINCT r) as total_edges,
-            collect(DISTINCT n.entity_type) as entity_types,
-            collect(DISTINCT r.relation_type) as relation_types,
+            collect(DISTINCT n.type) as entity_types,
+            collect(DISTINCT r.type) as relation_types,
             avg(n.confidence) as avg_node_confidence,
             avg(r.confidence) as avg_edge_confidence
         """

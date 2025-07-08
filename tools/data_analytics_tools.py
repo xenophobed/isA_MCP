@@ -2,17 +2,23 @@
 """
 Data Analytics Tools for MCP Server
 Provides the complete 5-step data analytics workflow
+tools included: 
+- Data Sourcing: Extract metadata from data sources and store in vector database
+- Data Query: Query data from vector database and generate SQL
+- Data Visualization: Generate visualization specification from data
+
+Note: This module is currently in development and not fully functional.
 """
 
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-from core.security import get_security_manager, SecurityLevel
+from tools.base_tool import BaseTool
+from core.security import SecurityLevel
 from core.logging import get_logger
 
 # Import the 5-step workflow services
-# Temporarily commented out due to PyMuPDF dependency in document_adapter
 # from tools.services.data_analytics_service.core.metadata_extractor import MetadataExtractor
 # from tools.services.data_analytics_service.services.semantic_enricher import SemanticEnricher
 # from tools.services.data_analytics_service.services.embedding_storage import EmbeddingStorage
@@ -23,15 +29,28 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-def register_data_analytics_tools(mcp):
-    """Register data analytics tools with the MCP server"""
+class DataAnalyticsTools(BaseTool):
+    """Data Analytics Tools inheriting from BaseTool for unified ISA client and billing management"""
     
-    # Get security manager for applying decorators
-    security_manager = get_security_manager()
+    def __init__(self):
+        super().__init__()
+        logger.info("Initializing Data Analytics Tools")
     
-    @mcp.tool()
-    @security_manager.security_check
-    @security_manager.require_authorization(SecurityLevel.MEDIUM)
+    def register_all_tools(self, mcp):
+        """Register all data analytics tools with the MCP server"""
+        logger.info("Registering data analytics tools with MCP server")
+        
+        # Register data sourcing tool
+        self.register_tool(mcp, self.data_sourcing)
+        
+        # Register data query tool  
+        self.register_tool(mcp, self.data_query)
+        
+        # Register visualization tool
+        self.register_tool(mcp, self.generate_visualization)
+        
+        logger.info(f"Successfully registered {len(self.registered_tools)} data analytics tools")
+    
     async def data_sourcing(
         source_type: str,
         source_config: Dict[str, Any],
@@ -57,9 +76,8 @@ def register_data_analytics_tools(mcp):
         Category: data
         """
         try:
-            # Security check
-            security_manager = get_security_manager()
-            if not security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
+            # Security check using inherited security manager
+            if not self.security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
                 raise Exception("Insufficient permissions for data analytics operations")
             
             logger.info(f"🚀 Starting data sourcing workflow for {source_type}")
@@ -152,61 +170,33 @@ def register_data_analytics_tools(mcp):
             
             logger.info(f"🎉 Data sourcing workflow completed successfully in {total_time:.2f}s")
             
-            # Collect all billing information
-            total_billing = {
-                "total_cost_usd": 0.0,
-                "service_breakdown": {},
-                "operations_count": 0
-            }
-            
-            # Add embedding storage billing
-            embedding_billing = storage_result.get("billing_info", {})
-            if embedding_billing:
-                total_billing["total_cost_usd"] += embedding_billing.get("total_cost_usd", 0.0)
-                total_billing["service_breakdown"]["embedding_storage"] = embedding_billing
-                total_billing["operations_count"] += embedding_billing.get("operation_count", 0)
-            
-            response = {
-                "status": "success",
-                "action": "data_sourcing",
-                "data": {
-                    "workflow_results": workflow_results,
-                    "semantic_metadata": {
-                        "business_entities": semantic_metadata.business_entities,
-                        "semantic_tags": semantic_metadata.semantic_tags,
-                        "data_patterns": semantic_metadata.data_patterns,
-                        "business_rules": semantic_metadata.business_rules,
-                        "domain_classification": semantic_metadata.domain_classification
-                    },
-                    "storage_result": storage_result,
-                    "message": f"Data sourcing completed: {len(raw_metadata.get('tables', []))} tables processed and stored in vector database"
+            # Note: Billing information is automatically handled by BaseTool
+            response_data = {
+                "workflow_results": workflow_results,
+                "semantic_metadata": {
+                    "business_entities": semantic_metadata.business_entities,
+                    "semantic_tags": semantic_metadata.semantic_tags,
+                    "data_patterns": semantic_metadata.data_patterns,
+                    "business_rules": semantic_metadata.business_rules,
+                    "domain_classification": semantic_metadata.domain_classification
                 },
-                "billing": total_billing,
-                "timestamp": datetime.now().isoformat()
+                "storage_result": storage_result,
+                "message": f"Data sourcing completed: {len(raw_metadata.get('tables', []))} tables processed and stored in vector database"
             }
             
             logger.info(f"Data sourcing completed: {len(raw_metadata.get('tables', []))} tables processed")
-            return json.dumps(response)
+            return self.create_response("success", "data_sourcing", response_data)
             
         except Exception as e:
-            error_response = {
-                "status": "error",
-                "action": "data_sourcing",
-                "data": {
-                    "source_type": source_type,
-                    "error": str(e),
-                    "workflow_results": workflow_results if 'workflow_results' in locals() else {},
-                    "message": "Data sourcing workflow failed"
-                },
-                "timestamp": datetime.now().isoformat()
+            error_data = {
+                "source_type": source_type,
+                "workflow_results": workflow_results if 'workflow_results' in locals() else {},
+                "message": "Data sourcing workflow failed"
             }
             
             logger.error(f"Data sourcing failed: {e}")
-            return json.dumps(error_response)
+            return self.create_response("error", "data_sourcing", error_data, str(e))
 
-    @mcp.tool()
-    @security_manager.security_check
-    @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def data_query(
         natural_query: str,
         source_connection: Dict[str, Any],
@@ -232,9 +222,8 @@ def register_data_analytics_tools(mcp):
         Category: data
         """
         try:
-            # Security check
-            security_manager = get_security_manager()
-            if not security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
+            # Security check using inherited security manager
+            if not self.security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
                 raise Exception("Insufficient permissions for data analytics operations")
             
             logger.info(f"🔍 Starting data query workflow: {natural_query[:100]}...")
@@ -396,82 +385,54 @@ def register_data_analytics_tools(mcp):
             
             logger.info(f"🎉 Data query workflow completed in {total_time:.2f}s")
             
-            # Collect all billing information
-            total_billing = {
-                "total_cost_usd": 0.0,
-                "service_breakdown": {},
-                "operations_count": 0
-            }
-            
-            # Add SQL generator billing
-            sql_generator_billing = sql_generator.get_service_billing_info()
-            if sql_generator_billing:
-                total_billing["total_cost_usd"] += sql_generator_billing.get("total_cost_usd", 0.0)
-                total_billing["service_breakdown"]["sql_generator"] = sql_generator_billing
-                total_billing["operations_count"] += sql_generator_billing.get("operation_count", 0)
-            
-            response = {
-                "status": "success",
-                "action": "data_query",
-                "data": {
-                    "workflow_results": workflow_results,
-                    "query_context": {
-                        "business_intent": query_context.business_intent,
-                        "entities_mentioned": query_context.entities_mentioned,
-                        "attributes_mentioned": query_context.attributes_mentioned,
-                        "operations": query_context.operations,
-                        "confidence_score": query_context.confidence_score
-                    },
-                    "generated_sql": sql_generation_result.sql,
-                    "sql_explanation": sql_generation_result.explanation,
-                    "execution_result": {
-                        "success": execution_result.success,
-                        "data": execution_result.data,
-                        "column_names": execution_result.column_names,
-                        "row_count": execution_result.row_count,
-                        "execution_time_ms": execution_result.execution_time_ms,
-                        "error_message": execution_result.error_message
-                    },
-                    "visualization": viz_result.get("visualization", {}),
-                    "visualization_alternatives": viz_result.get("alternatives", []),
-                    "data_insights": viz_result.get("visualization", {}).get("insights", []),
-                    "fallback_attempts": [
-                        {
-                            "attempt_number": attempt.attempt_number,
-                            "strategy": attempt.strategy,
-                            "success": attempt.success,
-                            "error_message": attempt.error_message
-                        }
-                        for attempt in fallback_attempts
-                    ],
-                    "message": f"Query processed: {'Success' if execution_result.success else 'Failed'} - {execution_result.row_count} rows returned with {viz_result.get('visualization', {}).get('type', 'unknown')} visualization"
+            # Note: Billing information is automatically handled by BaseTool
+            response_data = {
+                "workflow_results": workflow_results,
+                "query_context": {
+                    "business_intent": query_context.business_intent,
+                    "entities_mentioned": query_context.entities_mentioned,
+                    "attributes_mentioned": query_context.attributes_mentioned,
+                    "operations": query_context.operations,
+                    "confidence_score": query_context.confidence_score
                 },
-                "billing": total_billing,
-                "timestamp": datetime.now().isoformat()
+                "generated_sql": sql_generation_result.sql,
+                "sql_explanation": sql_generation_result.explanation,
+                "execution_result": {
+                    "success": execution_result.success,
+                    "data": execution_result.data,
+                    "column_names": execution_result.column_names,
+                    "row_count": execution_result.row_count,
+                    "execution_time_ms": execution_result.execution_time_ms,
+                    "error_message": execution_result.error_message
+                },
+                "visualization": viz_result.get("visualization", {}),
+                "visualization_alternatives": viz_result.get("alternatives", []),
+                "data_insights": viz_result.get("visualization", {}).get("insights", []),
+                "fallback_attempts": [
+                    {
+                        "attempt_number": attempt.attempt_number,
+                        "strategy": attempt.strategy,
+                        "success": attempt.success,
+                        "error_message": attempt.error_message
+                    }
+                    for attempt in fallback_attempts
+                ],
+                "message": f"Query processed: {'Success' if execution_result.success else 'Failed'} - {execution_result.row_count} rows returned with {viz_result.get('visualization', {}).get('type', 'unknown')} visualization"
             }
             
             logger.info(f"Data query completed: {execution_result.row_count} rows returned")
-            return json.dumps(response)
+            return self.create_response("success", "data_query", response_data)
             
         except Exception as e:
-            error_response = {
-                "status": "error",
-                "action": "data_query",
-                "data": {
-                    "natural_query": natural_query,
-                    "error": str(e),
-                    "workflow_results": workflow_results if 'workflow_results' in locals() else {},
-                    "message": "Data query workflow failed"
-                },
-                "timestamp": datetime.now().isoformat()
+            error_data = {
+                "natural_query": natural_query,
+                "workflow_results": workflow_results if 'workflow_results' in locals() else {},
+                "message": "Data query workflow failed"
             }
             
             logger.error(f"Data query failed: {e}")
-            return json.dumps(error_response)
+            return self.create_response("error", "data_query", error_data, str(e))
 
-    @mcp.tool()
-    @security_manager.security_check
-    @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def generate_visualization(
         data: List[Dict[str, Any]],
         columns: List[str],
@@ -498,9 +459,8 @@ def register_data_analytics_tools(mcp):
         Category: visualization
         """
         try:
-            # Security check
-            security_manager = get_security_manager()
-            if not security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
+            # Security check using inherited security manager
+            if not self.security_manager.check_permission("data_analytics", SecurityLevel.MEDIUM):
                 raise Exception("Insufficient permissions for data analytics operations")
             
             logger.info(f"🎨 Generating visualization for {len(data)} records")
@@ -566,35 +526,29 @@ def register_data_analytics_tools(mcp):
             
             logger.info(f"✅ Generated {viz_result.get('visualization', {}).get('type', 'unknown')} visualization")
             
-            response = {
-                "status": "success",
-                "action": "generate_visualization",
-                "data": {
-                    "visualization": viz_result.get("visualization", {}),
-                    "alternatives": viz_result.get("alternatives", []),
-                    "insights": viz_result.get("visualization", {}).get("insights", []),
-                    "data_summary": viz_result.get("data_summary", {}),
-                    "message": f"Generated {viz_result.get('visualization', {}).get('type', 'unknown')} visualization for {len(data)} records"
-                },
-                "timestamp": datetime.now().isoformat()
+            response_data = {
+                "visualization": viz_result.get("visualization", {}),
+                "alternatives": viz_result.get("alternatives", []),
+                "insights": viz_result.get("visualization", {}).get("insights", []),
+                "data_summary": viz_result.get("data_summary", {}),
+                "message": f"Generated {viz_result.get('visualization', {}).get('type', 'unknown')} visualization for {len(data)} records"
             }
             
             logger.info(f"Generated {viz_result.get('visualization', {}).get('type', 'unknown')} visualization for {len(data)} records")
-            return json.dumps(response)
+            return self.create_response("success", "generate_visualization", response_data)
             
         except Exception as e:
-            error_response = {
-                "status": "error",
-                "action": "generate_visualization",
-                "data": {
-                    "error": str(e),
-                    "visualization": {},
-                    "message": "Visualization generation failed"
-                },
-                "timestamp": datetime.now().isoformat()
+            error_data = {
+                "visualization": {},
+                "message": "Visualization generation failed"
             }
             
             logger.error(f"Visualization generation failed: {e}")
-            return json.dumps(error_response)
+            return self.create_response("error", "generate_visualization", error_data, str(e))
 
-logger.info("Data analytics tools registered successfully")
+def register_data_analytics_tools(mcp):
+    """Convenience function to register data analytics tools with the MCP server"""
+    data_analytics_tools = DataAnalyticsTools()
+    data_analytics_tools.register_all_tools(mcp)
+    logger.info("Data analytics tools registered successfully")
+    return data_analytics_tools

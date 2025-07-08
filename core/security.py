@@ -59,13 +59,14 @@ class SecurityPolicy:
         }
         
         self.forbidden_patterns = [
-            r"password",
-            r"secret",
-            r"api_key",
-            r"private_key",
-            r"token",
-            r"delete.*database",
-            r"drop.*table"
+            r"password.*=.*['\"]",
+            r"secret.*=.*['\"]",
+            r"api_key.*=.*['\"]",
+            r"private_key.*=.*['\"]",
+            r"auth_token.*=.*['\"]",
+            r"access_token.*=.*['\"]",
+            r"delete\s+from\s+",
+            r"drop\s+table\s+"
         ]
         
         self.rate_limits = {

@@ -10,6 +10,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from contextlib import contextmanager
 import json
+from datetime import datetime
 
 from .neo4j_client import Neo4jClient
 from ..core.entity_extractor import EntityExtractor
@@ -187,14 +188,23 @@ class Neo4jGraphRAGClient:
             Summary of extracted and stored data
         """
         try:
-            # Extract entities
-            entities = await self.entity_extractor.extract_entities(text)
+            text_size = len(text)
+            logger.info(f"🧠 开始长文本提取: {text_size:,} 字符")
             
-            # Extract relationships
+            # Extract entities (single LLM call for entire text)
+            entity_start = datetime.now()
+            entities = await self.entity_extractor.extract_entities(text)
+            entity_time = (datetime.now() - entity_start).total_seconds()
+            logger.info(f"🏷️  实体提取完成: {len(entities)}个实体, {entity_time:.2f}秒")
+            
+            # Extract relationships (single LLM call for entire text)
+            relation_start = datetime.now()
             relationships = await self.relation_extractor.extract_relations(
                 text=text,
                 entities=entities
             )
+            relation_time = (datetime.now() - relation_start).total_seconds()
+            logger.info(f"🔗 关系提取完成: {len(relationships)}个关系, {relation_time:.2f}秒")
             
             # Store entities in Neo4j
             stored_entities = []
@@ -207,15 +217,24 @@ class Neo4jGraphRAGClient:
                     
                     embedding = await self.embedding_service.generate_single_embedding(entity_text)
                     
+                    # Clean properties for Neo4j storage
+                    clean_properties = {}
+                    if entity.properties:
+                        for k, v in entity.properties.items():
+                            if isinstance(v, (str, int, float, bool)):
+                                clean_properties[k] = v
+                            else:
+                                clean_properties[k] = str(v)
+                    
                     result = await self.neo4j_client.store_entity(
                         name=entity.text,
                         entity_type=entity.entity_type.value,
                         properties={
                             "canonical_form": entity.canonical_form,
-                            "confidence": entity.confidence,
-                            "properties": entity.properties,
+                            "confidence": float(entity.confidence),
                             "source_id": source_id,
-                            "chunk_id": chunk_id
+                            "chunk_id": chunk_id,
+                            **clean_properties
                         },
                         embedding=embedding
                     )
@@ -227,17 +246,26 @@ class Neo4jGraphRAGClient:
             stored_relationships = []
             for rel in relationships:
                 try:
+                    # Clean properties for Neo4j storage
+                    clean_rel_properties = {}
+                    if rel.properties:
+                        for k, v in rel.properties.items():
+                            if isinstance(v, (str, int, float, bool)):
+                                clean_rel_properties[k] = v
+                            else:
+                                clean_rel_properties[k] = str(v)
+                    
                     result = await self.neo4j_client.store_relationship(
                         source_entity=rel.subject.text,
                         target_entity=rel.object.text,
                         relationship_type=rel.relation_type.value,
                         properties={
                             "predicate": rel.predicate,
-                            "confidence": rel.confidence,
+                            "confidence": float(rel.confidence),
                             "context": rel.context,
-                            **rel.properties,
                             "source_id": source_id,
-                            "chunk_id": chunk_id
+                            "chunk_id": chunk_id,
+                            **clean_rel_properties
                         }
                     )
                     stored_relationships.append(result)

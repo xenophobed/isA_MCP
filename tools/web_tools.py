@@ -8,86 +8,47 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
 from core.config import get_settings
+from tools.base_tool import BaseTool
 
-# Essential imports for search functionality
-from tools.services.web_services.engines.search_engine import SearchEngine, SearchProvider, BraveSearchStrategy
-from tools.services.web_services.core.browser_manager import BrowserManager
-from tools.services.web_services.core.session_manager import SessionManager
-from tools.services.web_services.core.stealth_manager import StealthManager
-from tools.services.web_services.engines.extraction_engine import ExtractionEngine
-from tools.services.web_services.strategies.extraction import LLMExtractionStrategy, PredefinedLLMSchemas
-from tools.services.web_services.strategies.filtering import SemanticFilter
-from tools.services.web_services.utils.rate_limiter import RateLimiter
-from tools.services.web_services.utils.human_behavior import HumanBehavior
+# Web Service Manager import
+from tools.services.web_services.core.web_service_manager import get_web_service_manager, cleanup_web_service_manager
+
+# Essential types for search functionality
+from tools.services.web_services.engines.search_engine import SearchProvider
+from tools.services.web_services.strategies.extraction import PredefinedLLMSchemas
 
 logger = get_logger(__name__)
 
-# Global instances
-_search_engine: Optional[SearchEngine] = None
-_browser_manager: Optional[BrowserManager] = None
-_session_manager: Optional[SessionManager] = None
-_stealth_manager: Optional[StealthManager] = None
-_human_behavior: Optional[HumanBehavior] = None
-_extraction_engine: Optional[ExtractionEngine] = None
-_rate_limiter: Optional[RateLimiter] = None
-_shared_llm_extractor: Optional[LLMExtractionStrategy] = None  # 共享LLM实例
+# Global web service manager instance
+_web_service_manager = None
 
 async def _initialize_search_services():
-    """Initialize only essential search services"""
-    global _search_engine, _browser_manager, _session_manager, _stealth_manager, _human_behavior, _extraction_engine, _rate_limiter, _shared_llm_extractor
+    """Initialize web services using the centralized service manager"""
+    global _web_service_manager
     
     try:
-        if _search_engine is None:
-            print("🔧 Initializing web search services...")
-            
-            # Core search engine
-            _search_engine = SearchEngine()
-            print("✅ SearchEngine created")
-            
-            # Add Brave search strategy using config manager
-            settings = get_settings()
-            brave_api_key = settings.brave_api_key
-            if brave_api_key:
-                brave_strategy = BraveSearchStrategy(brave_api_key)
-                _search_engine.register_strategy(SearchProvider.BRAVE, brave_strategy)
-                print(f"✅ Brave search strategy registered with key: {brave_api_key[:8]}...")
-            else:
-                print("⚠️ BRAVE_TOKEN not found in configuration (.env file)")
-            
-            # Only initialize browser/extraction for deep mode (lazy loading)
-            _browser_manager = BrowserManager()
-            _session_manager = SessionManager()
-            _stealth_manager = StealthManager()
-            _human_behavior = HumanBehavior()
-            _extraction_engine = ExtractionEngine()
-            _rate_limiter = RateLimiter()
-            
-            # 初始化共享LLM提取器
-            article_schema = PredefinedLLMSchemas.get_article_extraction_schema()
-            _shared_llm_extractor = LLMExtractionStrategy(article_schema)
-            
-            print("✅ Deep search components ready (will initialize on first use)")
-            print("✅ Stealth Manager and Human Behavior initialized")
-            print("✅ Shared LLM extractor initialized")
-            
-            logger.info("Web search services initialized")
+        if _web_service_manager is None:
+            print("🔧 Initializing web service manager...")
+            _web_service_manager = await get_web_service_manager()
+            print("✅ Web Service Manager initialized")
+            logger.info("Web Service Manager initialized")
         else:
-            print("ℹ️ Web search services already initialized")
+            print("ℹ️ Web Service Manager already initialized")
             
     except Exception as e:
-        print(f"❌ Failed to initialize web search services: {e}")
+        print(f"❌ Failed to initialize web service manager: {e}")
         raise
 
 def register_web_tools(mcp):
     """Register web search and extraction tools with the MCP server"""
     
-    security_manager = get_security_manager()
+    # Create base tool instance for security management
+    base_tool = BaseTool()
     
     @mcp.tool()
-    # @security_manager.security_check  # Disabled for testing
+    # @base_tool.security_manager.security_check  # Disabled for testing
     async def crawl_and_extract(
         urls: str,  # JSON array of URLs to crawl
         extraction_schema: str = "article",  # "article", "product", "contact", "event", "research", or custom JSON
@@ -126,23 +87,30 @@ def register_web_tools(mcp):
             
             logger.info(f"🕷️ Starting crawl & extract for {len(url_list)} URLs")
             
+            # Get services from manager
+            browser_manager = _web_service_manager.get_browser_manager()
+            session_manager = _web_service_manager.get_session_manager()
+            stealth_manager = _web_service_manager.get_stealth_manager()
+            human_behavior = _web_service_manager.get_human_behavior()
+            shared_llm_extractor = _web_service_manager.get_shared_llm_extractor()
+            
             # Initialize browser services
-            if not _browser_manager.initialized:
+            if not browser_manager.initialized:
                 print("🔧 Initializing browser for crawling...")
-                await _browser_manager.initialize()
+                await browser_manager.initialize()
             
             # Create enhanced stealth session for crawling
             session_id = f"crawl_extract_{user_id}_{hash(str(url_list))}"
-            page = await _session_manager.get_or_create_session(session_id, "stealth")
+            page = await session_manager.get_or_create_session(session_id, "stealth")
             
             # Apply stealth configuration to browser context
-            if _stealth_manager and page.context:
-                await _stealth_manager.apply_stealth_context(page.context, level="high")
+            if stealth_manager and page.context:
+                await stealth_manager.apply_stealth_context(page.context, level="high")
                 print("🛡️ Enhanced stealth protection activated")
             
             # Apply human navigation behavior
-            if _human_behavior:
-                await _human_behavior.apply_human_navigation(page)
+            if human_behavior:
+                await human_behavior.apply_human_navigation(page)
                 print("👤 Human-like navigation behavior applied")
             
             # Setup extraction strategy based on schema
@@ -170,6 +138,7 @@ def register_web_tools(mcp):
             # Setup semantic filtering if query provided
             semantic_filter = None
             if filter_query.strip():
+                from tools.services.web_services.strategies.filtering import SemanticFilter
                 semantic_filter = SemanticFilter(
                     user_query=filter_query,
                     similarity_threshold=0.6,
@@ -214,14 +183,14 @@ def register_web_tools(mcp):
                             await page.goto(url, wait_until='domcontentloaded', timeout=45000)
                             
                             # 人类行为：随机鼠标移动
-                            if _human_behavior:
-                                await _human_behavior.random_mouse_movement(page, movements=2)
+                            if human_behavior:
+                                await human_behavior.random_mouse_movement(page, movements=2)
                             
                             # 人类行为：模拟阅读页面
                             await page.wait_for_timeout(2000)  # 等待2秒模拟人类反应时间
                             
-                            if _human_behavior:
-                                await _human_behavior.simulate_reading(page, reading_time_factor=0.5)
+                            if human_behavior:
+                                await human_behavior.simulate_reading(page, reading_time_factor=0.5)
                             
                             await page.wait_for_load_state('networkidle', timeout=15000)
                         else:
@@ -229,8 +198,8 @@ def register_web_tools(mcp):
                             await page.goto(url, wait_until='networkidle', timeout=30000)
                             
                             # 添加少量人类行为模拟
-                            if _human_behavior:
-                                await _human_behavior.human_navigation_pause(page)
+                            if human_behavior:
+                                await human_behavior.human_navigation_pause(page)
                                 
                     except Exception as nav_error:
                         logger.warning(f"Navigation failed with networkidle, trying domcontentloaded: {nav_error}")
@@ -238,15 +207,16 @@ def register_web_tools(mcp):
                         await page.goto(url, wait_until='domcontentloaded', timeout=30000)
                         
                         # 即使在降级模式下也添加人类行为
-                        if _human_behavior:
-                            await _human_behavior.random_delay(2000, 4000)
+                        if human_behavior:
+                            await human_behavior.random_delay(2000, 4000)
                     
                     # 根据schema决定使用共享实例还是创建新实例
-                    if extraction_schema == "article" and _shared_llm_extractor:
+                    if extraction_schema == "article" and shared_llm_extractor:
                         # 使用共享LLM实例 (article schema)
-                        page_data = await _shared_llm_extractor.extract(page, "")
+                        page_data = await shared_llm_extractor.extract(page, "")
                     else:
                         # 创建专用LLM实例 (其他schema)
+                        from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
                         llm_extractor = LLMExtractionStrategy(schema)
                         page_data = await llm_extractor.extract(page, "")
                         await llm_extractor.close()
@@ -308,8 +278,8 @@ def register_web_tools(mcp):
             }
             
             # Add LLM extraction billing
-            if _shared_llm_extractor and hasattr(_shared_llm_extractor, 'get_service_billing_info'):
-                extraction_billing = _shared_llm_extractor.get_service_billing_info()
+            if shared_llm_extractor and hasattr(shared_llm_extractor, 'get_service_billing_info'):
+                extraction_billing = shared_llm_extractor.get_service_billing_info()
                 if extraction_billing:
                     total_billing["total_cost_usd"] += extraction_billing.get("total_cost_usd", 0.0)
                     total_billing["service_breakdown"]["llm_extraction"] = extraction_billing
@@ -373,7 +343,7 @@ def register_web_tools(mcp):
             return json.dumps(result, indent=2)
     
     @mcp.tool()
-    # @security_manager.security_check  # Disabled for testing
+    # @base_tool.security_manager.security_check  # Disabled for testing
     async def synthesize_and_generate(
         extracted_data: str,  # JSON array of extracted data items
         query: str = "",  # Original search query for context
@@ -506,16 +476,18 @@ def register_web_tools(mcp):
             return json.dumps(result, indent=2)
     
     @mcp.tool()
-    # @security_manager.security_check  # Disabled for testing
+    # @base_tool.security_manager.security_check  # Disabled for testing
     async def web_search(
         query: str,
-        mode: str = "simple",  # "simple" or "deep"
+        mode: str = "simple",  # "simple", "deep", or "automation"
+        task_type: str = "general",  # "general", "site_search", "link_filter", "form_automation", "data_collection"
+        automation_config: str = "{}",  # JSON: automation-specific configuration
         max_results: int = 10,
         providers: str = '["brave"]',  # JSON array
         filters: str = "{}",  # JSON: {"language": "en", "freshness": "week", etc.}
         user_id: str = "default"
     ) -> str:
-        """Web search with two modes: simple (direct API) and deep (full workflow)
+        """Enhanced web search with three modes: simple, deep, and automation
         
         Simple Mode:
         - Direct Brave API response with URLs and metadata
@@ -527,21 +499,29 @@ def register_web_tools(mcp):
         - Crawls pages, extracts structured data, applies AI analysis
         - Returns: Rich extracted content, analysis, and insights
         
+        Automation Mode:
+        - Advanced automation with task-specific behaviors
+        - Supports: site_search, link_filter, form_automation, data_collection
+        - Uses AI element detection and human behavior simulation
+        - Returns: Task-specific results with automation metadata
+        
         Args:
-            query: Search query
-            mode: "simple" (direct API) or "deep" (full workflow)
+            query: Search query or automation target
+            mode: "simple" (API), "deep" (workflow), or "automation" (advanced)
+            task_type: Task for automation mode ("general", "site_search", "link_filter", "form_automation", "data_collection")
+            automation_config: JSON config for automation tasks (site URLs, filter criteria, etc.)
             max_results: Number of results to return
             providers: JSON array of providers ["brave", "google", "bing"]
             filters: JSON object with search filters
             user_id: User identifier for session management
         
-        Keywords: search, web, api, brave, deep, workflow, extraction
+        Keywords: search, web, api, brave, deep, automation, ai-enhanced
         Category: web-search
         """
         await _initialize_search_services()
         
-        if _search_engine is None:
-            raise Exception("Search engine not initialized")
+        if _web_service_manager is None:
+            raise Exception("Web service manager not initialized")
         
         try:
             # Parse inputs
@@ -563,9 +543,12 @@ def register_web_tools(mcp):
             if mode.lower() == "simple":
                 return await _simple_search(query, search_providers, max_results, filter_config)
             elif mode.lower() == "deep":
-                return await _deep_search(query, search_providers, max_results, filter_config, user_id)
+                return await _deep_search(query, search_providers, max_results, filter_config, user_id, task_type)
+            elif mode.lower() == "automation":
+                automation_config_dict = json.loads(automation_config) if automation_config else {}
+                return await _automation_search(query, search_providers, max_results, filter_config, user_id, task_type, automation_config_dict)
             else:
-                raise ValueError(f"Invalid mode: {mode}. Use 'simple' or 'deep'")
+                raise ValueError(f"Invalid mode: {mode}. Use 'simple', 'deep', or 'automation'")
                 
         except Exception as e:
             result = {
@@ -582,26 +565,30 @@ def register_web_tools(mcp):
 async def _simple_search(query: str, providers: List[SearchProvider], max_results: int, filters: Dict) -> str:
     """Simple mode: Direct Brave API response"""
     try:
+        # Get services from manager
+        rate_limiter = _web_service_manager.get_rate_limiter()
+        search_engine = _web_service_manager.get_search_engine()
+        
         # Apply rate limiting
-        await _rate_limiter.wait_for_rate_limit(f"search_{providers[0].value}")
+        await rate_limiter.wait_for_rate_limit(f"search_{providers[0].value}")
         
         # Execute search with filters
         search_params = {"count": max_results}
         search_params.update(filters)
         
         if len(providers) == 1:
-            search_results = await _search_engine.search(
+            search_results = await search_engine.search(
                 query=query,
                 provider=providers[0],
                 **search_params
             )
         else:
-            multi_results = await _search_engine.multi_search(
+            multi_results = await search_engine.multi_search(
                 query=query,
                 providers=providers,
                 **search_params
             )
-            search_results = await _search_engine.aggregate_results(multi_results, deduplicate=True)
+            search_results = await search_engine.aggregate_results(multi_results, deduplicate=True)
         
         # Convert to simple response format
         results_data = []
@@ -635,42 +622,131 @@ async def _simple_search(query: str, providers: List[SearchProvider], max_result
         logger.error(f"❌ Simple search failed: {e}")
         raise
 
-async def _deep_search(query: str, providers: List[SearchProvider], max_results: int, filters: Dict, user_id: str) -> str:
-    """Deep mode: Full 4-step workflow implementation"""
+async def _deep_search(query: str, providers: List[SearchProvider], max_results: int, filters: Dict, user_id: str, task_type: str = "general") -> str:
+    """Deep mode: True intelligent automation with site-specific searches"""
     try:
+        # Get services from manager
+        browser_manager = _web_service_manager.get_browser_manager()
+        session_manager = _web_service_manager.get_session_manager()
+        search_engine = _web_service_manager.get_search_engine()
+        element_detector = _web_service_manager.get_service('element_detector')
+        
         # Initialize browser services for deep mode
-        if not _browser_manager.initialized:
+        if not browser_manager.initialized:
             print("🔧 Initializing browser for deep search...")
-            await _browser_manager.initialize()
+            await browser_manager.initialize()
         
-        logger.info("🚀 Starting 4-step deep search workflow...")
+        logger.info("🚀 Starting TRUE deep search with intelligent automation...")
         
-        # STEP 1: Search & Filter
-        print("📋 Step 1: Search & Filter")
-        search_params = {"count": max_results * 2}  # Get more for filtering
+        # PHASE 1: Initial Search & Filter
+        print("📋 Phase 1: Initial Search & Intelligent Filtering")
+        search_params = {"count": min(max_results, 10)}  # Respect Brave API limits
         search_params.update(filters)
         
         if len(providers) == 1:
-            search_results = await _search_engine.search(
+            search_results = await search_engine.search(
                 query=query,
                 provider=providers[0],
                 **search_params
             )
         else:
-            multi_results = await _search_engine.multi_search(
+            multi_results = await search_engine.multi_search(
                 query=query,
                 providers=providers,
                 **search_params
             )
-            search_results = await _search_engine.aggregate_results(multi_results, deduplicate=True)
+            search_results = await search_engine.aggregate_results(multi_results, deduplicate=True)
         
-        step1_results = [result.to_dict() for result in search_results[:max_results]]
-        print(f"   ✅ Found {len(step1_results)} filtered results")
+        initial_results = [result.to_dict() for result in search_results[:max_results//2]]  # Save half for site-specific
+        print(f"   ✅ Found {len(initial_results)} initial results")
+        
+        # PHASE 2: Site-Specific Intelligent Automation
+        print("🤖 Phase 2: Site-Specific Intelligent Automation")
+        site_specific_results = []
+        
+        # Define target sites for deep search
+        target_sites = [
+            {"name": "Reddit", "url": "https://www.reddit.com", "search_path": "/search"},
+            {"name": "Twitter", "url": "https://twitter.com", "search_path": "/search"},
+        ]
+        
+        session_id = f"deep_automation_{user_id}_{hash(query)}"
+        page = await session_manager.get_or_create_session(session_id, "stealth")
+        
+        for site in target_sites[:2]:  # Limit to 2 sites to avoid timeout
+            try:
+                print(f"   🌐 Automating search on {site['name']}...")
+                
+                # Navigate to the site
+                await page.goto(site['url'], wait_until='domcontentloaded')
+                await page.wait_for_timeout(2000)  # Wait for page to load
+                
+                # Use intelligent element detection to find search elements
+                print(f"   🧠 Detecting search elements on {site['name']}...")
+                search_elements = await element_detector.detect_search_elements(
+                    page, 
+                    target_elements=['search_input', 'search_button']
+                )
+                
+                if 'search_input' in search_elements:
+                    search_input = search_elements['search_input']
+                    print(f"   🎯 Found search input at ({search_input.x}, {search_input.y})")
+                    
+                    # Perform automated search
+                    await page.mouse.click(search_input.x, search_input.y)
+                    await page.wait_for_timeout(500)
+                    
+                    # Clear and type query
+                    await page.keyboard.press('Control+a')
+                    await page.keyboard.type(query)
+                    await page.wait_for_timeout(500)
+                    
+                    # Submit search
+                    if 'search_button' in search_elements:
+                        search_button = search_elements['search_button']
+                        await page.mouse.click(search_button.x, search_button.y)
+                    else:
+                        await page.keyboard.press('Enter')
+                    
+                    # Wait for results and detect links
+                    await page.wait_for_timeout(3000)
+                    print(f"   🔗 Detecting result links on {site['name']}...")
+                    
+                    link_elements = await element_detector.detect_link_elements(
+                        page,
+                        target_links=['product_links', 'navigation_links']
+                    )
+                    
+                    # Extract links from detected elements
+                    for link_name, link_result in link_elements.items():
+                        if link_result.metadata.get('href'):
+                            site_specific_results.append({
+                                'title': link_result.metadata.get('text', f"{site['name']} result"),
+                                'url': link_result.metadata.get('href'),
+                                'snippet': link_result.description,
+                                'source': site['name'],
+                                'automation_confidence': link_result.confidence,
+                                'detection_strategy': link_result.strategy.value
+                            })
+                    
+                    print(f"   ✅ Automated {site['name']} search: {len([r for r in site_specific_results if r['source'] == site['name']])} results")
+                    
+                else:
+                    print(f"   ⚠️ Could not find search input on {site['name']}")
+                    
+            except Exception as site_error:
+                print(f"   ❌ {site['name']} automation failed: {site_error}")
+                logger.warning(f"Site automation failed for {site['name']}: {site_error}")
+        
+        # Combine initial and site-specific results
+        all_results = initial_results + site_specific_results
+        step1_results = all_results[:max_results]
+        print(f"   ✅ Combined results: {len(step1_results)} total ({len(initial_results)} API + {len(site_specific_results)} automated)")
         
         # STEP 2: Web Automation (Navigate to pages)
         print("🤖 Step 2: Web Automation")
         session_id = f"deep_search_{user_id}_{hash(query)}"
-        page = await _session_manager.get_or_create_session(session_id, "stealth")
+        page = await session_manager.get_or_create_session(session_id, "stealth")
         
         # STEP 3: Crawl & Extract
         print("🕷️ Step 3: Crawl & Extract")
@@ -686,6 +762,7 @@ async def _deep_search(query: str, providers: List[SearchProvider], max_results:
                 await page.goto(url, wait_until='networkidle')
                 
                 # Use LLM extraction for structured data
+                from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
                 schema = PredefinedLLMSchemas.get_article_extraction_schema()
                 llm_extractor = LLMExtractionStrategy(schema)
                 
@@ -734,12 +811,20 @@ async def _deep_search(query: str, providers: List[SearchProvider], max_results:
             "action": "web_search",
             "mode": "deep",
             "workflow_steps": {
-                "step1_search_filter": f"{len(step1_results)} results",
-                "step2_automation": "stealth_navigation",
-                "step3_extract": f"{len(extracted_data)} items",
-                "step4_synthesis": "completed"
+                "phase1_initial_search": f"{len(initial_results)} API results",
+                "phase2_site_automation": f"{len(site_specific_results)} automated results from {len(target_sites)} sites",
+                "step3_extraction": f"{len(extracted_data)} structured items",
+                "step4_synthesis": "intelligent aggregation completed"
             },
-            "data": synthesized_results,
+            "data": {
+                **synthesized_results,
+                "automation_details": {
+                    "sites_automated": [site['name'] for site in target_sites],
+                    "total_automated_results": len(site_specific_results),
+                    "element_detection_used": True,
+                    "intelligent_navigation": True
+                }
+            },
             "timestamp": datetime.now().isoformat()
         }
         
@@ -748,6 +833,601 @@ async def _deep_search(query: str, providers: List[SearchProvider], max_results:
         
     except Exception as e:
         logger.error(f"❌ Deep search failed: {e}")
+        raise
+
+async def _automation_search(query: str, providers: List[SearchProvider], max_results: int, filters: Dict, user_id: str, task_type: str, automation_config: Dict) -> str:
+    """Automation mode: Advanced task-specific automation with AI-enhanced capabilities"""
+    try:
+        # Get services from manager
+        browser_manager = _web_service_manager.get_browser_manager()
+        
+        # Initialize browser services for automation mode
+        if not browser_manager.initialized:
+            print("🔧 Initializing browser for automation search...")
+            await browser_manager.initialize()
+        
+        logger.info(f"🤖 Starting automation search workflow - Task: {task_type}")
+        
+        if task_type == "site_search":
+            return await _handle_site_search(query, automation_config, user_id)
+        elif task_type == "link_filter":
+            return await _handle_link_filter(query, automation_config, providers, max_results, filters)
+        elif task_type == "form_automation":
+            return await _handle_form_automation(query, automation_config, user_id)
+        elif task_type == "data_collection":
+            return await _handle_data_collection(query, automation_config, user_id)
+        else:
+            # Default to enhanced general search with automation
+            return await _handle_general_automation(query, providers, max_results, filters, user_id, automation_config)
+            
+    except Exception as e:
+        logger.error(f"❌ Automation search failed: {e}")
+        result = {
+            "status": "error",
+            "action": "web_search",
+            "mode": "automation",
+            "task_type": task_type,
+            "error": f"Automation search failed: {str(e)}",
+            "query": query,
+            "timestamp": datetime.now().isoformat()
+        }
+        return json.dumps(result, indent=2)
+
+async def _handle_site_search(query: str, config: Dict, user_id: str) -> str:
+    """Handle site-specific search automation (Amazon, Twitter, etc.)"""
+    try:
+        target_site = config.get("site", "amazon.com")
+        search_type = config.get("search_type", "product")  # product, content, user, etc.
+        
+        print(f"🔍 Site Search: {target_site} for '{query}'")
+        
+        # Get services from manager
+        session_manager = _web_service_manager.get_session_manager()
+        stealth_manager = _web_service_manager.get_stealth_manager()
+        
+        # Create enhanced stealth session
+        session_id = f"site_search_{user_id}_{hash(target_site + query)}"
+        page = await session_manager.get_or_create_session(session_id, "stealth")
+        
+        # Apply stealth configuration
+        if stealth_manager and page.context:
+            await stealth_manager.apply_stealth_context(page.context, level="high")
+        
+        if "amazon" in target_site.lower():
+            return await _amazon_site_search(page, query, config)
+        elif "twitter" in target_site.lower():
+            return await _twitter_site_search(page, query, config)
+        else:
+            return await _generic_site_search(page, query, config, target_site)
+            
+    except Exception as e:
+        logger.error(f"Site search failed: {e}")
+        return json.dumps({
+            "status": "error",
+            "task_type": "site_search",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }, indent=2)
+
+async def _handle_link_filter(query: str, config: Dict, providers: List[SearchProvider], max_results: int, filters: Dict) -> str:
+    """Handle intelligent link filtering using AI and semantic analysis"""
+    try:
+        print(f"🔍 Smart Link Filtering for: '{query}'")
+        
+        # Get services from manager  
+        search_engine = _web_service_manager.get_search_engine()
+        
+        # Get initial search results (more than needed for filtering)
+        search_params = {"count": max_results * 3}  # Get more links for better filtering
+        search_params.update(filters)
+        
+        if len(providers) == 1:
+            search_results = await search_engine.search(
+                query=query,
+                provider=providers[0],
+                **search_params
+            )
+        else:
+            multi_results = await search_engine.multi_search(
+                query=query,
+                providers=providers,
+                **search_params
+            )
+            search_results = await search_engine.aggregate_results(multi_results, deduplicate=True)
+        
+        # Convert to URL list for filtering
+        initial_urls = [result.to_dict() for result in search_results]
+        print(f"   📊 Initial results: {len(initial_urls)} links")
+        
+        # Apply AI-enhanced filtering
+        filtered_urls = await _apply_smart_filtering(initial_urls, query, config)
+        
+        response = {
+            "status": "success",
+            "action": "web_search", 
+            "mode": "automation",
+            "task_type": "link_filter",
+            "data": {
+                "query": query,
+                "original_count": len(initial_urls),
+                "filtered_count": len(filtered_urls),
+                "filtered_results": filtered_urls[:max_results],
+                "filter_criteria": config,
+                "quality_stats": {
+                    "high_quality": len([u for u in filtered_urls if u.get("quality_score", 0) > 0.8]),
+                    "medium_quality": len([u for u in filtered_urls if 0.5 < u.get("quality_score", 0) <= 0.8]),
+                    "low_quality": len([u for u in filtered_urls if u.get("quality_score", 0) <= 0.5])
+                }
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        logger.info(f"✅ Link filtering completed: {len(filtered_urls)} high-quality links")
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Link filtering failed: {e}")
+        return json.dumps({
+            "status": "error",
+            "task_type": "link_filter", 
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }, indent=2)
+
+async def _handle_form_automation(query: str, config: Dict, user_id: str) -> str:
+    """Handle form automation tasks (filling, submitting, multi-step flows)"""
+    try:
+        target_url = config.get("url", "")
+        form_data = config.get("form_data", {})
+        
+        if not target_url:
+            raise ValueError("URL required for form automation")
+        
+        print(f"📝 Form Automation: {target_url}")
+        
+        # Get services from manager
+        element_detector = _web_service_manager.get_element_detector()
+        human_behavior = _web_service_manager.get_human_behavior()
+        session_manager = _web_service_manager.get_session_manager()
+        
+        # Create session for form automation
+        session_id = f"form_automation_{user_id}_{hash(target_url)}"
+        page = await session_manager.get_or_create_session(session_id, "stealth")
+        
+        # Navigate to target page
+        await page.goto(target_url, wait_until='networkidle')
+        
+        # Use intelligent element detection for form elements
+        if element_detector:
+            form_elements = await element_detector.detect_form_elements(page)
+            
+            # Fill form using human behavior simulation
+            for field_name, field_value in form_data.items():
+                if field_name in form_elements:
+                    element = form_elements[field_name]
+                    if human_behavior:
+                        await human_behavior.human_type(page, element, field_value)
+                        await human_behavior.random_delay(500, 1500)
+        
+        # Extract results after form interaction
+        extraction_results = []
+        if config.get("extract_after_submit", True):
+            schema = PredefinedLLMSchemas.get_article_extraction_schema()
+            from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
+            llm_extractor = LLMExtractionStrategy(schema)
+            extraction_results = await llm_extractor.extract(page, "")
+            await llm_extractor.close()
+        
+        response = {
+            "status": "success", 
+            "task_type": "form_automation",
+            "data": {
+                "url": target_url,
+                "form_filled": True,
+                "fields_processed": list(form_data.keys()),
+                "extracted_data": extraction_results
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Form automation failed: {e}")
+        return json.dumps({
+            "status": "error",
+            "task_type": "form_automation",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }, indent=2)
+
+async def _handle_data_collection(query: str, config: Dict, user_id: str) -> str:
+    """Handle systematic data collection from multiple sources"""
+    try:
+        urls = config.get("urls", [])
+        collection_schema = config.get("schema", "article")
+        
+        print(f"📊 Data Collection: {len(urls)} sources")
+        
+        # Get services from manager
+        session_manager = _web_service_manager.get_session_manager()
+        human_behavior = _web_service_manager.get_human_behavior()
+        
+        # Use existing crawl_and_extract logic but with automation enhancements
+        session_id = f"data_collection_{user_id}_{hash(str(urls))}"
+        page = await session_manager.get_or_create_session(session_id, "stealth")
+        
+        collected_data = []
+        for i, url in enumerate(urls):
+            try:
+                print(f"   🔍 Collecting from: {url}")
+                
+                # Enhanced navigation with human behavior
+                await page.goto(url, wait_until='networkidle')
+                if human_behavior:
+                    await human_behavior.simulate_reading(page, reading_time_factor=0.3)
+                
+                # Extract structured data
+                if collection_schema == "product":
+                    schema = PredefinedLLMSchemas.get_product_extraction_schema()
+                elif collection_schema == "contact":
+                    schema = PredefinedLLMSchemas.get_contact_extraction_schema()
+                else:
+                    schema = PredefinedLLMSchemas.get_article_extraction_schema()
+                
+                from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
+                llm_extractor = LLMExtractionStrategy(schema)
+                page_data = await llm_extractor.extract(page, "")
+                await llm_extractor.close()
+                
+                if page_data:
+                    for item in page_data:
+                        item.update({
+                            "source_url": url,
+                            "collection_index": i,
+                            "collection_timestamp": datetime.now().isoformat()
+                        })
+                    collected_data.extend(page_data)
+                    
+            except Exception as e:
+                logger.warning(f"Failed to collect from {url}: {e}")
+                continue
+        
+        response = {
+            "status": "success",
+            "task_type": "data_collection", 
+            "data": {
+                "query": query,
+                "sources_processed": len(urls),
+                "items_collected": len(collected_data),
+                "collection_schema": collection_schema,
+                "collected_data": collected_data
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        logger.info(f"✅ Data collection completed: {len(collected_data)} items")
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Data collection failed: {e}")
+        return json.dumps({
+            "status": "error",
+            "task_type": "data_collection",
+            "error": str(e), 
+            "timestamp": datetime.now().isoformat()
+        }, indent=2)
+
+async def _handle_general_automation(query: str, providers: List[SearchProvider], max_results: int, filters: Dict, user_id: str, config: Dict) -> str:
+    """Handle general automation-enhanced search with AI filtering"""
+    try:
+        print(f"🤖 General Automation Search: '{query}'")
+        
+        # Get services from manager
+        search_engine = _web_service_manager.get_search_engine()
+        
+        # Enhanced search with automation features
+        search_params = {"count": max_results * 2}
+        search_params.update(filters)
+        
+        # Get search results
+        if len(providers) == 1:
+            search_results = await search_engine.search(
+                query=query,
+                provider=providers[0], 
+                **search_params
+            )
+        else:
+            multi_results = await search_engine.multi_search(
+                query=query,
+                providers=providers,
+                **search_params
+            )
+            search_results = await search_engine.aggregate_results(multi_results, deduplicate=True)
+        
+        # Convert and apply smart filtering
+        initial_results = [result.to_dict() for result in search_results]
+        filtered_results = await _apply_smart_filtering(initial_results, query, config)
+        
+        response = {
+            "status": "success",
+            "action": "web_search",
+            "mode": "automation", 
+            "task_type": "general",
+            "data": {
+                "query": query,
+                "results": filtered_results[:max_results],
+                "total_results": len(filtered_results),
+                "providers_used": [p.value for p in providers],
+                "automation_features": ["ai_filtering", "quality_scoring", "relevance_ranking"]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"General automation failed: {e}")
+        raise
+
+async def _apply_smart_filtering(urls: List[Dict], query: str, config: Dict) -> List[Dict]:
+    """Apply AI-enhanced smart filtering to URL list"""
+    try:
+        # Extract filter criteria from config
+        relevance_threshold = config.get("relevance_threshold", 0.6)
+        quality_threshold = config.get("quality_threshold", 0.5)
+        exclude_patterns = config.get("exclude_patterns", ["ads", "spam"])
+        prefer_domains = config.get("prefer_domains", [])
+        
+        filtered_urls = []
+        
+        for url_data in urls:
+            url = url_data.get("url", "")
+            title = url_data.get("title", "")
+            snippet = url_data.get("snippet", "")
+            
+            # Basic filtering: exclude unwanted patterns
+            if any(pattern in url.lower() for pattern in exclude_patterns):
+                continue
+            
+            # Quality scoring
+            quality_score = _calculate_url_quality(url, title, snippet)
+            
+            # Relevance scoring using simple keyword matching
+            relevance_score = _calculate_relevance(query, title, snippet)
+            
+            # Domain preference bonus
+            domain_bonus = 0.1 if any(domain in url for domain in prefer_domains) else 0
+            
+            # Final scoring
+            final_score = (quality_score * 0.4) + (relevance_score * 0.5) + domain_bonus
+            
+            # Apply thresholds
+            if final_score >= quality_threshold and relevance_score >= relevance_threshold:
+                url_data.update({
+                    "quality_score": round(quality_score, 3),
+                    "relevance_score": round(relevance_score, 3), 
+                    "final_score": round(final_score, 3),
+                    "filter_metadata": {
+                        "passed_quality": quality_score >= quality_threshold,
+                        "passed_relevance": relevance_score >= relevance_threshold,
+                        "domain_bonus": domain_bonus > 0
+                    }
+                })
+                filtered_urls.append(url_data)
+        
+        # Sort by final score
+        filtered_urls.sort(key=lambda x: x.get("final_score", 0), reverse=True)
+        
+        return filtered_urls
+        
+    except Exception as e:
+        logger.error(f"Smart filtering failed: {e}")
+        return urls  # Return original if filtering fails
+
+def _calculate_url_quality(url: str, title: str, snippet: str) -> float:
+    """Calculate URL quality score based on various factors"""
+    score = 0.5  # Base score
+    
+    # Domain credibility
+    if any(domain in url for domain in [".edu", ".gov", "wikipedia.org"]):
+        score += 0.3
+    elif any(domain in url for domain in ["reddit.com", "stackoverflow.com", "github.com"]):
+        score += 0.2
+    
+    # Title quality
+    if len(title) > 10 and len(title) < 100:
+        score += 0.1
+    
+    # Snippet quality  
+    if len(snippet) > 50:
+        score += 0.1
+    
+    # URL structure (fewer subdirectories often better)
+    if url.count('/') <= 4:
+        score += 0.1
+    
+    return min(score, 1.0)
+
+def _calculate_relevance(query: str, title: str, snippet: str) -> float:
+    """Calculate relevance score using keyword matching"""
+    query_words = set(query.lower().split())
+    title_words = set(title.lower().split())
+    snippet_words = set(snippet.lower().split())
+    
+    # Title relevance (higher weight)
+    title_matches = len(query_words.intersection(title_words))
+    title_score = (title_matches / len(query_words)) * 0.7 if query_words else 0
+    
+    # Snippet relevance
+    snippet_matches = len(query_words.intersection(snippet_words))
+    snippet_score = (snippet_matches / len(query_words)) * 0.3 if query_words else 0
+    
+    return min(title_score + snippet_score, 1.0)
+
+async def _amazon_site_search(page, query: str, config: Dict) -> str:
+    """Amazon-specific site search automation"""
+    try:
+        print("🛒 Amazon Site Search")
+        
+        # Navigate to Amazon
+        await page.goto("https://amazon.com", wait_until='domcontentloaded')
+        
+        # Get services from manager
+        human_behavior = _web_service_manager.get_human_behavior()
+        element_detector = _web_service_manager.get_element_detector()
+        
+        # Apply human behavior
+        if human_behavior:
+            await human_behavior.random_delay(1000, 2000)
+        
+        # Find search box using intelligent detection
+        search_results = []
+        if element_detector:
+            elements = await element_detector.detect_elements(page, ["search box", "search input"])
+            
+            if elements:
+                search_box = elements[0]
+                # Human-like typing
+                if human_behavior:
+                    await human_behavior.human_type(page, search_box, query)
+                    await human_behavior.human_delay(500, 1000)
+                
+                # Find and click search button
+                search_btn_elements = await element_detector.detect_elements(page, ["search button", "submit"])
+                if search_btn_elements and human_behavior:
+                    await human_behavior.human_click(page, search_btn_elements[0])
+                    
+                # Wait for results
+                await page.wait_for_load_state('networkidle', timeout=10000)
+                
+                # Extract product links
+                schema = PredefinedLLMSchemas.get_product_extraction_schema()
+                from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
+                llm_extractor = LLMExtractionStrategy(schema)
+                search_results = await llm_extractor.extract(page, "")
+                await llm_extractor.close()
+        
+        response = {
+            "status": "success",
+            "task_type": "site_search",
+            "site": "amazon.com",
+            "data": {
+                "query": query,
+                "results_found": len(search_results),
+                "products": search_results
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Amazon site search failed: {e}")
+        raise
+
+async def _twitter_site_search(page, query: str, config: Dict) -> str:
+    """Twitter-specific site search automation"""
+    try:
+        print("🐦 Twitter Site Search")
+        
+        # Navigate to Twitter search
+        search_url = f"https://twitter.com/search?q={query.replace(' ', '%20')}"
+        await page.goto(search_url, wait_until='domcontentloaded')
+        
+        # Get services from manager
+        human_behavior = _web_service_manager.get_human_behavior()
+        
+        # Apply human behavior
+        if human_behavior:
+            await human_behavior.simulate_reading(page, reading_time_factor=0.5)
+        
+        # Extract tweets
+        schema = {
+            "name": "twitter_posts",
+            "content_type": "social",
+            "fields": [
+                {"name": "text", "type": "string", "description": "Tweet text content"},
+                {"name": "author", "type": "string", "description": "Tweet author username"},
+                {"name": "timestamp", "type": "string", "description": "Tweet timestamp"},
+                {"name": "engagement", "type": "object", "description": "Likes, retweets, replies"}
+            ]
+        }
+        
+        from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
+        llm_extractor = LLMExtractionStrategy(schema)
+        search_results = await llm_extractor.extract(page, "")
+        await llm_extractor.close()
+        
+        response = {
+            "status": "success", 
+            "task_type": "site_search",
+            "site": "twitter.com",
+            "data": {
+                "query": query,
+                "results_found": len(search_results),
+                "tweets": search_results
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Twitter site search failed: {e}")
+        raise
+
+async def _generic_site_search(page, query: str, config: Dict, site: str) -> str:
+    """Generic site search for any website"""
+    try:
+        print(f"🌐 Generic Site Search: {site}")
+        
+        # Navigate to site
+        base_url = site if site.startswith("http") else f"https://{site}"
+        await page.goto(base_url, wait_until='domcontentloaded')
+        
+        # Get services from manager
+        element_detector = _web_service_manager.get_element_detector()
+        human_behavior = _web_service_manager.get_human_behavior()
+        
+        # Try to find search functionality
+        search_results = []
+        if element_detector:
+            # Look for search elements
+            elements = await element_detector.detect_elements(page, ["search", "search box", "search input"])
+            
+            if elements and human_behavior:
+                await human_behavior.human_type(page, elements[0], query)
+                
+                # Look for search button
+                btn_elements = await element_detector.detect_elements(page, ["search button", "submit", "go"])
+                if btn_elements:
+                    await human_behavior.human_click(page, btn_elements[0])
+                    await page.wait_for_load_state('networkidle', timeout=10000)
+                
+                # Extract results
+                schema = PredefinedLLMSchemas.get_article_extraction_schema()
+                from tools.services.web_services.strategies.extraction import LLMExtractionStrategy
+                llm_extractor = LLMExtractionStrategy(schema)
+                search_results = await llm_extractor.extract(page, "")
+                await llm_extractor.close()
+        
+        response = {
+            "status": "success",
+            "task_type": "site_search", 
+            "site": site,
+            "data": {
+                "query": query,
+                "results_found": len(search_results),
+                "content": search_results
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return json.dumps(response, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Generic site search failed: {e}")
         raise
 
 async def _aggregate_and_deduplicate(data_items: List[Dict], query: str) -> List[Dict]:

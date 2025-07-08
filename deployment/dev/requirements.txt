@@ -20,6 +20,7 @@ neo4j>=5.0.0              # Neo4j graph database driver
 sentence-transformers>=2.2.0
 openai>=1.0.0
 tiktoken>=0.5.0
+modal
 
 # Vector database for embeddings
 pgvector>=0.2.0           # PostgreSQL vector extension
@@ -44,6 +45,9 @@ passlib>=1.7.0
 
 # Payment processing
 stripe>=7.0.0
+
+# Auth0 integration
+python-jose[cryptography]>=3.3.0
 
 # Monitoring and Logging
 structlog>=23.2.0

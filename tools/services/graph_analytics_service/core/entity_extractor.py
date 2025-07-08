@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """
-Entity Extractor for Graph Analytics
+Entity Extractor for Graph Analytics - Refactored Version
 
-Extracts named entities from text using multiple approaches:
-1. NLP-based extraction (spaCy, NLTK)
-2. LLM-based extraction for domain-specific entities
-3. Pattern-based extraction for structured data
-4. Custom entity recognition models
+Extracts named entities from text using:
+1. LLM-based extraction with structured output
+2. Pattern-based extraction for fallback
+3. Configurable entity types and confidence thresholds
 """
 
 import re
-import json
-from typing import List, Dict, Any, Optional, Set, Tuple
-from datetime import datetime
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 from core.logging import get_logger
-from tools.base_service import BaseService
+from .base_extractor import BaseExtractor
 
 logger = get_logger(__name__)
 
@@ -53,15 +50,11 @@ class Entity:
         if self.canonical_form is None:
             self.canonical_form = self.text
 
-class EntityExtractor(BaseService):
-    """Extract entities from text using multiple methods"""
+class EntityExtractor(BaseExtractor):
+    """Extract entities from text using LLM and pattern-based methods"""
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize entity extractor
-        
-        Args:
-            config: Configuration dict with extractor settings
-        """
+        """Initialize entity extractor"""
         super().__init__("EntityExtractor")
         self.config = config or {}
         
@@ -75,23 +68,31 @@ class EntityExtractor(BaseService):
             EntityType.MONEY: [
                 r'\$[\d,]+\.?\d*',
                 r'\b\d+\s*(dollars?|cents?|yuan|euros?)\b'
+            ],
+            EntityType.PERSON: [
+                r'\b[A-Z][a-z]+\s+[A-Z][a-z]+\b',
+                r'\b(Dr|Mr|Ms|Mrs|Prof|Professor)\s+[A-Z][a-z]+\b'
+            ],
+            EntityType.ORGANIZATION: [
+                r'\b[A-Z][a-z]+\s+(University|College|Institute|Corporation|Inc|LLC|Company|Group)\b',
+                r'\b(Microsoft|Google|Apple|Amazon|Facebook|IBM|Intel)\b'
+            ],
+            EntityType.CONCEPT: [
+                r'\b(machine learning|neural network|artificial intelligence|deep learning|algorithm|model|training|optimization)\b',
+                r'\b[a-z]+ing\b',
             ]
         }
         
         logger.info("EntityExtractor initialized")
     
     async def extract_entities(self, text: str, methods: List[str] = None) -> List[Entity]:
-        """Extract entities using specified methods
-        
-        Args:
-            text: Input text to analyze
-            methods: List of extraction methods ['llm', 'pattern', 'hybrid']
-            
-        Returns:
-            List of extracted entities
-        """
+        """Extract entities using specified methods"""
         if methods is None:
-            methods = ['hybrid']
+            methods = ['llm']  # Default to LLM for better accuracy
+            
+        # For long text, prioritize LLM long context capabilities
+        if self.should_use_llm_for_text(text):
+            methods = ['llm']
             
         all_entities = []
         
@@ -101,7 +102,6 @@ class EntityExtractor(BaseService):
             elif method == 'pattern':
                 entities = self._extract_with_patterns(text)
             elif method == 'hybrid':
-                # Combine LLM and pattern-based extraction
                 llm_entities = await self._extract_with_llm(text)
                 pattern_entities = self._extract_with_patterns(text)
                 entities = self._merge_entities(llm_entities + pattern_entities)
@@ -114,88 +114,110 @@ class EntityExtractor(BaseService):
         # Deduplicate and merge entities
         final_entities = self._merge_entities(all_entities)
         
-        logger.info(f"Extracted {len(final_entities)} entities from text ({len(text)} chars)")
+        logger.info(f"Extracted {len(final_entities)} entities from text ({len(text):,} chars)")
         return final_entities
     
     async def _extract_with_llm(self, text: str) -> List[Entity]:
-        """Extract entities using LLM"""
+        """Extract entities using LLM with structured output"""
+        prompt = f"""Extract named entities from the provided text. Identify and classify entities into the following types:
+
+**Entity Types:**
+- PERSON: People, authors, researchers, individuals
+- ORG: Organizations, companies, institutions, universities
+- LOC: Locations, places, countries, cities
+- EVENT: Events, conferences, meetings, occurrences
+- PRODUCT: Products, tools, software, technologies
+- CONCEPT: Concepts, methods, algorithms, theories
+- DATE: Dates, times, temporal expressions
+- MONEY: Money, financial amounts, currencies
+- CUSTOM: Other domain-specific entities
+
+**Text to analyze:**
+{text}
+
+**Required JSON format:**
+{{
+  "entities": [
+    {{
+      "text": "entity text as it appears",
+      "type": "PERSON|ORG|LOC|EVENT|PRODUCT|CONCEPT|DATE|MONEY|CUSTOM",
+      "start": 0,
+      "end": 10,
+      "confidence": 0.95,
+      "properties": {{}},
+      "canonical_form": "standardized form",
+      "aliases": []
+    }}
+  ]
+}}
+
+Return only valid JSON with the entities array."""
+        
+        # Use base class method for LLM extraction
+        items_data = await self.extract_with_llm(
+            text=text,
+            prompt=prompt,
+            expected_wrapper="entities",
+            operation_name="entity_extraction"
+        )
+        
+        # Convert to Entity objects
+        entities = []
+        for item_data in items_data:
+            entity = self._create_entity_from_data(item_data)
+            if entity:
+                entities.append(entity)
+        
+        return entities
+    
+    def _create_entity_from_data(self, item_data: Dict[str, Any]) -> Optional[Entity]:
+        """Create Entity object from LLM response data"""
         try:
-            prompt = f"""
-            Extract all important entities from the following text. For each entity, identify:
-            1. The entity text
-            2. Entity type (PERSON, ORG, LOC, EVENT, PRODUCT, CONCEPT, DATE, MONEY, CUSTOM)
-            3. Start and end positions in the text
-            4. Any important properties or attributes
-            5. Alternative names or aliases
+            text = self._clean_text_field(item_data.get('text'))
+            if not text:
+                return None
             
-            Text: "{text}"
+            type_str = self._get_safe_field(item_data, 'type', 'CUSTOM')
+            entity_type = self._map_entity_type(str(type_str).upper())
             
-            Return the results as a JSON array with this structure:
-            [
-                {{
-                    "text": "entity text",
-                    "type": "ENTITY_TYPE",
-                    "start": 0,
-                    "end": 10,
-                    "confidence": 0.95,
-                    "properties": {{"key": "value"}},
-                    "canonical_form": "canonical name",
-                    "aliases": ["alias1", "alias2"]
-                }}
-            ]
-            
-            Be precise with positions and comprehensive with entity identification.
-            """
-            
-            response, billing_info = await self.call_isa_with_billing(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                parameters={"max_tokens": 2000, "temperature": 0.1},
-                operation_name="entity_extraction"
+            return Entity(
+                text=text,
+                entity_type=entity_type,
+                start=self._get_safe_field(item_data, 'start', 0),
+                end=self._get_safe_field(item_data, 'end', len(text)),
+                confidence=self._standardize_confidence(item_data.get('confidence')),
+                properties=self._get_safe_field(item_data, 'properties', {}),
+                canonical_form=self._get_safe_field(item_data, 'canonical_form', text),
+                aliases=self._get_safe_field(item_data, 'aliases', [])
             )
-            
-            if 'text' in response:
-                response_text = response['text']
-            else:
-                raise Exception("Invalid response format from ISA API")
-            
-            # Parse LLM response
-            try:
-                # Extract JSON from response
-                json_start = response_text.find('[')
-                json_end = response_text.rfind(']') + 1
-                if json_start != -1 and json_end != -1:
-                    json_str = response_text[json_start:json_end]
-                    entities_data = json.loads(json_str)
-                    
-                    entities = []
-                    for ent_data in entities_data:
-                        entity_type = EntityType(ent_data.get('type', 'CUSTOM'))
-                        entity = Entity(
-                            text=ent_data['text'],
-                            entity_type=entity_type,
-                            start=ent_data.get('start', 0),
-                            end=ent_data.get('end', len(ent_data['text'])),
-                            confidence=ent_data.get('confidence', 0.8),
-                            properties=ent_data.get('properties', {}),
-                            canonical_form=ent_data.get('canonical_form'),
-                            aliases=ent_data.get('aliases', [])
-                        )
-                        entities.append(entity)
-                    
-                    return entities
-                else:
-                    logger.warning("No valid JSON found in LLM response")
-                    return []
-                    
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM entity response: {e}")
-                return []
-                
         except Exception as e:
-            logger.error(f"LLM entity extraction failed: {e}")
-            return []
+            logger.warning(f"Failed to create entity from data: {e}")
+            return None
+    
+    def _map_entity_type(self, type_str: str) -> EntityType:
+        """Map LLM entity type string to EntityType enum"""
+        type_mapping = {
+            'PERSON': EntityType.PERSON,
+            'PEOPLE': EntityType.PERSON,
+            'ORG': EntityType.ORGANIZATION,
+            'ORGANIZATION': EntityType.ORGANIZATION,
+            'COMPANY': EntityType.ORGANIZATION,
+            'LOC': EntityType.LOCATION,
+            'LOCATION': EntityType.LOCATION,
+            'PLACE': EntityType.LOCATION,
+            'EVENT': EntityType.EVENT,
+            'PRODUCT': EntityType.PRODUCT,
+            'CONCEPT': EntityType.CONCEPT,
+            'DATE': EntityType.DATE,
+            'TIME': EntityType.DATE,
+            'MONEY': EntityType.MONEY,
+            'CURRENCY': EntityType.MONEY,
+            'CUSTOM': EntityType.CUSTOM,
+            'ENTITY': EntityType.CUSTOM,
+            'MISC': EntityType.CUSTOM,
+            'OTHER': EntityType.CUSTOM
+        }
+        return type_mapping.get(type_str, EntityType.CUSTOM)
     
     def _extract_with_patterns(self, text: str) -> List[Entity]:
         """Extract entities using regex patterns"""
@@ -248,77 +270,30 @@ class EntityExtractor(BaseService):
         
         return merged
     
-    async def extract_domain_entities(self, text: str, domain: str) -> List[Entity]:
-        """Extract domain-specific entities
-        
-        Args:
-            text: Input text
-            domain: Domain context (e.g., 'medical', 'legal', 'technical')
-            
-        Returns:
-            List of domain-specific entities
-        """
-        domain_prompts = {
-            'medical': """
-            Extract medical entities including:
-            - Diseases, conditions, symptoms
-            - Medications, treatments
-            - Body parts, organs
-            - Medical procedures
-            - Healthcare professionals
-            """,
-            'legal': """
-            Extract legal entities including:
-            - Laws, statutes, regulations
-            - Legal documents, contracts
-            - Court cases, legal proceedings
-            - Legal entities (companies, organizations)
-            - Legal concepts and terms
-            """,
-            'technical': """
-            Extract technical entities including:
-            - Technologies, frameworks, tools
-            - Programming languages, libraries
-            - Technical concepts, algorithms
-            - Product names, versions
-            - Technical specifications
-            """,
-            'business': """
-            Extract business entities including:
-            - Companies, organizations
-            - Products, services
-            - Business metrics, KPIs
-            - Market segments
-            - Business processes
-            """
-        }
-        
-        domain_prompt = domain_prompts.get(domain, "Extract important domain-specific entities.")
-        
-        prompt = f"""
-        {domain_prompt}
-        
-        Text: "{text}"
-        
-        Return entities as JSON array with type, text, confidence, and properties.
-        """
-        
-        try:
-            response, billing_info = await self.call_isa_with_billing(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                parameters={"max_tokens": 1500, "temperature": 0.1},
-                operation_name="domain_entity_extraction"
-            )
-            
-            # Parse response similar to _extract_with_llm
-            # For now, delegate to the main extraction method
-            return await self._extract_with_llm(text)
-            
-        except Exception as e:
-            logger.error(f"Domain entity extraction failed: {e}")
-            return []
+    # Base class implementations
+    def _validate_item_data(self, item_data: Dict[str, Any]) -> bool:
+        """Validate entity data from LLM response"""
+        return isinstance(item_data, dict) and 'text' in item_data
+    
+    def _process_item_data(self, item_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Process entity data - just return as-is since _create_entity_from_data handles conversion"""
+        return item_data
+    
+    def _fallback_extraction(self, text: str) -> List[Dict[str, Any]]:
+        """Fallback to pattern-based extraction"""
+        logger.info("Falling back to pattern-based entity extraction")
+        entities = self._extract_with_patterns(text)
+        # Convert Entity objects to dicts for consistency
+        return [{
+            'text': entity.text,
+            'type': entity.entity_type.value,
+            'start': entity.start,
+            'end': entity.end,
+            'confidence': entity.confidence,
+            'properties': entity.properties,
+            'canonical_form': entity.canonical_form,
+            'aliases': entity.aliases
+        } for entity in entities]
     
     def get_entity_statistics(self, entities: List[Entity]) -> Dict[str, Any]:
         """Get statistics about extracted entities"""

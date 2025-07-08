@@ -1,0 +1,99 @@
+{
+  "title": "isA_MCP Documentation",
+  "description": "Comprehensive documentation for isA_MCP - AI-powered Smart MCP Server",
+  "author": "isA_MCP Team",
+  "language": "en",
+  "gitbook": ">=3.0.0",
+  
+  "structure": {
+    "readme": "README.md",
+    "summary": "SUMMARY.md"
+  },
+  
+  "plugins": [
+    "mermaid-gb3",
+    "code",
+    "prism",
+    "search",
+    "sharing",
+    "fontsettings",
+    "theme-default",
+    "expandable-chapters",
+    "anchor-navigation-ex",
+    "copy-code-button",
+    "github",
+    "edit-link",
+    "page-toc-button",
+    "back-to-top-button"
+  ],
+  
+  "pluginsConfig": {
+    "mermaid-gb3": {
+      "theme": "default"
+    },
+    "prism": {
+      "css": [
+        "prismjs/themes/prism-tomorrow.css"
+      ]
+    },
+    "github": {
+      "url": "https://github.com/your-org/isA_MCP"
+    },
+    "edit-link": {
+      "base": "https://github.com/your-org/isA_MCP/edit/main/docs",
+      "label": "Edit this page"
+    },
+    "sharing": {
+      "facebook": false,
+      "twitter": true,
+      "google": false,
+      "weibo": false,
+      "instapaper": false,
+      "vk": false,
+      "all": [
+        "twitter",
+        "linkedin"
+      ]
+    },
+    "fontsettings": {
+      "theme": "white",
+      "family": "sans",
+      "size": 2
+    },
+    "anchor-navigation-ex": {
+      "showLevel": false,
+      "associatedWithSummary": true,
+      "printLog": false,
+      "multipleH1": true,
+      "mode": "float",
+      "showGoTop": true,
+      "float": {
+        "floatIcon": "fa fa-navicon",
+        "showLevelIcon": false,
+        "level1Icon": "fa fa-hand-o-right",
+        "level2Icon": "fa fa-hand-o-right",
+        "level3Icon": "fa fa-hand-o-right"
+      },
+      "pageTop": {
+        "showLevelIcon": false,
+        "level1Icon": "fa fa-hand-o-right",
+        "level2Icon": "fa fa-hand-o-right",
+        "level3Icon": "fa fa-hand-o-right"
+      }
+    }
+  },
+  
+  "variables": {
+    "version": "2.0.0",
+    "baseUrl": "http://localhost:4321",
+    "productionUrl": "https://your-app.railway.app"
+  },
+  
+  "links": {
+    "sidebar": {
+      "GitHub Repository": "https://github.com/your-org/isA_MCP",
+      "Issue Tracker": "https://github.com/your-org/isA_MCP/issues",
+      "API Status": "https://status.your-app.com"
+    }
+  }
+}
