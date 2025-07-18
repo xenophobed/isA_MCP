@@ -86,8 +86,8 @@ cd ../../..
 
 # 3. 启动 Event Sourcing Service (端口 8101)
 echo "📝 启动 Event Sourcing Service (端口 8101)..."
-cd tools/services/event_sourcing_service
-python event_feedback_server.py --port 8101 &
+cd tools/services/event_service
+python event_server.py --port 8101 &
 EVENT_SERVICE_PID=$!
 echo "Event Service PID: $EVENT_SERVICE_PID"
 cd ../../..
@@ -96,7 +96,20 @@ cd ../../..
 echo "⏳ 等待服务启动..."
 sleep 5
 
-# 4. 启动 Smart MCP Server
+# 4. 启动 Stripe CLI Webhook 监听 (可选)
+STRIPE_CLI_PID=""
+if command -v stripe &> /dev/null; then
+    echo "💳 启动 Stripe CLI Webhook 监听..."
+    echo "转发到后端服务: localhost:8100/api/v1/webhooks/stripe"
+    stripe listen --forward-to localhost:8100/api/v1/webhooks/stripe > logs/stripe_cli.log 2>&1 &
+    STRIPE_CLI_PID=$!
+    echo "Stripe CLI PID: $STRIPE_CLI_PID"
+else
+    echo "⚠️  Stripe CLI 未安装，跳过 webhook 监听"
+    echo "如需安装: brew install stripe/stripe-cli/stripe"
+fi
+
+# 5. 启动 Smart MCP Server
 echo "🎯 Starting MCP server on port ${MCP_PORT:-8081}..."
 source .venv/bin/activate && python smart_mcp_server.py &
 MCP_PID=$!
@@ -105,6 +118,9 @@ MCP_PID=$!
 echo $USER_SERVICE_PID > logs/user_service.pid
 echo $EVENT_SERVICE_PID > logs/event_service.pid
 echo $MCP_PID > logs/mcp_server.pid
+if [[ -n "$STRIPE_CLI_PID" ]]; then
+    echo $STRIPE_CLI_PID > logs/stripe_cli.pid
+fi
 
 echo ""
 echo "✅ Local development environment started!"
@@ -114,6 +130,9 @@ echo "• Neo4j Browser:    http://localhost:7474"
 echo "• User Service:     http://localhost:8100"
 echo "• Event Service:    http://localhost:8101"
 echo "• Smart MCP Server: http://localhost:${MCP_PORT:-8081}"
+if [[ -n "$STRIPE_CLI_PID" ]]; then
+    echo "• Stripe CLI:       监听中 (转发到 localhost:8100)"
+fi
 echo "🔍 Health Check: http://localhost:${MCP_PORT:-8081}/health"
 echo ""
 echo "📝 日志文件位置: logs/"
@@ -122,5 +141,9 @@ echo ""
 echo "Press Ctrl+C to stop all services..."
 
 # 等待中断信号
-trap 'echo "🛑 Stopping local development environment..."; kill $USER_SERVICE_PID $EVENT_SERVICE_PID $MCP_PID 2>/dev/null; exit 0' SIGINT
+if [[ -n "$STRIPE_CLI_PID" ]]; then
+    trap 'echo "🛑 Stopping local development environment..."; kill $USER_SERVICE_PID $EVENT_SERVICE_PID $MCP_PID $STRIPE_CLI_PID 2>/dev/null; exit 0' SIGINT
+else
+    trap 'echo "🛑 Stopping local development environment..."; kill $USER_SERVICE_PID $EVENT_SERVICE_PID $MCP_PID 2>/dev/null; exit 0' SIGINT
+fi
 wait $MCP_PID

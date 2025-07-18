@@ -1,0 +1,25 @@
+{
+  "elements": {
+    "page_type": "content",
+    "page_state": "content_loaded",
+    "available_actions": [
+      "navigate",
+      "extract_content"
+    ],
+    "key_elements": [
+      "content_area",
+      "navigation_menu",
+      "popular_communities"
+    ],
+    "suggested_action": "extract_main_content",
+    "confidence": 0.9,
+    "reasoning": "The page shows a Reddit homepage with main content posts, navigation, and community links, indicating a content-focused page with loaded content."
+  },
+  "detection_type": "page_understanding",
+  "confidence": 0.9,
+  "timestamp": "2025-07-08T21:07:47.456953",
+  "url_pattern": "reddit.com",
+  "page_hash": "93d8abf808c1",
+  "expires_at": "2025-07-09T21:07:47.456994",
+  "hit_count": 4
+}

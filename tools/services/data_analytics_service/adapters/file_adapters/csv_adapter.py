@@ -7,7 +7,7 @@ import csv
 from typing import Dict, List, Any, Optional
 from collections import Counter
 from .base_adapter import FileAdapter
-from ...core.metadata_extractor import TableInfo, ColumnInfo
+from ...processors.data_processors.metadata_extractor import TableInfo, ColumnInfo
 
 try:
     import pandas as pd
@@ -350,8 +350,11 @@ class CSVAdapter(FileAdapter):
         if self.dataframe is None:
             return []
         
-        sample_df = self.dataframe.head(limit)
-        return sample_df.to_dict('records')
+        try:
+            sample_df = self.dataframe.head(limit)
+            return sample_df.to_dict('records')
+        except Exception as e:
+            return [{"error": f"Failed to get sample data: {str(e)}"}]
     
     def _analyze_column_distribution(self, section_name: str, column_name: str, sample_size: int) -> Dict[str, Any]:
         """Analyze column data distribution"""
@@ -441,3 +444,31 @@ class CSVAdapter(FileAdapter):
             return True
         except Exception:
             return False
+
+    def validate_file_structure(self) -> Dict[str, Any]:
+        """Validate CSV file structure and data quality - override to handle DataFrame check"""
+        try:
+            if self.dataframe is None or self.dataframe.empty:
+                return {"valid": False, "error": "No data loaded"}
+            
+            validation_result = {
+                "valid": True,
+                "file_info": self.file_info,
+                "structure_analysis": self._analyze_structure(),
+                "data_quality": self._assess_data_quality()
+            }
+            
+            return validation_result
+        except Exception as e:
+            return {"valid": False, "error": str(e)}
+    
+    def get_sample_data(self, table_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get sample data from CSV file - override to handle DataFrame check"""
+        try:
+            if self.dataframe is None or self.dataframe.empty:
+                return []
+            
+            # For CSV, table_name is usually the filename (ignored)
+            return self._get_sample_data_internal(table_name, limit)
+        except Exception as e:
+            return [{"error": str(e)}]

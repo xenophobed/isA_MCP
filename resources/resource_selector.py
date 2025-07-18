@@ -3,22 +3,21 @@
 Resource Selector using isa_model embeddings
 Similar to tool_selector but for resources
 """
-from core.database.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
-from core.isa_client import get_isa_client
+from tools.services.intelligence_service.language.embedding_generator import embedding_generator
+from core.database.supabase_client import get_supabase_client
+import logging
 
-from core.logging import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class ResourceSelector:
     """AI-powered resource selector"""
     
     def __init__(self):
-        self.client = None
+        self.embedding_generator = embedding_generator
         self.resources_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
@@ -31,7 +30,7 @@ class ResourceSelector:
             await self._load_resource_info()
             
             # Initialize embedding service
-            self.client = get_isa_client()
+            # Embedding service already initialized in __init__ as self.embedding_generator
             await self._compute_resource_embeddings()
             logger.info("Resource selector initialized")
         except Exception as e:
@@ -46,7 +45,7 @@ class ResourceSelector:
             await self._load_resource_info_from_mcp(mcp_server)
             
             # Initialize embedding service
-            self.client = get_isa_client()
+            # Embedding service already initialized in __init__ as self.embedding_generator
             await self._compute_resource_embeddings()
             logger.info(f"Resource selector initialized with {len(self.resources_info)} MCP resources")
         except Exception as e:
@@ -273,20 +272,8 @@ class ResourceSelector:
                 descriptions.append(combined_text)
                 resource_names.append(resource_name)
             
-            # Batch compute
-            if not self.client:
-                raise Exception("Embedding service not initialized")
-                
-            embeddings = []
-            for desc in descriptions:
-                result = await self.client.invoke(
-                    input_data=desc,
-                    task="embed",
-                    service_type="embedding"
-                )
-                if result.get('success'):
-                    embedding = result.get('result', [])
-                embeddings.append(embedding)
+            # Batch compute using embedding_generator
+            embeddings = await self.embedding_generator.embed_batch(descriptions)
             
             # Cache results
             for resource_name, embedding in zip(resource_names, embeddings):
@@ -352,28 +339,21 @@ class ResourceSelector:
     async def select_resources(self, user_request: str, max_resources: int = 3) -> List[str]:
         """Select relevant resources"""
         logger.info(f"Resource selector: analyzing request '{user_request}'")
-        logger.info(f"Embed service ready: {self.client is not None}")
+        logger.info(f"Embed service ready: {self.embedding_generator is not None}")
         logger.info(f"Embeddings cache ready: {bool(self.embeddings_cache)}")
         logger.info(f"Max resources: {max_resources}, Threshold: {self.threshold}")
         
-        if not self.client or not self.embeddings_cache:
+        if not self.embedding_generator or not self.embeddings_cache:
             logger.warning("Resource selector not ready, returning default resources")
             fallback_resources = ["memory://all", "monitoring://health"]
             logger.warning(f"Fallback resources: {fallback_resources}")
             return fallback_resources
         
         try:
-            # Compute user request embedding
+            # Compute user request embedding using embedding_generator
             logger.info("Computing user request embedding...")
-            result = await self.client.invoke(
-                input_data=user_request,
-                task="embed",
-                service_type="embedding"
-            )
-            if not result.get('success'):
-                raise Exception(f"Failed to create user embedding: {result.get('error')}")
-            user_embedding = result.get('result', [])
-            logger.info(f"User embedding computed, length: {len(user_embedding) if user_embedding else 0}")
+            user_embedding = await self.embedding_generator.embed_single(user_request)
+            logger.info(f"User embedding computed, length: {len(user_embedding)}")
             
             # Compute similarities using simple cosine similarity
             logger.info(f"Computing similarities with {len(self.embeddings_cache)} resources...")
@@ -467,9 +447,7 @@ class ResourceSelector:
     
     async def close(self):
         """Close service"""
-        if self.client:
-            # ISA client doesn't need explicit close in this context
-            self.client = None
+        # embedding_generator is a global instance, no need to close
 
 # Global instance
 _resource_selector = None

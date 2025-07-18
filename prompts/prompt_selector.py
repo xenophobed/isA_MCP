@@ -3,22 +3,21 @@
 Prompt Selector using isa_model embeddings
 Similar to tool_selector but for prompts
 """
-from core.database.supabase_client import get_supabase_client
 import json
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
-from core.isa_client import get_isa_client
+from tools.services.intelligence_service.language.embedding_generator import embedding_generator
+from core.database.supabase_client import get_supabase_client
+import logging
 
-from core.logging import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class PromptSelector:
     """AI-powered prompt selector"""
     
     def __init__(self):
-        self.client = None
+        self.embedding_generator = embedding_generator
         self.prompts_info = {}
         self.embeddings_cache = {}
         self.threshold = 0.25
@@ -30,8 +29,7 @@ class PromptSelector:
             # Load prompt information dynamically
             await self._load_prompt_info()
             
-            # Initialize embedding service
-            self.client = get_isa_client()
+            # Embedding service already initialized in __init__ as self.embedding_generator
             await self._compute_prompt_embeddings()
             logger.info("Prompt selector initialized")
         except Exception as e:
@@ -45,8 +43,7 @@ class PromptSelector:
             # Load prompt information from MCP server
             await self._load_prompt_info_from_mcp(mcp_server)
             
-            # Initialize embedding service
-            self.client = get_isa_client()
+            # Embedding service already initialized in __init__ as self.embedding_generator
             await self._compute_prompt_embeddings()
             logger.info(f"Prompt selector initialized with {len(self.prompts_info)} MCP prompts")
         except Exception as e:
@@ -223,20 +220,8 @@ class PromptSelector:
                 descriptions.append(combined_text)
                 prompt_names.append(prompt_name)
             
-            # Batch compute
-            if not self.client:
-                raise Exception("Embedding service not initialized")
-                
-            embeddings = []
-            for desc in descriptions:
-                result = await self.client.invoke(
-                    input_data=desc,
-                    task="embed",
-                    service_type="embedding"
-                )
-                if result.get('success'):
-                    embedding = result.get('result', [])
-                    embeddings.append(embedding)
+            # Batch compute using embedding_generator
+            embeddings = await self.embedding_generator.embed_batch(descriptions)
             
             # Cache results
             for prompt_name, embedding in zip(prompt_names, embeddings):
@@ -300,28 +285,20 @@ class PromptSelector:
     async def select_prompts(self, user_request: str, max_prompts: int = 3) -> List[str]:
         """Select relevant prompts"""
         logger.info(f"Prompt selector: analyzing request '{user_request}'")
-        logger.info(f"Embed service ready: {self.client is not None}")
+        logger.info(f"Embed service ready: {self.embedding_generator is not None}")
         logger.info(f"Embeddings cache ready: {bool(self.embeddings_cache)}")
         logger.info(f"Max prompts: {max_prompts}, Threshold: {self.threshold}")
         
-        if not self.client or not self.embeddings_cache:
+        if not self.embedding_generator or not self.embeddings_cache:
             logger.warning("Prompt selector not ready, returning default prompts")
             fallback_prompts = ["user_assistance_prompt", "memory_organization_prompt"]
             logger.warning(f"Fallback prompts: {fallback_prompts}")
             return fallback_prompts
         
         try:
-            # Compute user request embedding
+            # Compute user request embedding using embedding_generator
             logger.info("Computing user request embedding...")
-            result = await self.client.invoke(
-                input_data=user_request,
-                task="embed",
-                service_type="embedding"
-            )
-            if not result.get('success'):
-                raise Exception(f"Failed to create user embedding: {result.get('error')}")
-            
-            user_embedding = result.get('result', [])
+            user_embedding = await self.embedding_generator.embed_single(user_request)
             logger.info(f"User embedding computed, length: {len(user_embedding)}")
             
             # Compute similarities using simple cosine similarity
@@ -409,9 +386,7 @@ class PromptSelector:
     
     async def close(self):
         """Close service"""
-        if self.client:
-            # ISA client doesn't need explicit close in this context
-            self.client = None
+        # embedding_generator is a global instance, no need to close
 
 # Global instance
 _prompt_selector = None

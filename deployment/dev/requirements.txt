@@ -30,6 +30,8 @@ pandas>=1.5.0             # For CSV/Excel processing
 openpyxl>=3.1.0           # For Excel files
 numpy>=1.24.0             # Numerical computing
 PyMuPDF>=1.23.0           # For PDF processing (fitz module)
+PyPDF2>=3.0.0             # For PDF processing
+dask[complete]>=2023.12.0 # Distributed computing for pipeline acceleration
 
 # Web automation
 playwright>=1.40.0

@@ -1,0 +1,47 @@
+{
+  "elements": {
+    "ui_elements": [
+      {
+        "id": "omni_0",
+        "type": "button",
+        "content": "click me",
+        "center": [
+          101,
+          70
+        ],
+        "bbox": [
+          49,
+          50,
+          153,
+          91
+        ],
+        "confidence": 0.9526301622390747,
+        "interactable": true
+      },
+      {
+        "id": "omni_1",
+        "type": "button",
+        "content": "click me",
+        "center": [
+          111,
+          73
+        ],
+        "bbox": [
+          78,
+          66,
+          145,
+          80
+        ],
+        "confidence": 0.05912726745009422,
+        "interactable": true
+      }
+    ]
+  },
+  "detection_type": "ui_elements",
+  "confidence": 0.9,
+  "timestamp": "2025-07-12T19:59:17.599220",
+  "url_pattern": "test-cache-page.com",
+  "page_hash": "d70d853a152c",
+  "expires_at": "2025-07-13T19:59:17.599241",
+  "hit_count": 0
+}

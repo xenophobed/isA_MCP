@@ -5,11 +5,10 @@ Base Tool Class for ISA MCP Tools
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Union, Callable
-from core.isa_client import get_isa_client, extract_isa_response_with_billing
-from core.security import get_security_manager
-from core.logging import get_logger
+import logging
+from isa_model.client import ISAModelClient
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class BaseTool:
     """基础工具类，提供统一的ISA客户端调用和billing信息处理"""
@@ -24,14 +23,17 @@ class BaseTool:
     def isa_client(self):
         """延迟初始化ISA客户端"""
         if self._isa_client is None:
-            self._isa_client = get_isa_client()
+            self._isa_client = ISAModelClient()
         return self._isa_client
     
-    @property
+    @property 
     def security_manager(self):
-        """延迟初始化安全管理器"""
+        """Simple security manager placeholder"""
         if self._security_manager is None:
-            self._security_manager = get_security_manager()
+            class SimpleSecurityManager:
+                def security_check(self, func):
+                    return func
+            self._security_manager = SimpleSecurityManager()
         return self._security_manager
     
     async def call_isa_with_billing(
@@ -63,7 +65,8 @@ class BaseTool:
             )
             
             # 提取结果和billing信息
-            result_data, billing_info = extract_isa_response_with_billing(isa_response)
+            result_data = isa_response.get('result', {})
+            billing_info = isa_response.get('billing', {})
             
             # 记录billing信息
             if billing_info:

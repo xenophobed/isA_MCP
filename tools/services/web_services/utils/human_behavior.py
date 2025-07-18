@@ -323,8 +323,6 @@ class HumanBehavior:
             height = random.randint(800, 1080)
             await page.set_viewport_size({"width": width, "height": height})
             
-            # Random user agent selection would go here if needed
-            
             # Set random geolocation (if permissions allow)
             try:
                 lat = random.uniform(25.0, 49.0)  # US bounds
@@ -332,6 +330,45 @@ class HumanBehavior:
                 await page.context.set_geolocation({"latitude": lat, "longitude": lng})
             except:
                 pass  # Ignore if geolocation setting fails
+            
+            # Set random timezone
+            try:
+                timezones = [
+                    'America/New_York',
+                    'America/Los_Angeles', 
+                    'America/Chicago',
+                    'America/Denver',
+                    'America/Phoenix'
+                ]
+                await page.context.set_timezone(random.choice(timezones))
+            except:
+                pass
+            
+            # Simulate real browser behavior with cookies and local storage
+            try:
+                # Add some realistic cookies
+                await page.context.add_cookies([
+                    {
+                        'name': 'session_id',
+                        'value': f'sess_{random.randint(100000, 999999)}',
+                        'domain': '.example.com',
+                        'path': '/'
+                    },
+                    {
+                        'name': 'user_pref',
+                        'value': 'en-US',
+                        'domain': '.example.com',
+                        'path': '/'
+                    }
+                ])
+            except:
+                pass
+                
+            # Set realistic permissions
+            try:
+                await page.context.grant_permissions(['geolocation'])
+            except:
+                pass
             
         except Exception as e:
             logger.warning(f"Failed to apply human navigation settings: {e}")
@@ -379,3 +416,185 @@ class HumanBehavior:
         
         logger.info(f"Updated human behavior profile: WPM={self.typing_speed_wpm}, "
                    f"Errors={self.typing_errors_rate}, Speed={self.mouse_movement_speed}")
+    
+    async def simulate_real_user_session(self, page: Page):
+        """Simulate a realistic user session with varied behavior patterns"""
+        try:
+            # Realistic session start behavior
+            await self.random_delay(1000, 3000)  # Initial page load thinking time
+            
+            # Random viewport resizing (simulates window resizing)
+            if random.random() < 0.3:  # 30% chance
+                new_width = random.randint(1200, 1920)
+                new_height = random.randint(800, 1080)
+                await page.set_viewport_size({"width": new_width, "height": new_height})
+                await self.random_delay(500, 1500)
+            
+            # Simulate reading behavior with varied scroll patterns
+            await self.simulate_varied_reading_behavior(page)
+            
+            # Random mouse movements to simulate natural cursor behavior
+            if random.random() < 0.7:  # 70% chance
+                await self.random_mouse_movement(page, movements=random.randint(2, 5))
+            
+            # Simulate brief focus loss (tab switching simulation)
+            if random.random() < 0.2:  # 20% chance
+                await self.simulate_focus_loss(page)
+            
+            logger.info("✅ Real user session simulation completed")
+            
+        except Exception as e:
+            logger.warning(f"Failed to simulate real user session: {e}")
+    
+    async def simulate_varied_reading_behavior(self, page: Page):
+        """Simulate varied reading patterns with natural scroll behavior"""
+        try:
+            # Get page dimensions
+            page_height = await page.evaluate("document.body.scrollHeight")
+            viewport_height = await page.evaluate("window.innerHeight")
+            
+            if page_height <= viewport_height:
+                # Short page - just read
+                await self.random_delay(2000, 5000)
+                return
+            
+            # Simulate natural reading with varied scroll patterns
+            total_scrolls = random.randint(3, 8)
+            scroll_position = 0
+            
+            for i in range(total_scrolls):
+                # Varied reading time based on content
+                reading_time = random.randint(1500, 4000)
+                if i == 0:  # First section - longer reading
+                    reading_time = random.randint(3000, 6000)
+                
+                await asyncio.sleep(reading_time / 1000)
+                
+                # Varied scroll amounts
+                scroll_amount = random.randint(1, 3)
+                scroll_direction = "down" if random.random() < 0.9 else "up"  # Occasional upward scrolling
+                
+                await self.human_scroll(page, scroll_direction, scroll_amount)
+                
+                # Occasional pause mid-scroll
+                if random.random() < 0.3:  # 30% chance
+                    await self.random_delay(1000, 2500)
+                
+                # Sometimes scroll back up to re-read
+                if random.random() < 0.15:  # 15% chance
+                    await self.human_scroll(page, "up", 1)
+                    await self.random_delay(1000, 2000)
+                    await self.human_scroll(page, "down", 1)
+            
+        except Exception as e:
+            logger.warning(f"Failed to simulate varied reading behavior: {e}")
+    
+    async def simulate_focus_loss(self, page: Page):
+        """Simulate brief focus loss (like tab switching or checking notifications)"""
+        try:
+            # Simulate losing focus by pausing activity
+            focus_loss_time = random.randint(2000, 8000)  # 2-8 seconds
+            logger.info(f"🔄 Simulating focus loss for {focus_loss_time}ms")
+            
+            await asyncio.sleep(focus_loss_time / 1000)
+            
+            # Simulate regaining focus with a small action
+            if random.random() < 0.5:  # 50% chance
+                await self.random_mouse_movement(page, movements=1)
+            else:
+                # Small scroll to "reorient"
+                await self.human_scroll(page, "down", 1)
+            
+        except Exception as e:
+            logger.warning(f"Failed to simulate focus loss: {e}")
+    
+    async def advanced_anti_detection_behavior(self, page: Page):
+        """Apply advanced anti-detection behaviors"""
+        try:
+            # Simulate realistic browser behavior patterns
+            await self.simulate_browser_warming(page)
+            
+            # Add realistic timing patterns
+            await self.apply_realistic_timing_patterns(page)
+            
+            # Simulate natural interaction patterns
+            await self.simulate_natural_interaction_patterns(page)
+            
+            logger.info("✅ Advanced anti-detection behavior applied")
+            
+        except Exception as e:
+            logger.warning(f"Failed to apply advanced anti-detection behavior: {e}")
+    
+    async def simulate_browser_warming(self, page: Page):
+        """Simulate browser warming behavior like a real user"""
+        try:
+            # Simulate checking page load
+            await page.evaluate("document.readyState")
+            await self.random_delay(100, 300)
+            
+            # Simulate checking for specific elements (like a real browser would)
+            common_selectors = ['body', 'main', 'header', 'nav', 'footer', '#content', '.content']
+            for selector in random.sample(common_selectors, 3):
+                try:
+                    await page.query_selector(selector)
+                    await self.random_delay(50, 150)
+                except:
+                    pass
+            
+            # Simulate initial page interaction
+            await self.random_delay(300, 800)
+            
+        except Exception as e:
+            logger.warning(f"Failed to simulate browser warming: {e}")
+    
+    async def apply_realistic_timing_patterns(self, page: Page):
+        """Apply realistic timing patterns that mimic human behavior"""
+        try:
+            # Simulate realistic request timing
+            await page.evaluate("""
+                // Override setTimeout to add slight variations
+                const originalSetTimeout = window.setTimeout;
+                window.setTimeout = function(callback, delay) {
+                    const variation = Math.random() * 50 - 25; // ±25ms variation
+                    return originalSetTimeout(callback, delay + variation);
+                };
+                
+                // Override setInterval similarly
+                const originalSetInterval = window.setInterval;
+                window.setInterval = function(callback, delay) {
+                    const variation = Math.random() * 100 - 50; // ±50ms variation
+                    return originalSetInterval(callback, delay + variation);
+                };
+            """)
+            
+            # Add realistic delays between actions
+            await self.random_delay(200, 600)
+            
+        except Exception as e:
+            logger.warning(f"Failed to apply realistic timing patterns: {e}")
+    
+    async def simulate_natural_interaction_patterns(self, page: Page):
+        """Simulate natural interaction patterns"""
+        try:
+            # Simulate checking page content
+            await page.evaluate("document.title")
+            await self.random_delay(100, 300)
+            
+            # Simulate natural cursor movement pattern
+            viewport = await page.evaluate("() => ({ width: window.innerWidth, height: window.innerHeight })")
+            
+            # Natural reading pattern - eyes/cursor movement
+            positions = [
+                (viewport['width'] * 0.1, viewport['height'] * 0.2),  # Top left
+                (viewport['width'] * 0.5, viewport['height'] * 0.3),  # Center top
+                (viewport['width'] * 0.1, viewport['height'] * 0.5),  # Mid left
+                (viewport['width'] * 0.8, viewport['height'] * 0.6),  # Lower right
+                (viewport['width'] * 0.3, viewport['height'] * 0.8),  # Bottom center
+            ]
+            
+            for x, y in positions:
+                await self.human_mouse_move(page, x, y)
+                await self.random_delay(300, 800)
+            
+        except Exception as e:
+            logger.warning(f"Failed to simulate natural interaction patterns: {e}")

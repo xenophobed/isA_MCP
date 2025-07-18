@@ -43,12 +43,18 @@ class SupabaseClient:
         """Initialize Supabase client"""
         load_dotenv()
         
-        # Also try to load from deployment/dev/.env for development
-        import os
+        # Load environment-specific configuration
+        env = os.getenv("ENV", "development")
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        dev_env_path = os.path.join(current_dir, '../../deployment/dev/.env')
-        if os.path.exists(dev_env_path):
-            load_dotenv(dev_env_path)
+        project_root = os.path.abspath(os.path.join(current_dir, '../..'))
+        
+        if env == "development":
+            env_file = os.path.join(project_root, "deployment/dev/.env")
+        else:
+            env_file = os.path.join(project_root, f"deployment/{env}/.env.{env}")
+        
+        if os.path.exists(env_file):
+            load_dotenv(env_file)
         
         # Try multiple environment variable names for flexibility
         self.supabase_url = (

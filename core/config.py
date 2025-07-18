@@ -11,7 +11,7 @@ env = os.getenv("ENV", "development")
 if env == "development":
     env_file = "deployment/dev/.env"
 else:
-    env_file = f"deployment/.env.{env}"
+    env_file = f"deployment/{env}/.env.{env}"
 
 # Load the appropriate environment file (override existing env vars)
 load_dotenv(env_file, override=True)

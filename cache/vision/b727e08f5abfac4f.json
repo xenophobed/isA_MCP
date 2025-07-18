@@ -1,0 +1,63 @@
+{
+  "elements": {
+    "input": {
+      "type": "coordinate",
+      "x": 900,
+      "y": 288,
+      "action": "type",
+      "description": "OpenAI semantic search: Located at the top center, near the 'Search Reddit' placeholder, typical position for a search text box.",
+      "confidence": 0.9,
+      "source": "openai_semantic",
+      "isa_element": {
+        "id": "omni_47",
+        "type": "button",
+        "content": "unanswerable",
+        "center": [
+          900,
+          288
+        ],
+        "bbox": [
+          890,
+          279,
+          910,
+          298
+        ],
+        "confidence": 0.1700395941734314,
+        "interactable": true
+      }
+    },
+    "submit": {
+      "type": "coordinate",
+      "x": 960,
+      "y": 26,
+      "action": "click",
+      "description": "OpenAI semantic search: Located nearby at the top right, labeled 'search credit', likely a button to initiate the search.",
+      "confidence": 0.9,
+      "source": "openai_semantic",
+      "isa_element": {
+        "id": "omni_46",
+        "type": "button",
+        "content": "search credit",
+        "center": [
+          960,
+          26
+        ],
+        "bbox": [
+          672,
+          3,
+          1249,
+          49
+        ],
+        "confidence": 0.2118716686964035,
+        "interactable": true
+      }
+    }
+  },
+  "detection_type": "search",
+  "confidence": 0.8,
+  "timestamp": "2025-07-08T21:10:56.465837",
+  "url_pattern": "reddit.com",
+  "page_hash": "93d8abf808c1",
+  "expires_at": "2025-07-09T21:10:56.465879",
+  "hit_count": 6
+}

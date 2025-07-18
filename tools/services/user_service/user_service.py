@@ -111,6 +111,34 @@ class UserService:
             logger.error(f"Error getting user by ID: {str(e)}")
             return None
 
+    async def get_user_by_email(self, email: str) -> Optional[User]:
+        """
+        通过邮箱获取用户
+        
+        Args:
+            email: 用户邮箱
+            
+        Returns:
+            用户对象，不存在返回None
+        """
+        try:
+            if self.use_database and self.db_service:
+                user_data = await self.db_service.get_user_by_email(email)
+                if user_data:
+                    return User(**user_data)
+                return None
+            
+            # Fallback to cache
+            for user in self._users_cache.values():
+                if user.email == email:
+                    return user
+                    
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user by email: {str(e)}")
+            return None
+
     async def create_user(self, auth0_id: str, email: str, name: str) -> User:
         """创建新用户"""
         if self.use_database and self.db_service:

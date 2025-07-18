@@ -30,6 +30,13 @@ if [[ -f "logs/mcp_server.pid" ]]; then
     rm -f logs/mcp_server.pid
 fi
 
+if [[ -f "logs/stripe_cli.pid" ]]; then
+    STRIPE_CLI_PID=$(cat logs/stripe_cli.pid)
+    echo "💳 Stopping Stripe CLI (PID: $STRIPE_CLI_PID)..."
+    kill $STRIPE_CLI_PID 2>/dev/null || echo "  ⚠️  Stripe CLI already stopped"
+    rm -f logs/stripe_cli.pid
+fi
+
 # Stop Neo4j if running
 echo "🗄️  Stopping Neo4j..."
 if pgrep -f "neo4j" > /dev/null; then
@@ -49,6 +56,7 @@ echo "🧹 Cleaning up remaining processes..."
 pkill -f "start_server.py" 2>/dev/null || true
 pkill -f "event_feedback_server.py" 2>/dev/null || true
 pkill -f "smart_mcp_server.py" 2>/dev/null || true
+pkill -f "stripe listen" 2>/dev/null || true
 
 echo ""
 echo "✅ All local development services stopped!"
