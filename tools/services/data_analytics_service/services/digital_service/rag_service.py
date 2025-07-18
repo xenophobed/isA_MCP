@@ -48,6 +48,7 @@ class RAGService:
         self.default_overlap = self.config.get('overlap', 50)
         self.default_top_k = self.config.get('top_k', 5)
         self.embedding_model = self.config.get('embedding_model', 'text-embedding-3-small')
+        self.enable_rerank = self.config.get('enable_rerank', False)  # Default: no rerank
         
         logger.info("RAG Service initialized")
     
@@ -217,14 +218,16 @@ class RAGService:
     async def search_knowledge(self, 
                              user_id: str, 
                              query: str, 
-                             top_k: int = None) -> Dict[str, Any]:
+                             top_k: int = None,
+                             enable_rerank: bool = None) -> Dict[str, Any]:
         """
-        Search user's knowledge base with ranking and relevance scoring.
+        Search user's knowledge base with optional ranking and relevance scoring.
         
         Args:
             user_id: User identifier
             query: Search query
             top_k: Number of results to return
+            enable_rerank: Enable reranking (overrides default setting)
             
         Returns:
             Dict containing search results with relevance scores
@@ -234,43 +237,95 @@ class RAGService:
             context_result = await self.retrieve_context(user_id, query, top_k)
             
             if not context_result['success'] or not context_result['context_items']:
-                return context_result
+                # Return the search results in the expected format
+                return {
+                    'success': context_result['success'],
+                    'user_id': user_id,
+                    'query': query,
+                    'search_results': [],
+                    'total_knowledge_items': context_result.get('total_knowledge_items', 0),
+                    'error': context_result.get('error')
+                }
             
-            # Extract texts for reranking
             context_items = context_result['context_items']
-            documents = [item['text'] for item in context_items]
             
-            # Use reranker for improved relevance
-            reranked_results = await rerank(query, documents, top_k=top_k or self.default_top_k)
+            # Check if reranking is enabled
+            use_rerank = enable_rerank if enable_rerank is not None else self.enable_rerank
             
-            # Combine reranking with original context items
-            final_results = []
-            for rerank_result in reranked_results:
-                document_text = rerank_result['document']
-                relevance_score = rerank_result['relevance_score']
+            if use_rerank:
+                # Extract texts for reranking
+                documents = [item['text'] for item in context_items]
                 
-                # Find matching context item
-                for item in context_items:
-                    if item['text'] == document_text:
+                try:
+                    # Use reranker with correct parameters
+                    from tools.services.intelligence_service.language.embedding_generator import embedding_generator
+                    reranked_results = await embedding_generator.rerank_documents(
+                        query=query,
+                        documents=documents,
+                        top_k=top_k or self.default_top_k,
+                        model="isa-jina-reranker-v2-service",
+                        return_documents=True
+                    )
+                    
+                    # Combine reranking with original context items
+                    final_results = []
+                    for rerank_result in reranked_results:
+                        document_text = rerank_result.get('document', rerank_result.get('text', ''))
+                        relevance_score = rerank_result.get('relevance_score', rerank_result.get('score', 0))
+                        
+                        # Find matching context item
+                        for item in context_items:
+                            if item['text'] == document_text:
+                                final_results.append({
+                                    'knowledge_id': item['knowledge_id'],
+                                    'text': document_text,
+                                    'relevance_score': relevance_score,
+                                    'similarity_score': item['similarity_score'],
+                                    'metadata': item['metadata'],
+                                    'created_at': item['created_at'],
+                                    'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
+                                })
+                                break
+                    
+                    logger.info(f"Search with reranking completed for user {user_id}, {len(final_results)} results")
+                    
+                except Exception as rerank_error:
+                    logger.warning(f"Reranking failed for user {user_id}: {rerank_error}, falling back to similarity search")
+                    # Fall back to similarity search without reranking
+                    final_results = []
+                    for item in context_items:
                         final_results.append({
                             'knowledge_id': item['knowledge_id'],
-                            'text': document_text,
-                            'relevance_score': relevance_score,
+                            'text': item['text'],
+                            'relevance_score': item['similarity_score'],  # Use similarity as relevance
                             'similarity_score': item['similarity_score'],
                             'metadata': item['metadata'],
                             'created_at': item['created_at'],
                             'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
                         })
-                        break
-            
-            logger.info(f"Search completed for user {user_id}, {len(final_results)} results")
+            else:
+                # No reranking, use similarity search results directly
+                final_results = []
+                for item in context_items:
+                    final_results.append({
+                        'knowledge_id': item['knowledge_id'],
+                        'text': item['text'],
+                        'relevance_score': item['similarity_score'],  # Use similarity as relevance
+                        'similarity_score': item['similarity_score'],
+                        'metadata': item['metadata'],
+                        'created_at': item['created_at'],
+                        'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
+                    })
+                
+                logger.info(f"Search without reranking completed for user {user_id}, {len(final_results)} results")
             
             return {
                 'success': True,
                 'user_id': user_id,
                 'query': query,
                 'search_results': final_results,
-                'total_knowledge_items': context_result['total_knowledge_items']
+                'total_knowledge_items': context_result['total_knowledge_items'],
+                'reranking_used': use_rerank
             }
             
         except Exception as e:

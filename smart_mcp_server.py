@@ -7,12 +7,14 @@ import argparse
 import asyncio
 import uvicorn
 import json
+import os
 from typing import List, Dict, Optional
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from starlette.responses import JSONResponse, FileResponse
+from starlette.routing import Route, Mount
 from starlette.middleware import Middleware
+from starlette.staticfiles import StaticFiles
 import logging
 
 # Core services
