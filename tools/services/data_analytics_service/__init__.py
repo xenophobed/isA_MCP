@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """
-Data Analytics Service for MCP Server
-Provides metadata discovery, semantic analysis, and data visualization capabilities
+Data Analytics Service Package
+
+A comprehensive data analytics service implementing the MCP architecture.
+Provides tools and services for data extraction, processing, and analysis.
 """
 
+# Package metadata
 __version__ = "1.0.0"
-__author__ = "MCP Data Analytics Team"
+__author__ = "Data Analytics Team"
 
-# Core services
-from .services.metadata_service import MetadataDiscoveryService
+# Core functionality - only import what actually exists and works
+try:
+    from .models.base_models import AssetType
+    
+    # Only import working components
+    __all__ = [
+        "AssetType"
+    ]
+    
+except ImportError as e:
+    # Graceful fallback if imports fail
+    __all__ = []
+    print(f"Warning: Some data analytics components not available: {e}")
 
-# Core components
-from .core.metadata_extractor import MetadataExtractor
-
-__all__ = [
-    "MetadataDiscoveryService",
-    "MetadataExtractor"
-]
+def get_version():
+    """Get package version."""
+    return __version__

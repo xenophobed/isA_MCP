@@ -5,7 +5,7 @@ Base database adapter abstract class
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
-from ...core.metadata_extractor import MetadataExtractor, TableInfo, ColumnInfo, RelationshipInfo, IndexInfo
+from ...processors.data_processors.metadata_extractor import MetadataExtractor, TableInfo, ColumnInfo, RelationshipInfo, IndexInfo
 
 class DatabaseAdapter(MetadataExtractor):
     """Abstract base class for database adapters"""

@@ -8,7 +8,7 @@ import json
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from core.isa_client import get_isa_client
+from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
 
 from core.logging import get_logger
 
@@ -18,10 +18,10 @@ class ToolSelector:
     """AI-powered tool selector"""
     
     def __init__(self):
-        self.client = None
+        self.embedding_generator = EmbeddingGenerator()
         self.tools_info = {}
         self.embeddings_cache = {}
-        self.threshold = 0.25
+        self.threshold = 0.3
         self.supabase = get_supabase_client()
     
     async def initialize(self):
@@ -30,8 +30,7 @@ class ToolSelector:
             # Load tool information dynamically
             await self._load_tool_info()
             
-            # Initialize ISA client
-            self.client = get_isa_client()
+            # Embedding generator is already initialized in __init__
             await self._compute_tool_embeddings()
             logger.info("Tool selector initialized")
         except Exception as e:
@@ -45,8 +44,7 @@ class ToolSelector:
             # Load tool information from MCP server
             await self._load_tool_info_from_mcp(mcp_server)
             
-            # Initialize ISA client
-            self.client = get_isa_client()
+            # Embedding generator is already initialized in __init__
             await self._compute_tool_embeddings()
             logger.info(f"Tool selector initialized with {len(self.tools_info)} MCP tools")
         except Exception as e:
@@ -148,21 +146,17 @@ class ToolSelector:
     async def _compute_missing_embeddings(self, missing_tools: List[str]):
         """只计算缺失的embeddings"""
         try:
-            if not self.client:
-                raise Exception("ISA client not initialized")
-            
             new_embeddings = {}
             for tool_name in missing_tools:
                 tool_info = self.tools_info[tool_name]
                 combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
-                result = await self.client.invoke(
-                    input_data=combined_text,
-                    task="embed",
-                    service_type="embedding"
+                
+                # Use embedding generator for consistent dimensions
+                embedding = await self.embedding_generator.embed_single(
+                    combined_text,
+                    model="text-embedding-3-small"  # Force consistent model
                 )
-                if result.get('success'):
-                    embedding = result.get('result', [])
-                    new_embeddings[tool_name] = embedding
+                new_embeddings[tool_name] = embedding
                 self.embeddings_cache[tool_name] = embedding
             
             # 只保存新的embeddings
@@ -174,19 +168,15 @@ class ToolSelector:
     async def _compute_all_embeddings(self):
         """计算所有embeddings"""
         try:
-            if not self.client:
-                raise Exception("ISA client not initialized")
-                
             for tool_name, tool_info in self.tools_info.items():
                 combined_text = f"{tool_info['description']} {' '.join(tool_info['keywords'])}"
-                result = await self.client.invoke(
-                    input_data=combined_text,
-                    task="embed",
-                    service_type="embedding"
+                
+                # Use embedding generator for consistent dimensions
+                embedding = await self.embedding_generator.embed_single(
+                    combined_text,
+                    model="text-embedding-3-small"  # Force consistent model
                 )
-                if result.get('success'):
-                    embedding = result.get('result', [])
-                    self.embeddings_cache[tool_name] = embedding
+                self.embeddings_cache[tool_name] = embedding
             
             await self._save_embeddings_cache()
             logger.info(f"Computed embeddings for {len(self.embeddings_cache)} tools")
@@ -279,28 +269,23 @@ class ToolSelector:
     async def select_tools(self, user_request: str, max_tools: int = 3) -> List[str]:
         """Select relevant tools"""
         logger.info(f"Tool selector: analyzing request '{user_request}'")
-        logger.info(f"ISA client ready: {self.client is not None}")
+        logger.info(f"Embedding generator ready: {self.embedding_generator is not None}")
         logger.info(f"Embeddings cache ready: {bool(self.embeddings_cache)}")
         logger.info(f"Max tools: {max_tools}, Threshold: {self.threshold}")
         
-        if not self.client or not self.embeddings_cache:
+        if not self.embeddings_cache:
             logger.warning("Tool selector not ready, returning all tools")
             fallback_tools = list(self.tools_info.keys())
             logger.warning(f"Fallback tools: {fallback_tools}")
             return fallback_tools
         
         try:
-            # Compute user request embedding
+            # Compute user request embedding using embedding generator
             logger.info("Computing user request embedding...")
-            result = await self.client.invoke(
-                input_data=user_request,
-                task="embed", 
-                service_type="embedding"
+            user_embedding = await self.embedding_generator.embed_single(
+                user_request,
+                model="text-embedding-3-small"  # Force consistent model
             )
-            if not result.get('success'):
-                raise Exception(f"Failed to create user embedding: {result.get('error')}")
-            
-            user_embedding = result.get('result', [])
             logger.info(f"User embedding computed, length: {len(user_embedding)}")
             
             # Compute similarities using simple cosine similarity
@@ -389,9 +374,8 @@ class ToolSelector:
     
     async def close(self):
         """Close service"""
-        if self.client:
-            # ISA client doesn't need explicit close in this context
-            self.client = None
+        # Embedding generator doesn't need explicit close
+        pass
 
 # Global instance
 _tool_selector = None

@@ -5,7 +5,7 @@ MySQL database adapter
 
 from typing import Dict, List, Any, Optional
 from .base_adapter import DatabaseAdapter
-from ...core.metadata_extractor import TableInfo, ColumnInfo, RelationshipInfo, IndexInfo
+from ...processors.data_processors.metadata_extractor import TableInfo, ColumnInfo, RelationshipInfo, IndexInfo
 
 try:
     import mysql.connector

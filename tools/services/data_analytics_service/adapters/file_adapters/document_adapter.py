@@ -24,7 +24,7 @@ except ImportError:
 import logging
 
 from .base_adapter import FileAdapter
-from ...core.metadata_extractor import TableInfo, ColumnInfo 
+from ...processors.data_processors.metadata_extractor import TableInfo, ColumnInfo 
 from datetime import datetime
 
 logger = logging.getLogger(__name__)

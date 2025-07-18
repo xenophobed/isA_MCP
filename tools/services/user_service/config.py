@@ -8,12 +8,34 @@ User Service Configuration
 import os
 from typing import List, Optional
 from functools import lru_cache
+from dotenv import load_dotenv
+from pathlib import Path
 
 
 class UserServiceConfig:
     """用户服务配置类"""
     
     def __init__(self):
+        # Load environment-specific configuration
+        self._load_environment_config()
+    
+    def _load_environment_config(self):
+        """加载环境特定的配置"""
+        # 加载环境配置文件
+        env_file = os.getenv("ENV_FILE", ".env")
+        if os.path.exists(env_file):
+            load_dotenv(env_file)
+        
+        # 加载开发环境配置
+        dev_env_file = "deployment/dev/.env"
+        if os.path.exists(dev_env_file):
+            load_dotenv(dev_env_file)
+        
+        # 加载用户服务特定的环境配置
+        user_service_env = "deployment/dev/.env.user_service"
+        if os.path.exists(user_service_env):
+            load_dotenv(user_service_env)
+        
         # 应用基础配置
         self.app_name = os.getenv("APP_NAME", "User Management Service")
         self.app_version = os.getenv("APP_VERSION", "1.0.0")

@@ -32,7 +32,8 @@ echo "🔀 设置本地 Webhook 转发..."
 echo "这将把 Stripe 事件转发到本地服务器"
 echo "请保持此终端窗口打开"
 
-# 启动转发，监听所有事件并转发到本地服务器
+# 启动转发，监听所有事件并转发到后端服务
+# Stripe webhook 直接发送到后端服务
 stripe listen --forward-to localhost:8100/api/v1/webhooks/stripe
 
 echo "✅ Stripe CLI 设置完成！"

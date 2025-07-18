@@ -273,12 +273,14 @@ class PaymentService:
         """
         return self.price_to_plan.get(price_id, SubscriptionStatus.FREE)
 
-    async def handle_checkout_completed(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_checkout_completed(self, event_data: Dict[str, Any], 
+                                      user_service=None) -> Dict[str, Any]:
         """
         处理订阅完成事件
         
         Args:
             event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
             
         Returns:
             处理结果
@@ -289,6 +291,18 @@ class PaymentService:
             subscription_id = session.get('subscription')
             metadata = session.get('metadata', {})
 
+            # Checkout sessions may not include subscription data directly
+            # We need to handle this case
+            if not subscription_id:
+                logger.warning(f"Checkout session has no subscription ID, will be handled by customer.subscription.created event")
+                return {
+                    "type": "checkout_completed",
+                    "customer_id": customer_id,
+                    "subscription_id": None,
+                    "status": "deferred_to_subscription_created",
+                    "metadata": metadata
+                }
+
             # 获取订阅详情
             subscription = await self.get_subscription(subscription_id)
             if not subscription:
@@ -298,28 +312,72 @@ class PaymentService:
             price_id = subscription['items']['data'][0]['price']['id']
             plan_type = self.determine_plan_from_price_id(price_id)
 
+            # 从metadata中获取用户信息
+            auth0_user_id = metadata.get('auth0_user_id')
+            user_email = metadata.get('user_email')
+
+            if not auth0_user_id:
+                raise ValueError("Missing auth0_user_id in metadata")
+
+            # 更新数据库中的用户和订阅信息
+            if user_service and user_service.db_service:
+                # 获取用户
+                user = await user_service.get_user_by_auth0_id(auth0_user_id)
+                if not user:
+                    raise ValueError(f"User not found: {auth0_user_id}")
+
+                # 创建订阅记录
+                await user_service.db_service.create_subscription(
+                    user_id=user.id,
+                    stripe_subscription_id=subscription_id,
+                    stripe_customer_id=customer_id,
+                    plan_type=plan_type.value,
+                    status='active',
+                    current_period_start=datetime.fromtimestamp(subscription.get('current_period_start', 0)),
+                    current_period_end=datetime.fromtimestamp(subscription.get('current_period_end', 0))
+                )
+
+                # 获取计划配置并更新用户积分
+                plan_configs = {
+                    'free': {'credits': 1000},
+                    'pro': {'credits': 10000},
+                    'enterprise': {'credits': 50000}
+                }
+                plan_config = plan_configs.get(plan_type.value, plan_configs['free'])
+                
+                # 更新用户的订阅状态和积分
+                await user_service.db_service.update_user_subscription_status(
+                    user_id=user.id,
+                    subscription_status=plan_type.value,
+                    credits_total=plan_config['credits'],
+                    credits_remaining=plan_config['credits']
+                )
+
             result = {
                 "type": "checkout_completed",
                 "customer_id": customer_id,
                 "subscription_id": subscription_id,
                 "plan_type": plan_type.value,
                 "metadata": metadata,
-                "subscription": subscription
+                "subscription": subscription,
+                "user_updated": True
             }
 
-            logger.info(f"Checkout completed processed: {subscription_id}")
+            logger.info(f"Checkout completed processed: {subscription_id}, user: {auth0_user_id}")
             return result
 
         except Exception as e:
             logger.error(f"Error handling checkout completed: {str(e)}")
             raise ValueError(f"Failed to handle checkout completed: {str(e)}")
 
-    async def handle_subscription_updated(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_subscription_created(self, event_data: Dict[str, Any], 
+                                        user_service=None) -> Dict[str, Any]:
         """
-        处理订阅更新事件
+        处理订阅创建事件
         
         Args:
             event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
             
         Returns:
             处理结果
@@ -334,6 +392,108 @@ class PaymentService:
             price_id = subscription['items']['data'][0]['price']['id']
             plan_type = self.determine_plan_from_price_id(price_id)
 
+            # 从 Stripe 获取客户信息来找到用户
+            customer = await self.get_customer(customer_id)
+            customer_email = customer.get('email') if customer else None
+
+            # 更新数据库中的用户和订阅信息
+            if user_service and user_service.db_service and customer_email:
+                # 通过邮箱获取用户
+                user = await user_service.get_user_by_email(customer_email)
+                if user:
+                    # 创建订阅记录
+                    await user_service.db_service.create_subscription(
+                        user_id=user.id,
+                        stripe_subscription_id=subscription_id,
+                        stripe_customer_id=customer_id,
+                        plan_type=plan_type.value,
+                        status=status,
+                        current_period_start=datetime.fromtimestamp(subscription.get('current_period_start', 0)),
+                        current_period_end=datetime.fromtimestamp(subscription.get('current_period_end', 0))
+                    )
+
+                    # 获取计划配置并更新用户积分
+                    plan_configs = {
+                        'free': {'credits': 1000},
+                        'pro': {'credits': 10000},
+                        'enterprise': {'credits': 50000}
+                    }
+                    plan_config = plan_configs.get(plan_type.value, plan_configs['free'])
+                    
+                    # 更新用户的订阅状态和积分
+                    await user_service.db_service.update_user_subscription_status(
+                        user_id=user.id,
+                        subscription_status=plan_type.value,
+                        credits_total=plan_config['credits'],
+                        credits_remaining=plan_config['credits']
+                    )
+
+                    logger.info(f"Subscription created and user updated: {subscription_id}, user: {user.id}")
+
+            result = {
+                "type": "subscription_created",
+                "subscription_id": subscription_id,
+                "customer_id": customer_id,
+                "status": status,
+                "plan_type": plan_type.value,
+                "customer_email": customer_email,
+                "current_period_start": datetime.fromtimestamp(subscription.get('current_period_start', 0)),
+                "current_period_end": datetime.fromtimestamp(subscription.get('current_period_end', 0)),
+                "database_updated": True
+            }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error handling subscription created: {str(e)}")
+            raise ValueError(f"Failed to handle subscription created: {str(e)}")
+
+    async def handle_subscription_updated(self, event_data: Dict[str, Any], 
+                                        user_service=None) -> Dict[str, Any]:
+        """
+        处理订阅更新事件
+        
+        Args:
+            event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
+            
+        Returns:
+            处理结果
+        """
+        try:
+            subscription = event_data
+            subscription_id = subscription['id']
+            customer_id = subscription['customer']
+            status = subscription['status']
+            
+            # 确定计划类型
+            price_id = subscription['items']['data'][0]['price']['id']
+            plan_type = self.determine_plan_from_price_id(price_id)
+
+            # 更新数据库中的订阅信息
+            if user_service and user_service.db_service:
+                # 更新订阅状态
+                await user_service.db_service.update_subscription_by_stripe_id(
+                    stripe_subscription_id=subscription_id,
+                    updates={
+                        'status': status,
+                        'plan_type': plan_type.value,
+                        'current_period_start': datetime.fromtimestamp(subscription['current_period_start']).isoformat(),
+                        'current_period_end': datetime.fromtimestamp(subscription['current_period_end']).isoformat()
+                    }
+                )
+
+                # 如果订阅状态变为取消或过期，更新用户状态
+                if status in ['canceled', 'unpaid', 'past_due']:
+                    subscription_record = await user_service.db_service.get_subscription_by_stripe_id(subscription_id)
+                    if subscription_record:
+                        await user_service.db_service.update_user_subscription_status(
+                            user_id=subscription_record['user_id'],
+                            subscription_status='free',
+                            credits_total=1000,
+                            credits_remaining=1000
+                        )
+
             result = {
                 "type": "subscription_updated",
                 "subscription_id": subscription_id,
@@ -341,22 +501,25 @@ class PaymentService:
                 "status": status,
                 "plan_type": plan_type.value,
                 "current_period_start": datetime.fromtimestamp(subscription['current_period_start']),
-                "current_period_end": datetime.fromtimestamp(subscription['current_period_end'])
+                "current_period_end": datetime.fromtimestamp(subscription['current_period_end']),
+                "database_updated": True
             }
 
-            logger.info(f"Subscription updated processed: {subscription_id}")
+            logger.info(f"Subscription updated processed: {subscription_id}, status: {status}")
             return result
 
         except Exception as e:
             logger.error(f"Error handling subscription updated: {str(e)}")
             raise ValueError(f"Failed to handle subscription updated: {str(e)}")
 
-    async def handle_subscription_deleted(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_subscription_deleted(self, event_data: Dict[str, Any], 
+                                        user_service=None) -> Dict[str, Any]:
         """
         处理订阅删除事件
         
         Args:
             event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
             
         Returns:
             处理结果
@@ -380,12 +543,14 @@ class PaymentService:
             logger.error(f"Error handling subscription deleted: {str(e)}")
             raise ValueError(f"Failed to handle subscription deleted: {str(e)}")
 
-    async def handle_payment_succeeded(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_payment_succeeded(self, event_data: Dict[str, Any], 
+                                      user_service=None) -> Dict[str, Any]:
         """
         处理支付成功事件
         
         Args:
             event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
             
         Returns:
             处理结果
@@ -413,12 +578,14 @@ class PaymentService:
             logger.error(f"Error handling payment succeeded: {str(e)}")
             raise ValueError(f"Failed to handle payment succeeded: {str(e)}")
 
-    async def handle_payment_failed(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_payment_failed(self, event_data: Dict[str, Any], 
+                                   user_service=None) -> Dict[str, Any]:
         """
         处理支付失败事件
         
         Args:
             event_data: Stripe 事件数据
+            user_service: 用户服务实例（用于数据库操作）
             
         Returns:
             处理结果

@@ -438,29 +438,60 @@ async def stripe_webhook(request: Request):
         result = {"success": True, "processed": True, "event_type": event_type}
         
         # 处理不同类型的事件
-        if event_type == 'checkout.session.completed':
-            webhook_result = await payment_service.handle_checkout_completed(event_data)
-            result.update(webhook_result)
+        try:
+            if event_type == 'checkout.session.completed':
+                webhook_result = await payment_service.handle_checkout_completed(event_data, user_service)
+                result.update(webhook_result)
+                
+            elif event_type == 'customer.subscription.created':
+                webhook_result = await payment_service.handle_subscription_created(event_data, user_service)
+                result.update(webhook_result)
+                
+            elif event_type == 'customer.subscription.updated':
+                webhook_result = await payment_service.handle_subscription_updated(event_data, user_service)
+                result.update(webhook_result)
+                
+            elif event_type == 'customer.subscription.deleted':
+                webhook_result = await payment_service.handle_subscription_deleted(event_data, user_service)
+                result.update(webhook_result)
+                
+            elif event_type == 'invoice.payment_succeeded':
+                webhook_result = await payment_service.handle_payment_succeeded(event_data, user_service)
+                result.update(webhook_result)
+                
+            elif event_type == 'invoice.payment_failed':
+                webhook_result = await payment_service.handle_payment_failed(event_data, user_service)
+                result.update(webhook_result)
+                
+            else:
+                result["message"] = f"Unhandled event type: {event_type}"
+                result["unhandled"] = True
+                
+            # 记录webhook处理结果
+            if user_service and user_service.db_service:
+                await user_service.db_service.log_webhook_event(
+                    event_id=event['id'],
+                    event_type=event_type,
+                    processed=result.get('success', True),
+                    user_id=webhook_result.get('user_id') if 'webhook_result' in locals() else None,
+                    stripe_subscription_id=webhook_result.get('subscription_id') if 'webhook_result' in locals() else None
+                )
+        except Exception as webhook_error:
+            logger.error(f"Error processing webhook event {event_type}: {str(webhook_error)}")
+            result.update({
+                "success": False,
+                "error": str(webhook_error),
+                "message": f"Failed to process {event_type}"
+            })
             
-        elif event_type == 'customer.subscription.updated':
-            webhook_result = await payment_service.handle_subscription_updated(event_data)
-            result.update(webhook_result)
-            
-        elif event_type == 'customer.subscription.deleted':
-            webhook_result = await payment_service.handle_subscription_deleted(event_data)
-            result.update(webhook_result)
-            
-        elif event_type == 'invoice.payment_succeeded':
-            webhook_result = await payment_service.handle_payment_succeeded(event_data)
-            result.update(webhook_result)
-            
-        elif event_type == 'invoice.payment_failed':
-            webhook_result = await payment_service.handle_payment_failed(event_data)
-            result.update(webhook_result)
-            
-        else:
-            result["message"] = f"Unhandled event type: {event_type}"
-            result["unhandled"] = True
+            # 记录失败的webhook事件
+            if user_service and user_service.db_service:
+                await user_service.db_service.log_webhook_event(
+                    event_id=event['id'],
+                    event_type=event_type,
+                    processed=False,
+                    error_message=str(webhook_error)
+                )
         
         return result
         
