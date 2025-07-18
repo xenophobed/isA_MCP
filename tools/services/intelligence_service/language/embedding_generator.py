@@ -473,6 +473,7 @@ class EmbeddingGenerator:
         top_k: int = 5,
         return_documents: bool = True,
         model: Optional[str] = None,
+        provider: str = "isa",
         **kwargs
     ) -> List[dict]:
         """
@@ -484,27 +485,23 @@ class EmbeddingGenerator:
             top_k: Number of top results to return
             return_documents: Whether to include document text in results
             model: Model to use (defaults to isa-jina-reranker-v2-service)
+            provider: Provider to use (defaults to isa)
             **kwargs: Additional parameters
             
         Returns:
             List of reranked documents with relevance scores
         """
         try:
-            # Use ISA's rerank task
-            params = {
-                "documents": documents,
-                "top_k": top_k,
-                "return_documents": return_documents
-            }
-            if model:
-                params["model"] = model
-            params.update(kwargs)
-            
+            # Use ISA's rerank task with correct parameters
             response = await self.client.invoke(
                 input_data=query,
                 task="rerank",
                 service_type="embedding",
-                **params
+                model=model or "isa-jina-reranker-v2-service",
+                provider=provider,
+                documents=documents,
+                top_k=top_k,
+                **kwargs
             )
             
             if not response.get('success'):
@@ -542,4 +539,10 @@ async def chunk(text: str, **kwargs) -> List[dict]:
 
 async def rerank(query: str, documents: List[str], **kwargs) -> List[dict]:
     """Rerank documents by relevance"""
-    return await embedding_generator.rerank_documents(query, documents, **kwargs)
+    return await embedding_generator.rerank_documents(
+        query, 
+        documents, 
+        model="isa-jina-reranker-v2-service",
+        provider="isa",
+        **kwargs
+    )

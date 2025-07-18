@@ -84,12 +84,12 @@ class AIMetadataEmbeddingService(BaseService):
             raise
     
     async def _ensure_table(self):
-        """Ensure the db_metadata_embedding table exists"""
+        """Ensure the db_meta_embedding table exists"""
         try:
-            result = self.supabase.client.table('db_metadata_embedding').select('*').limit(1).execute()
-            logger.info("db_metadata_embedding table verified")
+            result = self.supabase.client.schema('dev').table('db_meta_embedding').select('*').limit(1).execute()
+            logger.info("db_meta_embedding table verified")
         except Exception as e:
-            logger.warning(f"db_metadata_embedding table may not exist: {e}")
+            logger.warning(f"db_meta_embedding table may not exist: {e}")
             logger.info("Please run setup_metadata_embedding.sql to create the table")
             raise
     
@@ -288,8 +288,8 @@ class AIMetadataEmbeddingService(BaseService):
                     'content': content,
                     'embedding': embedding,
                     'metadata': {
-                        'business_importance': entity.get('business_importance'),
-                        'record_count': entity.get('record_count'),
+                        'business_importance': entity.get('business_importance', 'unknown'),
+                        'record_count': entity.get('record_count', 0),
                         'key_attributes': entity.get('key_attributes', []),
                         'relationships': entity.get('relationships', [])
                     },
@@ -301,7 +301,7 @@ class AIMetadataEmbeddingService(BaseService):
                     'updated_at': datetime.now().isoformat()
                 }
                 
-                result = self.supabase.client.table('db_metadata_embedding').upsert(record_data).execute()
+                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
                 
                 if result.data:
                     results['stored'] += 1
@@ -357,7 +357,7 @@ class AIMetadataEmbeddingService(BaseService):
                     'updated_at': datetime.now().isoformat()
                 }
                 
-                result = self.supabase.client.table('db_metadata_embedding').upsert(record_data).execute()
+                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
                 
                 if result.data:
                     results['stored'] += 1
@@ -414,7 +414,7 @@ class AIMetadataEmbeddingService(BaseService):
                     'updated_at': datetime.now().isoformat()
                 }
                 
-                result = self.supabase.client.table('db_metadata_embedding').upsert(record_data).execute()
+                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
                 
                 if result.data:
                     results['stored'] += 1
@@ -475,7 +475,7 @@ class AIMetadataEmbeddingService(BaseService):
                     'updated_at': datetime.now().isoformat()
                 }
                 
-                result = self.supabase.client.table('db_metadata_embedding').upsert(record_data).execute()
+                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
                 
                 if result.data:
                     results['stored'] += 1
