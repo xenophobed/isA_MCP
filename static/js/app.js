@@ -21,10 +21,8 @@ class MCPPortal {
         this.setupSearch();
         await this.loadInitialData();
         
-        // Load initial dashboard after data is loaded
-        if (this.dashboardModule) {
-            this.dashboardModule.refresh();
-        }
+        // Load initial dashboard page
+        await this.navigateToPage('dashboard');
     }
 
     // =================== NAVIGATION MODULE ===================
@@ -40,25 +38,124 @@ class MCPPortal {
         });
     }
 
-    navigateToPage(page) {
+    async navigateToPage(page) {
         // Update active nav link
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
         document.querySelector(`[data-page="${page}"]`).classList.add('active');
 
-        // Show page
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.add('hidden');
-        });
-        document.getElementById(`${page}-page`).classList.remove('hidden');
-
         // Update breadcrumb
-        document.getElementById('current-page').textContent = 
-            page.charAt(0).toUpperCase() + page.slice(1);
-
+        document.getElementById('current-page').textContent = this.capitalizeFirst(page);
+        
+        // Load page content dynamically
+        await this.loadPageContent(page);
+        
+        // Update current page reference
         this.currentPage = page;
-        this.loadPageData(page);
+    }
+
+    async loadPageContent(page) {
+        const contentContainer = document.getElementById('current-page-content');
+        const loadingIndicator = document.getElementById('page-loading');
+        
+        try {
+            // Show loading state
+            loadingIndicator.style.display = 'block';
+            
+            // Fetch page content
+            const response = await fetch(`/static/pages/${page}.html`);
+            if (!response.ok) {
+                throw new Error(`Failed to load page: ${response.status}`);
+            }
+            
+            const pageContent = await response.text();
+            
+            // Update content
+            contentContainer.innerHTML = pageContent;
+            
+            // Initialize page-specific functionality
+            await this.initializePageModule(page);
+            
+            // Reinitialize Lucide icons for new content
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+            
+        } catch (error) {
+            console.error(`Error loading page ${page}:`, error);
+            contentContainer.innerHTML = `
+                <div class="error-container">
+                    <div class="error-message">
+                        <h2>Error Loading Page</h2>
+                        <p>Failed to load the ${page} page. Please try again.</p>
+                        <button class="btn btn-primary" onclick="portal.navigateToPage('${page}')">
+                            <i data-lucide="refresh-cw"></i>
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        } finally {
+            // Hide loading state
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    async initializePageModule(page) {
+        // Initialize page-specific modules after content is loaded
+        switch (page) {
+            case 'dashboard':
+                if (this.dashboardModule) {
+                    this.dashboardModule.refresh();
+                }
+                break;
+            case 'tools':
+                if (this.toolsModule) {
+                    this.toolsModule.refresh();
+                }
+                break;
+            case 'prompts':
+                if (this.promptsModule) {
+                    this.promptsModule.refresh();
+                }
+                break;
+            case 'resources':
+                if (this.resourcesModule) {
+                    this.resourcesModule.refresh();
+                }
+                break;
+            case 'playground':
+                // Initialize playground module only when playground page is loaded
+                if (!this.playgroundModule) {
+                    this.playgroundModule = new PlaygroundModule(this);
+                } else {
+                    this.playgroundModule.refresh();
+                }
+                break;
+            case 'logs':
+                if (this.logsModule) {
+                    this.logsModule.refresh();
+                }
+                break;
+            case 'monitoring':
+                if (this.monitoringModule) {
+                    this.monitoringModule.refresh();
+                }
+                break;
+            case 'analytics':
+                // Initialize analytics module only when analytics page is loaded
+                if (!this.analyticsModule) {
+                    this.analyticsModule = new AnalyticsModule(this);
+                } else {
+                    this.analyticsModule.refresh();
+                }
+                break;
+        }
+    }
+
+    capitalizeFirst(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
     async loadPageData(page) {
@@ -185,8 +282,8 @@ class MCPPortal {
 
     async loadTools() {
         try {
-            console.log('Loading tools from:', `${this.apiBase}/tools`);
-            const response = await fetch(`${this.apiBase}/tools`);
+            console.log('Loading tools from:', `${this.apiBase}/admin/tools`);
+            const response = await fetch(`${this.apiBase}/admin/tools`);
             console.log('Tools API response status:', response.status);
             
             if (response.ok) {
@@ -209,8 +306,8 @@ class MCPPortal {
 
     async loadPrompts() {
         try {
-            console.log('Loading prompts from:', `${this.apiBase}/prompts`);
-            const response = await fetch(`${this.apiBase}/prompts`);
+            console.log('Loading prompts from:', `${this.apiBase}/admin/prompts`);
+            const response = await fetch(`${this.apiBase}/admin/prompts`);
             
             if (response.ok) {
                 const data = await response.json();
@@ -230,8 +327,8 @@ class MCPPortal {
 
     async loadResources() {
         try {
-            console.log('Loading resources from:', `${this.apiBase}/resources`);
-            const response = await fetch(`${this.apiBase}/resources`);
+            console.log('Loading resources from:', `${this.apiBase}/admin/resources`);
+            const response = await fetch(`${this.apiBase}/admin/resources`);
             
             if (response.ok) {
                 const data = await response.json();
@@ -341,14 +438,18 @@ class MCPPortal {
 
     // =================== MODULE INITIALIZATION ===================
     initializeModules() {
+        // Initialize modules that don't depend on specific page DOM elements
         this.dashboardModule = new DashboardModule(this);
         this.toolsModule = new ToolsModule(this);
         this.promptsModule = new PromptsModule(this);
         this.resourcesModule = new ResourcesModule(this);
-        this.playgroundModule = new PlaygroundModule(this);
         this.logsModule = new LogsModule(this);
         this.monitoringModule = new MonitoringModule(this);
         this.configurationModule = new ConfigurationModule(this);
+        
+        // Page-specific modules will be initialized when pages are loaded
+        this.playgroundModule = null;
+        this.analyticsModule = null;
     }
 
     // =================== FALLBACK DATA ===================
@@ -985,7 +1086,7 @@ class PlaygroundModule {
         outputArea.innerHTML = '<div class="loading"><div class="spinner"></div> Executing tool...</div>';
 
         try {
-            const response = await fetch(`${this.portal.apiBase}/call-tool`, {
+            const response = await fetch(`${this.portal.apiBase}/admin/call-tool`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1346,6 +1447,91 @@ window.accessResource = function(uri) {
     portal.showNotification(`Accessing resource: ${uri}`, 'info');
 };
 
+// =================== ANALYTICS MODULE ===================
+class AnalyticsModule {
+    constructor(portal) {
+        this.portal = portal;
+        this.refresh();
+    }
+
+    refresh() {
+        this.loadAnalyticsStats();
+        this.loadAnalyticsCharts();
+        this.loadAnalyticsTable();
+    }
+
+    async loadAnalyticsStats() {
+        const statsContainer = document.getElementById('analytics-stats');
+        if (!statsContainer) return;
+
+        const stats = [
+            { title: 'Total Operations', value: '2,847', change: '+12.5%', icon: 'activity' },
+            { title: 'Success Rate', value: '97.8%', change: '+0.8%', icon: 'check-circle' },
+            { title: 'Avg Response Time', value: '245ms', change: '-15ms', icon: 'clock' },
+            { title: 'Active Sessions', value: '24', change: '+3', icon: 'users' }
+        ];
+
+        statsContainer.innerHTML = stats.map(stat => `
+            <div class="metric-card">
+                <div class="metric-header">
+                    <i data-lucide="${stat.icon}" class="metric-icon"></i>
+                    <span class="metric-change success">${stat.change}</span>
+                </div>
+                <div class="metric-value">${stat.value}</div>
+                <div class="metric-label">${stat.title}</div>
+            </div>
+        `).join('');
+
+        // Reinitialize icons
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
+
+    async loadAnalyticsCharts() {
+        // Implementation would go here for Chart.js charts
+        console.log('Analytics charts loaded');
+    }
+
+    async loadAnalyticsTable() {
+        const table = document.getElementById('analytics-table');
+        if (!table) return;
+
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td>search_memories</td>
+                <td>memory</td>
+                <td>67</td>
+                <td><span class="status-indicator success">99.1%</span></td>
+                <td>250ms</td>
+                <td>+8</td>
+                <td><span class="trend-up">↗️</span></td>
+            </tr>
+            <tr>
+                <td>generate_image</td>
+                <td>ai</td>
+                <td>67</td>
+                <td><span class="status-indicator warning">94.2%</span></td>
+                <td>3500ms</td>
+                <td>+12</td>
+                <td><span class="trend-up">↗️</span></td>
+            </tr>
+            <tr>
+                <td>web_search</td>
+                <td>web</td>
+                <td>89</td>
+                <td><span class="status-indicator success">96.7%</span></td>
+                <td>1500ms</td>
+                <td>+23</td>
+                <td><span class="trend-up">↗️</span></td>
+            </tr>
+        `;
+    }
+}
+
 window.inspectResource = function(uri) {
     const resource = portal.resources.find(r => r.uri === uri);
     if (resource) {
@@ -1361,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Export for API usage
 window.MCPPortalAPI = {
     async callTool(name, args) {
-        const response = await fetch(`${window.portal.apiBase}/call-tool`, {
+        const response = await fetch(`${window.portal.apiBase}/admin/call-tool`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, arguments: args })

@@ -30,9 +30,15 @@ try:
 except ImportError:
     PYODBC_AVAILABLE = False
 
+try:
+    import sqlite3
+    SQLITE_AVAILABLE = True
+except ImportError:
+    SQLITE_AVAILABLE = False
+
 from .query_matcher import QueryPlan, QueryContext
 from .semantic_enricher import SemanticMetadata
-from .llm_sql_generator import SQLGenerationResult
+from .sql_generator import SQLGenerationResult
 
 logger = logging.getLogger(__name__)
 
@@ -394,18 +400,27 @@ class SQLExecutor:
                 explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"
             elif self.db_type == 'mysql':
                 explain_sql = f"EXPLAIN FORMAT=JSON {sql}"
+            elif self.db_type == 'sqlite':
+                explain_sql = f"EXPLAIN QUERY PLAN {sql}"
             else:
                 explain_sql = f"EXPLAIN {sql}"
             
-            cursor = self.connection.cursor(cursor_factory=RealDictCursor if self.db_type == 'postgresql' else None)
+            if self.db_type == 'postgresql':
+                cursor = self.connection.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = self.connection.cursor()
+            
             cursor.execute(explain_sql)
             
-            if self.db_type in ['postgresql', 'mysql']:
+            if self.db_type == 'postgresql':
                 result = cursor.fetchall()
-                if self.db_type == 'postgresql':
-                    return {'plan': result[0]['QUERY PLAN']}
-                else:
-                    return {'plan': result}
+                return {'plan': result[0]['QUERY PLAN']}
+            elif self.db_type == 'mysql':
+                result = cursor.fetchall()
+                return {'plan': result}
+            elif self.db_type == 'sqlite':
+                rows = cursor.fetchall()
+                return {'plan': [dict(row) for row in rows]}
             else:
                 rows = cursor.fetchall()
                 return {'plan': [dict(zip([desc[0] for desc in cursor.description], row)) for row in rows]}
@@ -502,6 +517,22 @@ class SQLExecutor:
                     db_name = cursor.fetchone()[0]
                     stats['database_info']['database'] = db_name
                 
+                elif self.db_type == 'sqlite':
+                    # Get SQLite statistics
+                    cursor.execute("SELECT sqlite_version()")
+                    version = cursor.fetchone()[0]
+                    stats['database_info']['version'] = version
+                    
+                    # SQLite doesn't have a database name concept like other DBs
+                    stats['database_info']['database'] = self.database_config.get('database', 'sqlite_db')
+                    
+                    # Get database size
+                    cursor.execute("PRAGMA page_count")
+                    page_count = cursor.fetchone()[0]
+                    cursor.execute("PRAGMA page_size")
+                    page_size = cursor.fetchone()[0]
+                    stats['database_info']['size_bytes'] = page_count * page_size
+                
                 cursor.close()
             
             return stats
@@ -518,7 +549,10 @@ class SQLExecutor:
             await self._ensure_connection()
             
             # Set timeout (database-specific)
-            cursor = self.connection.cursor(cursor_factory=RealDictCursor if self.db_type == 'postgresql' else None)
+            if self.db_type == 'postgresql':
+                cursor = self.connection.cursor(cursor_factory=RealDictCursor)
+            else:
+                cursor = self.connection.cursor()
             
             # Execute query
             cursor.execute(sql)
@@ -532,6 +566,8 @@ class SQLExecutor:
                 # Convert to list of dictionaries
                 if self.db_type == 'postgresql':
                     data = [dict(row) for row in rows]
+                elif self.db_type == 'sqlite':
+                    data = [dict(row) for row in rows]  # sqlite3.Row objects
                 else:
                     data = [dict(zip(column_names, row)) for row in rows]
                 
@@ -810,6 +846,18 @@ class SQLExecutor:
                 )
                 self.connection = pyodbc.connect(connection_string)
             
+            elif self.db_type == 'sqlite' and SQLITE_AVAILABLE:
+                # SQLite database path should be provided in database_config['database']
+                db_path = self.database_config.get('database')
+                if not db_path:
+                    raise Exception("SQLite database path not provided in config['database']")
+                
+                self.connection = sqlite3.connect(db_path)
+                # Enable foreign key support
+                self.connection.execute("PRAGMA foreign_keys = ON")
+                # Set row factory for dict-like access
+                self.connection.row_factory = sqlite3.Row
+            
             else:
                 raise Exception(f"Database type {self.db_type} not supported or required packages not installed")
             
@@ -986,6 +1034,50 @@ class SQLExecutor:
         """Optimize WHERE clause conditions"""
         # Add basic optimizations like moving selective conditions first
         return sql
+    
+    @classmethod
+    def create_sqlite_executor(cls, database_filename: str, user_id: Optional[str] = None) -> 'SQLExecutor':
+        """
+        Create SQL executor for SQLite database in resources/dbs/sqlite
+        
+        Args:
+            database_filename: Name of the SQLite database file
+            user_id: Optional user ID for user-specific databases
+            
+        Returns:
+            SQLExecutor configured for the SQLite database
+        """
+        # Get path to resources/dbs/sqlite directory
+        import os
+        from pathlib import Path
+        
+        current_dir = Path(__file__).resolve()
+        project_root = current_dir
+        while project_root.name != "isA_MCP":
+            project_root = project_root.parent
+            if project_root == project_root.parent:  # Reached filesystem root
+                break
+        
+        sqlite_dir = project_root / "resources" / "dbs" / "sqlite"
+        
+        # If user_id provided, look for user-specific database
+        if user_id:
+            user_db_path = sqlite_dir / f"user_{user_id}_{database_filename}"
+            if user_db_path.exists():
+                db_path = str(user_db_path)
+            else:
+                db_path = str(sqlite_dir / database_filename)
+        else:
+            db_path = str(sqlite_dir / database_filename)
+        
+        database_config = {
+            'type': 'sqlite',
+            'database': db_path,
+            'max_execution_time': 30,
+            'max_rows': 10000
+        }
+        
+        return cls(database_config)
     
     # ===== LLM Integration and Feedback Methods =====
     

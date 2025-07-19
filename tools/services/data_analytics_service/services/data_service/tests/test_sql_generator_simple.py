@@ -166,17 +166,15 @@ class TestLLMSQLGeneratorSimple:
         
         original_query = "Show me customers with total sales over 100"
         
-        # Mock the LLM call
-        with patch.object(generator, 'call_isa_with_billing') as mock_call:
-            mock_call.return_value = (
-                {
-                    "sql": "SELECT c.customer_name, SUM(e.total_amount) as total_sales FROM ecommerce_sales e JOIN customers c ON e.customer_id = c.customer_id WHERE e.total_amount > 100 GROUP BY c.customer_name ORDER BY total_sales DESC LIMIT 1000;",
-                    "explanation": "Query shows customers with total sales over 100",
-                    "confidence": 0.9,
-                    "complexity": "medium"
-                },
-                {'cost': 0.002, 'tokens': 150}
-            )
+        # Mock the text generator call
+        with patch('tools.services.data_analytics_service.services.data_service.sql_generator.generate') as mock_generate:
+            mock_response = json.dumps({
+                "sql": "SELECT c.customer_name, SUM(e.total_amount) as total_sales FROM ecommerce_sales e JOIN customers c ON e.customer_id = c.customer_id WHERE e.total_amount > 100 GROUP BY c.customer_name ORDER BY total_sales DESC LIMIT 1000;",
+                "explanation": "Query shows customers with total sales over 100",
+                "confidence": 0.9,
+                "complexity": "medium"
+            })
+            mock_generate.return_value = mock_response
             
             result = await generator.generate_sql_from_context(
                 sample_query_context, sample_metadata_matches, 

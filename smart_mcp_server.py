@@ -334,19 +334,194 @@ async def capabilities_endpoint(request):
             "message": str(e)
         })
 
+# =================== PORTAL ENDPOINTS ===================
+def get_supabase_client():
+    """Get Supabase client for portal queries"""
+    from core.database.supabase_client import get_supabase_client
+    return get_supabase_client()
+
+async def portal_root(request):
+    """Serve the management portal index page"""
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    index_path = os.path.join(static_dir, "index.html")
+    
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        return JSONResponse({
+            "error": "Management portal not found",
+            "message": "Static files not available"
+        }, status_code=404)
+
+async def portal_tools(request):
+    """Get MCP tools from database for portal"""
+    try:
+        db = get_supabase_client()
+        result = db.table('mcp_tools').select('*').eq('is_active', True).order('call_count', desc=True).execute()
+        
+        tools = []
+        for row in result.data:
+            tools.append({
+                "name": row["name"],
+                "description": row["description"] or "MCP tool",
+                "category": row["category"] or "utility",
+                "inputSchema": row["input_schema"] if row["input_schema"] else {},
+                "callCount": row["call_count"] or 0,
+                "avgResponseTime": row["avg_response_time"] or 0,
+                "successRate": float(row["success_rate"]) if row["success_rate"] else 100.0,
+                "lastUsed": row["last_used"] if row["last_used"] else None,
+                "isActive": row["is_active"]
+            })
+        
+        return JSONResponse({"tools": tools})
+        
+    except Exception as e:
+        logger.error(f"Error fetching tools: {e}")
+        return JSONResponse({"tools": [], "error": str(e)})
+
+async def portal_prompts(request):
+    """Get MCP prompts from database for portal"""
+    try:
+        db = get_supabase_client()
+        result = db.table('mcp_prompts').select('*').eq('is_active', True).order('usage_count', desc=True).execute()
+        
+        prompts = []
+        for row in result.data:
+            prompts.append({
+                "name": row["name"],
+                "description": row["description"] or "MCP prompt",
+                "category": row["category"] or "user",
+                "arguments": row["arguments"] if row["arguments"] else [],
+                "content": row["content"] or "",
+                "usageCount": row["usage_count"] or 0,
+                "lastModified": row["last_modified"] if row["last_modified"] else None,
+                "isActive": row["is_active"]
+            })
+        
+        return JSONResponse({"prompts": prompts})
+        
+    except Exception as e:
+        logger.error(f"Error fetching prompts: {e}")
+        return JSONResponse({"prompts": [], "error": str(e)})
+
+async def portal_resources(request):
+    """Get MCP resources from database for portal"""
+    try:
+        db = get_supabase_client()
+        result = db.table('mcp_resources').select('*').eq('is_active', True).order('access_count', desc=True).execute()
+        
+        resources = []
+        for row in result.data:
+            resources.append({
+                "uri": row["uri"],
+                "name": row["name"],
+                "description": row["description"] or "MCP resource",
+                "type": row["resource_type"] or "other",
+                "mimeType": row["mime_type"] or "application/octet-stream",
+                "size": row["size_bytes"] or 0,
+                "accessCount": row["access_count"] or 0,
+                "lastAccessed": row["last_accessed"] if row["last_accessed"] else None,
+                "isActive": row["is_active"]
+            })
+        
+        return JSONResponse({"resources": resources})
+        
+    except Exception as e:
+        logger.error(f"Error fetching resources: {e}")
+        return JSONResponse({"resources": [], "error": str(e)})
+
+async def portal_call_tool(request):
+    """Call an MCP tool from portal and update usage stats"""
+    global smart_server
+    if smart_server and smart_server.mcp:
+        try:
+            data = await request.json()
+            tool_name = data.get("name")
+            arguments = data.get("arguments", {})
+            
+            # Record the tool call start time
+            import time
+            from datetime import datetime
+            start_time = time.time()
+            
+            # Call the tool
+            result = await smart_server.mcp.call_tool(tool_name, arguments)
+            
+            # Calculate response time
+            response_time = int((time.time() - start_time) * 1000)  # Convert to ms
+            
+            # Update usage statistics in database
+            try:
+                db = get_supabase_client()
+                
+                # Get current tool stats
+                current_tool = db.table('mcp_tools').select('call_count, avg_response_time').eq('name', tool_name).single().execute()
+                
+                if current_tool.data:
+                    current_count = current_tool.data['call_count'] or 0
+                    current_avg = current_tool.data['avg_response_time'] or 0
+                    
+                    # Calculate new average response time
+                    new_avg = int((current_avg * current_count + response_time) / (current_count + 1)) if current_count > 0 else response_time
+                    
+                    # Update tool statistics
+                    db.table('mcp_tools').update({
+                        'call_count': current_count + 1,
+                        'last_used': datetime.now().isoformat(),
+                        'avg_response_time': new_avg
+                    }).eq('name', tool_name).execute()
+                    
+            except Exception as e:
+                logger.error(f"Failed to update tool stats: {e}")
+            
+            return JSONResponse({"result": result})
+            
+        except Exception as e:
+            # Update error statistics if possible
+            try:
+                db = get_supabase_client()
+                db.table('mcp_tools').update({
+                    'last_used': datetime.now().isoformat()
+                }).eq('name', data.get("name", "unknown")).execute()
+            except:
+                pass
+            
+            logger.error(f"Tool call failed: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+    return JSONResponse({"error": "Server not available"}, status_code=503)
+
 def add_endpoints(app: Starlette):
-    """Add custom API endpoints"""
+    """Add custom API endpoints and management portal"""
     from core.secure_endpoints import add_auth_endpoints
+    
+    # Check if static directory exists
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
     
     routes = [
         Route("/health", health_check),
         Route("/discover", discover_endpoint, methods=["POST"]),
         Route("/stats", stats_endpoint),
-        Route("/capabilities", capabilities_endpoint)
+        Route("/capabilities", capabilities_endpoint),
+        # Admin API endpoints (separate from MCP endpoints)
+        Route("/admin/tools", portal_tools),
+        Route("/admin/prompts", portal_prompts),
+        Route("/admin/resources", portal_resources),
+        Route("/admin/call-tool", portal_call_tool, methods=["POST"]),
+        # Portal root
+        Route("/", portal_root),
+        Route("/portal", portal_root),
+        Route("/admin", portal_root),
     ]
     
     for route in routes:
         app.router.routes.append(route)
+    
+    # Mount static files if directory exists
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        print(f"  ✅ Management portal mounted at /static")
+    else:
+        print(f"  ⚠️ Static directory not found at {static_dir}")
     
     # 添加安全认证端点
     add_auth_endpoints(app)
@@ -383,11 +558,16 @@ async def run_server(port: int = 8081):
     print(f"📦 Capabilities: {sum(server_info['capabilities_count'].values())} modules")
     print()
     print(f"🎯 MCP endpoint: http://0.0.0.0:{port}/mcp/")
+    print(f"🎯 Management Portal: http://0.0.0.0:{port}/")
     print(f"🎯 API endpoints:")
     print(f"   • /health - Health check and server info")
     print(f"   • /discover (POST) - AI-powered capability discovery")
     print(f"   • /stats - AI selector statistics")
     print(f"   • /capabilities - List all available capabilities")
+    print(f"   • /admin/tools - List MCP tools (admin)")
+    print(f"   • /admin/prompts - List MCP prompts (admin)") 
+    print(f"   • /admin/resources - List MCP resources (admin)")
+    print(f"   • /admin/call-tool (POST) - Execute MCP tool (admin)")
     print()
     
     # Start server

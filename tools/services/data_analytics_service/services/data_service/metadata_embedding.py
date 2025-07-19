@@ -197,7 +197,8 @@ class AIMetadataEmbeddingService(BaseService):
             
         except Exception as e:
             logger.error(f"Failed to search similar entities: {e}")
-            return []
+            # Fallback to intelligence service search when DB function is missing
+            return await self._fallback_similarity_search(query, entity_type, limit, similarity_threshold)
     
     async def search_with_reranking(self, query: str, entity_type: Optional[str] = None, 
                                   limit: int = 10, similarity_threshold: float = 0.7,
@@ -500,27 +501,26 @@ class AIMetadataEmbeddingService(BaseService):
             
             # Use AI embedding generator if available
             if self.embedding_generator and embed:
-                embedding = await embed(text)
+                embedding = await embed(text, model="text-embedding-3-small")
                 
                 # Cache the result
                 self.embedding_cache[text_hash] = embedding
                 return embedding
             
-            # Fallback to direct ISA client if AI service unavailable
+            # Fallback: Try direct import if service not initialized
             else:
-                logger.warning("Using fallback ISA client for embedding generation")
-                result_data, billing_info = await self.call_isa_with_billing(
-                    input_data=text,
-                    task="embed",
-                    service_type="embedding",
-                    operation_name="generate_embedding"
-                )
-                
-                embedding = result_data
-                
-                # Cache the result
-                self.embedding_cache[text_hash] = embedding
-                return embedding
+                try:
+                    from tools.services.intelligence_service.language.embedding_generator import embed as direct_embed
+                    logger.info("Using direct intelligence service embedding import")
+                    embedding = await direct_embed(text, model="text-embedding-3-small")
+                    
+                    # Cache the result
+                    self.embedding_cache[text_hash] = embedding
+                    return embedding
+                    
+                except ImportError:
+                    logger.error("Intelligence service embedding unavailable - cannot generate embeddings")
+                    return None
             
         except Exception as e:
             logger.error(f"Failed to generate embedding: {e}")
@@ -531,7 +531,7 @@ class AIMetadataEmbeddingService(BaseService):
         try:
             if self.embedding_generator and embed:
                 # Use AI batch embedding for efficiency
-                embeddings = await embed(texts)
+                embeddings = await embed(texts, model="text-embedding-3-small")
                 
                 # Cache results
                 for text, embedding in zip(texts, embeddings):
@@ -541,16 +541,125 @@ class AIMetadataEmbeddingService(BaseService):
                 return embeddings
             
             else:
-                # Fallback: process individually
-                embeddings = []
-                for text in texts:
-                    embedding = await self._generate_embedding(text)
-                    embeddings.append(embedding)
-                return embeddings
+                # Fallback: Try direct batch embedding
+                try:
+                    from tools.services.intelligence_service.language.embedding_generator import embed as direct_embed
+                    embeddings = await direct_embed(texts, model="text-embedding-3-small")
+                    
+                    # Cache results
+                    for text, embedding in zip(texts, embeddings):
+                        text_hash = hashlib.md5(text.encode()).hexdigest()
+                        self.embedding_cache[text_hash] = embedding
+                    
+                    return embeddings
+                    
+                except ImportError:
+                    # Last resort: process individually
+                    embeddings = []
+                    for text in texts:
+                        embedding = await self._generate_embedding(text)
+                        embeddings.append(embedding)
+                    return embeddings
                 
         except Exception as e:
             logger.error(f"Failed to generate batch embeddings: {e}")
             return [None] * len(texts)
+    
+    async def _fallback_similarity_search(self, query: str, entity_type: Optional[str] = None,
+                                        limit: int = 10, similarity_threshold: float = 0.7) -> List[SearchResult]:
+        """
+        Fallback similarity search using intelligence service search function
+        Used when the database RPC function is not available
+        """
+        try:
+            # Query all content from database
+            db_query = self.supabase.client.schema('dev').table('db_meta_embedding').select('*')
+            
+            # Add filters
+            if entity_type:
+                db_query = db_query.eq('entity_type', entity_type)
+            db_query = db_query.eq('database_source', self.database_source)
+            
+            result = db_query.execute()
+            
+            if not result.data:
+                return []
+            
+            # Extract content texts for search
+            candidates = []
+            content_to_row = {}
+            
+            for row in result.data:
+                content = row.get('content', '')
+                if content:
+                    candidates.append(content)
+                    content_to_row[content] = row
+            
+            if not candidates:
+                return []
+            
+            # Use intelligence service search function
+            try:
+                from tools.services.intelligence_service.language.embedding_generator import search
+                
+                # Use the actual query with intelligence service search
+                search_results_raw = await search(query, candidates, top_k=limit)
+                
+                search_results = []
+                for content, similarity_score in search_results_raw:
+                    if similarity_score >= similarity_threshold and content in content_to_row:
+                        row = content_to_row[content]
+                        search_result = SearchResult(
+                            entity_name=row['entity_name'],
+                            entity_type=row['entity_type'],
+                            similarity_score=similarity_score,
+                            content=content,
+                            metadata=row.get('metadata', {}),
+                            semantic_tags=row.get('semantic_tags', [])
+                        )
+                        search_results.append(search_result)
+                
+                return search_results
+                
+            except ImportError:
+                logger.warning("Intelligence service search not available")
+                return []
+            
+        except Exception as e:
+            logger.error(f"Fallback similarity search failed: {e}")
+            return []
+    
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Calculate cosine similarity between two vectors"""
+        try:
+            import math
+            
+            # Convert to same length if needed
+            if len(vec1) != len(vec2):
+                min_len = min(len(vec1), len(vec2))
+                vec1 = vec1[:min_len]
+                vec2 = vec2[:min_len]
+            
+            # Calculate dot product
+            dot_product = sum(a * b for a, b in zip(vec1, vec2))
+            
+            # Calculate magnitudes
+            magnitude1 = math.sqrt(sum(a * a for a in vec1))
+            magnitude2 = math.sqrt(sum(a * a for a in vec2))
+            
+            # Avoid division by zero
+            if magnitude1 == 0 or magnitude2 == 0:
+                return 0.0
+            
+            # Calculate cosine similarity
+            similarity = dot_product / (magnitude1 * magnitude2)
+            
+            # Ensure result is between 0 and 1
+            return max(0.0, min(1.0, similarity))
+            
+        except Exception as e:
+            logger.error(f"Cosine similarity calculation failed: {e}")
+            return 0.0
     
     async def get_metadata_stats(self) -> Dict[str, Any]:
         """Get statistics about stored metadata embeddings"""

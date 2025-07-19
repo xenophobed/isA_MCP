@@ -1,0 +1,123 @@
+<div class="page-header">
+    <h1 class="page-title">System Logs</h1>
+    <p class="page-description">
+        Monitor MCP server activity, tool calls, and system events in real-time.
+    </p>
+    <div class="page-actions">
+        <button class="btn btn-secondary" id="refresh-logs">
+            <i data-lucide="refresh-cw"></i>
+            Refresh
+        </button>
+        <button class="btn btn-secondary" id="clear-logs">
+            <i data-lucide="trash-2"></i>
+            Clear Logs
+        </button>
+        <button class="btn btn-primary" id="export-logs">
+            <i data-lucide="download"></i>
+            Export Logs
+        </button>
+    </div>
+</div>
+
+<!-- Log Filters -->
+<div class="card" style="margin-bottom: var(--space-6);">
+    <div class="card-header">
+        <h3 class="card-title">Filters</h3>
+    </div>
+    <div class="card-content">
+        <div class="grid grid-4">
+            <!-- Log Level Filter -->
+            <div>
+                <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Log Level</label>
+                <select class="search-input" id="log-level-filter">
+                    <option value="">All Levels</option>
+                    <option value="DEBUG">Debug</option>
+                    <option value="INFO">Info</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="ERROR">Error</option>
+                    <option value="CRITICAL">Critical</option>
+                </select>
+            </div>
+
+            <!-- Component Filter -->
+            <div>
+                <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Component</label>
+                <select class="search-input" id="component-filter">
+                    <option value="">All Components</option>
+                    <option value="tools">Tools</option>
+                    <option value="prompts">Prompts</option>
+                    <option value="resources">Resources</option>
+                    <option value="server">Server</option>
+                    <option value="discovery">Discovery</option>
+                </select>
+            </div>
+
+            <!-- Time Range Filter -->
+            <div>
+                <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Time Range</label>
+                <select class="search-input" id="time-range-filter">
+                    <option value="1h">Last Hour</option>
+                    <option value="6h">Last 6 Hours</option>
+                    <option value="24h" selected>Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                </select>
+            </div>
+
+            <!-- Search -->
+            <div>
+                <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Search</label>
+                <input type="text" class="search-input" id="log-search" placeholder="Search logs...">
+            </div>
+        </div>
+
+        <!-- Quick Filter Buttons -->
+        <div style="margin-top: var(--space-4); display: flex; gap: var(--space-2); flex-wrap: wrap;">
+            <button class="btn btn-ghost btn-sm log-quick-filter active" data-filter="all">
+                All Logs
+            </button>
+            <button class="btn btn-ghost btn-sm log-quick-filter" data-filter="errors">
+                <i data-lucide="alert-circle" style="width: 14px; height: 14px;"></i>
+                Errors Only
+            </button>
+            <button class="btn btn-ghost btn-sm log-quick-filter" data-filter="tools">
+                <i data-lucide="wrench" style="width: 14px; height: 14px;"></i>
+                Tool Calls
+            </button>
+            <button class="btn btn-ghost btn-sm log-quick-filter" data-filter="discovery">
+                <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                Discovery
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Log Statistics -->
+<div class="grid grid-4" style="margin-bottom: var(--space-6);" id="log-stats">
+    <!-- Log stats will be populated by JavaScript -->
+</div>
+
+<!-- Log Display -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Log Stream</h3>
+        <div style="display: flex; gap: var(--space-2);">
+            <span class="status-indicator success" id="connection-status">
+                <span class="status-dot"></span>
+                Connected
+            </span>
+        </div>
+    </div>
+    <div class="card-content" style="padding: 0;">
+        <div class="log-container" id="log-container">
+            <div class="log-stream" id="log-stream">
+                <!-- Log entries will be populated by JavaScript -->
+            </div>
+            <div class="log-loading" id="log-loading">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading logs...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

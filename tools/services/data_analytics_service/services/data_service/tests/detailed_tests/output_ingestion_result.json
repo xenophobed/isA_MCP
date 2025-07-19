@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "request_id": "test_ingestion",
+  "source_path": "tools/services/data_analytics_service/processors/data_processors/tests/customers_sample.csv",
+  "sqlite_database_path": "/Users/xenodennis/Documents/Fun/isA_MCP/resources/dbs/sqlite/customers_sample.db",
+  "pgvector_database": "test_separated_functions",
+  "metadata_pipeline": {
+    "tables_found": 1,
+    "columns_found": 12,
+    "business_entities": 1,
+    "semantic_tags": 13,
+    "embeddings_stored": 24,
+    "search_ready": true,
+    "ai_analysis_source": "ai_comprehensive_analysis"
+  },
+  "processing_time_ms": 68796.254,
+  "cost_usd": 0.0,
+  "created_at": "2025-07-18T21:44:17.505840"
+}

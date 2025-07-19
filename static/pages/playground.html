@@ -1,0 +1,51 @@
+<div class="page-header">
+    <h1 class="page-title">MCP Playground</h1>
+    <p class="page-description">
+        Test and experiment with MCP tools and prompts in real-time.
+    </p>
+</div>
+
+<div class="grid grid-2">
+    <!-- Input Panel -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Tool Testing</h3>
+        </div>
+        <div class="card-content">
+            <form id="playground-form">
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Tool</label>
+                    <select class="search-input" id="tool-select">
+                        <option value="">Select a tool</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: var(--space-4);">
+                    <label style="display: block; margin-bottom: var(--space-2); font-weight: 500;">Arguments (JSON)</label>
+                    <textarea class="search-input" id="tool-args" rows="6" placeholder='{"key": "value"}'></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i data-lucide="play"></i>
+                    Execute Tool
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Output Panel -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Output</h3>
+            <button class="btn btn-ghost btn-sm" id="copy-output">
+                <i data-lucide="copy"></i>
+                Copy
+            </button>
+        </div>
+        <div class="card-content">
+            <div id="output-area" style="min-height: 300px; padding: var(--space-4); background: var(--muted); border-radius: var(--radius); font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap;">
+                Output will appear here...
+            </div>
+        </div>
+    </div>
+</div>
