@@ -141,30 +141,42 @@ async def test_service_initialization():
         print(f"❌ Service initialization failed: {e}")
         return False
 
-async def test_single_csv_pipeline():
-    """Test complete pipeline with realistic CSV data"""
-    print("📊 Testing Complete Pipeline - CSV Data Source")
+async def test_real_customer_csv_pipeline():
+    """Test complete pipeline with real customer CSV data"""
+    print("📊 Testing Complete Pipeline - Real Customer CSV Data")
     
-    service = MetadataStoreService("test_pipeline_db")
+    service = MetadataStoreService("customer_test_db")
     
     try:
-        # Create test CSV file
-        csv_file = create_test_csv_file()
-        print(f"   📁 Created test CSV: {Path(csv_file).name}")
+        # Use the real customer sample CSV file
+        current_dir = Path(__file__).parent
+        csv_file = current_dir.parent.parent.parent / "processors" / "data_processors" / "tests" / "customers_sample.csv"
+        
+        if not csv_file.exists():
+            print(f"   ❌ Customer CSV file not found: {csv_file}")
+            return False
+            
+        print(f"   📁 Using real customer CSV: {csv_file.name}")
         
         # Run complete pipeline
         print("   🔄 Running complete 3-step pipeline...")
-        result = await service.process_data_source(csv_file, pipeline_id="csv_test_pipeline")
+        result = await service.process_data_source(str(csv_file), pipeline_id="real_customer_pipeline")
         
         # Validate pipeline result
         assert result.success, f"Pipeline failed: {result.error_message}"
         print(f"   ✅ Pipeline completed successfully in {result.total_duration:.2f}s")
         
-        # Step 1 validation
+        # Step 1 validation - Customer data specific
         print(f"   📋 Step 1 - Extraction: {result.tables_found} tables, {result.columns_found} columns ({result.extraction_duration:.2f}s)")
         assert result.tables_found > 0, "No tables found"
         assert result.columns_found > 0, "No columns found"
-        assert 'order_id' in str(result.raw_metadata), "Expected order_id column not found"
+        
+        # Check for expected customer columns
+        raw_metadata_str = str(result.raw_metadata)
+        expected_columns = ['Customer Id', 'First Name', 'Last Name', 'Company', 'Email']
+        found_columns = [col for col in expected_columns if col in raw_metadata_str]
+        print(f"   🔍 Found customer columns: {found_columns}")
+        assert len(found_columns) >= 3, f"Expected customer columns not found. Found: {found_columns}"
         
         # Step 2 validation  
         print(f"   🧠 Step 2 - Enrichment: {result.business_entities} entities, {result.semantic_tags} tags ({result.enrichment_duration:.2f}s)")
@@ -172,27 +184,31 @@ async def test_single_csv_pipeline():
         assert result.semantic_tags > 0, "No semantic tags generated"
         assert result.ai_analysis_source != 'error', "AI analysis failed"
         
-        # Step 3 validation (note: may have storage issues due to table name mismatch)
+        # Validate semantic metadata content
+        semantic_data = result.semantic_metadata
+        confidence_scores = getattr(semantic_data, 'confidence_scores', {})
+        overall_confidence = confidence_scores.get('overall', 0.0)
+        domain_class = getattr(semantic_data, 'domain_classification', {})
+        print(f"   📊 Semantic analysis confidence: {overall_confidence:.2f}")
+        print(f"   🏷️  Domain classification: {domain_class.get('primary_domain', 'unknown')}")
+        
+        # Step 3 validation
         print(f"   💾 Step 3 - Storage: {result.embeddings_stored} embeddings stored ({result.storage_duration:.2f}s)")
-        # Note: Storage may fail due to table name configuration - this is expected
         step3_working = result.storage_duration > 0  # Embedding generation is working
         print(f"   🔍 Step 3 embedding generation: {'✅' if step3_working else '❌'}")
         
         if result.embeddings_stored == 0:
-            print("   ⚠️  Storage failed (table config issue) - but embedding generation worked")
+            print("   ⚠️  Storage may have failed (pgvector config) - but embedding generation worked")
         
         # Cost and performance validation
         print(f"   💰 Pipeline cost: ${result.pipeline_cost:.4f}")
         assert result.pipeline_cost >= 0, "Invalid cost calculation"
         
-        # Cleanup
-        Path(csv_file).unlink()
-        
-        print("✅ CSV pipeline test passed!")
+        print("✅ Real customer CSV pipeline test passed!")
         return True
         
     except Exception as e:
-        print(f"❌ CSV pipeline test failed: {e}")
+        print(f"❌ Real customer CSV pipeline test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -497,7 +513,7 @@ async def main():
     results = []
     
     results.append(await test_service_initialization())
-    results.append(await test_single_csv_pipeline())
+    results.append(await test_real_customer_csv_pipeline())
     results.append(await test_single_json_pipeline())
     results.append(await test_batch_processing())
     results.append(await test_search_functionality())

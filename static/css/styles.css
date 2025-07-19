@@ -798,6 +798,49 @@ body {
     to { transform: rotate(360deg); }
 }
 
+/* Page Loading States */
+.loading-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: var(--space-8);
+}
+
+.loading-container .loading {
+    font-size: 16px;
+    gap: var(--space-3);
+}
+
+.loading-container .spinner {
+    width: 20px;
+    height: 20px;
+}
+
+/* Error States */
+.error-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: var(--space-8);
+}
+
+.error-message {
+    text-align: center;
+    max-width: 400px;
+}
+
+.error-message h2 {
+    color: var(--destructive);
+    margin-bottom: var(--space-4);
+}
+
+.error-message p {
+    color: var(--muted-foreground);
+    margin-bottom: var(--space-6);
+}
+
 /* Utilities */
 .sr-only {
     position: absolute;

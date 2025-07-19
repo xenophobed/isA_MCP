@@ -11,7 +11,13 @@ import logging
 
 from .query_matcher import QueryContext, MetadataMatch, QueryPlan
 from .semantic_enricher import SemanticMetadata
-from .....base_service import BaseService
+
+# Import AI text generator from intelligence service
+try:
+    from tools.services.intelligence_service.language.text_generator import generate
+except ImportError:
+    generate = None
+    logging.warning("Could not import intelligence_service text_generator - SQL generation will be limited")
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +32,10 @@ class SQLGenerationResult:
     estimated_rows: Optional[str] = None
     alternative_sqls: List[str] = None
 
-class LLMSQLGenerator(BaseService):
+class LLMSQLGenerator:
     """LLM-powered SQL generation with domain expertise"""
     
     def __init__(self):
-        super().__init__("LLMSQLGenerator")
         self.llm_model = None
         self.domain_templates = self._load_domain_templates()
         self.sql_patterns = self._load_sql_patterns()
@@ -52,12 +57,12 @@ class LLMSQLGenerator(BaseService):
         if llm_model:
             self.llm_model = llm_model
         else:
-            # Use ISA Model client from BaseService
-            try:
-                self.llm_model = self.isa_client  # Using the client from BaseService
-                logger.info("LLM model initialized successfully with ISA Model client")
-            except Exception as e:
-                logger.warning(f"ISA client not available: {e}, using fallback generation")
+            # Use AI text generator from intelligence service
+            if generate:
+                self.llm_model = "text_generator_available"
+                logger.info("LLM model initialized successfully with intelligence service text generator")
+            else:
+                logger.warning("Intelligence service text generator not available, using fallback generation")
                 self.llm_model = None
     
     async def generate_sql_from_context(self, query_context: QueryContext, 
@@ -144,7 +149,7 @@ class LLMSQLGenerator(BaseService):
     
     def get_service_billing_info(self) -> Dict[str, Any]:
         """Get billing information for this service"""
-        return self.get_billing_summary()
+        return {"message": "Billing handled by intelligence service text generator"}
     
     async def _build_enhanced_prompt(self, original_query: str, 
                                    query_context: QueryContext,
@@ -212,16 +217,11 @@ class LLMSQLGenerator(BaseService):
     async def _generate_with_llm(self, prompt: str) -> SQLGenerationResult:
         """Generate SQL using LLM model"""
         try:
-            # Call LLM model using ISA Model client with billing collection
-            result_data, billing_info = await self.call_isa_with_billing(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                parameters={"temperature": 0.1},
-                operation_name="generate_sql"
-            )
-            
-            response = result_data.get('text', '') if isinstance(result_data, dict) else result_data
+            # Use AI text generator from intelligence service
+            if generate:
+                response = await generate(prompt, temperature=0.1)
+            else:
+                raise Exception("AI text generator not available - intelligence service not accessible")
             
             # Parse response - isa_model returns string
             if isinstance(response, str):
@@ -426,8 +426,8 @@ class LLMSQLGenerator(BaseService):
         if match:
             return match.group(1).strip()
         
-        # Look for SELECT statements
-        select_pattern = r'(SELECT\s+.*?;?)'
+        # Look for SELECT statements - improved pattern to capture full statements
+        select_pattern = r'(SELECT\s+.*?(?:;|$))'
         match = re.search(select_pattern, text, re.DOTALL | re.IGNORECASE)
         
         if match:

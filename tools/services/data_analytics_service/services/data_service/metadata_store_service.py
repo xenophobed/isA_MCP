@@ -100,11 +100,31 @@ class MetadataStoreService:
         logger.info(f"Starting pipeline {pipeline_id} for source: {source_path}")
         
         try:
-            # Step 1: Metadata Extraction
+            # Step 1: Data Processing + Metadata Extraction
             step1_start = datetime.now()
-            logger.info(f"Pipeline {pipeline_id}: Step 1 - Extracting metadata")
+            logger.info(f"Pipeline {pipeline_id}: Step 1 - Processing data source and extracting metadata")
             
-            raw_metadata = self.metadata_extractor.extract_metadata(source_path, source_type)
+            csv_database_path = None
+            # First, process CSV file and create SQLite database if needed
+            if source_path.lower().endswith('.csv'):
+                from ...processors.data_processors.csv_processor import CSVProcessor
+                logger.info(f"Pipeline {pipeline_id}: Processing CSV file and creating SQLite database")
+                
+                csv_processor = CSVProcessor(source_path)
+                csv_analysis = csv_processor.get_full_analysis_with_sqlite(save_to_sqlite=True)
+                
+                if not csv_analysis.get('sqlite_database', {}).get('success', False):
+                    raise Exception(f"CSV processing failed: {csv_analysis.get('error', 'Unknown error')}")
+                
+                csv_database_path = csv_analysis['sqlite_database']['database_path']
+                logger.info(f"Pipeline {pipeline_id}: SQLite database created at {csv_database_path}")
+            
+            # Then extract metadata
+            raw_metadata = extract_metadata(source_path, source_type)
+            
+            # Store database path in metadata for SQL executor
+            if csv_database_path:
+                raw_metadata['csv_database_path'] = csv_database_path
             
             if 'error' in raw_metadata:
                 raise Exception(f"Metadata extraction failed: {raw_metadata['error']}")

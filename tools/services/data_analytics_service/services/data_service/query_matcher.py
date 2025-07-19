@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 import logging
 
-from .embedding_storage import EmbeddingStorage, SearchResult
+from .metadata_embedding import AIMetadataEmbeddingService, SearchResult
 from .semantic_enricher import SemanticMetadata
 
 logger = logging.getLogger(__name__)
@@ -54,8 +54,8 @@ class QueryPlan:
 class QueryMatcher:
     """Step 4: Find related metadata to support SQL generation"""
     
-    def __init__(self, embedding_storage: EmbeddingStorage):
-        self.embedding_storage = embedding_storage
+    def __init__(self, embedding_service: AIMetadataEmbeddingService):
+        self.embedding_service = embedding_service
         self.business_terms = self._load_business_terms()
         self.sql_patterns = self._load_sql_patterns()
         self.entity_synonyms = self._load_entity_synonyms()
@@ -149,7 +149,7 @@ class QueryMatcher:
             List of related entities
         """
         # Search for similar entities using embeddings
-        related_entities = await self.embedding_storage.search_similar_entities(
+        related_entities = await self.embedding_service.search_similar_entities(
             f"related to {entity_name} {relationship_type}",
             entity_type=None,
             limit=10,
@@ -524,7 +524,7 @@ class QueryMatcher:
         matches = []
         
         # Search using embeddings
-        search_results = await self.embedding_storage.search_similar_entities(
+        search_results = await self.embedding_service.search_similar_entities(
             f"entity {entity} table database",
             entity_type=None,
             limit=5,
@@ -550,7 +550,7 @@ class QueryMatcher:
         
         try:
             # Search with full query - lower threshold for better coverage
-            search_results = await self.embedding_storage.search_similar_entities(
+            search_results = await self.embedding_service.search_similar_entities(
                 query,
                 entity_type=None,
                 limit=10,
@@ -604,7 +604,7 @@ class QueryMatcher:
         matches = []
         
         # Search columns using embeddings
-        search_results = await self.embedding_storage.search_similar_entities(
+        search_results = await self.embedding_service.search_similar_entities(
             f"column attribute {attribute} field",
             entity_type='column',
             limit=5,

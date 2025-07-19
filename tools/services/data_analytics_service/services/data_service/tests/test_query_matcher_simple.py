@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..
 from tools.services.data_analytics_service.services.data_service.query_matcher import (
     QueryMatcher, QueryContext, MetadataMatch, QueryPlan
 )
-from tools.services.data_analytics_service.services.data_service.embedding_storage import (
-    EmbeddingStorage, SearchResult
+from tools.services.data_analytics_service.services.data_service.metadata_embedding import (
+    AIMetadataEmbeddingService, SearchResult
 )
 from tools.services.data_analytics_service.services.data_service.semantic_enricher import (
     SemanticMetadata
@@ -104,9 +104,9 @@ class TestQueryMatcherSimple:
         )
     
     @pytest.fixture
-    def mock_embedding_storage(self):
-        """Create mock embedding storage with realistic search results"""
-        mock_storage = Mock(spec=EmbeddingStorage)
+    def mock_embedding_service(self):
+        """Create mock embedding service with realistic search results"""
+        mock_service = Mock(spec=AIMetadataEmbeddingService)
         
         mock_results = [
             SearchResult(
@@ -114,24 +114,26 @@ class TestQueryMatcherSimple:
                 entity_type='table',
                 similarity_score=0.8,
                 content='Sales transaction data with customer information',
-                metadata={'table_comment': 'E-commerce sales transaction data'}
+                metadata={'table_comment': 'E-commerce sales transaction data'},
+                semantic_tags=['sales', 'ecommerce', 'transaction']
             ),
             SearchResult(
                 entity_name='customers',
                 entity_type='table',
                 similarity_score=0.7,
                 content='Customer master data with personal information',
-                metadata={'table_comment': 'Customer information'}
+                metadata={'table_comment': 'Customer information'},
+                semantic_tags=['customer', 'user', 'profile']
             )
         ]
         
-        mock_storage.search_similar_entities = AsyncMock(return_value=mock_results)
-        return mock_storage
+        mock_service.search_similar_entities = AsyncMock(return_value=mock_results)
+        return mock_service
     
     @pytest.fixture
-    def query_matcher(self, mock_embedding_storage):
-        """Create QueryMatcher instance with mock storage"""
-        return QueryMatcher(mock_embedding_storage)
+    def query_matcher(self, mock_embedding_service):
+        """Create QueryMatcher instance with mock service"""
+        return QueryMatcher(mock_embedding_service)
     
     @pytest.mark.asyncio
     async def test_english_query_context_extraction(self, query_matcher):

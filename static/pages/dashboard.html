@@ -1,0 +1,65 @@
+<div class="page-header">
+    <h1 class="page-title">MCP Dashboard</h1>
+    <p class="page-description">
+        Monitor your MCP server, track tool usage, and manage system resources from a unified interface.
+    </p>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-4" id="stats-grid">
+    <!-- Stats will be populated by JavaScript -->
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-2" style="margin-top: var(--space-8);">
+    <!-- Tool Usage Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Tool Usage</h3>
+            <p class="card-description">Last 7 days</p>
+        </div>
+        <div class="card-content">
+            <canvas id="usage-chart" style="height: 200px;"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Activity</h3>
+            <p class="card-description">Latest MCP operations</p>
+        </div>
+        <div class="card-content">
+            <div id="activity-list">
+                <!-- Activity items will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Performance -->
+<div class="card" style="margin-top: var(--space-6);">
+    <div class="card-header">
+        <h3 class="card-title">System Performance</h3>
+        <p class="card-description">MCP server metrics and tool response times</p>
+    </div>
+    <div class="card-content">
+        <div class="table-container">
+            <table class="table" id="performance-table">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Type</th>
+                        <th>Avg Response Time</th>
+                        <th>Success Rate</th>
+                        <th>Calls (24h)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Performance data will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
