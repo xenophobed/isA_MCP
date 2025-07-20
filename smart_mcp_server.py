@@ -26,6 +26,7 @@ from core.auto_discovery import AutoDiscoverySystem
 from tools.core.tool_selector import ToolSelector
 from prompts.prompt_selector import PromptSelector
 from resources.resource_selector import ResourceSelector
+from core.search_service import get_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class SmartMCPServer:
         self.tool_selector = None
         self.prompt_selector = None
         self.resource_selector = None
+        self.search_service = None
         self.auto_discovery = AutoDiscoverySystem()
         self.config = config or {}
     
@@ -115,6 +117,14 @@ class SmartMCPServer:
         except Exception as e:
             print(f"  ⚠️ Resource selector failed: {e}")
             self.resource_selector = None
+        
+        # Unified search service
+        try:
+            self.search_service = await get_search_service(self.mcp)
+            print("  ✅ Unified search service ready (connected to MCP)")
+        except Exception as e:
+            print(f"  ⚠️ Search service failed: {e}")
+            self.search_service = None
         
         print("✅ AI selectors initialized and connected to MCP server")
     
@@ -334,6 +344,71 @@ async def capabilities_endpoint(request):
             "message": str(e)
         })
 
+async def search_endpoint(request):
+    """Unified search across tools, prompts, and resources"""
+    try:
+        body = await request.json()
+        query = body.get("query", "")
+        filters = body.get("filters", {})
+        max_results = body.get("max_results", 10)
+        user_id = body.get("user_id")
+        
+        if not query.strip():
+            return JSONResponse({
+                "status": "error",
+                "message": "Query is required"
+            })
+        
+        # Get the search service from the smart server instance
+        if hasattr(smart_server, 'search_service') and smart_server.search_service:
+            from core.search_service import SearchFilter
+            
+            # Convert filters to SearchFilter object
+            search_filter = SearchFilter(
+                types=filters.get("types"),
+                categories=filters.get("categories"), 
+                keywords=filters.get("keywords"),
+                min_similarity=filters.get("min_similarity", 0.25)
+            )
+            
+            # Perform search with user filtering
+            results = await smart_server.search_service.search(query, search_filter, max_results, user_id)
+            
+            # Convert results to JSON-serializable format
+            search_results = []
+            for result in results:
+                search_results.append({
+                    "name": result.name,
+                    "type": result.type,
+                    "description": result.description,
+                    "similarity_score": result.similarity_score,
+                    "category": result.category,
+                    "keywords": result.keywords,
+                    "metadata": result.metadata
+                })
+            
+            return JSONResponse({
+                "status": "success",
+                "query": query,
+                "filters": filters,
+                "user_id": user_id,
+                "results": search_results,
+                "result_count": len(search_results),
+                "max_results": max_results
+            })
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": "Search service not available"
+            })
+            
+    except Exception as e:
+        logger.error(f"Search endpoint error: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        })
+
 # =================== PORTAL ENDPOINTS ===================
 def get_supabase_client():
     """Get Supabase client for portal queries"""
@@ -502,6 +577,7 @@ def add_endpoints(app: Starlette):
         Route("/discover", discover_endpoint, methods=["POST"]),
         Route("/stats", stats_endpoint),
         Route("/capabilities", capabilities_endpoint),
+        Route("/search", search_endpoint, methods=["POST"]),
         # Admin API endpoints (separate from MCP endpoints)
         Route("/admin/tools", portal_tools),
         Route("/admin/prompts", portal_prompts),
@@ -548,6 +624,10 @@ async def run_server(port: int = 8081):
     # Get ASGI application
     app = mcp.streamable_http_app()
     
+    # Add optional authentication middleware
+    from core.mcp_auth_middleware import add_mcp_auth_middleware
+    add_mcp_auth_middleware(app, smart_server.config)
+    
     # Add custom endpoints
     add_endpoints(app)
     
@@ -564,6 +644,7 @@ async def run_server(port: int = 8081):
     print(f"   • /discover (POST) - AI-powered capability discovery")
     print(f"   • /stats - AI selector statistics")
     print(f"   • /capabilities - List all available capabilities")
+    print(f"   • /search (POST) - Unified search across tools, prompts, and resources")
     print(f"   • /admin/tools - List MCP tools (admin)")
     print(f"   • /admin/prompts - List MCP prompts (admin)") 
     print(f"   • /admin/resources - List MCP resources (admin)")

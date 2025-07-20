@@ -138,7 +138,9 @@ class MCPSettings:
     
     # Authentication (disabled by default for initial setup)
     require_auth: bool = False
+    require_mcp_auth: bool = False
     api_keys: Dict[str, str] = field(default_factory=dict)
+    mcp_api_keys: Dict[str, str] = field(default_factory=dict)
     
     # External service configurations
     openweather_api_key: Optional[str] = None
@@ -167,6 +169,11 @@ class MCPSettings:
     supabase_service_role_key: Optional[str] = None
     supabase_pwd: Optional[str] = None
     db_schema: Optional[str] = None
+    
+    # ISA Model Service APIs
+    isa_service_url: Optional[str] = None
+    isa_api_key: Optional[str] = None
+    require_isa_auth: bool = False
     
     # Local and Cloud Supabase URLs
     supabase_local_url: Optional[str] = None

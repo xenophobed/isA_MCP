@@ -1,45 +1,40 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Web Crawl Service - Intelligent Hybrid Content Extraction
+Web Crawl Service - Simplified Hybrid Content Extraction
 
-Elegant, generic hybrid approach:
-1. Try traditional extraction (BeautifulSoup + CSS selectors) first
-2. Fall back to VLM analysis only when needed
-3. Use atomic functions for clean separation
-4. Synthesize final output with best from both methods
+Simplified architecture:
+1. Default: BS4 text extraction (fast, clean)
+2. Fallback: VLM analysis (comprehensive)
+3. Analysis: text_generator for final synthesis
 """
 
 import json
 import asyncio
 import requests
 from typing import Dict, Any, List, Optional
-from pathlib import Path
 from playwright.async_api import async_playwright, Browser, Page
 
 from core.logging import get_logger
 
 # Import atomic functions
+from tools.services.web_services.services.bs4_service import extract_text as bs4_extract
 from tools.services.intelligence_service.vision.image_analyzer import analyze as image_analyze
 from tools.services.intelligence_service.language.text_generator import generate
-
-# Import extraction and filtering strategies
-from tools.services.web_services.strategies.extraction.css_extraction import CSSExtractionStrategy, PredefinedSchemas
-from tools.services.web_services.strategies.filtering.pruning_filter import PruningFilter
 
 logger = get_logger(__name__)
 
 
 class WebCrawlService:
-    """Intelligent hybrid web crawling service"""
+    """Simplified hybrid web crawling service"""
     
     def __init__(self):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
-        logger.info("✅ WebCrawlService initialized with hybrid approach")
+        logger.info("✅ WebCrawlService initialized with simplified hybrid approach")
     
     async def crawl_and_analyze(self, url: str, analysis_request: Optional[str] = None) -> Dict[str, Any]:
         """
-        Main crawling function with hybrid approach
+        Main crawling function with simplified hybrid approach
         
         Args:
             url: Target web page URL
@@ -49,17 +44,15 @@ class WebCrawlService:
             Dictionary containing extracted and analyzed content
         """
         try:
-            logger.info(f"🚀 Starting hybrid crawl for: {url}")
+            logger.info(f"🚀 Starting simplified crawl for: {url}")
             logger.info(f"📋 Analysis request: {analysis_request}")
             
-            # Step 1: Check if traditional extraction is viable
-            can_extract_traditionally = await self._can_extract_traditionally(url)
+            # Step 1: Try BS4 extraction first (default)
+            can_use_bs4 = await self._can_use_bs4(url)
             
-            result = {}
-            
-            if can_extract_traditionally:
-                logger.info("✅ Using traditional extraction method")
-                result = await self._traditional_extraction_path(url, analysis_request)
+            if can_use_bs4:
+                logger.info("✅ Using BS4 extraction method")
+                result = await self._bs4_extraction_path(url, analysis_request)
             else:
                 logger.info("🔄 Falling back to VLM analysis method")
                 result = await self._vlm_analysis_path(url, analysis_request)
@@ -83,7 +76,7 @@ class WebCrawlService:
     
     async def crawl_and_compare_multiple(self, urls: List[str], analysis_request: str) -> Dict[str, Any]:
         """
-        Multi-URL comparison with hybrid approach
+        Multi-URL comparison with simplified approach
         
         Args:
             urls: List of URLs to compare
@@ -93,7 +86,7 @@ class WebCrawlService:
             Dictionary containing comparison results
         """
         try:
-            logger.info(f"🚀 Starting multi-URL hybrid crawl for {len(urls)} URLs")
+            logger.info(f"🚀 Starting multi-URL crawl for {len(urls)} URLs")
             
             # Crawl each URL
             individual_results = []
@@ -117,15 +110,17 @@ class WebCrawlService:
                         "success": False
                     })
             
-            # Generate comparison report
+            # Generate comparison report using text_generator
             comparison_report = await self._generate_comparison_report(individual_results, analysis_request)
             
             return {
                 "success": True,
                 "analysis_request": analysis_request,
                 "urls_count": len(urls),
+                "urls": urls,
                 "individual_results": individual_results,
                 "comparison_report": comparison_report,
+                "processing_time_ms": int(asyncio.get_event_loop().time() * 1000),
                 "timestamp": str(asyncio.get_event_loop().time())
             }
             
@@ -137,18 +132,18 @@ class WebCrawlService:
                 "urls": urls
             }
     
-    async def _can_extract_traditionally(self, url: str) -> bool:
+    async def _can_use_bs4(self, url: str) -> bool:
         """
-        Determine if traditional extraction (BeautifulSoup) is viable
+        Determine if BS4 extraction is viable (DEFAULT: True)
         
         Args:
             url: Target URL
             
         Returns:
-            True if traditional extraction should work
+            True if BS4 extraction should work (DEFAULT: True)
         """
         try:
-            # Quick HEAD request to check content type and accessibility
+            # Quick HEAD request to check content type
             response = requests.head(url, timeout=10, allow_redirects=True)
             
             # Check if it's HTML content
@@ -156,45 +151,16 @@ class WebCrawlService:
             if 'html' not in content_type:
                 return False
             
-            # Check if it's a simple static page (no heavy JS)
-            # Simple heuristics: if it's a known SPA framework or has specific patterns
-            response = requests.get(url, timeout=15)
-            html_content = response.text.lower()
-            
-            # Indicators that suggest heavy JS/SPA (need VLM)
-            js_heavy_indicators = [
-                'react', 'angular', 'vue.js', 'next.js', 'nuxt',
-                'document.write', 'eval(', 'webpack',
-                'data-reactroot', 'ng-app', 'v-app'
-            ]
-            
-            # If too many JS indicators, prefer VLM
-            js_score = sum(1 for indicator in js_heavy_indicators if indicator in html_content)
-            
-            # Check if there's substantial static content
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Remove script and style tags
-            for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
-                tag.decompose()
-            
-            text_content = soup.get_text(strip=True)
-            word_count = len(text_content.split())
-            
-            # Decision logic
-            has_good_content = word_count > 100
-            not_too_js_heavy = js_score < 3
-            
-            return has_good_content and not_too_js_heavy
+            # Default to BS4 unless clearly problematic
+            return True
             
         except Exception as e:
-            logger.warning(f"⚠️ Could not determine extraction method, defaulting to VLM: {e}")
-            return False
+            logger.warning(f"⚠️ Could not determine extraction method, defaulting to BS4: {e}")
+            return True  # Default to BS4 on error
     
-    async def _traditional_extraction_path(self, url: str, analysis_request: Optional[str]) -> Dict[str, Any]:
+    async def _bs4_extraction_path(self, url: str, analysis_request: Optional[str]) -> Dict[str, Any]:
         """
-        Traditional extraction using BeautifulSoup + CSS selectors
+        BS4 extraction path using bs4_service + text_generator
         
         Args:
             url: Target URL
@@ -204,52 +170,49 @@ class WebCrawlService:
             Extraction results
         """
         try:
-            logger.info("🔧 Starting traditional extraction...")
+            logger.info("🔧 Starting BS4 extraction...")
             
-            # Fetch content
-            response = requests.get(url, timeout=30)
-            html_content = response.text
+            # Extract text using BS4 service
+            bs4_result = await bs4_extract(url)
             
-            # Apply content filtering
-            pruning_filter = PruningFilter(threshold=0.3, min_word_threshold=5)
-            filtered_content = await pruning_filter.filter(html_content)
+            if not bs4_result.success:
+                logger.warning(f"BS4 extraction failed: {bs4_result.error}")
+                # Fall back to VLM if BS4 fails
+                return await self._vlm_analysis_path(url, analysis_request)
             
-            # Determine extraction schema based on analysis request
-            schema = self._select_extraction_schema(analysis_request, filtered_content)
-            
-            # Start browser for CSS extraction
-            await self._start_browser()
-            await self.page.goto(url, wait_until="domcontentloaded")
-            
-            # Extract structured data
-            css_extractor = CSSExtractionStrategy(schema)
-            extracted_data = await css_extractor.extract(self.page, filtered_content)
-            
-            # Generate final analysis if requested
+            # Generate analysis using text_generator if requested
             final_analysis = ""
-            if analysis_request and extracted_data:
-                final_analysis = await self._synthesize_traditional_results(extracted_data, analysis_request)
-            
-            await self._cleanup_browser()
+            if analysis_request and bs4_result.content:
+                final_analysis = await self._synthesize_bs4_results(bs4_result, analysis_request)
             
             return {
-                "method": "traditional_extraction",
-                "process_type": "css_extraction",
-                "schema_used": schema["name"],
-                "extracted_items": len(extracted_data),
-                "structured_data": extracted_data,
+                "method": "bs4_extraction",
+                "success": True,
+                "content": bs4_result.content,
+                "title": bs4_result.title,
+                "headings": bs4_result.headings,
+                "paragraphs": bs4_result.paragraphs,
+                "links": bs4_result.links,
+                "word_count": bs4_result.word_count,
+                "processing_time": bs4_result.processing_time,
                 "final_report": final_analysis,
-                "content_length": len(filtered_content)
+                "raw_data": {
+                    "title": bs4_result.title,
+                    "content": bs4_result.content[:1000] + "..." if len(bs4_result.content) > 1000 else bs4_result.content,
+                    "headings_count": len(bs4_result.headings),
+                    "paragraphs_count": len(bs4_result.paragraphs),
+                    "links_count": len(bs4_result.links)
+                }
             }
             
         except Exception as e:
-            logger.error(f"❌ Traditional extraction failed: {e}")
+            logger.error(f"❌ BS4 extraction path failed: {e}")
             # Fall back to VLM
             return await self._vlm_analysis_path(url, analysis_request)
     
     async def _vlm_analysis_path(self, url: str, analysis_request: Optional[str]) -> Dict[str, Any]:
         """
-        VLM-based analysis using image_analyzer atomic function
+        VLM analysis path using image_analyzer + text_generator
         
         Args:
             url: Target URL
@@ -270,10 +233,10 @@ class WebCrawlService:
             screenshot = await self.page.screenshot()
             
             # Create analysis prompt
-            prompt = self._create_vlm_analysis_prompt(analysis_request or "extract main content")
+            prompt = self._create_vlm_prompt(analysis_request or "extract and analyze main content")
             
             # Use image_analyzer atomic function
-            result = await image_analyze(
+            vlm_result = await image_analyze(
                 image=screenshot,
                 prompt=prompt,
                 provider="openai"
@@ -281,144 +244,96 @@ class WebCrawlService:
             
             await self._cleanup_browser()
             
-            if result.success:
+            if vlm_result.success:
+                # Generate final synthesis using text_generator if needed
+                final_analysis = vlm_result.response
+                if analysis_request:
+                    final_analysis = await self._synthesize_vlm_results(vlm_result.response, analysis_request)
+                
                 return {
                     "method": "vlm_analysis",
-                    "process_type": "vision_analysis",
-                    "model_used": result.model_used,
-                    "processing_time": result.processing_time,
-                    "final_report": result.response,
-                    "analysis_length": len(result.response)
+                    "success": True,
+                    "content": vlm_result.response,
+                    "model_used": vlm_result.model_used,
+                    "processing_time": vlm_result.processing_time,
+                    "final_report": final_analysis,
+                    "raw_data": {
+                        "analysis_length": len(vlm_result.response),
+                        "model": vlm_result.model_used,
+                        "processing_time": vlm_result.processing_time
+                    }
                 }
             else:
                 return {
                     "method": "vlm_analysis",
-                    "process_type": "vision_analysis",
-                    "error": result.error,
-                    "final_report": f"VLM analysis failed: {result.error}"
+                    "success": False,
+                    "error": vlm_result.error,
+                    "final_report": f"VLM analysis failed: {vlm_result.error}"
                 }
                 
         except Exception as e:
             logger.error(f"❌ VLM analysis failed: {e}")
             return {
                 "method": "vlm_analysis",
-                "process_type": "vision_analysis",
+                "success": False,
                 "error": str(e),
                 "final_report": f"Analysis failed: {str(e)}"
             }
     
-    def _select_extraction_schema(self, analysis_request: Optional[str], content: str) -> Dict[str, Any]:
-        """
-        Select appropriate extraction schema based on request and content
-        
-        Args:
-            analysis_request: User's analysis request
-            content: HTML content to analyze
-            
-        Returns:
-            Appropriate extraction schema
-        """
-        if not analysis_request:
-            # Default to general content extraction
-            return self._create_generic_content_schema()
-        
-        request_lower = analysis_request.lower()
-        
-        # Match request patterns to schemas
-        if any(word in request_lower for word in ['product', 'price', 'shop', 'buy', 'ecommerce']):
-            return PredefinedSchemas.get_product_listings_schema()
-        elif any(word in request_lower for word in ['news', 'article', 'blog', 'post']):
-            return PredefinedSchemas.get_news_articles_schema()
-        elif any(word in request_lower for word in ['contact', 'email', 'phone', 'address']):
-            return PredefinedSchemas.get_contact_info_schema()
-        elif any(word in request_lower for word in ['table', 'data', 'stats', 'numbers']):
-            return PredefinedSchemas.get_table_data_schema()
-        elif any(word in request_lower for word in ['link', 'navigation', 'menu']):
-            return PredefinedSchemas.get_navigation_links_schema()
-        else:
-            # Analyze content to determine type
-            content_lower = content.lower()
-            if content_lower.count('price') > 3 or content_lower.count('product') > 3:
-                return PredefinedSchemas.get_product_listings_schema()
-            elif content_lower.count('article') > 2 or content_lower.count('author') > 1:
-                return PredefinedSchemas.get_news_articles_schema()
-            else:
-                return self._create_generic_content_schema()
-    
-    def _create_generic_content_schema(self) -> Dict[str, Any]:
-        """Create a generic content extraction schema"""
-        return {
-            "name": "Generic Content",
-            "baseSelector": "main, article, .content, .main, .post, .article, body",
-            "fields": [
-                {"name": "title", "selector": "h1, h2, .title, title", "type": "text"},
-                {"name": "content", "selector": "p, .content, .text, .description", "type": "list"},
-                {"name": "headings", "selector": "h1, h2, h3, h4, h5, h6", "type": "list"},
-                {"name": "links", "selector": "a[href]", "type": "list"},
-                {"name": "images", "selector": "img", "type": "attribute", "attribute": "src"}
-            ]
-        }
-    
-    def _create_vlm_analysis_prompt(self, analysis_request: str) -> str:
-        """
-        Create appropriate VLM analysis prompt
-        
-        Args:
-            analysis_request: User's analysis request
-            
-        Returns:
-            Formatted prompt for VLM
-        """
-        return f"""Analyze this webpage screenshot for the following request: "{analysis_request}"
+    def _create_vlm_prompt(self, analysis_request: str) -> str:
+        """Create VLM analysis prompt"""
+        return f"""Analyze this webpage screenshot for: "{analysis_request}"
 
 Please provide a comprehensive analysis including:
 
 1. **Main Content Overview**
-   - What type of page is this?
-   - What is the primary purpose/content?
+   - Page type and purpose
    - Key sections and layout
+   - Primary content focus
 
-2. **Specific Analysis for Request**
-   - Address the specific request: {analysis_request}
+2. **Specific Analysis**
+   - Address the request: {analysis_request}
    - Extract relevant information
    - Identify key data points
 
 3. **Content Summary**
    - Main findings and insights
-   - Important details or specifications
-   - Any notable characteristics
+   - Important details
+   - Notable characteristics
 
-4. **Structured Findings**
+4. **Structured Output**
    - Organize information clearly
    - Use bullet points for key items
    - Provide actionable information
 
-Format your response as a clear, well-structured analysis that directly addresses the request."""
+Format as a clear, well-structured analysis."""
     
-    async def _synthesize_traditional_results(self, extracted_data: List[Dict[str, Any]], analysis_request: str) -> str:
-        """
-        Synthesize traditional extraction results using text generation
-        
-        Args:
-            extracted_data: Extracted structured data
-            analysis_request: User's analysis request
-            
-        Returns:
-            Synthesized analysis report
-        """
+    async def _synthesize_bs4_results(self, bs4_result, analysis_request: str) -> str:
+        """Synthesize BS4 results using text_generator"""
         try:
-            # Prepare data summary
-            data_summary = json.dumps(extracted_data[:10], indent=2)  # Limit to first 10 items
-            
-            prompt = f"""Based on the following extracted data from a webpage, create a comprehensive analysis report for this request: "{analysis_request}"
+            # Prepare content summary
+            content_summary = f"""
+Title: {bs4_result.title}
+Word Count: {bs4_result.word_count}
+Headings: {len(bs4_result.headings)}
+Paragraphs: {len(bs4_result.paragraphs)}
+Links: {len(bs4_result.links)}
 
-Extracted Data:
-{data_summary}
+Content Preview:
+{bs4_result.content[:1000]}...
+
+Sample Headings:
+{json.dumps([h['text'] for h in bs4_result.headings[:5]], indent=2)}
+"""
+            
+            prompt = f"""Based on this extracted webpage content, create a comprehensive analysis for: "{analysis_request}"
+
+{content_summary}
 
 Please provide:
-1. Summary of findings
-2. Key insights related to the request
-3. Structured analysis of the data
+1. Summary of findings relevant to the request
+2. Key insights and information
+3. Structured analysis of the content
 4. Actionable conclusions
 
 Format as a clear, professional report."""
@@ -427,20 +342,34 @@ Format as a clear, professional report."""
             return response
             
         except Exception as e:
-            logger.error(f"❌ Synthesis failed: {e}")
-            return f"Extracted {len(extracted_data)} items. Analysis synthesis failed: {str(e)}"
+            logger.error(f"❌ BS4 synthesis failed: {e}")
+            return f"BS4 extraction completed ({bs4_result.word_count} words). Analysis synthesis failed: {str(e)}"
+    
+    async def _synthesize_vlm_results(self, vlm_response: str, analysis_request: str) -> str:
+        """Synthesize VLM results using text_generator"""
+        try:
+            prompt = f"""Based on this VLM analysis of a webpage, create a refined report for: "{analysis_request}"
+
+VLM Analysis:
+{vlm_response}
+
+Please provide:
+1. Enhanced summary focused on the request
+2. Key insights and findings
+3. Structured analysis
+4. Actionable conclusions
+
+Format as a clear, professional report."""
+            
+            response = await generate(prompt, temperature=0.7)
+            return response
+            
+        except Exception as e:
+            logger.error(f"❌ VLM synthesis failed: {e}")
+            return vlm_response  # Return original VLM response if synthesis fails
     
     async def _generate_comparison_report(self, individual_results: List[Dict[str, Any]], analysis_request: str) -> str:
-        """
-        Generate comparison report using text generation
-        
-        Args:
-            individual_results: Results from individual URL analysis
-            analysis_request: Comparison request
-            
-        Returns:
-            Comparison report
-        """
+        """Generate comparison report using text_generator"""
         try:
             # Collect successful results
             successful_results = [r for r in individual_results if r.get("success")]
@@ -452,16 +381,17 @@ Format as a clear, professional report."""
             comparison_data = []
             for result in successful_results[:5]:  # Limit to 5 items
                 analysis_result = result.get("analysis_result", {})
-                final_report = analysis_result.get("result", {}).get("final_report", "No report available")
+                result_data = analysis_result.get("result", {})
                 
                 comparison_data.append({
                     "url": result.get("url"),
-                    "method": analysis_result.get("result", {}).get("method", "unknown"),
-                    "summary": final_report[:500] + "..." if len(final_report) > 500 else final_report
+                    "method": result_data.get("method", "unknown"),
+                    "title": result_data.get("title", "No title"),
+                    "content_preview": result_data.get("content", "")[:300] + "...",
+                    "final_report": result_data.get("final_report", "No analysis available")[:500] + "..."
                 })
             
-            # Generate comparison using text generation
-            prompt = f"""Create a comprehensive comparison report for this request: "{analysis_request}"
+            prompt = f"""Create a comprehensive comparison report for: "{analysis_request}"
 
 Data from {len(comparison_data)} websites:
 
@@ -470,7 +400,7 @@ Data from {len(comparison_data)} websites:
 Please provide:
 1. **Executive Summary** - Key findings across all sites
 2. **Detailed Comparison** - Compare specific aspects
-3. **Insights and Patterns** - Common themes and differences  
+3. **Insights and Patterns** - Common themes and differences
 4. **Recommendations** - Conclusions and suggestions
 
 Format as a professional markdown report."""
@@ -512,23 +442,17 @@ Format as a professional markdown report."""
 
 # Test function
 async def test_web_crawl_service():
-    """Test the hybrid web crawl service"""
+    """Test the simplified web crawl service"""
     service = WebCrawlService()
     
     try:
-        # Test with a simple page (should use traditional extraction)
+        # Test with example.com (should use BS4)
         result1 = await service.crawl_and_analyze(
-            "https://httpbin.org/html", 
-            "extract main content"
+            "https://example.com", 
+            "extract main content and analyze the page"
         )
         print(f"Test 1 Result: {result1.get('result', {}).get('method')} - {result1.get('success')}")
-        
-        # Test with a complex page (should use VLM)
-        result2 = await service.crawl_and_analyze(
-            "https://www.google.com", 
-            "analyze page layout and functionality"
-        )
-        print(f"Test 2 Result: {result2.get('result', {}).get('method')} - {result2.get('success')}")
+        print(f"Content: {result1.get('result', {}).get('content', '')[:200]}...")
         
     finally:
         await service.close()

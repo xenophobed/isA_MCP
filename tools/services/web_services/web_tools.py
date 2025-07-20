@@ -168,13 +168,13 @@ def register_web_tools(mcp: FastMCP):
         analysis_request: str = ""
     ) -> str:
         """
-        Intelligently crawl and analyze web pages using VLM+LLM
+        Intelligently crawl and analyze web pages using simplified hybrid approach: BS4 (default) + VLM (fallback) + LLM (analysis)
         
         Supports both single URL and multiple URL analysis:
         - Single URL: pass a single URL string
         - Multiple URLs: pass a JSON array string like '["url1", "url2"]'
         
-        Keywords: crawl, web, analyze, scrape, extract, page, compare, multiple
+        Keywords: crawl, web, analyze, scrape, extract, page, compare, multiple, bs4, beautifulsoup
         Category: web
         
         Args:

@@ -145,7 +145,7 @@ async def test_customer_queries_with_real_data():
         query_results = []
         
         for i, query in enumerate(test_queries):
-            print(f"   = Query {i+1}: {query}")
+            print(f"   = Query {i+1}: {query}")
             
             result = await service.process_query(
                 query,
@@ -197,7 +197,7 @@ async def test_customer_queries_with_real_data():
 
 async def test_sql_validation_and_optimization():
     """Test SQL validation and optimization features"""
-    print("= Testing SQL Validation and Optimization")
+    print("= Testing SQL Validation and Optimization")
     
     # Setup test data  
     db_path, semantic_metadata, database_config = await setup_test_data()
@@ -219,7 +219,7 @@ async def test_sql_validation_and_optimization():
         ]
         
         for i, query in enumerate(test_queries):
-            print(f"   = Validating query {i+1}: {query[:50]}...")
+            print(f"   = Validating query {i+1}: {query[:50]}...")
             
             validation_result = await service.validate_and_optimize_query(
                 query,
@@ -236,7 +236,7 @@ async def test_sql_validation_and_optimization():
                 if validation_result['optimization_suggestions']:
                     print(f"      =� Suggestions: {len(validation_result['optimization_suggestions'])}")
                     for suggestion in validation_result['optimization_suggestions'][:2]:
-                        print(f"         " {suggestion}")
+                        print(f"         {suggestion}")
                         
                 if validation_result['validation_warnings']:
                     print(f"      �  Warnings: {len(validation_result['validation_warnings'])}")
@@ -303,10 +303,10 @@ async def test_query_performance_and_fallbacks():
         insights = await service.get_processing_insights()
         if insights.get('total_queries', 0) > 0:
             print(f"   =� Performance insights:")
-            print(f"      " Total queries: {insights['total_queries']}")
-            print(f"      " Success rate: {insights['success_rate']:.2%}")
-            print(f"      " Avg processing time: {insights['avg_processing_time_ms']:.1f}ms")
-            print(f"      " Fallback usage: {insights['fallback_usage_rate']:.2%}")
+            print(f"       Total queries: {insights['total_queries']}")
+            print(f"       Success rate: {insights['success_rate']:.2%}")
+            print(f"       Avg processing time: {insights['avg_processing_time_ms']:.1f}ms")
+            print(f"       Fallback usage: {insights['fallback_usage_rate']:.2%}")
         
         print(" Query performance and fallbacks test passed!")
         return True
@@ -429,11 +429,11 @@ def print_summary(results):
     print("    Step 4: Query Context Extraction & Metadata Matching")
     print("    Step 5: AI-Powered SQL Generation") 
     print("    Step 6: SQL Execution with Fallback Mechanisms")
-    print("   " Natural language query processing")
-    print("   " Real customer data integration")  
-    print("   " SQL validation and optimization")
-    print("   " Performance monitoring and fallbacks")
-    print("   " SQLite database integration")
+    print("    Natural language query processing")
+    print("    Real customer data integration")  
+    print("    SQL validation and optimization")
+    print("    Performance monitoring and fallbacks")
+    print("    SQLite database integration")
 
 async def main():
     """Run complete SQL Query Service test suite"""

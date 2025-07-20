@@ -123,7 +123,7 @@ class TestTextExtractor:
 
     async def test_extract_entities(self):
         """Test entity extraction with business report"""
-        print(">ê Testing entity extraction...")
+        print("> Testing entity extraction...")
         
         data = self.get_test_data()["business_report"]
         result = await self.extractor.extract_entities(
@@ -151,7 +151,7 @@ class TestTextExtractor:
 
     async def test_classify_text(self):
         """Test text classification with customer review"""
-        print(">ê Testing text classification...")
+        print("> Testing text classification...")
         
         data = self.get_test_data()["customer_review"]
         categories = ["positive", "negative", "neutral", "mixed"]
@@ -181,7 +181,7 @@ class TestTextExtractor:
 
     async def test_extract_key_information(self):
         """Test key information extraction with meeting notes"""
-        print(">ê Testing key information extraction...")
+        print("> Testing key information extraction...")
         
         data = self.get_test_data()["meeting_notes"]
         schema = {
@@ -216,7 +216,7 @@ class TestTextExtractor:
 
     async def test_summarize_text(self):
         """Test text summarization with scientific paper"""
-        print(">ê Testing text summarization...")
+        print("> Testing text summarization...")
         
         data = self.get_test_data()["scientific_paper"]
         result = await self.extractor.summarize_text(
@@ -245,7 +245,7 @@ class TestTextExtractor:
 
     async def test_analyze_sentiment(self):
         """Test sentiment analysis with customer review"""
-        print(">ê Testing sentiment analysis...")
+        print("> Testing sentiment analysis...")
         
         data = self.get_test_data()["customer_review"]
         result = await self.extractor.analyze_sentiment(
@@ -272,7 +272,7 @@ class TestTextExtractor:
 
     async def test_multi_label_classification(self):
         """Test multi-label classification with news article"""
-        print(">ê Testing multi-label classification...")
+        print("> Testing multi-label classification...")
         
         data = self.get_test_data()["news_article"]
         categories = ["technology", "security", "business", "finance", "breaking_news"]
@@ -302,7 +302,7 @@ class TestTextExtractor:
 
     async def test_convenience_functions(self):
         """Test convenience functions with simple text"""
-        print(">ê Testing convenience functions...")
+        print("> Testing convenience functions...")
         
         simple_text = "Apple Inc. reported strong quarterly results in Cupertino, California."
         
@@ -327,7 +327,7 @@ class TestTextExtractor:
 
     async def test_error_handling(self):
         """Test error handling with invalid inputs"""
-        print(">ê Testing error handling...")
+        print("> Testing error handling...")
         
         # Test empty text
         result = await self.extractor.extract_entities("")
@@ -352,7 +352,7 @@ class TestTextExtractor:
 
     async def run_all_tests(self):
         """Run all test cases"""
-        print("=€ Starting comprehensive text extractor tests...\n")
+        print("= Starting comprehensive text extractor tests...\n")
         
         tests = [
             self.test_extract_entities,
@@ -376,7 +376,7 @@ class TestTextExtractor:
         
         # Print comprehensive results
         print("\n" + "="*60)
-        print("=Ê TEXT EXTRACTOR TEST RESULTS")
+        print("= TEXT EXTRACTOR TEST RESULTS")
         print("="*60)
         
         passed = sum(results)
@@ -394,18 +394,18 @@ class TestTextExtractor:
             
             print(f"{status} {test_result['test']:<25} | Confidence: {test_result['confidence']:.3f} | Cost: ${cost:.6f}")
         
-        print(f"\n=° Total Testing Cost: ${total_cost:.6f}")
+        print(f"\n= Total Testing Cost: ${total_cost:.6f}")
         
         # Quality metrics
         avg_confidence = sum(r['confidence'] for r in self.test_results) / len(self.test_results)
-        print(f"=È Average Confidence: {avg_confidence:.3f}")
+        print(f"= Average Confidence: {avg_confidence:.3f}")
         
         if success_rate >= 80:
-            print("<‰ EXCELLENT: Text extractor is working correctly!")
+            print("< EXCELLENT: Text extractor is working correctly!")
         elif success_rate >= 60:
-            print("   GOOD: Most functionality working, some issues to address")
+            print("  GOOD: Most functionality working, some issues to address")
         else:
-            print("=¨ NEEDS ATTENTION: Multiple failures detected")
+            print("= NEEDS ATTENTION: Multiple failures detected")
         
         return success_rate == 100.0
 

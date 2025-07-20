@@ -92,8 +92,8 @@ class AtomicImageIntelligence:
     def isa_client(self):
         """Lazy load ISA client"""
         if self._client is None:
-            from isa_model.client import ISAModelClient
-            self._client = ISAModelClient()
+            from core.isa_client_factory import get_isa_client
+            self._client = get_isa_client()
         return self._client
     
     def _validate_task_type(self, task_type: str) -> bool:

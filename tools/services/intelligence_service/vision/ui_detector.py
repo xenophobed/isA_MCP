@@ -82,8 +82,8 @@ class UIDetector:
     def client(self):
         """Lazy load ISA client following pattern"""
         if self._client is None:
-            from isa_model.client import ISAModelClient
-            self._client = ISAModelClient()
+            from core.isa_client_factory import get_isa_client
+            self._client = get_isa_client()
         return self._client
     
     async def detect_ui_with_coordinates(

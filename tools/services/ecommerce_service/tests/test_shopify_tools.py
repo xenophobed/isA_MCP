@@ -11,7 +11,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime
 
 # Import the module we're testing
-from ..shopify_tools import ShopifyToolsManager, register_shopify_tools
+from tools.services.ecommerce_service.shopify_tools import ShopifyToolsManager, register_shopify_tools
 
 class TestShopifyToolsManager:
     """Test cases for ShopifyToolsManager class"""
@@ -33,9 +33,9 @@ class TestShopifyToolsManager:
     @pytest.fixture
     def shopify_manager(self, mock_supabase):
         """Create ShopifyToolsManager instance with mocked dependencies"""
-        with patch('shopify_tools.get_security_manager'), \
-             patch('shopify_tools.get_supabase_client', return_value=mock_supabase), \
-             patch('shopify_tools.ShopifyClient') as mock_client_class:
+        with patch('tools.services.ecommerce_service.shopify_tools.get_security_manager'), \
+             patch('tools.services.ecommerce_service.shopify_tools.get_supabase_client', return_value=mock_supabase), \
+             patch('tools.services.ecommerce_service.shopify_tools.ShopifyClient') as mock_client_class:
             
             mock_client_class.return_value = AsyncMock()
             manager = ShopifyToolsManager()
@@ -352,7 +352,7 @@ class TestRegisterShopifyTools:
         mock_mcp = Mock()
         mock_mcp.tool = Mock(return_value=lambda func: func)
         
-        with patch('shopify_tools.ShopifyToolsManager') as mock_manager_class:
+        with patch('tools.services.ecommerce_service.shopify_tools.ShopifyToolsManager') as mock_manager_class:
             mock_manager = Mock()
             mock_manager_class.return_value = mock_manager
             
@@ -368,9 +368,9 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_complete_shopping_workflow(self):
         """Test a complete shopping workflow from search to cart"""
-        with patch('shopify_tools.get_security_manager'), \
-             patch('shopify_tools.get_supabase_client'), \
-             patch('shopify_tools.ShopifyClient') as mock_client_class:
+        with patch('tools.services.ecommerce_service.shopify_tools.get_security_manager'), \
+             patch('tools.services.ecommerce_service.shopify_tools.get_supabase_client'), \
+             patch('tools.services.ecommerce_service.shopify_tools.ShopifyClient') as mock_client_class:
             
             # Mock the client
             mock_client = AsyncMock()

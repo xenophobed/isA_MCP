@@ -12,7 +12,8 @@ class OCRExtractor:
     
     def __init__(self):
         """Initialize the OCR extractor with ISA Model Client."""
-        self.client = ISAModelClient()
+        from core.isa_client_factory import get_isa_client
+        self.client = get_isa_client()
     
     async def extract_text(
         self, 

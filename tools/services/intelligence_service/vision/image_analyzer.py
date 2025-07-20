@@ -39,15 +39,15 @@ class ImageAnalyzer:
     def client(self):
         """Lazy load ISA client following text_generator pattern"""
         if self._client is None:
-            from isa_model.client import ISAModelClient
-            self._client = ISAModelClient()
+            from core.isa_client_factory import get_isa_client
+            self._client = get_isa_client()
         return self._client
     
     async def analyze(
         self,
         image: Union[str, bytes],
         prompt: str,
-        model: Optional[str] = None,
+        model: Optional[str] = "gpt-4.1-nano",
         provider: str = "openai",
         response_format: str = "text"
     ) -> ImageAnalysisResult:

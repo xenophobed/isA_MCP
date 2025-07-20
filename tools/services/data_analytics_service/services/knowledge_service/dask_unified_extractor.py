@@ -126,9 +126,9 @@ class DaskUnifiedExtractor:
         start_time = time.time()
         
         try:
-            from isa_model.client import ISAModelClient
+            from tools.services.intelligence_service.language.text_generator import generate
             
-            # Create prompt for direct LLM call
+            # Create prompt for text generation service
             text_content = text[:4000]  # Limit length
             domain_context = f"This text is from the {domain} domain. " if domain else ""
             
@@ -155,28 +155,18 @@ IMPORTANT:
 - Include confidence scores between 0.7-1.0
 - Keep it concise but accurate"""
 
-            # Use ISA client directly
-            client = ISAModelClient()
-            response = await client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                model="gpt-4o-mini",
+            # Use text generation service
+            result_text = await generate(
+                prompt,
                 temperature=0.1,
-                stream=False
+                max_tokens=1000
             )
             
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
+            if not result_text:
+                raise Exception("Text generation failed: No result returned")
             
-            # Process response
-            result_content = response.get('result', '')
-            if hasattr(result_content, 'content'):
-                result_text = result_content.content
-            elif isinstance(result_content, str):
-                result_text = result_content
-            else:
-                result_text = str(result_content)
+            # Process response (result_text is already a string from text generator)
+            # No need for additional processing
             
             # Parse JSON response
             import json
@@ -334,10 +324,10 @@ IMPORTANT:
                 
                 async def _extract():
                     try:
-                        # Initialize ISA client directly within worker (avoid unified_extractor singleton issues)
-                        from isa_model.client import ISAModelClient
+                        # Use text generation service within worker
+                        from tools.services.intelligence_service.language.text_generator import generate
                         
-                        # Create prompt for direct LLM call
+                        # Create prompt for text generation
                         text_content = chunk_data["text"][:4000]  # Limit length
                         domain_context = f"This text is from the {domain} domain. " if domain else ""
                         
@@ -364,28 +354,15 @@ IMPORTANT:
 - Include confidence scores between 0.7-1.0
 - Keep it concise but accurate"""
 
-                        # Use ISA client directly
-                        client = ISAModelClient()
-                        response = await client.invoke(
-                            input_data=prompt,
-                            task="chat",
-                            service_type="text",
-                            model="gpt-4o-mini",
+                        # Use text generation service
+                        result_text = await generate(
+                            prompt,
                             temperature=0.1,
-                            stream=False
+                            max_tokens=1000
                         )
                         
-                        if not response.get('success'):
-                            raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-                        
-                        # Process response
-                        result_content = response.get('result', '')
-                        if hasattr(result_content, 'content'):
-                            result_text = result_content.content
-                        elif isinstance(result_content, str):
-                            result_text = result_content
-                        else:
-                            result_text = str(result_content)
+                        if not result_text:
+                            raise Exception("Text generation failed: No result returned")
                         
                         # Parse JSON response
                         import json

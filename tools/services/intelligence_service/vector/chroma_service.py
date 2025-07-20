@@ -87,7 +87,8 @@ class ChromaService:
         # 1. 优先使用 ISA Client embedding
         if ISACLIENT_AVAILABLE:
             try:
-                self.isa_client = ISAModelClient()
+                from core.isa_client_factory import get_isa_client
+                self.isa_client = get_isa_client()
                 self.use_openai_embedding = True
                 logger.info("ChromaService: Using ISA Model embedding")
             except Exception as e:

@@ -153,7 +153,8 @@ class VisionAnalyzer:
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                self.client = ISAModelClient()
+                from core.isa_client_factory import get_isa_client
+                self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
             # Step 1: Use ISA Vision (OmniParser) to get all UI element coordinates
@@ -454,7 +455,8 @@ Only include elements you are confident about (confidence > 0.7). Start your res
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                self.client = ISAModelClient()
+                from core.isa_client_factory import get_isa_client
+                self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
             # Step 1: Use ISA Vision (OmniParser) to get all UI element coordinates
@@ -1292,7 +1294,8 @@ Only include elements you are confident about (confidence > 0.7). Start your res
                 
                 # Use ISA Model client for vision analysis
                 if self.client is None:
-                    self.client = ISAModelClient()
+                    from core.isa_client_factory import get_isa_client
+                    self.client = get_isa_client()
                     logger.info(f"✅ ISA Model client initialized")
                 
                 # Step 1: Use ISA Vision (OmniParser) to get all UI element coordinates
@@ -1342,7 +1345,8 @@ Only include elements you are confident about (confidence > 0.7). Start your res
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                self.client = ISAModelClient()
+                from core.isa_client_factory import get_isa_client
+                self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
             # Step 1: Use ISA Vision (OmniParser) to get all UI element coordinates
@@ -1783,7 +1787,8 @@ Only include elements you are confident about (confidence > 0.7). Start your res
         try:
             # Initialize client if needed
             if self.client is None:
-                self.client = ISAModelClient()
+                from core.isa_client_factory import get_isa_client
+                self.client = get_isa_client()
             
             # Create analysis prompt
             prompt = f"""Analyze this webpage to understand its type and structure. Based on the screenshot and content, determine:
