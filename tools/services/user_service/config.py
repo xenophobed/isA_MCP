@@ -49,7 +49,7 @@ class UserServiceConfig:
         self.log_level = os.getenv("LOG_LEVEL", "info")
         
         # CORS 配置
-        cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://www.iapro.ai")
+        cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://www.iapro.ai")
         self.cors_origins = [x.strip() for x in cors_origins_str.split(",")]
         self.cors_allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
         self.cors_allow_methods = ["*"]

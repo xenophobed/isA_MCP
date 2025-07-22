@@ -61,7 +61,9 @@ class MCPPortal {
         
         try {
             // Show loading state
-            loadingIndicator.style.display = 'block';
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'block';
+            }
             
             // Fetch page content
             const response = await fetch(`/static/pages/${page}.html`);
@@ -97,8 +99,11 @@ class MCPPortal {
                 </div>
             `;
         } finally {
-            // Hide loading state
-            loadingIndicator.style.display = 'none';
+            // Hide loading state - re-get the element as it might have been replaced
+            const currentLoadingIndicator = document.getElementById('page-loading');
+            if (currentLoadingIndicator) {
+                currentLoadingIndicator.style.display = 'none';
+            }
         }
     }
 

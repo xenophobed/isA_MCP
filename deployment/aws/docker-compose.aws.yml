@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Main MCP Server - AWS ECS
+  isa_mcp:
+    build:
+      context: ../../
+      dockerfile: deployment/aws/Dockerfile.aws
+    ports:
+      - "8081:8081"
+    environment:
+      - NODE_ENV=production
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - AWS_REGION=${AWS_REGION}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /ecs/isa-mcp
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream-prefix: mcp-server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - isa_service_user
+      - isa_service_event
+
+  # User Management Service - AWS ECS
+  isa_service_user:
+    build:
+      context: ../../
+      dockerfile: tools/services/user_service/Dockerfile.aws
+    ports:
+      - "8100:8100"
+    environment:
+      - NODE_ENV=production
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - AWS_REGION=${AWS_REGION}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRO_PRICE_ID=${STRIPE_PRO_PRICE_ID}
+      - STRIPE_ENTERPRISE_PRICE_ID=${STRIPE_ENTERPRISE_PRICE_ID}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /ecs/isa-user-service
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream-prefix: user-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # Event Sourcing Service - AWS ECS
+  isa_service_event:
+    build:
+      context: ../../
+      dockerfile: tools/services/event_sourcing_service/Dockerfile.aws
+    ports:
+      - "8101:8101"
+    environment:
+      - NODE_ENV=production
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - AWS_REGION=${AWS_REGION}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /ecs/isa-event-service
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream-prefix: event-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+networks:
+  default:
+    name: isa-aws-network

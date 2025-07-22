@@ -1,0 +1,53 @@
+FROM python:3.11-slim
+
+# Install system dependencies for Playwright and AWS
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    software-properties-common \
+    xvfb \
+    xauth \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libgtk-3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+COPY requirements.minimal.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright and browsers with system dependencies
+RUN pip install playwright==1.40.0
+RUN playwright install chromium --with-deps
+
+# Copy application code
+COPY . .
+
+# Set Python path
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Create display for headless browser
+ENV DISPLAY=:99
+
+# Expose port
+EXPOSE 8081
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+# Start command with virtual display
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & python smart_mcp_server.py --port 8081"]
