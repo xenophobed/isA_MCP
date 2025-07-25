@@ -1,3 +1,93 @@
+#!/usr/bin/env python3
+"""
+Configuration Management System - isA MCP Core
+
+PROJECT DESCRIPTION:
+    Comprehensive configuration management system for the isA MCP (Model Context Protocol) infrastructure.
+    Provides environment-aware configuration loading, type-safe settings management, and hierarchical 
+    configuration structure supporting development, staging, and production environments.
+
+INPUTS:
+    - Environment variables from system and .env files
+    - Configuration files specific to each environment
+    - Runtime configuration overrides
+    - External service API keys and endpoints
+    - Database connection parameters
+
+OUTPUTS:
+    - Typed configuration objects with validation
+    - Environment-specific settings instances
+    - Service configuration parameters
+    - Security and authentication settings
+    - Database and external service configurations
+
+FUNCTIONALITY:
+    - Multi-Environment Configuration:
+      * Development, staging, and production environment support
+      * Environment-specific .env file loading
+      * Hierarchical configuration inheritance
+      * Runtime configuration validation
+    
+    - Service Configuration Categories:
+      * Security settings (authentication, authorization, rate limiting)
+      * Database configuration (Supabase local/cloud, connection pooling)
+      * Logging and monitoring settings
+      * Graph analytics and AI service parameters
+      * External API configurations (OpenAI, Shopify, etc.)
+    
+    - Type Safety and Validation:
+      * Dataclass-based configuration structures
+      * Type hints for all configuration parameters
+      * Default value management
+      * Configuration validation and error reporting
+    
+    - Dynamic Configuration Management:
+      * Runtime configuration reloading
+      * Environment variable override support
+      * Configuration change detection
+      * Settings caching and optimization
+
+DEPENDENCIES:
+    - python-dotenv: Environment variable file loading
+    - dataclasses: Type-safe configuration structures
+    - pathlib: Cross-platform path handling
+    - typing: Type hints and validation support
+    - os: System environment variable access
+
+OPTIMIZATION POINTS:
+    - Add configuration schema validation with pydantic
+    - Implement configuration caching for performance
+    - Add configuration change notifications
+    - Optimize environment file loading and parsing
+    - Add configuration hot reloading capabilities
+    - Implement configuration backup and versioning
+    - Add configuration encryption for sensitive values
+    - Optimize database connection configuration
+    - Add configuration audit logging
+    - Implement configuration drift detection
+
+CONFIGURATION CATEGORIES:
+    - SecuritySettings: Authentication, authorization, rate limiting
+    - DatabaseSettings: Connection management and optimization
+    - LoggingSettings: Structured logging and audit trails
+    - MonitoringSettings: Metrics collection and alerting
+    - GraphAnalyticsSettings: AI/ML service configurations
+    - MCPSettings: Main server and service configurations
+
+USAGE:
+    from core.config import get_settings, reload_settings
+    
+    # Get current configuration
+    settings = get_settings()
+    
+    # Access specific configurations
+    db_config = settings.database
+    security_config = settings.security
+    
+    # Reload configuration at runtime
+    new_settings = reload_settings()
+"""
+
 import os
 from typing import Dict, Any, Optional, List
 from pathlib import Path

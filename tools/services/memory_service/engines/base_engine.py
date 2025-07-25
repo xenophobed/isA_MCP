@@ -1,27 +1,16 @@
 #!/usr/bin/env python3
 """
 Base Memory Engine
-Common functionality for all memory type engines
+Clean, efficient base class for all memory type engines
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
 
-import sys
-import os
-import importlib.util
-
-# Import supabase client directly without triggering database __init__.py
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
-supabase_client_path = os.path.join(project_root, 'core', 'database', 'supabase_client.py')
-
-spec = importlib.util.spec_from_file_location("supabase_client", supabase_client_path)
-supabase_client_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(supabase_client_module)
-
-get_supabase_client = supabase_client_module.get_supabase_client
+# Clean imports
+from core.database.supabase_client import get_supabase_client
 from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
 from core.logging import get_logger
 from ..models import MemoryModel, MemorySearchQuery, MemorySearchResult, MemoryOperationResult
@@ -30,12 +19,25 @@ logger = get_logger(__name__)
 
 
 class BaseMemoryEngine(ABC):
-    """Base class for memory engines using atomic adapter pattern"""
+    """Base class for memory engines - clean and efficient"""
     
     def __init__(self):
-        # Centralized adapters
-        self.db = get_supabase_client()
-        self.embedder = EmbeddingGenerator()
+        self._db = None
+        self._embedder = None
+    
+    @property
+    def db(self):
+        """Lazy-loaded database client"""
+        if self._db is None:
+            self._db = get_supabase_client()
+        return self._db
+    
+    @property
+    def embedder(self):
+        """Lazy-loaded embedding generator"""
+        if self._embedder is None:
+            self._embedder = EmbeddingGenerator()
+        return self._embedder
         
     @property
     @abstractmethod
@@ -50,44 +52,20 @@ class BaseMemoryEngine(ABC):
         pass
     
     async def store_memory(self, memory: MemoryModel) -> MemoryOperationResult:
-        """Store a memory with embedding generation"""
+        """Store a memory with automatic embedding generation"""
         try:
             # Generate embedding if not provided
             if not memory.embedding:
                 memory.embedding = await self.embedder.embed_single(memory.content)
             
-            # Prepare data for database using model_dump with serialization mode
-            memory_data = memory.model_dump(mode='json')
-            memory_data['embedding'] = json.dumps(memory.embedding)  # Store as JSON
-            memory_data['context'] = json.dumps(memory.context)
-            memory_data['tags'] = json.dumps(memory.tags)
-            
-            # Handle datetime fields - convert to ISO format strings
-            datetime_fields = ['created_at', 'updated_at', 'last_accessed_at', 'expires_at', 'episode_date']
-            for field in datetime_fields:
-                if field in memory_data and isinstance(memory_data[field], datetime):
-                    memory_data[field] = memory_data[field].isoformat()
-            
-            # Additional check for any remaining datetime objects
-            def serialize_datetime_recursive(obj):
-                if isinstance(obj, datetime):
-                    return obj.isoformat()
-                elif isinstance(obj, dict):
-                    return {k: serialize_datetime_recursive(v) for k, v in obj.items()}
-                elif isinstance(obj, list):
-                    return [serialize_datetime_recursive(item) for item in obj]
-                return obj
-            
-            memory_data = serialize_datetime_recursive(memory_data)
-            
-            # Custom fields for specific memory types
-            memory_data = await self._prepare_memory_data(memory_data)
+            # Prepare data for storage
+            memory_data = self._prepare_for_storage(memory)
             
             # Insert into database
             result = self.db.table(self.table_name).insert(memory_data).execute()
             
             if result.data:
-                logger.info(f"Stored {self.memory_type} memory: {memory.id}")
+                logger.info(f"✅ Stored {self.memory_type} memory: {memory.id}")
                 return MemoryOperationResult(
                     success=True,
                     memory_id=memory.id,
@@ -99,7 +77,7 @@ class BaseMemoryEngine(ABC):
                 raise Exception("No data returned from insert")
                 
         except Exception as e:
-            logger.error(f"Failed to store {self.memory_type} memory: {e}")
+            logger.error(f"❌ Failed to store {self.memory_type} memory: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id=memory.id,
@@ -117,29 +95,24 @@ class BaseMemoryEngine(ABC):
                 .execute()
             
             if result.data:
-                # Update access tracking - temporarily disabled
-                # await self._track_access(memory_id)
-                return await self._parse_memory_data(result.data)
+                return await self._parse_from_storage(result.data)
             
             return None
             
         except Exception as e:
-            logger.error(f"Failed to get {self.memory_type} memory {memory_id}: {e}")
+            logger.error(f"❌ Failed to get {self.memory_type} memory {memory_id}: {e}")
             return None
     
     async def search_memories(self, query: MemorySearchQuery) -> List[MemorySearchResult]:
-        """Search memories using vector similarity"""
+        """Search memories using vector similarity - optimized"""
         try:
-            # Generate embedding for query
-            query_embedding = await self.embedder.embed_single(query.query)
-            
-            # Get all memories for the user (could be optimized with vector search)
+            # Build database query with filters first (more efficient)
             db_query = self.db.table(self.table_name).select('*')
             
             if query.user_id:
                 db_query = db_query.eq('user_id', query.user_id)
             
-            # Apply filters
+            # Apply other filters early to reduce dataset
             if query.importance_min:
                 db_query = db_query.gte('importance_score', query.importance_min)
             if query.confidence_min:
@@ -149,40 +122,50 @@ class BaseMemoryEngine(ABC):
             if query.created_before:
                 db_query = db_query.lte('created_at', query.created_before.isoformat())
             
+            # Limit initial results for performance
+            db_query = db_query.limit(min(query.top_k * 3, 100))  # Get more than needed for filtering
+            
             result = db_query.execute()
             
             if not result.data:
                 return []
             
-            # Calculate similarities and rank
+            # Calculate similarities in parallel for better performance
             search_results = []
-            for i, memory_data in enumerate(result.data):
-                memory = await self._parse_memory_data(memory_data)
-                
+            similarity_tasks = []
+            
+            for memory_data in result.data:
+                memory = await self._parse_from_storage(memory_data)
                 if memory.embedding:
-                    # Use ISA client for similarity calculation
-                    similarity = await self.embedder.compute_similarity(
-                        query.query, 
-                        memory.content
-                    )
-                    
+                    task = self._calculate_similarity(query.query, memory)
+                    similarity_tasks.append((task, memory))
+            
+            # Process similarities concurrently
+            for task, memory in similarity_tasks:
+                try:
+                    similarity = await task
                     if similarity >= query.similarity_threshold:
                         search_results.append(MemorySearchResult(
                             memory=memory,
                             similarity_score=similarity,
-                            rank=len(search_results) + 1
+                            rank=1  # Temporary value, will be set after sorting
                         ))
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to calculate similarity for memory {memory.id}: {e}")
             
-            # Sort by similarity and limit results
+            # Sort by similarity and assign ranks
             search_results.sort(key=lambda x: x.similarity_score, reverse=True)
+            for i, result in enumerate(search_results):
+                result.rank = i + 1
+            
             return search_results[:query.top_k]
             
         except Exception as e:
-            logger.error(f"Failed to search {self.memory_type} memories: {e}")
+            logger.error(f"❌ Failed to search {self.memory_type} memories: {e}")
             return []
     
     async def update_memory(self, memory_id: str, updates: Dict[str, Any]) -> MemoryOperationResult:
-        """Update a memory"""
+        """Update a memory with automatic embedding regeneration"""
         try:
             # If content is updated, regenerate embedding
             if 'content' in updates:
@@ -190,13 +173,11 @@ class BaseMemoryEngine(ABC):
                     await self.embedder.embed_single(updates['content'])
                 )
             
+            # Add timestamp
             updates['updated_at'] = datetime.now().isoformat()
             
-            # Handle JSON fields
-            if 'context' in updates:
-                updates['context'] = json.dumps(updates['context'])
-            if 'tags' in updates:
-                updates['tags'] = json.dumps(updates['tags'])
+            # Handle JSON serialization
+            updates = self._serialize_json_fields(updates)
             
             result = self.db.table(self.table_name)\
                 .update(updates)\
@@ -215,7 +196,7 @@ class BaseMemoryEngine(ABC):
                 raise Exception("No data returned from update")
                 
         except Exception as e:
-            logger.error(f"Failed to update {self.memory_type} memory {memory_id}: {e}")
+            logger.error(f"❌ Failed to update {self.memory_type} memory {memory_id}: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id=memory_id,
@@ -226,11 +207,12 @@ class BaseMemoryEngine(ABC):
     async def delete_memory(self, memory_id: str) -> MemoryOperationResult:
         """Delete a memory"""
         try:
-            result = self.db.table(self.table_name)\
+            self.db.table(self.table_name)\
                 .delete()\
                 .eq('id', memory_id)\
                 .execute()
             
+            logger.info(f"🗑️ Deleted {self.memory_type} memory: {memory_id}")
             return MemoryOperationResult(
                 success=True,
                 memory_id=memory_id,
@@ -239,49 +221,13 @@ class BaseMemoryEngine(ABC):
             )
             
         except Exception as e:
-            logger.error(f"Failed to delete {self.memory_type} memory {memory_id}: {e}")
+            logger.error(f"❌ Failed to delete {self.memory_type} memory {memory_id}: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id=memory_id,
                 operation="delete",
                 message=f"Failed to delete memory: {str(e)}"
             )
-    
-    async def _track_access(self, memory_id: str, user_id: str = None) -> None:
-        """Track memory access for cognitive decay modeling using metadata table"""
-        try:
-            # Skip tracking if no user_id available
-            if not user_id:
-                return
-                
-            # Update memory_metadata table instead of direct table access
-            await self.db.table('memory_metadata')\
-                .upsert({
-                    'memory_id': memory_id,
-                    'memory_type': self.memory_type,
-                    'user_id': user_id,
-                    'access_count': 1,  # This will be incremented by a database trigger
-                    'last_accessed_at': datetime.now().isoformat()
-                })\
-                .execute()
-        except Exception as e:
-            logger.warning(f"Failed to track access for memory {memory_id}: {e}")
-    
-    async def _prepare_memory_data(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare memory data for storage - override in subclasses"""
-        return memory_data
-    
-    async def _parse_memory_data(self, data: Dict[str, Any]) -> MemoryModel:
-        """Parse memory data from database - override in subclasses"""
-        # Parse JSON fields
-        if 'embedding' in data and isinstance(data['embedding'], str):
-            data['embedding'] = json.loads(data['embedding'])
-        if 'context' in data and isinstance(data['context'], str):
-            data['context'] = json.loads(data['context']) 
-        if 'tags' in data and isinstance(data['tags'], str):
-            data['tags'] = json.loads(data['tags'])
-        
-        return MemoryModel(**data)
     
     async def find_related_memories(self, memory_id: str, limit: int = 5) -> List[MemorySearchResult]:
         """Find memories related to a given memory"""
@@ -306,5 +252,89 @@ class BaseMemoryEngine(ABC):
             return related[:limit]
             
         except Exception as e:
-            logger.error(f"Failed to find related memories for {memory_id}: {e}")
+            logger.error(f"❌ Failed to find related memories for {memory_id}: {e}")
             return []
+    
+    # Helper methods for data processing
+    
+    def _prepare_for_storage(self, memory: MemoryModel) -> Dict[str, Any]:
+        """Prepare memory data for database storage"""
+        # Get serialized data
+        memory_data = memory.model_dump(mode='json')
+        
+        # Handle embedding and JSON fields
+        memory_data['embedding'] = json.dumps(memory.embedding)
+        memory_data = self._serialize_json_fields(memory_data)
+        
+        # Convert datetime objects
+        memory_data = self._serialize_datetime_fields(memory_data)
+        
+        # Remove common fields that don't exist in database schemas
+        # 注意：importance_score在factual_memories中存在，但在episodic_memories中不存在
+        common_fields_to_remove = ['access_count', 'last_accessed_at']
+        for field in common_fields_to_remove:
+            memory_data.pop(field, None)
+        
+        # Allow subclasses to customize
+        return self._customize_for_storage(memory_data)
+    
+    async def _parse_from_storage(self, data: Dict[str, Any]) -> MemoryModel:
+        """Parse memory data from database"""
+        # Parse JSON fields
+        data = self._deserialize_json_fields(data)
+        
+        # Allow subclasses to customize
+        data = self._customize_from_storage(data)
+        
+        return await self._create_memory_model(data)
+    
+    def _serialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize JSON fields for storage"""
+        json_fields = ['context', 'tags', 'participants', 'key_events', 'outcomes']
+        for field in json_fields:
+            if field in data and not isinstance(data[field], str):
+                data[field] = json.dumps(data[field])
+        return data
+    
+    def _deserialize_json_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Deserialize JSON fields from storage"""
+        json_fields = ['embedding', 'context', 'tags', 'participants', 'key_events', 'outcomes']
+        for field in json_fields:
+            if field in data and isinstance(data[field], str):
+                try:
+                    data[field] = json.loads(data[field])
+                except (json.JSONDecodeError, TypeError):
+                    # Keep as string if can't parse
+                    pass
+        return data
+    
+    def _serialize_datetime_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert datetime objects to ISO strings"""
+        datetime_fields = ['created_at', 'updated_at', 'last_accessed_at', 'expires_at', 'episode_date', 'occurred_at']
+        for field in datetime_fields:
+            if field in data and isinstance(data[field], datetime):
+                data[field] = data[field].isoformat()
+        return data
+    
+    async def _calculate_similarity(self, query: str, memory: MemoryModel) -> float:
+        """Calculate similarity between query and memory content"""
+        try:
+            return await self.embedder.compute_similarity(query, memory.content)
+        except Exception as e:
+            logger.warning(f"⚠️ Similarity calculation failed: {e}")
+            return 0.0
+    
+    # Abstract methods for subclasses to override
+    
+    def _customize_for_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Override in subclasses to customize data before storage"""
+        return data
+    
+    def _customize_from_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Override in subclasses to customize data after retrieval"""
+        return data
+    
+    @abstractmethod
+    async def _create_memory_model(self, data: Dict[str, Any]) -> MemoryModel:
+        """Override in subclasses to create the correct memory model type"""
+        pass

@@ -31,9 +31,9 @@ sys.path.insert(0, str(project_root / "tools"))
 
 try:
     # Try relative imports first (when used as module)
-    from .knowledge_service.graph_constructor import GraphConstructor
-    from .knowledge_service.neo4j_store import Neo4jStore
-    from .knowledge_service.knowledge_retriever import GraphRAGRetriever
+    from tools.services.data_analytics_service.services.knowledge_service.graph_constructor import GraphConstructor
+    from tools.services.data_analytics_service.services.knowledge_service.neo4j_store import Neo4jStore
+    from tools.services.data_analytics_service.services.knowledge_service.knowledge_retriever import GraphRAGRetriever
     from ...user_service.user_service import UserService
     from ...user_service.models import User
 except ImportError:
@@ -78,7 +78,7 @@ class GraphAnalyticsService:
         
         # Initialize Neo4j client and store
         try:
-            from .knowledge_service.neo4j_client import Neo4jClient
+            from tools.services.data_analytics_service.services.knowledge_service.neo4j_client import Neo4jClient
         except ImportError:
             from knowledge_service.neo4j_client import Neo4jClient
         
@@ -209,7 +209,7 @@ class GraphAnalyticsService:
             # Get the actual KnowledgeGraph object (not the dictionary summary)
             if len(text_content) > 6000:
                 # For chunked processing, create a KnowledgeGraph object
-                from .knowledge_service.graph_constructor import KnowledgeGraph
+                from tools.services.data_analytics_service.services.knowledge_service.graph_constructor import KnowledgeGraph
                 kg_object = KnowledgeGraph(
                     nodes={},  # Would need to reconstruct from all_nodes
                     edges={},  # Would need to reconstruct from all_edges  
@@ -264,6 +264,7 @@ class GraphAnalyticsService:
                 }
             
             # Step 5: Register MCP resource
+            logger.info(f"🔄 Starting MCP resource registration for resource_id: {resource_id}, user_id: {user_id}")
             mcp_resource = await self._register_mcp_resource(
                 resource_id=resource_id,
                 user_id=user_id,
@@ -271,6 +272,7 @@ class GraphAnalyticsService:
                 graph_result=graph_result,
                 storage_result=storage_result
             )
+            logger.info(f"🎯 MCP resource registration completed: {mcp_resource.get('address', 'Unknown')}")
             
             processing_time = (datetime.now() - start_time).total_seconds()
             
@@ -336,12 +338,37 @@ class GraphAnalyticsService:
                     'user_id': user_id
                 }
             
-            # Filter MCP resources for this user
-            user_mcp_resources = {
-                resource_id: resource_data
-                for resource_id, resource_data in self.mcp_resources.items()
-                if resource_data['user_id'] == user_id
-            }
+            # Get MCP resources from the actual resource manager (not memory)
+            try:
+                # Import the resource manager
+                import sys
+                from pathlib import Path
+                project_root = Path(__file__).parent.parent.parent.parent.parent
+                sys.path.insert(0, str(project_root))
+                
+                from resources.graph_knowledge_resources import graph_knowledge_resources
+                mcp_resources_result = await graph_knowledge_resources.get_user_resources(user_id)
+                
+                if mcp_resources_result.get('success'):
+                    # Convert to the expected format
+                    user_mcp_resources = {}
+                    for resource in mcp_resources_result.get('resources', []):
+                        resource_id = resource['resource_id']
+                        user_mcp_resources[resource_id] = resource
+                    logger.info(f"✅ Retrieved {len(user_mcp_resources)} MCP resources from resource manager")
+                else:
+                    logger.warning(f"Failed to get MCP resources: {mcp_resources_result.get('error')}")
+                    user_mcp_resources = {}
+                    
+            except Exception as e:
+                logger.error(f"Failed to query MCP resource manager: {e}")
+                # Fallback to memory storage (old behavior)
+                user_mcp_resources = {
+                    resource_id: resource_data
+                    for resource_id, resource_data in self.mcp_resources.items()
+                    if resource_data['user_id'] == user_id
+                }
+                logger.warning(f"Falling back to memory storage: {len(user_mcp_resources)} resources")
             
             return {
                 'success': True,
@@ -776,8 +803,8 @@ class GraphAnalyticsService:
                 'source_metadata': source_metadata,
                 'created_at': datetime.now().isoformat(),
                 'metadata': {
-                    'entities_count': graph_result['knowledge_graph']['entities_count'],
-                    'relationships_count': graph_result['knowledge_graph']['relationships_count'],
+                    'entities_count': storage_result['nodes_created'],
+                    'relationships_count': storage_result['relationships_created'],
                     'topics': graph_result['knowledge_graph'].get('topics', []),
                     'neo4j_nodes': storage_result['nodes_created'],
                     'neo4j_relationships': storage_result['relationships_created']
@@ -789,19 +816,36 @@ class GraphAnalyticsService:
             
             # Integrate with MCP resource registration system
             try:
-                from ....resources.graph_knowledge_resources import graph_knowledge_resources
+                # Try multiple import paths for resource registration
+                import sys
+                from pathlib import Path
+                project_root = Path(__file__).parent.parent.parent.parent.parent
+                sys.path.insert(0, str(project_root))
+                
+                from resources.graph_knowledge_resources import graph_knowledge_resources
                 registration_result = await graph_knowledge_resources.register_resource(
                     resource_id=resource_id,
                     user_id=user_id,
                     resource_data=resource_data
                 )
-            except ImportError:
-                # Mock registration for testing
-                registration_result = {'success': True}
+                logger.info(f"✅ MCP resource registration successful: {registration_result}")
+                
+                # If registration is successful, we should also clear old resources from memory
+                # and query from the actual resource manager instead of using self.mcp_resources
+                if registration_result.get('success'):
+                    logger.info(f"✅ Resource {resource_id} successfully registered with correct metadata")
+                
+            except Exception as e:
+                logger.error(f"❌ MCP resource registration failed: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                # DO NOT mock success - let the error propagate so we know registration failed
+                registration_result = {'success': False, 'error': str(e)}
             
             if not registration_result.get('success'):
-                logger.warning(f"MCP resource registration failed: {registration_result.get('error')}")
-                # Continue anyway as the resource is still stored in Neo4j
+                logger.error(f"MCP resource registration FAILED: {registration_result.get('error')}")
+                logger.error(f"This means queries will return empty results despite Neo4j storage success")
+                # Continue anyway as the resource is still stored in Neo4j, but queries won't work
             
             logger.info(f"MCP resource registered: {mcp_address} for user {user_id}")
             

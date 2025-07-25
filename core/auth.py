@@ -1,7 +1,92 @@
 #!/usr/bin/env python3
 """
-生产级认证和授权系统
-JWT Token + API Key + Rate Limiting
+Production-Grade Authentication and Authorization System - isA MCP Core
+
+PROJECT DESCRIPTION:
+    Comprehensive security module providing multi-layered authentication and authorization for the isA MCP system.
+    Implements JWT token-based authentication, API key management, rate limiting, IP blocking, and granular 
+    permission controls to ensure secure access to MCP services and tools.
+
+INPUTS:
+    - Authentication headers (Bearer tokens, API keys)
+    - User credentials and permissions
+    - Client IP addresses and request metadata
+    - Environment variables for security configuration
+    - Security policies and rate limiting rules
+
+OUTPUTS:
+    - JWT tokens with embedded user permissions
+    - API keys for programmatic access
+    - Authentication validation results
+    - Authorization decisions and access controls
+    - Rate limiting and security violation reports
+    - Security event logs and audit trails
+
+FUNCTIONALITY:
+    - JWT Token Generation and Validation:
+      * Secure token creation with expiration and permissions
+      * Token verification with proper error handling
+      * Support for refresh tokens and token revocation
+    
+    - API Key Management:
+      * Secure API key generation and storage
+      * Key validation with usage tracking
+      * Key lifecycle management (creation, rotation, revocation)
+    
+    - Rate Limiting and Abuse Prevention:
+      * Per-user and per-API-key rate limiting
+      * Sliding window rate limiting algorithm
+      * IP-based blocking for security violations
+    
+    - Authorization Controls:
+      * Role-based access control (RBAC)
+      * Permission-based access to tools and resources
+      * Context-aware authorization decisions
+    
+    - Security Monitoring:
+      * Authentication attempt logging
+      * Security violation detection and response
+      * Audit trail for compliance and forensics
+
+DEPENDENCIES:
+    - PyJWT: JSON Web Token handling and cryptographic operations
+    - secrets: Cryptographically secure random number generation
+    - datetime: Time-based operations for token expiration
+    - logging: Security event logging and audit trails
+    - os: Environment variable access for configuration
+
+OPTIMIZATION POINTS:
+    - Implement token caching to reduce JWT verification overhead
+    - Add Redis backend for distributed rate limiting
+    - Optimize IP blocking with efficient data structures
+    - Add token blacklisting for immediate revocation
+    - Implement adaptive rate limiting based on user behavior
+    - Add geographic IP validation for enhanced security
+    - Optimize permission checking with role hierarchies
+    - Add support for OAuth2/OpenID Connect integration
+    - Implement security headers and CSRF protection
+    - Add multi-factor authentication (MFA) support
+
+SECURITY CONSIDERATIONS:
+    - Uses cryptographically secure random generation for secrets
+    - Implements proper JWT signature verification
+    - Provides protection against timing attacks
+    - Includes rate limiting to prevent brute force attacks
+    - Supports IP blocking for malicious actors
+    - Maintains audit logs for security compliance
+    - Uses secure defaults for development environments
+
+USAGE:
+    from core.auth import security_manager, require_auth
+    
+    # Generate tokens
+    token = security_manager.generate_jwt_token("user123", ["admin"])
+    
+    # Validate requests
+    auth_info = await require_auth(headers, remote_addr, ["admin"])
+    
+    # Create middleware
+    auth_middleware = create_auth_middleware()
 """
 import jwt
 import os

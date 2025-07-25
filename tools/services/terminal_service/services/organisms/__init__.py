@@ -8,8 +8,11 @@
 
 from .deployment_organisms import DeploymentOrganism
 from .quick_app_organism import QuickAppOrganism
+from .app_generation_organism import AppGenerationOrganism, AppDeploymentResult
 
 __all__ = [
     'DeploymentOrganism',
-    'QuickAppOrganism'
+    'QuickAppOrganism',
+    'AppGenerationOrganism',
+    'AppDeploymentResult'
 ] 

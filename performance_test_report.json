@@ -1,0 +1,200 @@
+{
+  "test_timestamp": 1753406114.4426281,
+  "baseline_performance": [
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 91.94183349609375,
+      "success": true
+    },
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 10.167598724365234,
+      "success": true
+    },
+    {
+      "endpoint": "/api/v1/subscriptions/plans",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 9.615182876586914,
+      "success": true
+    },
+    {
+      "endpoint": "/docs",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 6.786108016967773,
+      "success": true
+    }
+  ],
+  "response_size_analysis": [
+    {
+      "endpoint": "/",
+      "status_code": 200,
+      "response_time_ms": 1.7330646514892578,
+      "content_length_bytes": 115,
+      "content_type": "application/json",
+      "throughput_bytes_per_ms": 66.3564396753336
+    },
+    {
+      "endpoint": "/health",
+      "status_code": 200,
+      "response_time_ms": 0.6341934204101562,
+      "content_length_bytes": 475,
+      "content_type": "application/json",
+      "throughput_bytes_per_ms": 748.9828571428571
+    },
+    {
+      "endpoint": "/api/v1/subscriptions/plans",
+      "status_code": 200,
+      "response_time_ms": 0.5598068237304688,
+      "content_length_bytes": 535,
+      "content_type": "application/json",
+      "throughput_bytes_per_ms": 955.6868143100511
+    },
+    {
+      "endpoint": "/docs",
+      "status_code": 200,
+      "response_time_ms": 0.5218982696533203,
+      "content_length_bytes": 947,
+      "content_type": "text/html; charset=utf-8",
+      "throughput_bytes_per_ms": 1814.529871174052
+    }
+  ],
+  "concurrent_performance": {
+    "/health": [
+      {
+        "endpoint": "/health",
+        "num_requests": 1,
+        "total_time_ms": 6.232976913452148,
+        "success_rate": 1.0,
+        "avg_response_time_ms": 6.123065948486328,
+        "median_response_time_ms": 6.123065948486328,
+        "min_response_time_ms": 6.123065948486328,
+        "max_response_time_ms": 6.123065948486328,
+        "std_dev_ms": 0,
+        "requests_per_second": 160.43698121868186
+      },
+      {
+        "endpoint": "/health",
+        "num_requests": 5,
+        "total_time_ms": 32.29999542236328,
+        "success_rate": 1.0,
+        "avg_response_time_ms": 20.886516571044922,
+        "median_response_time_ms": 21.47817611694336,
+        "min_response_time_ms": 8.635759353637695,
+        "max_response_time_ms": 31.637907028198242,
+        "std_dev_ms": 8.718006075426024,
+        "requests_per_second": 154.79878354837757
+      },
+      {
+        "endpoint": "/health",
+        "num_requests": 10,
+        "total_time_ms": 72.20196723937988,
+        "success_rate": 1.0,
+        "avg_response_time_ms": 45.427823066711426,
+        "median_response_time_ms": 44.06535625457764,
+        "min_response_time_ms": 19.04582977294922,
+        "max_response_time_ms": 70.7859992980957,
+        "std_dev_ms": 17.307354216913097,
+        "requests_per_second": 138.50038139329078
+      },
+      {
+        "endpoint": "/health",
+        "num_requests": 20,
+        "total_time_ms": 136.98315620422363,
+        "success_rate": 1.0,
+        "avg_response_time_ms": 72.29483127593994,
+        "median_response_time_ms": 68.19891929626465,
+        "min_response_time_ms": 21.60501480102539,
+        "max_response_time_ms": 132.08389282226562,
+        "std_dev_ms": 35.077100574583696,
+        "requests_per_second": 146.00335219450386
+      },
+      {
+        "endpoint": "/health",
+        "num_requests": 50,
+        "total_time_ms": 290.80867767333984,
+        "success_rate": 1.0,
+        "avg_response_time_ms": 152.68896579742432,
+        "median_response_time_ms": 153.2118320465088,
+        "min_response_time_ms": 42.6182746887207,
+        "max_response_time_ms": 263.629674911499,
+        "std_dev_ms": 64.25737889601047,
+        "requests_per_second": 171.93434666404315
+      }
+    ]
+  },
+  "performance_trends": {
+    "performance_degradation": {
+      "response_time_increase_factor": 24.936684837629468,
+      "max_successful_load": 50,
+      "peak_rps": 171.93434666404315,
+      "scalability_score": 100.0
+    },
+    "load_vs_performance": [
+      {
+        "concurrent_requests": 1,
+        "avg_response_time_ms": 6.123065948486328,
+        "requests_per_second": 160.43698121868186,
+        "success_rate": 1.0
+      },
+      {
+        "concurrent_requests": 5,
+        "avg_response_time_ms": 20.886516571044922,
+        "requests_per_second": 154.79878354837757,
+        "success_rate": 1.0
+      },
+      {
+        "concurrent_requests": 10,
+        "avg_response_time_ms": 45.427823066711426,
+        "requests_per_second": 138.50038139329078,
+        "success_rate": 1.0
+      },
+      {
+        "concurrent_requests": 20,
+        "avg_response_time_ms": 72.29483127593994,
+        "requests_per_second": 146.00335219450386,
+        "success_rate": 1.0
+      },
+      {
+        "concurrent_requests": 50,
+        "avg_response_time_ms": 152.68896579742432,
+        "requests_per_second": 171.93434666404315,
+        "success_rate": 1.0
+      }
+    ]
+  },
+  "error_handling": {
+    "endpoint": "/nonexistent",
+    "num_requests": 10,
+    "total_time_ms": 68.00007820129395,
+    "success_rate": 0.0,
+    "avg_response_time_ms": 45.52137851715088,
+    "median_response_time_ms": 45.95589637756348,
+    "min_response_time_ms": 23.504018783569336,
+    "max_response_time_ms": 66.09201431274414,
+    "std_dev_ms": 14.766809536325868,
+    "requests_per_second": 147.05865440916088
+  },
+  "summary": {
+    "fastest_endpoint": {
+      "endpoint": "/docs",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 6.786108016967773,
+      "success": true
+    },
+    "slowest_endpoint": {
+      "endpoint": "/",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 91.94183349609375,
+      "success": true
+    },
+    "total_tests_run": 11
+  }
+}

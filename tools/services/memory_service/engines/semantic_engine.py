@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Semantic Memory Engine  
-Specialized engine for semantic memory management
+Semantic Memory Engine
+Simple, clean implementation for semantic memory management
 """
 
-from typing import Dict, Any, List, Optional
-import json
+from typing import Dict, Any, List
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import SemanticMemory, MemoryOperationResult
@@ -15,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class SemanticMemoryEngine(BaseMemoryEngine):
-    """Engine for managing semantic memories"""
+    """Simple engine for managing semantic memories"""
     
     def __init__(self):
         super().__init__()
@@ -36,582 +35,282 @@ class SemanticMemoryEngine(BaseMemoryEngine):
         importance_score: float = 0.5
     ) -> MemoryOperationResult:
         """
-        Store semantic memories by intelligently extracting concepts and knowledge from dialog
+        Store semantic memory by extracting concepts from dialog
         
-        Args:
-            user_id: User identifier
-            dialog_content: Raw dialog between human and AI
-            importance_score: Manual importance override (0.0-1.0)
+        Simple workflow: TextExtractor → SemanticMemory → base.store_memory
         """
         try:
-            # Extract semantic concepts from dialog
-            extraction_result = await self._extract_semantic_info(dialog_content)
+            # Extract concepts using TextExtractor
+            extraction_result = await self._extract_concepts(dialog_content)
             
             if not extraction_result['success']:
-                logger.error(f"Failed to extract semantic info: {extraction_result.get('error')}")
+                logger.error(f"Failed to extract concepts: {extraction_result.get('error')}")
                 return MemoryOperationResult(
                     success=False,
                     memory_id="",
                     operation="store_semantic_memory",
-                    message=f"Failed to extract semantic information: {extraction_result.get('error')}"
+                    message=f"Failed to extract concepts: {extraction_result.get('error')}"
                 )
             
-            concepts_data = extraction_result['data']
-            stored_concepts = []
+            concept_data = extraction_result['data']
             
-            # Process each extracted concept
-            for concept_data in concepts_data.get('concepts', []):
-                # Check for existing concepts with same type and definition
-                existing = await self._find_existing_concept(
-                    user_id, 
-                    concept_data.get('concept_type'), 
-                    concept_data.get('definition')
-                )
-                
-                if existing:
-                    # Update existing concept
-                    result = await self._merge_semantic_concept(
-                        existing, 
-                        concept_data.get('properties', {}),
-                        concept_data.get('related_concepts', []),
-                        concept_data.get('category'),
-                        importance_score
-                    )
-                else:
-                    # Create new semantic memory
-                    content = f"{concept_data.get('concept_type', 'concept')}: {concept_data.get('definition', '')}"
-                    if concept_data.get('properties'):
-                        prop_str = ", ".join([f"{k}: {v}" for k, v in concept_data.get('properties', {}).items()])
-                        content += f" ({prop_str})"
-                    
-                    semantic_memory = SemanticMemory(
-                        user_id=user_id,
-                        content=content,
-                        concept_type=concept_data.get('concept_type', 'general_concept'),
-                        definition=concept_data.get('definition', ''),
-                        properties=concept_data.get('properties', {}),
-                        abstraction_level=concept_data.get('abstraction_level', 'medium'),
-                        related_concepts=concept_data.get('related_concepts', []),
-                        category=concept_data.get('category', 'general'),
-                        importance_score=concept_data.get('importance_score', importance_score)
-                    )
-                    
-                    result = await self.store_memory(semantic_memory)
-                
-                if result.success:
-                    stored_concepts.append(result.memory_id)
-                    logger.info(f"Stored intelligent semantic concept: {result.memory_id}")
+            # Create SemanticMemory object with proper model fields
+            semantic_memory = SemanticMemory(
+                user_id=user_id,
+                content=concept_data.get('definition', dialog_content[:200]),  # model需要但DB没有
+                concept_type=concept_data.get('concept', 'unknown'),  # model字段，映射到DB的concept_name
+                definition=concept_data.get('definition', ''),
+                category=concept_data.get('domain', 'general'),  # model字段，映射到DB的concept_category
+                properties=concept_data.get('properties', {}),
+                related_concepts=concept_data.get('related_concepts', []),
+                abstraction_level=concept_data.get('abstraction_level', 'medium'),
+                confidence=float(concept_data.get('confidence', 0.8)),  # model需要但DB没有
+                importance_score=importance_score  # model需要但DB没有
+            )
             
-            if stored_concepts:
-                return MemoryOperationResult(
-                    success=True,
-                    memory_id=stored_concepts[0] if len(stored_concepts) == 1 else "",
-                    operation="store_semantic_memory",
-                    message=f"Successfully stored {len(stored_concepts)} semantic concepts",
-                    data={"stored_concepts": stored_concepts, "total_concepts": len(stored_concepts)}
-                )
-            else:
-                return MemoryOperationResult(
-                    success=False,
-                    memory_id="",
-                    operation="store_semantic_memory",
-                    message="No concepts could be extracted or stored"
-                )
-                
+            # Let base engine handle embedding and storage
+            result = await self.store_memory(semantic_memory)
+            
+            if result.success:
+                logger.info(f"✅ Stored concept: {semantic_memory.concept_type} ({semantic_memory.category})")
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Failed to store semantic memory from dialog: {e}")
+            logger.error(f"❌ Failed to store semantic memory: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id="",
                 operation="store_semantic_memory",
                 message=f"Failed to store semantic memory: {str(e)}"
             )
+
+    async def search_concepts_by_domain(self, user_id: str, domain: str, limit: int = 10) -> List[SemanticMemory]:
+        """Search concepts by domain using database field concept_category"""
+        try:
+            result = self.db.table(self.table_name)\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .eq('concept_category', domain)\
+                .order('mastery_level', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            concepts = []
+            for data in result.data or []:
+                concept = await self._parse_from_storage(data)
+                concepts.append(concept)
+            
+            return concepts
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to search concepts by domain {domain}: {e}")
+            return []
+
+    async def search_concepts_by_name(self, user_id: str, concept_name: str, limit: int = 10) -> List[SemanticMemory]:
+        """Search concepts by name using database field concept_name"""
+        try:
+            result = self.db.table(self.table_name)\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .ilike('concept_name', f'%{concept_name}%')\
+                .order('mastery_level', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            concepts = []
+            for data in result.data or []:
+                concept = await self._parse_from_storage(data)
+                concepts.append(concept)
+            
+            return concepts
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to search concepts by name {concept_name}: {e}")
+            return []
     
+    # Alias methods for compatibility
     async def search_concepts_by_category(self, user_id: str, category: str, limit: int = 10) -> List[SemanticMemory]:
-        """Search concepts by category"""
+        """Alias for search_concepts_by_domain for compatibility"""
+        return await self.search_concepts_by_domain(user_id, category, limit)
+    
+    async def search_concepts_by_concept_type(self, user_id: str, concept_type: str, limit: int = 10) -> List[SemanticMemory]:
+        """Alias for search_concepts_by_domain for compatibility"""
+        return await self.search_concepts_by_domain(user_id, concept_type, limit)
+    
+    async def search_concepts_by_mastery_level(self, user_id: str, min_mastery: float, limit: int = 10) -> List[SemanticMemory]:
+        """Search concepts by minimum mastery level"""
         try:
             result = self.db.table(self.table_name)\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .ilike('category', f'%{category}%')\
-                .order('importance_score', desc=True)\
+                .gte('mastery_level', min_mastery)\
+                .order('mastery_level', desc=True)\
                 .limit(limit)\
                 .execute()
             
             concepts = []
             for data in result.data or []:
-                concept = await self._parse_memory_data(data)
+                concept = await self._parse_from_storage(data)
                 concepts.append(concept)
             
             return concepts
             
         except Exception as e:
-            logger.error(f"Failed to search concepts by category {category}: {e}")
+            logger.error(f"❌ Failed to search concepts by mastery level {min_mastery}: {e}")
             return []
     
-    async def search_concepts_by_abstraction_level(
-        self, 
-        user_id: str, 
-        abstraction_level: str,
-        limit: int = 10
-    ) -> List[SemanticMemory]:
-        """Search concepts by abstraction level"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .eq('abstraction_level', abstraction_level)\
-                .order('importance_score', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            concepts = []
-            for data in result.data or []:
-                concept = await self._parse_memory_data(data)
-                concepts.append(concept)
-            
-            return concepts
-            
-        except Exception as e:
-            logger.error(f"Failed to search concepts by abstraction level {abstraction_level}: {e}")
-            return []
-
-    async def search_concepts_by_type(self, user_id: str, concept_type: str, limit: int = 10) -> List[SemanticMemory]:
-        """Search concepts by concept type"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .ilike('concept_type', f'%{concept_type}%')\
-                .order('importance_score', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            concepts = []
-            for data in result.data or []:
-                concept = await self._parse_memory_data(data)
-                concepts.append(concept)
-            
-            return concepts
-            
-        except Exception as e:
-            logger.error(f"Failed to search concepts by type {concept_type}: {e}")
-            return []
-
-    async def search_concepts_by_definition(self, user_id: str, definition_keyword: str, limit: int = 10) -> List[SemanticMemory]:
-        """Search concepts by definition content"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .ilike('definition', f'%{definition_keyword}%')\
-                .order('importance_score', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            concepts = []
-            for data in result.data or []:
-                concept = await self._parse_memory_data(data)
-                concepts.append(concept)
-            
-            return concepts
-            
-        except Exception as e:
-            logger.error(f"Failed to search concepts by definition {definition_keyword}: {e}")
-            return []
-
-    async def search_concepts_by_related_concept(
-        self, 
-        user_id: str, 
-        related_concept_id: str,
-        limit: int = 10
-    ) -> List[SemanticMemory]:
-        """Search concepts that are related to a specific concept"""
-        try:
-            # Get all concepts for user and filter by related concept
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .order('importance_score', desc=True)\
-                .execute()
-            
-            concepts = []
-            for data in result.data or []:
-                concept = await self._parse_memory_data(data)
-                if related_concept_id in concept.related_concepts:
-                    concepts.append(concept)
-                    if len(concepts) >= limit:
-                        break
-            
-            return concepts
-            
-        except Exception as e:
-            logger.error(f"Failed to search concepts by related concept {related_concept_id}: {e}")
-            return []
+    # Private helper methods
     
-    async def add_concept_relation(
-        self, 
-        source_concept_id: str, 
-        target_concept_id: str
-    ) -> MemoryOperationResult:
-        """Add relationship between concepts"""
+    async def _extract_concepts(self, dialog_content: str) -> Dict[str, Any]:
+        """Extract concepts using TextExtractor with simple schema"""
         try:
-            # Get source concept
-            source_concept = await self.get_memory(source_concept_id)
-            if not source_concept:
-                return MemoryOperationResult(
-                    success=False,
-                    memory_id=source_concept_id,
-                    operation="add_relation",
-                    message="Source concept not found"
-                )
-            
-            # Add to related concepts if not already there
-            related_concepts = source_concept.related_concepts
-            if target_concept_id not in related_concepts:
-                related_concepts.append(target_concept_id)
-                
-                updates = {'related_concepts': related_concepts}
-                return await self.update_memory(source_concept_id, updates)
-            
-            return MemoryOperationResult(
-                success=True,
-                memory_id=source_concept_id,
-                operation="add_relation",
-                message="Relation already exists"
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to add concept relation: {e}")
-            return MemoryOperationResult(
-                success=False,
-                memory_id=source_concept_id,
-                operation="add_relation",
-                message=f"Failed to add relation: {str(e)}"
-            )
-    
-    async def update_concept_properties(
-        self, 
-        memory_id: str, 
-        new_properties: Dict[str, Any]
-    ) -> MemoryOperationResult:
-        """Update concept properties"""
-        try:
-            concept = await self.get_memory(memory_id)
-            if not concept:
-                return MemoryOperationResult(
-                    success=False,
-                    memory_id=memory_id,
-                    operation="update_properties",
-                    message="Concept not found"
-                )
-            
-            # Merge properties
-            merged_properties = concept.properties.copy()
-            merged_properties.update(new_properties)
-            
-            # Update content to reflect new properties
-            prop_str = ", ".join([f"{k}: {v}" for k, v in merged_properties.items()])
-            content = f"{concept.concept_type}: {concept.definition}"
-            if merged_properties:
-                content += f" ({prop_str})"
-            
-            updates = {
-                'properties': merged_properties,
-                'content': content
+            # Schema for concept extraction - 根据数据库字段设计
+            concept_schema = {
+                "concept": "Main concept or term being defined or discussed",
+                "definition": "Clear definition or explanation of the concept",
+                "domain": "Domain or field this concept belongs to (technology, science, business, etc.)",
+                "properties": "Key properties or attributes of this concept (as dict)",
+                "related_concepts": "List of related concepts or terms",
+                "abstraction_level": "Level of abstraction (basic, medium, advanced)",
+                "use_cases": "List of use cases or applications",
+                "examples": "Examples demonstrating this concept",
+                "learning_source": "Source of this knowledge (conversation, document, etc.)",
+                "confidence": "Confidence in extraction quality (0.0-1.0)"
             }
             
-            return await self.update_memory(memory_id, updates)
-            
-        except Exception as e:
-            logger.error(f"Failed to update concept properties: {e}")
-            return MemoryOperationResult(
-                success=False,
-                memory_id=memory_id,
-                operation="update_properties",
-                message=f"Failed to update properties: {str(e)}"
-            )
-    
-    async def _prepare_memory_data(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare semantic memory data for storage"""
-        # Add semantic-specific fields
-        semantic_fields = [
-            'concept_type', 'definition', 'properties', 'abstraction_level',
-            'related_concepts', 'category'
-        ]
-        
-        for field in semantic_fields:
-            if field not in memory_data:
-                if field in ['properties']:
-                    memory_data[field] = json.dumps({})
-                elif field == 'related_concepts':
-                    memory_data[field] = json.dumps([])
-                elif field == 'abstraction_level':
-                    memory_data[field] = 'medium'
-                else:
-                    memory_data[field] = None
-        
-        # Handle JSON fields
-        if isinstance(memory_data.get('properties'), dict):
-            memory_data['properties'] = json.dumps(memory_data['properties'])
-        if isinstance(memory_data.get('related_concepts'), list):
-            memory_data['related_concepts'] = json.dumps(memory_data['related_concepts'])
-        
-        return memory_data
-    
-    async def _parse_memory_data(self, data: Dict[str, Any]) -> SemanticMemory:
-        """Parse semantic memory data from database"""
-        # Parse JSON fields
-        if 'embedding' in data and isinstance(data['embedding'], str):
-            data['embedding'] = json.loads(data['embedding'])
-        if 'context' in data and isinstance(data['context'], str):
-            data['context'] = json.loads(data['context'])
-        if 'tags' in data and isinstance(data['tags'], str):
-            data['tags'] = json.loads(data['tags'])
-        if 'properties' in data and isinstance(data['properties'], str):
-            data['properties'] = json.loads(data['properties'])
-        if 'related_concepts' in data and isinstance(data['related_concepts'], str):
-            data['related_concepts'] = json.loads(data['related_concepts'])
-        
-        return SemanticMemory(**data)
-    
-    async def _find_existing_concept(
-        self, 
-        user_id: str, 
-        concept_type: str, 
-        definition: str
-    ) -> Optional[SemanticMemory]:
-        """Find existing concept with similar structure"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .eq('concept_type', concept_type)\
-                .ilike('definition', f'%{definition[:50]}%')\
-                .execute()
-            
-            if result.data:
-                return await self._parse_memory_data(result.data[0])
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Failed to find existing concept: {e}")
-            return None
-    
-    async def _merge_semantic_concept(
-        self,
-        existing: SemanticMemory,
-        new_properties: Dict[str, Any],
-        new_related_concepts: List[str],
-        new_category: Optional[str],
-        new_importance: float
-    ) -> MemoryOperationResult:
-        """Merge new concept information with existing"""
-        try:
-            # Update importance (take maximum)
-            updated_importance = max(existing.importance_score, new_importance)
-            
-            # Merge properties
-            merged_properties = existing.properties.copy()
-            merged_properties.update(new_properties)
-            
-            # Merge related concepts
-            merged_related = list(set(existing.related_concepts + new_related_concepts))
-            
-            # Update content
-            prop_str = ", ".join([f"{k}: {v}" for k, v in merged_properties.items()])
-            content = f"{existing.concept_type}: {existing.definition}"
-            if merged_properties:
-                content += f" ({prop_str})"
-            
-            updates = {
-                'properties': merged_properties,
-                'related_concepts': merged_related,
-                'content': content,
-                'importance_score': updated_importance,
-                'access_count': existing.access_count + 1
-            }
-            
-            if new_category:
-                updates['category'] = new_category
-            
-            result = await self.update_memory(existing.id, updates)
-            
-            if result.success:
-                result.message = "Semantic concept merged and updated"
-                result.data = result.data or {}
-                result.data['action'] = 'merged'
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Failed to merge semantic concept: {e}")
-            return MemoryOperationResult(
-                success=False,
-                memory_id=existing.id,
-                operation="merge",
-                message=f"Failed to merge semantic concept: {str(e)}"
-            )
-    
-    async def _extract_semantic_info(self, dialog_content: str) -> Dict[str, Any]:
-        """Extract structured semantic information from raw dialog"""
-        try:
-            # Define extraction schema for semantic memory
-            semantic_schema = {
-                "concepts": "List of semantic concepts discussed. Each concept should have: concept_type (e.g., 'definition', 'principle', 'theory', 'classification', 'relationship'), definition (clear explanation of the concept), properties (key attributes as dict), abstraction_level ('concrete', 'medium', 'abstract'), category (domain like 'technology', 'science', 'business'), related_concepts (list of related concept names), importance_score (0.0-1.0)",
-                "knowledge_domain": "Primary domain of knowledge discussed (e.g., 'technology', 'science', 'philosophy', 'business')",
-                "abstraction_level": "Overall level of abstraction in the discussion ('concrete', 'medium', 'abstract')",
-                "key_relationships": "Important relationships between concepts mentioned",
-                "extraction_confidence": "Overall confidence in the extraction quality (0.0-1.0)"
-            }
-            
-            # Extract key information using text extractor
+            # Use TextExtractor to extract structured information
             extraction_result = await self.text_extractor.extract_key_information(
                 text=dialog_content,
-                schema=semantic_schema
+                schema=concept_schema
             )
             
-            if not extraction_result['success']:
+            if extraction_result['success']:
+                # Simple validation and cleanup
+                data = extraction_result['data']
+                
+                # Ensure required fields with safe defaults
+                if not data.get('concept'):
+                    data['concept'] = 'unknown'
+                if not data.get('definition'):
+                    data['definition'] = dialog_content[:100] + '...' if len(dialog_content) > 100 else dialog_content
+                if not data.get('domain'):
+                    data['domain'] = 'general'
+                
+                # Ensure lists are lists
+                for list_field in ['related_concepts', 'use_cases', 'examples']:
+                    if not isinstance(data.get(list_field), list):
+                        data[list_field] = []
+                
+                # Ensure dict fields are dicts
+                if not isinstance(data.get('properties'), dict):
+                    data['properties'] = {}
+                
+                # Ensure string fields have defaults
+                if not data.get('abstraction_level'):
+                    data['abstraction_level'] = 'medium'
+                if not data.get('learning_source'):
+                    data['learning_source'] = 'conversation'
+                
+                # Ensure numeric fields are numbers
+                try:
+                    data['confidence'] = float(data.get('confidence', 0.8))
+                except (ValueError, TypeError):
+                    data['confidence'] = 0.8
+                
+                return {
+                    'success': True,
+                    'data': data,
+                    'confidence': extraction_result.get('confidence', 0.7)
+                }
+            else:
                 return extraction_result
             
-            extracted_data = extraction_result['data']
-            
-            # Post-process extracted concepts
-            processed_data = await self._process_semantic_data(extracted_data, dialog_content)
-            
-            return {
-                'success': True,
-                'data': processed_data,
-                'confidence': extraction_result.get('confidence', 0.7),
-                'billing_info': extraction_result.get('billing_info')
-            }
-            
         except Exception as e:
-            logger.error(f"Semantic information extraction failed: {e}")
+            logger.error(f"❌ Concept extraction failed: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'data': {},
+                'data': {
+                    'concept': 'unknown',
+                    'definition': dialog_content[:100],
+                    'domain': 'general',
+                    'related_concepts': [],
+                    'examples': [],
+                    'confidence': 0.5
+                },
                 'confidence': 0.0
             }
     
-    async def _process_semantic_data(self, raw_data: Dict[str, Any], original_content: str) -> Dict[str, Any]:
-        """Process and validate extracted semantic data"""
-        processed = {
-            'concepts': [],
-            'knowledge_domain': 'general',
-            'abstraction_level': 'medium',
-            'key_relationships': [],
-            'extraction_confidence': 0.7
-        }
-        
-        # Process knowledge domain
-        domain = raw_data.get('knowledge_domain', 'general')
-        if isinstance(domain, str):
-            processed['knowledge_domain'] = domain.lower()
-        
-        # Process abstraction level
-        abstraction = raw_data.get('abstraction_level', 'medium')
-        valid_levels = ['concrete', 'medium', 'abstract']
-        if isinstance(abstraction, str) and abstraction.lower() in valid_levels:
-            processed['abstraction_level'] = abstraction.lower()
-        
-        # Process extraction confidence
-        try:
-            extraction_confidence = float(raw_data.get('extraction_confidence', 0.7))
-            processed['extraction_confidence'] = max(0.0, min(1.0, extraction_confidence))
-        except (ValueError, TypeError):
-            processed['extraction_confidence'] = 0.7
-        
-        # Process key relationships
-        relationships = raw_data.get('key_relationships', [])
-        if isinstance(relationships, list):
-            processed['key_relationships'] = relationships[:5]  # Limit to 5 relationships
-        elif isinstance(relationships, str):
-            processed['key_relationships'] = [relationships]
-        
-        # Process concepts
-        concepts = raw_data.get('concepts', [])
-        if not isinstance(concepts, list):
-            concepts = []
-        
-        for concept in concepts:
-            if isinstance(concept, dict):
-                processed_concept = self._process_single_concept(concept, processed['knowledge_domain'], processed['abstraction_level'])
-                if processed_concept:
-                    processed['concepts'].append(processed_concept)
-        
-        # If no concepts extracted, try to extract basic concepts
-        if not processed['concepts']:
-            basic_concepts = self._extract_basic_concepts(original_content)
-            processed['concepts'].extend(basic_concepts)
-        
-        return processed
+    # Override base engine methods for semantic-specific handling
     
-    def _process_single_concept(self, concept: Dict[str, Any], default_domain: str, default_abstraction: str) -> Optional[Dict[str, Any]]:
-        """Process and validate a single concept"""
-        try:
-            # Required fields
-            definition = concept.get('definition')
-            if not definition or len(str(definition).strip()) < 5:
-                return None
-            
-            processed_concept = {
-                'concept_type': str(concept.get('concept_type', 'general_concept')).lower().replace(' ', '_'),
-                'definition': str(definition).strip(),
-                'properties': concept.get('properties', {}) if isinstance(concept.get('properties'), dict) else {},
-                'category': str(concept.get('category', default_domain)).lower(),
-                'related_concepts': concept.get('related_concepts', []) if isinstance(concept.get('related_concepts'), list) else [],
-            }
-            
-            # Process abstraction level
-            abstraction = concept.get('abstraction_level', default_abstraction)
-            valid_levels = ['concrete', 'medium', 'abstract']
-            if isinstance(abstraction, str) and abstraction.lower() in valid_levels:
-                processed_concept['abstraction_level'] = abstraction.lower()
-            else:
-                processed_concept['abstraction_level'] = default_abstraction
-            
-            # Process importance score
-            try:
-                importance_score = float(concept.get('importance_score', 0.5))
-                processed_concept['importance_score'] = max(0.0, min(1.0, importance_score))
-            except (ValueError, TypeError):
-                processed_concept['importance_score'] = 0.5
-            
-            return processed_concept
-            
-        except Exception as e:
-            logger.warning(f"Failed to process concept: {e}")
-            return None
+    def _customize_for_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data before storage - handle semantic-specific fields"""
+        # Remove fields that don't exist in database schema
+        # DB有：concept_name, concept_category, definition, properties, related_concepts, 
+        #       hierarchical_level, parent_concept_id, use_cases, examples, mastery_level, learning_source
+        # DB没有：content, memory_type, tags, confidence, access_count, last_accessed_at, importance_score, abstraction_level, context
+        fields_to_remove = ['content', 'memory_type', 'tags', 'confidence', 'importance_score', 'abstraction_level', 'context']
+        
+        for field in fields_to_remove:
+            data.pop(field, None)
+        
+        # Map model fields to database fields
+        if 'concept_type' in data:
+            data['concept_name'] = data.pop('concept_type')
+        if 'category' in data:
+            data['concept_category'] = data.pop('category')
+        
+        # Set default values for database-specific fields
+        if 'concept_name' not in data:
+            data['concept_name'] = 'unknown'
+        if 'concept_category' not in data:
+            data['concept_category'] = 'general'
+        if 'definition' not in data:
+            data['definition'] = 'No definition available'
+        if 'properties' not in data:
+            data['properties'] = {}
+        if 'related_concepts' not in data:
+            data['related_concepts'] = []
+        if 'use_cases' not in data:
+            data['use_cases'] = []
+        if 'examples' not in data:
+            data['examples'] = []
+        if 'hierarchical_level' not in data:
+            data['hierarchical_level'] = 1
+        if 'mastery_level' not in data:
+            data['mastery_level'] = 0.5
+        if 'learning_source' not in data:
+            data['learning_source'] = 'conversation'
+        
+        return data
     
-    def _extract_basic_concepts(self, content: str) -> List[Dict[str, Any]]:
-        """Extract basic concepts when structured extraction fails"""
-        concepts = []
+    def _customize_from_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data after retrieval - add model-required fields"""
+        # Map database fields back to model fields
+        if 'concept_name' in data and 'concept_type' not in data:
+            data['concept_type'] = data['concept_name']
+        if 'concept_category' in data and 'category' not in data:
+            data['category'] = data['concept_category']
         
-        # Simple heuristics for basic concept extraction
-        sentences = [s.strip() for s in content.split('.') if s.strip()]
+        # Reconstruct content from definition for model
+        if 'content' not in data:
+            data['content'] = data.get('definition', 'No definition available')
         
-        for sentence in sentences[:3]:  # Limit to first 3 sentences
-            if len(sentence) > 30 and len(sentence) < 300:
-                # Look for definition patterns
-                for pattern in [' is ', ' are ', ' means ', ' refers to ']:
-                    if pattern in sentence.lower():
-                        parts = sentence.lower().split(pattern, 1)
-                        if len(parts) == 2:
-                            concept_name = parts[0].strip()
-                            definition = parts[1].strip()
-                            
-                            concepts.append({
-                                'concept_type': 'definition',
-                                'definition': f"{concept_name} {pattern.strip()} {definition}",
-                                'properties': {},
-                                'abstraction_level': 'medium',
-                                'category': 'general',
-                                'related_concepts': [],
-                                'importance_score': 0.6
-                            })
-                            break
+        # Add model-required fields with defaults (这些字段不在数据库中但model需要)
+        if 'memory_type' not in data:
+            data['memory_type'] = 'semantic'
+        if 'tags' not in data:
+            data['tags'] = []
+        if 'confidence' not in data:
+            data['confidence'] = 0.8
+        if 'importance_score' not in data:
+            data['importance_score'] = 0.5
+        if 'abstraction_level' not in data:
+            data['abstraction_level'] = 'medium'
         
-        return concepts[:2]  # Limit to 2 basic concepts
+        return data
+    
+    async def _create_memory_model(self, data: Dict[str, Any]) -> SemanticMemory:
+        """Create SemanticMemory model from database data"""
+        return SemanticMemory(**data)

@@ -1,9 +1,18 @@
 # 基于Supabase + pgvector的AI Agent记忆系统设计
 
 ## 核心设计理念
-- **以记忆类型为核心**：按照认知科学的记忆分类进行设计
-- **存储提取后的结构化记忆**：不存储原始对话，只存储LLM提取的有价值信息
+- **以记忆类型为核心**：按照认知科学的记忆分类进行设计（事实性、程序性、情景性、语义性、工作记忆）
+- **智能内容提取**：从自然对话中智能提取并存储结构化记忆信息
 - **向量检索优先**：利用pgvector进行语义相似度检索
+- **MCP工具集成**：通过MCP工具提供统一的记忆管理接口
+
+## 系统架构概览
+
+```
+User Query → MCP Memory Tools → Memory Service → Supabase Database
+                ↓                    ↓              ↓
+         Tool Response ←  Processing Logic ← pgvector Search
+```
 
 ## 1. 事实性记忆表 (factual_memories)
 
@@ -627,3 +636,127 @@ AND fact_type = 'skill'
 AND is_active = true
 ORDER BY importance_score DESC;
 ```
+
+## MCP工具接口说明
+
+### 智能对话处理工具
+
+#### 1. 智能记忆存储工具
+从自然对话中智能提取并存储记忆：
+
+```python
+# 存储事实性记忆
+await mcp_service.call_tool("store_factual_memory_from_dialog", {
+    "user_id": "user123",
+    "dialog_content": "我喜欢喝咖啡，特别是拿铁，通常在早上8点喝",
+    "importance_score": 0.7
+})
+
+# 存储程序性记忆  
+await mcp_service.call_tool("store_procedural_memory_from_dialog", {
+    "user_id": "user123", 
+    "dialog_content": "每次部署代码时，我先运行测试，然后打包，最后上传到服务器",
+    "importance_score": 0.8
+})
+
+# 存储情景记忆
+await mcp_service.call_tool("store_episodic_memory_from_dialog", {
+    "user_id": "user123",
+    "dialog_content": "昨天和团队开了项目回顾会议，讨论了新功能的设计方案",
+    "episode_date": "2024-01-15T14:00:00Z",
+    "importance_score": 0.6
+})
+```
+
+#### 2. 记忆搜索工具
+跨记忆类型的语义搜索：
+
+```python
+# 搜索相关记忆（重要：memory_types必须是JSON字符串）
+await mcp_service.call_tool("search_memories", {
+    "user_id": "user123",
+    "query": "工作流程和部署相关的记忆",
+    "memory_types": '["FACTUAL", "PROCEDURAL"]',  # JSON字符串格式
+    "limit": 10,
+    "similarity_threshold": 0.7
+})
+
+# 按类型搜索事实记忆
+await mcp_service.call_tool("search_facts_by_type", {
+    "user_id": "user123", 
+    "fact_type": "preference",
+    "limit": 5
+})
+```
+
+#### 3. 会话记忆管理
+管理对话会话的上下文记忆：
+
+```python
+# 存储会话消息
+await mcp_service.call_tool("store_session_message", {
+    "user_id": "user123",
+    "session_id": "session_abc",
+    "message_content": "用户询问关于API设计的问题",
+    "message_type": "human",
+    "importance_score": 0.5
+})
+
+# 获取会话上下文
+await mcp_service.call_tool("get_session_context", {
+    "user_id": "user123",
+    "session_id": "session_abc",
+    "include_summaries": True,
+    "max_recent_messages": 5
+})
+```
+
+#### 4. 工作记忆管理
+管理短期任务和当前上下文：
+
+```python
+# 获取活跃工作记忆
+await mcp_service.call_tool("get_active_working_memories", {
+    "user_id": "user123"
+})
+
+# 存储工作记忆
+await mcp_service.call_tool("store_working_memory_from_dialog", {
+    "user_id": "user123",
+    "dialog_content": "正在开发用户认证功能，需要集成OAuth2",
+    "current_task_context": '{"task": "authentication", "priority": "high"}',
+    "ttl_hours": 48
+})
+```
+
+### 记忆聚合服务
+
+提供智能记忆上下文聚合功能：
+
+```python
+from tools.services.memory_service.memory_aggregator import get_user_memory_context
+
+# 获取综合记忆上下文
+context = await get_user_memory_context(
+    mcp_service=mcp_service,
+    user_id="user123", 
+    session_id="session_abc",
+    query_context="API设计和开发流程",
+    max_length=2000
+)
+
+# 仅获取会话摘要
+session_context = await get_session_summary_only(
+    mcp_service=mcp_service,
+    user_id="user123",
+    session_id="session_abc"
+)
+```
+
+### 注意事项
+
+1. **JSON参数格式**：`memory_types`、`participants`等数组参数必须传递JSON字符串格式
+2. **用户隔离**：所有记忆数据按user_id严格隔离
+3. **生命周期管理**：工作记忆有TTL机制，会自动过期
+4. **向量检索**：所有文本内容自动生成embedding进行语义搜索
+5. **安全性**：通过Supabase RLS确保数据访问安全

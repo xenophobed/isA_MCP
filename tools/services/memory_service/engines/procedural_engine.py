@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Procedural Memory Engine
-Specialized engine for procedural memory management
+Simple, clean implementation for procedural memory management
 """
 
-from typing import Dict, Any, List, Optional
-import json
+from typing import Dict, Any, List
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import ProceduralMemory, MemoryOperationResult
@@ -15,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class ProceduralMemoryEngine(BaseMemoryEngine):
-    """Engine for managing procedural memories"""
+    """Simple engine for managing procedural memories"""
     
     def __init__(self):
         super().__init__()
@@ -36,393 +35,255 @@ class ProceduralMemoryEngine(BaseMemoryEngine):
         importance_score: float = 0.5
     ) -> MemoryOperationResult:
         """
-        Store procedural memories by intelligently extracting procedural knowledge from dialog
+        Store procedural memory by extracting procedures from dialog
         
-        Args:
-            user_id: User identifier
-            dialog_content: Raw dialog between human and AI
-            importance_score: Manual importance override (0.0-1.0)
+        Simple workflow: TextExtractor → ProceduralMemory → base.store_memory
         """
         try:
-            # Extract procedural knowledge from dialog
-            extraction_result = await self._extract_procedural_info(dialog_content)
+            # Extract procedures using TextExtractor
+            extraction_result = await self._extract_procedures(dialog_content)
             
             if not extraction_result['success']:
-                logger.error(f"Failed to extract procedural info: {extraction_result.get('error')}")
+                logger.error(f"Failed to extract procedures: {extraction_result.get('error')}")
                 return MemoryOperationResult(
                     success=False,
                     memory_id="",
                     operation="store_procedural_memory",
-                    message=f"Failed to extract procedural information: {extraction_result.get('error')}"
+                    message=f"Failed to extract procedures: {extraction_result.get('error')}"
                 )
             
-            extracted_data = extraction_result['data']
+            procedure_data = extraction_result['data']
             
-            # Create procedural memory with extracted data
+            # Create ProceduralMemory object with proper model fields
+            # Ensure difficulty_level is string for model validation
+            difficulty_level = procedure_data.get('difficulty_level', 'medium')
+            if isinstance(difficulty_level, int):
+                level_map = {1: 'easy', 2: 'medium', 3: 'hard'}
+                difficulty_level = level_map.get(difficulty_level, 'medium')
+            
             procedural_memory = ProceduralMemory(
                 user_id=user_id,
-                content=extracted_data.get('clean_content', dialog_content[:500]),
-                skill_type=extracted_data.get('skill_type', 'general_skill'),
-                steps=extracted_data.get('steps', []),
-                prerequisites=extracted_data.get('prerequisites', []),
-                difficulty_level=extracted_data.get('difficulty_level', 'medium'),
-                domain=extracted_data.get('domain', 'general'),
-                importance_score=extracted_data.get('importance_score', importance_score)
+                content=procedure_data.get('expected_outcome', dialog_content[:200]),  # model需要但DB没有
+                skill_type=procedure_data.get('task_description', 'unknown'),  # model字段，映射到DB的procedure_name
+                domain=procedure_data.get('domain', 'general'),  # model和DB都有
+                steps=procedure_data.get('steps', []),
+                prerequisites=procedure_data.get('prerequisites', []),
+                difficulty_level=difficulty_level,  # 确保是字符串
+                success_rate=float(procedure_data.get('success_rate', 0.0)),
+                confidence=float(procedure_data.get('confidence', 0.8)),  # model需要但DB没有
+                importance_score=importance_score  # model需要但DB没有
             )
             
-            # Store the memory
+            # Let base engine handle embedding and storage
             result = await self.store_memory(procedural_memory)
             
             if result.success:
-                logger.info(f"Stored intelligent procedural memory: {procedural_memory.id}")
-                logger.info(f"Extracted: skill_type={extracted_data.get('skill_type')}, "
-                          f"steps={len(extracted_data.get('steps', []))}, "
-                          f"domain={extracted_data.get('domain')}")
+                logger.info(f"✅ Stored procedure: {procedural_memory.skill_type[:50]}...")
             
             return result
             
         except Exception as e:
-            logger.error(f"Failed to store procedural memory from dialog: {e}")
+            logger.error(f"❌ Failed to store procedural memory: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id="",
                 operation="store_procedural_memory",
                 message=f"Failed to store procedural memory: {str(e)}"
             )
-    
-    async def update_success_rate(self, memory_id: str, success: bool) -> MemoryOperationResult:
-        """Update procedure success rate based on usage"""
+
+    async def search_procedures_by_task(self, user_id: str, task_name: str, limit: int = 10) -> List[ProceduralMemory]:
+        """Search procedures by task using database field procedure_name"""
         try:
-            memory = await self.get_memory(memory_id)
-            if not memory:
-                return MemoryOperationResult(
-                    success=False,
-                    memory_id=memory_id,
-                    operation="update_success_rate",
-                    message="Memory not found"
-                )
+            result = self.db.table(self.table_name)\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .ilike('procedure_name', f'%{task_name}%')\
+                .order('success_rate', desc=True)\
+                .limit(limit)\
+                .execute()
             
-            # Calculate new success rate
-            current_rate = memory.success_rate
-            access_count = memory.access_count
+            procedures = []
+            for data in result.data or []:
+                procedure = await self._parse_from_storage(data)
+                procedures.append(procedure)
             
-            if access_count == 0:
-                new_rate = 1.0 if success else 0.0
-            else:
-                # Weighted average
-                total_successes = current_rate * access_count
-                if success:
-                    total_successes += 1
-                new_rate = total_successes / (access_count + 1)
+            return procedures
             
-            updates = {
-                'success_rate': new_rate,
-                'access_count': access_count + 1
+        except Exception as e:
+            logger.error(f"❌ Failed to search procedures by task {task_name}: {e}")
+            return []
+    
+    # Private helper methods
+    
+    async def _extract_procedures(self, dialog_content: str) -> Dict[str, Any]:
+        """Extract procedures using TextExtractor with simple schema"""
+        try:
+            # Schema for procedure extraction - 根据数据库字段设计
+            procedure_schema = {
+                "task_description": "Brief description of the task or procedure (maps to procedure_name)",
+                "domain": "Domain or category this procedure belongs to",
+                "steps": "List of steps to complete the task",
+                "prerequisites": "List of required prior knowledge or conditions",
+                "trigger_conditions": "When or under what conditions to use this procedure",
+                "expected_outcome": "What should happen when this procedure is completed",
+                "difficulty_level": "Difficulty level (easy=1, medium=2, hard=3)",
+                "success_rate": "Success rate when this procedure is applied (0.0-1.0)",
+                "estimated_time_minutes": "Estimated time to complete in minutes",
+                "required_tools": "List of tools or resources needed",
+                "confidence": "Confidence in extraction quality (0.0-1.0)"
             }
             
-            return await self.update_memory(memory_id, updates)
-            
-        except Exception as e:
-            logger.error(f"Failed to update success rate: {e}")
-            return MemoryOperationResult(
-                success=False,
-                memory_id=memory_id,
-                operation="update_success_rate",
-                message=f"Failed to update success rate: {str(e)}"
-            )
-    
-    async def search_procedures_by_domain(self, user_id: str, domain: str, limit: int = 10) -> List[ProceduralMemory]:
-        """Search procedures by domain"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .ilike('domain', f'%{domain}%')\
-                .order('success_rate', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            procedures = []
-            for data in result.data or []:
-                procedure = await self._parse_memory_data(data)
-                procedures.append(procedure)
-            
-            return procedures
-            
-        except Exception as e:
-            logger.error(f"Failed to search procedures by domain {domain}: {e}")
-            return []
-
-    async def search_procedures_by_skill_type(self, user_id: str, skill_type: str, limit: int = 10) -> List[ProceduralMemory]:
-        """Search procedures by skill type"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .ilike('skill_type', f'%{skill_type}%')\
-                .order('success_rate', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            procedures = []
-            for data in result.data or []:
-                procedure = await self._parse_memory_data(data)
-                procedures.append(procedure)
-            
-            return procedures
-            
-        except Exception as e:
-            logger.error(f"Failed to search procedures by skill type {skill_type}: {e}")
-            return []
-
-    async def search_procedures_by_difficulty(
-        self, 
-        user_id: str, 
-        difficulty_level: str,
-        limit: int = 10
-    ) -> List[ProceduralMemory]:
-        """Search procedures by difficulty level"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .eq('difficulty_level', difficulty_level)\
-                .order('success_rate', desc=True)\
-                .order('importance_score', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            procedures = []
-            for data in result.data or []:
-                procedure = await self._parse_memory_data(data)
-                procedures.append(procedure)
-            
-            return procedures
-            
-        except Exception as e:
-            logger.error(f"Failed to search procedures by difficulty {difficulty_level}: {e}")
-            return []
-
-    async def search_procedures_by_success_rate(
-        self, 
-        user_id: str, 
-        min_success_rate: float = 0.8,
-        limit: int = 10
-    ) -> List[ProceduralMemory]:
-        """Search high-success-rate procedures"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .gte('success_rate', min_success_rate)\
-                .order('success_rate', desc=True)\
-                .order('access_count', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            procedures = []
-            for data in result.data or []:
-                procedure = await self._parse_memory_data(data)
-                procedures.append(procedure)
-            
-            return procedures
-            
-        except Exception as e:
-            logger.error(f"Failed to search procedures by success rate: {e}")
-            return []
-
-    async def search_procedures_by_prerequisites(
-        self, 
-        user_id: str, 
-        prerequisite: str,
-        limit: int = 10
-    ) -> List[ProceduralMemory]:
-        """Search procedures that require a specific prerequisite"""
-        try:
-            # Get all procedures for user and filter by prerequisite
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .order('difficulty_level')\
-                .execute()
-            
-            procedures = []
-            for data in result.data or []:
-                procedure = await self._parse_memory_data(data)
-                if prerequisite.lower() in [p.lower() for p in procedure.prerequisites]:
-                    procedures.append(procedure)
-                    if len(procedures) >= limit:
-                        break
-            
-            return procedures
-            
-        except Exception as e:
-            logger.error(f"Failed to search procedures by prerequisite {prerequisite}: {e}")
-            return []
-    
-    async def _prepare_memory_data(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare procedural memory data for storage"""
-        # Add procedural-specific fields
-        procedural_fields = [
-            'skill_type', 'steps', 'prerequisites', 'difficulty_level',
-            'success_rate', 'domain'
-        ]
-        
-        for field in procedural_fields:
-            if field not in memory_data:
-                if field == 'success_rate':
-                    memory_data[field] = 0.0
-                elif field in ['steps', 'prerequisites']:
-                    memory_data[field] = json.dumps([])
-                elif field == 'difficulty_level':
-                    memory_data[field] = 'medium'
-                else:
-                    memory_data[field] = None
-        
-        # Handle JSON fields
-        if isinstance(memory_data.get('steps'), list):
-            memory_data['steps'] = json.dumps(memory_data['steps'])
-        if isinstance(memory_data.get('prerequisites'), list):
-            memory_data['prerequisites'] = json.dumps(memory_data['prerequisites'])
-        
-        return memory_data
-    
-    async def _parse_memory_data(self, data: Dict[str, Any]) -> ProceduralMemory:
-        """Parse procedural memory data from database"""
-        # Parse JSON fields
-        if 'embedding' in data and isinstance(data['embedding'], str):
-            data['embedding'] = json.loads(data['embedding'])
-        if 'context' in data and isinstance(data['context'], str):
-            data['context'] = json.loads(data['context'])
-        if 'tags' in data and isinstance(data['tags'], str):
-            data['tags'] = json.loads(data['tags'])
-        if 'steps' in data and isinstance(data['steps'], str):
-            data['steps'] = json.loads(data['steps'])
-        if 'prerequisites' in data and isinstance(data['prerequisites'], str):
-            data['prerequisites'] = json.loads(data['prerequisites'])
-        
-        return ProceduralMemory(**data)
-    
-    async def _extract_procedural_info(self, dialog_content: str) -> Dict[str, Any]:
-        """Extract structured procedural information from raw dialog"""
-        try:
-            # Define extraction schema for procedural memory
-            procedural_schema = {
-                "skill_type": "Type of skill or procedure being described (e.g., 'programming', 'cooking', 'problem_solving', 'analysis')",
-                "clean_content": "Clean, concise description of the procedure or skill (2-3 sentences max)",
-                "steps": "List of procedural steps, each with: step_number (int), description (str), importance (str: critical/important/optional), estimated_time (str), tools_needed (list)",
-                "prerequisites": "List of required skills, knowledge, or conditions needed before attempting this procedure",
-                "difficulty_level": "Difficulty level: 'beginner', 'intermediate', 'advanced', or 'expert'",
-                "domain": "Knowledge domain (e.g., 'technology', 'cooking', 'business', 'science', 'creative')",
-                "importance_score": "How important this procedure is from 0.0 (trivial) to 1.0 (critical)",
-                "tools_required": "List of tools, software, or resources needed",
-                "success_indicators": "How to know when the procedure has been completed successfully",
-                "common_mistakes": "Common errors to avoid when following this procedure"
-            }
-            
-            # Extract key information using text extractor
+            # Use TextExtractor to extract structured information
             extraction_result = await self.text_extractor.extract_key_information(
                 text=dialog_content,
-                schema=procedural_schema
+                schema=procedure_schema
             )
             
-            if not extraction_result['success']:
+            if extraction_result['success']:
+                # Simple validation and cleanup
+                data = extraction_result['data']
+                
+                # Ensure required fields with safe defaults
+                if not data.get('task_description'):
+                    data['task_description'] = 'Unknown task'
+                if not data.get('domain'):
+                    data['domain'] = 'general'
+                if not data.get('expected_outcome'):
+                    data['expected_outcome'] = 'Task completion'
+                if not data.get('difficulty_level'):
+                    data['difficulty_level'] = 'medium'
+                
+                # Ensure lists are lists and convert strings to proper format
+                for list_field in ['prerequisites', 'trigger_conditions', 'required_tools']:
+                    if not isinstance(data.get(list_field), list):
+                        data[list_field] = []
+                
+                # Handle steps - convert string list to dict list for model
+                if not isinstance(data.get('steps'), list):
+                    data['steps'] = []
+                else:
+                    # Convert string steps to dict format for model
+                    formatted_steps = []
+                    for i, step in enumerate(data['steps']):
+                        if isinstance(step, str):
+                            formatted_steps.append({
+                                'step_number': i + 1,
+                                'description': step,
+                                'details': ''
+                            })
+                        elif isinstance(step, dict):
+                            formatted_steps.append(step)
+                    data['steps'] = formatted_steps
+                
+                # Ensure numeric fields are numbers
+                for numeric_field in ['confidence', 'success_rate', 'estimated_time_minutes']:
+                    try:
+                        if numeric_field == 'estimated_time_minutes':
+                            data[numeric_field] = int(data.get(numeric_field, 30))
+                        else:
+                            data[numeric_field] = float(data.get(numeric_field, 0.8 if numeric_field == 'confidence' else 0.0))
+                    except (ValueError, TypeError):
+                        data[numeric_field] = 30 if numeric_field == 'estimated_time_minutes' else (0.8 if numeric_field == 'confidence' else 0.0)
+                
+                return {
+                    'success': True,
+                    'data': data,
+                    'confidence': extraction_result.get('confidence', 0.7)
+                }
+            else:
                 return extraction_result
             
-            extracted_data = extraction_result['data']
-            
-            # Post-process extracted data
-            processed_data = await self._process_procedural_data(extracted_data, dialog_content)
-            
-            return {
-                'success': True,
-                'data': processed_data,
-                'confidence': extraction_result.get('confidence', 0.7),
-                'billing_info': extraction_result.get('billing_info')
-            }
-            
         except Exception as e:
-            logger.error(f"Procedural information extraction failed: {e}")
+            logger.error(f"❌ Procedure extraction failed: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'data': {},
+                'data': {
+                    'task_description': 'Unknown task',
+                    'steps': [],
+                    'context': {},
+                    'expected_outcome': 'Task completion',
+                    'difficulty_level': 'medium',
+                    'confidence': 0.5
+                },
                 'confidence': 0.0
             }
     
-    async def _process_procedural_data(self, raw_data: Dict[str, Any], original_content: str) -> Dict[str, Any]:
-        """Process and validate extracted procedural data"""
-        processed = {}
+    # Override base engine methods for procedural-specific handling
+    
+    def _customize_for_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data before storage - handle procedural-specific fields"""
+        # Remove fields that don't exist in database schema
+        # DB有：procedure_name, domain, trigger_conditions, steps, expected_outcome, success_rate, 
+        #       usage_count, last_used_at, difficulty_level, estimated_time_minutes, required_tools
+        # DB没有：content, memory_type, tags, confidence, access_count, last_accessed_at, importance_score, prerequisites, context
+        fields_to_remove = ['content', 'memory_type', 'tags', 'confidence', 'importance_score', 'prerequisites', 'context']
         
-        # Skill type processing
-        skill_type = raw_data.get('skill_type', 'general_skill')
-        if isinstance(skill_type, str):
-            processed['skill_type'] = skill_type.lower().replace(' ', '_')
-        else:
-            processed['skill_type'] = 'general_skill'
+        for field in fields_to_remove:
+            data.pop(field, None)
         
-        # Clean content
-        clean_content = raw_data.get('clean_content', '')
-        if not clean_content or len(clean_content) < 10:
-            # Generate a basic summary if extraction failed
-            words = original_content.split()[:30]
-            processed['clean_content'] = ' '.join(words) + ('...' if len(words) == 30 else '')
-        else:
-            processed['clean_content'] = clean_content[:500]  # Limit length
+        # Map model fields to database fields
+        if 'skill_type' in data:
+            data['procedure_name'] = data.pop('skill_type')
         
-        # Steps processing
-        steps = raw_data.get('steps', [])
-        if isinstance(steps, str):
-            # If steps came as string, try to parse into basic format
-            step_lines = [s.strip() for s in steps.split('\n') if s.strip()]
-            processed_steps = []
-            for i, step_desc in enumerate(step_lines[:10]):  # Limit to 10 steps
-                processed_steps.append({
-                    'step_number': i + 1,
-                    'description': step_desc,
-                    'importance': 'important',
-                    'estimated_time': 'varies',
-                    'tools_needed': []
-                })
-            processed['steps'] = processed_steps
-        elif isinstance(steps, list):
-            processed['steps'] = steps[:10]  # Limit to 10 steps
-        else:
-            processed['steps'] = []
+        # Convert difficulty level string to int for database
+        if 'difficulty_level' in data and isinstance(data['difficulty_level'], str):
+            difficulty_map = {'easy': 1, 'medium': 2, 'hard': 3}
+            data['difficulty_level'] = difficulty_map.get(data['difficulty_level'].lower(), 2)
         
-        # Prerequisites processing
-        prerequisites = raw_data.get('prerequisites', [])
-        if isinstance(prerequisites, str):
-            prerequisites = [p.strip() for p in prerequisites.split(',') if p.strip()]
-        elif not isinstance(prerequisites, list):
-            prerequisites = []
-        processed['prerequisites'] = prerequisites[:10]  # Limit to 10 prerequisites
+        # Set default values for database-specific fields
+        if 'procedure_name' not in data:
+            data['procedure_name'] = 'Unknown task'
+        if 'domain' not in data:
+            data['domain'] = 'general'
+        if 'trigger_conditions' not in data:
+            data['trigger_conditions'] = []
+        if 'steps' not in data:
+            data['steps'] = []
+        if 'expected_outcome' not in data:
+            data['expected_outcome'] = 'Task completion'
+        if 'success_rate' not in data:
+            data['success_rate'] = 0.0
+        if 'usage_count' not in data:
+            data['usage_count'] = 0
+        if 'difficulty_level' not in data:
+            data['difficulty_level'] = 2
+        if 'estimated_time_minutes' not in data:
+            data['estimated_time_minutes'] = 30
+        if 'required_tools' not in data:
+            data['required_tools'] = []
         
-        # Difficulty level processing
-        difficulty = raw_data.get('difficulty_level', 'medium')
-        valid_difficulties = ['beginner', 'intermediate', 'advanced', 'expert']
-        if isinstance(difficulty, str) and difficulty.lower() in valid_difficulties:
-            processed['difficulty_level'] = difficulty.lower()
-        else:
-            processed['difficulty_level'] = 'medium'
+        return data
+    
+    def _customize_from_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data after retrieval - add model-required fields"""
+        # Map database fields back to model fields
+        if 'procedure_name' in data and 'skill_type' not in data:
+            data['skill_type'] = data['procedure_name']
         
-        # Domain processing
-        domain = raw_data.get('domain', 'general')
-        if isinstance(domain, str):
-            processed['domain'] = domain.lower()
-        else:
-            processed['domain'] = 'general'
+        # Convert difficulty level int back to string for model
+        if 'difficulty_level' in data and isinstance(data['difficulty_level'], int):
+            level_map = {1: 'easy', 2: 'medium', 3: 'hard'}
+            data['difficulty_level'] = level_map.get(data['difficulty_level'], 'medium')
         
-        # Numerical fields with validation
-        try:
-            importance_score = float(raw_data.get('importance_score', 0.5))
-            processed['importance_score'] = max(0.0, min(1.0, importance_score))
-        except (ValueError, TypeError):
-            processed['importance_score'] = 0.5
+        # Reconstruct content from expected_outcome for model
+        if 'content' not in data:
+            data['content'] = data.get('expected_outcome', 'Unknown task')
         
-        # Additional context fields
-        processed['tools_required'] = raw_data.get('tools_required', [])
-        processed['success_indicators'] = raw_data.get('success_indicators', [])
-        processed['common_mistakes'] = raw_data.get('common_mistakes', [])
+        # Add model-required fields with defaults (这些字段不在数据库中但model需要)
+        if 'memory_type' not in data:
+            data['memory_type'] = 'procedural'
+        if 'tags' not in data:
+            data['tags'] = []
+        if 'confidence' not in data:
+            data['confidence'] = 0.8
+        if 'importance_score' not in data:
+            data['importance_score'] = 0.5
+        if 'prerequisites' not in data:
+            data['prerequisites'] = []
         
-        return processed
+        return data
+    
+    async def _create_memory_model(self, data: Dict[str, Any]) -> ProceduralMemory:
+        """Create ProceduralMemory model from database data"""
+        return ProceduralMemory(**data)

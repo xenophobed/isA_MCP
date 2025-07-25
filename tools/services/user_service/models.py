@@ -5,10 +5,16 @@ User Service Data Models
 使用 Pydantic 进行数据验证和序列化
 """
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+
+# 导入用户ID验证工具
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+from core.user_id_utils import UserIdValidator, validate_user_id
 
 
 class SubscriptionStatus(str, Enum):
@@ -32,7 +38,8 @@ class StripeSubscriptionStatus(str, Enum):
 class User(BaseModel):
     """用户模型"""
     id: Optional[int] = None
-    auth0_id: str = Field(..., description="Auth0 用户ID")
+    user_id: str = Field(..., description="用户业务ID（通常是Auth0 ID）", max_length=255)
+    auth0_id: Optional[str] = Field(None, description="Auth0 用户ID", max_length=255)
     email: EmailStr = Field(..., description="用户邮箱")
     name: str = Field(..., description="用户姓名")
     credits_remaining: int = Field(default=1000, description="剩余积分")
@@ -41,6 +48,31 @@ class User(BaseModel):
     is_active: bool = Field(default=True, description="用户是否激活")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """验证用户ID格式"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+    
+    @validator('auth0_id')
+    def validate_auth0_id_format(cls, v):
+        """验证Auth0 ID格式"""
+        if v is None:
+            return v
+        
+        # Auth0 ID可以为空，但如果提供了必须格式正确
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid auth0_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
 
     class Config:
         from_attributes = True
@@ -76,7 +108,7 @@ class UserResponse(BaseModel):
 class Subscription(BaseModel):
     """订阅模型"""
     id: Optional[int] = None
-    user_id: int = Field(..., description="用户ID")
+    user_id: str = Field(..., description="用户业务ID")
     stripe_subscription_id: Optional[str] = Field(None, description="Stripe 订阅ID")
     stripe_customer_id: Optional[str] = Field(None, description="Stripe 客户ID")
     status: StripeSubscriptionStatus = Field(..., description="订阅状态")
@@ -163,9 +195,218 @@ class WebhookEvent(BaseModel):
 
 
 class Auth0UserInfo(BaseModel):
-    """Auth0用户信息模型"""
-    sub: str = Field(..., description="用户ID")
-    email: EmailStr = Field(..., description="用户邮箱")
-    name: str = Field(..., description="用户姓名")
-    picture: Optional[str] = Field(None, description="用户头像")
-    email_verified: bool = Field(default=False, description="邮箱是否验证") 
+    """Auth0 user information model"""
+    sub: str = Field(..., description="User ID")
+    email: EmailStr = Field(..., description="User email")
+    name: str = Field(..., description="User name")
+    picture: Optional[str] = Field(None, description="User avatar")
+    email_verified: bool = Field(default=False, description="Email verified status")
+
+
+# ============ Usage Record Models ============
+
+class UsageRecord(BaseModel):
+    """User usage record model"""
+    id: Optional[int] = None
+    user_id: str = Field(..., description="User ID", max_length=255)
+    session_id: Optional[str] = Field(None, description="Session ID")
+    trace_id: Optional[str] = Field(None, description="Trace ID")
+    endpoint: str = Field(..., description="API endpoint")
+    event_type: str = Field(..., description="Event type")
+    credits_charged: float = Field(default=0.0, description="Credits charged")
+    cost_usd: float = Field(default=0.0, description="USD cost")
+    calculation_method: Optional[str] = Field(default="unknown", description="Calculation method")
+    tokens_used: Optional[int] = Field(default=0, description="Tokens used")
+    prompt_tokens: Optional[int] = Field(default=0, description="Prompt tokens")
+    completion_tokens: Optional[int] = Field(default=0, description="Completion tokens")
+    model_name: Optional[str] = Field(None, description="Model name")
+    provider: Optional[str] = Field(None, description="Service provider")
+    tool_name: Optional[str] = Field(None, description="Tool name")
+    operation_name: Optional[str] = Field(None, description="Operation name")
+    billing_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Billing metadata")
+    request_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Request data")
+    response_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Response data")
+    created_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class UsageRecordCreate(BaseModel):
+    """Create usage record request model"""
+    user_id: str = Field(..., description="User ID")
+    session_id: Optional[str] = Field(None, description="Session ID")
+    trace_id: Optional[str] = Field(None, description="Trace ID")
+    endpoint: str = Field(..., description="API endpoint")
+    event_type: str = Field(..., description="Event type")
+    credits_charged: float = Field(default=0.0, description="Credits charged")
+    cost_usd: float = Field(default=0.0, description="USD cost")
+    calculation_method: Optional[str] = Field(default="unknown", description="Calculation method")
+    tokens_used: Optional[int] = Field(default=0, description="Tokens used")
+    prompt_tokens: Optional[int] = Field(default=0, description="Prompt tokens")
+    completion_tokens: Optional[int] = Field(default=0, description="Completion tokens")
+    model_name: Optional[str] = Field(None, description="Model name")
+    provider: Optional[str] = Field(None, description="Service provider")
+    tool_name: Optional[str] = Field(None, description="Tool name")
+    operation_name: Optional[str] = Field(None, description="Operation name")
+    billing_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Billing metadata")
+    request_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Request data")
+    response_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Response data")
+
+
+class UsageStatistics(BaseModel):
+    """Usage statistics model"""
+    total_records: int = Field(..., description="Total record count")
+    total_credits_charged: float = Field(..., description="Total credits charged")
+    total_cost_usd: float = Field(..., description="Total USD cost")
+    total_tokens_used: int = Field(..., description="Total tokens used")
+    by_event_type: Dict[str, int] = Field(default_factory=dict, description="Statistics by event type")
+    by_model: Dict[str, int] = Field(default_factory=dict, description="Statistics by model")
+    by_provider: Dict[str, int] = Field(default_factory=dict, description="Statistics by provider")
+    date_range: Dict[str, Optional[datetime]] = Field(default_factory=dict, description="Date range")
+
+
+# ============ Session Models ============
+
+class Session(BaseModel):
+    """Session model"""
+    id: Optional[int] = None
+    session_id: str = Field(..., description="Session ID")
+    user_id: str = Field(..., description="User ID", max_length=255)
+    title: Optional[str] = Field(None, description="Session title")
+    status: str = Field(default="active", description="Session status")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Session metadata")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class SessionCreate(BaseModel):
+    """Create session request model"""
+    user_id: str = Field(..., description="User ID")
+    title: Optional[str] = Field(None, description="Session title")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Session metadata")
+
+
+class SessionMemory(BaseModel):
+    """Session memory model"""
+    id: Optional[int] = None
+    session_id: str = Field(..., description="Session ID")
+    user_id: str = Field(..., description="User ID", max_length=255)
+    memory_type: str = Field(..., description="Memory type")
+    content: str = Field(..., description="Memory content")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Memory metadata")
+    created_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class SessionMessage(BaseModel):
+    """Session message model"""
+    id: Optional[int] = None
+    session_id: str = Field(..., description="Session ID")
+    user_id: str = Field(..., description="User ID", max_length=255)
+    role: str = Field(..., description="Message role (user/assistant/system)")
+    content: str = Field(..., description="Message content")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Message metadata")
+    created_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+# ============ Credit Transaction Models ============
+
+class CreditTransaction(BaseModel):
+    """Credit transaction model"""
+    id: Optional[int] = None
+    transaction_id: str = Field(..., description="Transaction ID")
+    user_id: str = Field(..., description="User ID", max_length=255)
+    transaction_type: str = Field(..., description="Transaction type (consume/recharge/refund)")
+    amount: float = Field(..., description="Transaction amount")
+    balance_before: float = Field(..., description="Balance before transaction")
+    balance_after: float = Field(..., description="Balance after transaction")
+    reference_type: Optional[str] = Field(None, description="Reference type")
+    reference_id: Optional[str] = Field(None, description="Reference ID")
+    usage_record_id: Optional[int] = Field(None, description="Associated usage record ID")
+    description: Optional[str] = Field(None, description="Transaction description")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata")
+    created_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class CreditTransactionCreate(BaseModel):
+    """Create credit transaction request model"""
+    user_id: str = Field(..., description="User ID")
+    transaction_type: str = Field(..., description="Transaction type (consume/recharge/refund)")
+    amount: float = Field(..., description="Transaction amount")
+    reference_type: Optional[str] = Field(None, description="Reference type")
+    reference_id: Optional[str] = Field(None, description="Reference ID")
+    usage_record_id: Optional[int] = Field(None, description="Associated usage record ID")
+    description: Optional[str] = Field(None, description="Transaction description")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata") 

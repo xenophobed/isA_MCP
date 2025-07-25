@@ -14,6 +14,8 @@ from .command_execution import CommandExecution
 from .port_manager import PortManager
 from .service_manager import ServiceManager
 from .template_engine import TemplateEngine
+from .requirement_parser import RequirementParser, RequirementAnalysis
+from .code_template_engine import CodeTemplateEngine
 
 __all__ = [
     # 原子服务
@@ -23,4 +25,7 @@ __all__ = [
     'PortManager',
     'ServiceManager',
     'TemplateEngine',
+    'RequirementParser',
+    'RequirementAnalysis',
+    'CodeTemplateEngine',
 ] 

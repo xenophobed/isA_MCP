@@ -14,7 +14,8 @@ from tools.services.event_service.event_services import (
     EventSourceTaskType, 
     init_event_sourcing_service
 )
-from tools.services.event_service.event_database_service import EventDatabaseService
+from tools.services.event_service.services.event_service import EventService
+from tools.services.event_service.services.task_service import TaskService
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +23,15 @@ class EventServiceTools:
     """Event service tools for MCP integration"""
     
     def __init__(self):
-        self.db_service = EventDatabaseService()
-        self.event_service = None
+        self.event_service_instance = None
+        self.task_service = TaskService()
+        self.event_service_logic = EventService()
         
     async def get_event_service(self):
         """Get or initialize event service"""
-        if self.event_service is None:
-            self.event_service = await init_event_sourcing_service()
-        return self.event_service
+        if self.event_service_instance is None:
+            self.event_service_instance = await init_event_sourcing_service()
+        return self.event_service_instance
 
 def register_event_service_tools(mcp: FastMCP):
     """Register event service tools with MCP"""
@@ -97,7 +99,28 @@ def register_event_service_tools(mcp: FastMCP):
             # Get event service
             event_service = await tools.get_event_service()
             
-            # Create task
+            # Create task using new TaskService
+            task_data = {
+                "task_type": task_type,
+                "description": description,
+                "config": config_dict,
+                "callback_url": callback_url,
+                "user_id": user_id
+            }
+            
+            result = await tools.task_service.create_task(task_data)
+            
+            if not result['success']:
+                return json.dumps({
+                    "status": "error",
+                    "message": result['error'],
+                    "timestamp": datetime.now().isoformat()
+                })
+            
+            task_id = result['task_id']
+            
+            # Also create in old event service for compatibility
+            event_service = await tools.get_event_service()
             task = await event_service.create_task(
                 task_type=task_type_enum,
                 description=description,
@@ -105,19 +128,6 @@ def register_event_service_tools(mcp: FastMCP):
                 callback_url=callback_url,
                 user_id=user_id
             )
-            
-            # Store in database
-            task_data = {
-                "task_id": task.task_id,
-                "task_type": task.task_type.value,
-                "description": task.description,
-                "config": task.config,
-                "callback_url": task.callback_url,
-                "user_id": task.user_id,
-                "status": task.status
-            }
-            
-            db_task_id = await tools.db_service.store_background_task(task_data)
             
             return json.dumps({
                 "status": "success",

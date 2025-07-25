@@ -8,7 +8,7 @@ import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-# 导入AI文本生成服务
+# 导入AI文本生成服务和SimplePRDGenerator
 import sys
 import os
 # 添加项目根目录到路径
@@ -17,12 +17,14 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(c
 sys.path.insert(0, project_root)
 
 from tools.services.intelligence_service.language.text_generator import generate
+from ..atomic.simple_prd_generator import SimplePRDGenerator
 
 
 class AppAnalysisMolecule:
     """应用分析分子服务"""
     
     def __init__(self):
+        self.prd_generator = SimplePRDGenerator()
         self.app_type_keywords = {
             "web": ["网站", "web", "页面", "前端", "界面", "展示", "html", "css", "bootstrap"],
             "api": ["api", "接口", "rest", "服务端", "后端", "数据", "json", "restful"],
@@ -40,20 +42,34 @@ class AppAnalysisMolecule:
         }
     
     async def analyze_app_description(self, description: str) -> Dict[str, Any]:
-        """分析应用描述"""
+        """分析应用描述并生成PRD"""
         try:
-            # 基础分析
+            # 基础分析确定应用类型
             basic_analysis = self._basic_analysis(description)
+            app_type = basic_analysis.get("app_type", "web")
             
-            # AI增强分析
-            ai_analysis = await self._ai_enhanced_analysis(description)
+            # 使用SimplePRDGenerator生成完整PRD
+            prd_result = await self.prd_generator.generate_prd(description, app_type)
             
-            # 合并结果
-            final_analysis = self._merge_analysis(basic_analysis, ai_analysis)
+            if not prd_result["success"]:
+                # 如果PRD生成失败，回退到基础分析
+                return {
+                    "success": True,
+                    "analysis": basic_analysis,
+                    "prd": None,
+                    "fallback_to_basic": True,
+                    "prd_error": prd_result.get("error"),
+                    "timestamp": datetime.now().isoformat()
+                }
             
+            # 返回PRD作为主要输出
             return {
                 "success": True,
-                "analysis": final_analysis,
+                "analysis": basic_analysis,  # 保留基础分析用于兼容性
+                "prd": prd_result["prd"],  # 主要输出：完整PRD
+                "app_type": app_type,
+                "confidence": basic_analysis.get("confidence", 0.8),
+                "generation_method": prd_result.get("generation_method", "ai"),
                 "timestamp": datetime.now().isoformat()
             }
             

@@ -43,7 +43,7 @@ class GraphKnowledgeResources:
                               user_id: int,
                               resource_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Register a new knowledge graph resource.
+        Register a new knowledge graph resource with Neo4j synchronization.
         
         Args:
             resource_id: Unique resource identifier
@@ -54,20 +54,37 @@ class GraphKnowledgeResources:
             Dict containing registration result
         """
         try:
-            # Create MCP resource entry
+            # Extract metadata with proper Neo4j data mapping
+            metadata = resource_data.get('metadata', {})
+            
+            # Ensure we have actual storage numbers (not extraction estimates)
+            entities_count = metadata.get('neo4j_nodes', metadata.get('entities_count', 0))
+            relationships_count = metadata.get('neo4j_relationships', metadata.get('relationships_count', 0))
+            
+            # Create MCP resource entry with synchronized data
             mcp_resource = {
                 'resource_id': resource_id,
                 'user_id': user_id,
                 'type': 'knowledge_graph',
                 'address': f"mcp://graph_knowledge/{resource_id}",
                 'registered_at': datetime.now().isoformat(),
-                'metadata': resource_data.get('metadata', {}),
+                'metadata': {
+                    'entities_count': entities_count,
+                    'relationships_count': relationships_count,
+                    'topics': metadata.get('topics', []),
+                    'neo4j_nodes': entities_count,
+                    'neo4j_relationships': relationships_count,
+                    'source_file': resource_data.get('source_file'),
+                    'source_metadata': resource_data.get('source_metadata', {})
+                },
                 'source_file': resource_data.get('source_file'),
+                'source_metadata': resource_data.get('source_metadata', {}),
                 'access_permissions': {
                     'owner': user_id,
                     'read_access': [user_id],
                     'write_access': [user_id]
-                }
+                },
+                'capabilities': ['query', 'graphrag', 'search', 'retrieve']
             }
             
             # Store resource
@@ -387,6 +404,84 @@ class GraphKnowledgeResources:
                 'query': query
             }
     
+    async def sync_with_neo4j(self, user_id: int) -> Dict[str, Any]:
+        """
+        Synchronize MCP resources with actual Neo4j data.
+        
+        Args:
+            user_id: User ID to sync resources for
+            
+        Returns:
+            Dict containing sync results
+        """
+        try:
+            # Try to import Neo4j client for verification
+            try:
+                import sys
+                from pathlib import Path
+                project_root = Path(__file__).parent.parent
+                sys.path.insert(0, str(project_root))
+                
+                from tools.services.data_analytics_service.services.knowledge_service.neo4j_client import Neo4jClient
+                neo4j_client = Neo4jClient({
+                    'uri': 'bolt://localhost:7687',
+                    'username': 'neo4j',
+                    'password': 'password',
+                    'database': 'neo4j'
+                })
+                
+                # Get actual Neo4j data for user
+                neo4j_result = await neo4j_client.get_user_resources(user_id)
+                
+                if neo4j_result.get('success'):
+                    neo4j_entities = neo4j_result['resources'].get('entities', 0)
+                    
+                    # Update MCP resource metadata to match Neo4j reality
+                    updated_resources = 0
+                    for resource_id in self.user_resource_map.get(user_id, []):
+                        if resource_id in self.resources:
+                            resource = self.resources[resource_id]
+                            old_count = resource['metadata'].get('entities_count', 0)
+                            
+                            # Update with actual Neo4j data
+                            resource['metadata']['entities_count'] = neo4j_entities
+                            resource['metadata']['neo4j_nodes'] = neo4j_entities
+                            resource['updated_at'] = datetime.now().isoformat()
+                            
+                            if old_count != neo4j_entities:
+                                updated_resources += 1
+                                logger.info(f"Updated resource {resource_id}: {old_count} -> {neo4j_entities} entities")
+                    
+                    return {
+                        'success': True,
+                        'user_id': user_id,
+                        'neo4j_entities': neo4j_entities,
+                        'resources_updated': updated_resources,
+                        'sync_timestamp': datetime.now().isoformat()
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': f"Neo4j sync failed: {neo4j_result.get('error')}",
+                        'user_id': user_id
+                    }
+                    
+            except Exception as neo4j_error:
+                logger.warning(f"Neo4j sync not available: {neo4j_error}")
+                return {
+                    'success': False,
+                    'error': f"Neo4j connection failed: {neo4j_error}",
+                    'user_id': user_id
+                }
+                
+        except Exception as e:
+            logger.error(f"Resource sync failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'user_id': user_id
+            }
+    
     def get_resource_stats(self) -> Dict[str, Any]:
         """Get resource statistics."""
         try:
@@ -394,13 +489,20 @@ class GraphKnowledgeResources:
                 'total_resources': len(self.resources),
                 'total_users': len(self.user_resource_map),
                 'resource_types': {},
-                'resources_per_user': {}
+                'resources_per_user': {},
+                'total_entities': 0,
+                'total_relationships': 0
             }
             
-            # Count resource types
+            # Count resource types and aggregate data
             for resource in self.resources.values():
                 resource_type = resource['type']
                 stats['resource_types'][resource_type] = stats['resource_types'].get(resource_type, 0) + 1
+                
+                # Aggregate knowledge graph data
+                metadata = resource.get('metadata', {})
+                stats['total_entities'] += metadata.get('entities_count', 0)
+                stats['total_relationships'] += metadata.get('relationships_count', 0)
             
             # Count resources per user
             for user_id, resources in self.user_resource_map.items():

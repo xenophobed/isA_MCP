@@ -1,7 +1,100 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Centralized Logging Configuration for MCP Server
-Provides structured logging with proper formatting and handlers
+Centralized Logging and Monitoring System - isA MCP Core
+
+PROJECT DESCRIPTION:
+    Advanced logging infrastructure providing structured, contextual, and performance-oriented logging
+    for the isA MCP system. Implements configurable log formatters, rotating file handlers, 
+    security event logging, and specialized loggers for different system components.
+
+INPUTS:
+    - Log messages from all system components
+    - Security events and authentication attempts
+    - Tool execution metrics and performance data
+    - System configuration for log levels and output formats
+    - Context information (user IDs, request IDs, execution times)
+
+OUTPUTS:
+    - Structured JSON logs for machine processing
+    - Human-readable console logs for development
+    - Rotating log files with configurable retention
+    - Security audit trails and compliance logs
+    - Performance metrics and execution timing data
+    - Error reports with full context and stack traces
+
+FUNCTIONALITY:
+    - Multi-Format Logging:
+      * Structured JSON logging for production environments
+      * Human-readable formatting for development
+      * Configurable log levels and output destinations
+      * Log rotation with size and time-based policies
+    
+    - Contextual Logging:
+      * Request ID tracking across service calls
+      * User ID association with all operations
+      * Tool execution context and performance metrics
+      * Security event correlation and audit trails
+    
+    - Specialized Loggers:
+      * Security logger for authentication/authorization events
+      * Tool execution logger with performance metrics
+      * Monitoring logger for system health and metrics
+      * Error logger with enhanced context and debugging info
+    
+    - Performance Monitoring:
+      * Execution time tracking for all operations
+      * Tool performance metrics and optimization insights
+      * System resource usage monitoring
+      * Response time analysis and bottleneck detection
+    
+    - Security and Compliance:
+      * Security event logging with threat detection
+      * Authorization decision audit trails
+      * Compliance logging for regulatory requirements
+      * Tamper-evident log integrity protection
+
+DEPENDENCIES:
+    - logging: Python standard logging framework
+    - logging.handlers: Advanced log handlers (rotation, buffering)
+    - json: Structured log format serialization
+    - datetime: Timestamp generation and formatting
+    - pathlib: Cross-platform log file path handling
+
+OPTIMIZATION POINTS:
+    - Implement asynchronous logging for high-throughput scenarios
+    - Add log aggregation and centralized collection
+    - Optimize JSON serialization for structured logs
+    - Implement log compression for long-term storage
+    - Add real-time log streaming for monitoring dashboards
+    - Optimize log file I/O with buffering strategies
+    - Add log sampling for high-volume debug logging
+    - Implement log alerting for critical events
+    - Add log analytics and pattern detection
+    - Optimize memory usage for long-running processes
+
+LOGGER CATEGORIES:
+    - MCPLogger: Enhanced base logger with context management
+    - SecurityLogger: Authentication and authorization events
+    - ToolLogger: Tool execution and performance monitoring
+    - MonitoringLogger: System health and metrics collection
+    - ErrorLogger: Error reporting with enhanced debugging context
+
+USAGE:
+    from core.logging import get_logger, setup_mcp_logging
+    
+    # Setup logging infrastructure
+    setup_mcp_logging()
+    
+    # Get specialized loggers
+    logger = get_logger(__name__)
+    security_logger = get_logger("mcp.security")
+    
+    # Context-aware logging
+    logger.set_context(user_id="user123", request_id="req456")
+    logger.info("Processing user request")
+    
+    # Tool execution logging
+    logger.tool_execution("analyze_data", "user123", True, 1.23)
 """
 import logging
 import logging.handlers

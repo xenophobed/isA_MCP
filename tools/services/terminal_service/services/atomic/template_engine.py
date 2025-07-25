@@ -139,7 +139,7 @@ class TemplateEngine:
                 return match.group(0)
         
         # 使用正则表达式替换变量
-        rendered = re.sub(r'\\{([^}]+)\\}', replace_variable, content)
+        rendered = re.sub(r'\{([^}]+)\}', replace_variable, content)
         
         return rendered
     

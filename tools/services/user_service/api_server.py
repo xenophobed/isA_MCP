@@ -18,12 +18,21 @@ import json
 from .models import (
     User, UserCreate, UserUpdate, UserResponse,
     SubscriptionStatus, CreditConsumption, CreditConsumptionResponse,
-    PaymentIntent, CheckoutSession, WebhookEvent
+    PaymentIntent, CheckoutSession, WebhookEvent,
+    # New unified service models
+    UsageRecord, UsageRecordCreate, UsageStatistics,
+    Session, SessionCreate, SessionMemory, SessionMessage,
+    CreditTransaction, CreditTransactionCreate
 )
 from .auth_service import Auth0Service
 from .subscription_service import SubscriptionService
 from .payment_service import PaymentService
-from .user_service import UserService
+# 使用新的 ServiceV2 和 Repository 模式
+from .services import UserServiceV2, SubscriptionServiceV2
+from .services.usage_service import UsageService
+from .services.session_service import SessionService  
+from .services.credit_service import CreditService
+from .repositories import UserRepository, SubscriptionRepository
 from .config import get_config
 
 
@@ -73,12 +82,21 @@ payment_service = PaymentService(
     enterprise_price_id=config.stripe_enterprise_price_id
 )
 
-user_service = UserService(
-    auth_service=auth_service,
-    subscription_service=subscription_service,
-    payment_service=payment_service,
-    use_database=True
+# 初始化 Repository 层
+user_repository = UserRepository()
+subscription_repository = SubscriptionRepository()
+
+# 初始化新的 Service V2 层
+user_service = UserServiceV2(user_repository=user_repository)
+subscription_service_v2 = SubscriptionServiceV2(
+    subscription_repository=subscription_repository, 
+    user_repository=user_repository
 )
+
+# 初始化新的统一数据管理服务
+usage_service = UsageService()
+session_service = SessionService()
+credit_service = CreditService()
 
 
 # 依赖函数
@@ -157,12 +175,20 @@ async def ensure_user_exists(
     try:
         auth0_id = current_user["sub"]
         
-        user = await user_service.ensure_user_exists(
+        # 使用新的 ServiceV2 
+        result = await user_service.ensure_user_exists(
             auth0_id=auth0_id,
             email=user_data.email,
             name=user_data.name
         )
         
+        if not result.is_success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to ensure user exists: {result.message}"
+            )
+        
+        user = result.data
         return {
             "success": True,
             "user_id": user.id,
@@ -504,6 +530,386 @@ async def stripe_webhook(request: Request):
             detail=f"Webhook processing failed: {str(e)}"
         )
 
+
+# ============ UNIFIED DATA MANAGEMENT API ENDPOINTS ============
+# These endpoints provide centralized access to user data for other services
+
+# Usage Records API
+@app.post("/api/v1/users/{user_id}/usage", response_model=Dict[str, Any], tags=["Usage Records"])
+async def record_usage(
+    user_id: str,
+    usage_data: UsageRecordCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Record user usage event
+    For other services to log AI usage, API calls, etc.
+    """
+    try:
+        # Validate user_id matches the usage data
+        if usage_data.user_id != user_id:
+            raise HTTPException(status_code=400, detail="User ID mismatch")
+        
+        result = await usage_service.record_usage(usage_data)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recording usage: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to record usage: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/usage", response_model=Dict[str, Any], tags=["Usage Records"])
+async def get_usage_history(
+    user_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user usage history
+    """
+    try:
+        # Parse dates if provided
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        
+        result = await usage_service.get_user_usage_history(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+            start_date=start_dt,
+            end_date=end_dt
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting usage history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get usage history: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/usage/stats", response_model=Dict[str, Any], tags=["Usage Records"])
+async def get_usage_statistics(
+    user_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get usage statistics for user
+    """
+    try:
+        # Parse dates if provided
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        
+        result = await usage_service.get_usage_statistics(
+            user_id=user_id,
+            start_date=start_dt,
+            end_date=end_dt
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting usage statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get usage statistics: {str(e)}")
+
+
+# Session Management API
+@app.post("/api/v1/users/{user_id}/sessions", response_model=Dict[str, Any], tags=["Sessions"])
+async def create_session(
+    user_id: str,
+    session_data: SessionCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Create new session
+    For other services to create conversation sessions
+    """
+    try:
+        # Validate user_id matches the session data
+        if session_data.user_id != user_id:
+            raise HTTPException(status_code=400, detail="User ID mismatch")
+        
+        result = await session_service.create_session(session_data)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/sessions", response_model=Dict[str, Any], tags=["Sessions"])
+async def get_user_sessions(
+    user_id: str,
+    active_only: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user sessions
+    """
+    try:
+        result = await session_service.get_user_sessions(
+            user_id=user_id,
+            active_only=active_only,
+            limit=limit,
+            offset=offset
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user sessions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user sessions: {str(e)}")
+
+
+@app.put("/api/v1/sessions/{session_id}/status", response_model=Dict[str, Any], tags=["Sessions"])
+async def update_session_status(
+    session_id: str,
+    status: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Update session status
+    """
+    try:
+        result = await session_service.update_session_status(session_id, status)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating session status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update session status: {str(e)}")
+
+
+@app.post("/api/v1/sessions/{session_id}/messages", response_model=Dict[str, Any], tags=["Sessions"])
+async def add_session_message(
+    session_id: str,
+    role: str,
+    content: str,
+    message_type: str = "chat",
+    tokens_used: int = 0,
+    cost_usd: float = 0.0,
+    current_user = Depends(get_current_user)
+):
+    """
+    Add message to session
+    """
+    try:
+        result = await session_service.add_session_message(
+            session_id=session_id,
+            role=role,
+            content=content,
+            message_type=message_type,
+            tokens_used=tokens_used,
+            cost_usd=cost_usd
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding session message: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add session message: {str(e)}")
+
+
+@app.get("/api/v1/sessions/{session_id}/messages", response_model=Dict[str, Any], tags=["Sessions"])
+async def get_session_messages(
+    session_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get session messages
+    """
+    try:
+        result = await session_service.get_session_messages(
+            session_id=session_id,
+            limit=limit,
+            offset=offset
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting session messages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get session messages: {str(e)}")
+
+
+# Credit Transaction API
+@app.post("/api/v1/users/{user_id}/credits/consume", response_model=Dict[str, Any], tags=["Credits"])
+async def consume_credits_v2(
+    user_id: str,
+    amount: float,
+    description: Optional[str] = None,
+    usage_record_id: Optional[int] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Consume user credits (V2 - unified)
+    Replaces the existing credits consumption endpoint
+    """
+    try:
+        result = await credit_service.consume_credits(
+            user_id=user_id,
+            amount=amount,
+            description=description,
+            usage_record_id=usage_record_id
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error consuming credits: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to consume credits: {str(e)}")
+
+
+@app.post("/api/v1/users/{user_id}/credits/recharge", response_model=Dict[str, Any], tags=["Credits"])
+async def recharge_credits(
+    user_id: str,
+    amount: float,
+    description: Optional[str] = None,
+    reference_id: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Recharge user credits
+    """
+    try:
+        result = await credit_service.recharge_credits(
+            user_id=user_id,
+            amount=amount,
+            description=description,
+            reference_id=reference_id
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recharging credits: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to recharge credits: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/credits/balance", response_model=Dict[str, Any], tags=["Credits"])
+async def get_credit_balance(
+    user_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user credit balance
+    """
+    try:
+        result = await credit_service.get_credit_balance(user_id)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting credit balance: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get credit balance: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/credits/transactions", response_model=Dict[str, Any], tags=["Credits"])
+async def get_transaction_history(
+    user_id: str,
+    transaction_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user credit transaction history
+    """
+    try:
+        # Parse dates if provided
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        
+        result = await credit_service.get_transaction_history(
+            user_id=user_id,
+            transaction_type=transaction_type,
+            limit=limit,
+            offset=offset,
+            start_date=start_dt,
+            end_date=end_dt
+        )
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return result.to_dict()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting transaction history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get transaction history: {str(e)}")
+
+
+# ============ END UNIFIED DATA MANAGEMENT API ============
 
 # 分析和管理路由
 @app.get("/api/v1/users/{user_id}/analytics", tags=["Analytics"])

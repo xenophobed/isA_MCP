@@ -154,7 +154,7 @@ class MemoryService:
     async def search_facts_by_fact_type(self, user_id: str, fact_type: str, limit: int = 10) -> List[FactualMemory]:
         """Search facts by type"""
         engine = self.engines[MemoryType.FACTUAL]
-        return await engine.search_facts_by_fact_type(user_id, fact_type, limit)
+        return await engine.search_facts_by_type(user_id, fact_type, limit)
     
     async def search_facts_by_confidence(self, user_id: str, min_confidence: float = 0.7, limit: int = 10) -> List[FactualMemory]:
         """Search high-confidence facts"""
@@ -210,7 +210,7 @@ class MemoryService:
         """Store episodic memory from dialog using intelligent processing"""
         engine = self.engines[MemoryType.EPISODIC]
         return await engine.store_episode(
-            user_id, dialog_content, episode_date, importance_score
+            user_id, dialog_content, importance_score=importance_score
         )
     
     async def search_episodes_by_timeframe(
@@ -283,8 +283,11 @@ class MemoryService:
     ) -> MemoryOperationResult:
         """Store working memory from dialog using intelligent processing"""
         engine = self.engines[MemoryType.WORKING]
+        # Convert ttl_seconds to expires_at datetime
+        expires_at = datetime.now() + timedelta(seconds=ttl_seconds)
+        # Map to engine's actual method signature
         return await engine.store_working_memory(
-            user_id, dialog_content, current_task_context, ttl_seconds, importance_score
+            user_id, dialog_content, priority="medium", expires_at=expires_at
         )
     
     async def get_active_working_memories(self, user_id: str) -> List[WorkingMemory]:
@@ -314,8 +317,9 @@ class MemoryService:
     ) -> MemoryOperationResult:
         """Store session message with intelligent processing"""
         engine = self.engines[MemoryType.SESSION]
-        return await engine.store_session_message(
-            user_id, session_id, message_content, message_type, role, importance_score
+        # Map to engine's actual method signature
+        return await engine.store_session_memory(
+            user_id, session_id, message_content, message_count=1
         )
 
     async def summarize_session(

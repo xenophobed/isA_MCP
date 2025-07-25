@@ -60,8 +60,8 @@ class UserDatabaseService:
             now = datetime.utcnow().isoformat()
             
             user_data = {
-                'user_id': auth0_id,  # 使用 auth0_id 作为 user_id
-                'auth0_id': auth0_id,
+                'user_id': auth0_id,  # user_id是业务主键，存储Auth0 ID字符串
+                'auth0_id': auth0_id,  # auth0_id字段用于显式标识Auth0来源
                 'email': email,
                 'name': name,
                 'credits_remaining': credits_remaining,
@@ -141,10 +141,10 @@ class UserDatabaseService:
                 logger.error(f"User not found for ID: {user_id}")
                 return None
                 
-            user_auth0_id = user_data.get('user_id')  # This is actually the auth0_id
+            user_auth0_id = user_data.get('user_id')  # user_id字段存储的就是auth0_id字符串
             
             subscription_data = {
-                'user_id': user_auth0_id,  # Use auth0_id as foreign key
+                'user_id': user_auth0_id,  # 使用auth0_id作为外键，符合数据库设计
                 'subscription_scope': 'global',  # Add required field
                 'stripe_subscription_id': stripe_subscription_id,
                 'stripe_customer_id': stripe_customer_id,

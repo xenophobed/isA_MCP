@@ -44,7 +44,7 @@ class GraphAnalyticsTool(BaseTool):
             logger.info("Initializing verified Graph Analytics services...")
             
             # 1. Initialize Simple PDF Extract Service (VERIFIED WORKING)
-            from ..services.digital_service.pdf_extract_service import PDFExtractService
+            from tools.services.data_analytics_service.services.digital_service.pdf_extract_service import PDFExtractService
             self._pdf_extract_service = PDFExtractService({
                 'chunk_size': 2000,        # Verified working chunk size
                 'chunk_overlap': 200       # Verified working overlap
@@ -63,7 +63,7 @@ class GraphAnalyticsTool(BaseTool):
             self._user_service = MockUserService()
             
             # 3. Initialize Graph Analytics Service (VERIFIED WORKING)
-            from ..services.graph_analytics_service import GraphAnalyticsService
+            from tools.services.data_analytics_service.services.graph_analytics_service import GraphAnalyticsService
             self._graph_analytics_service = GraphAnalyticsService(
                 user_service=self._user_service,
                 config={
@@ -125,54 +125,105 @@ class GraphAnalyticsTool(BaseTool):
                     f"PDF file not found: {pdf_path}"
                 )
             
-            if not pdf_path.lower().endswith('.pdf'):
+            # Support multiple file types
+            file_extension = Path(pdf_path).suffix.lower()
+            supported_extensions = {'.pdf', '.txt', '.md', '.json'}
+            
+            if file_extension not in supported_extensions:
                 return self.create_response(
                     "error",
                     "process_pdf_to_knowledge_graph",
                     {},
-                    f"Only PDF files supported. Got: {Path(pdf_path).suffix}"
+                    f"Unsupported file type: {file_extension}. Supported types: {supported_extensions}"
                 )
             
-            logger.info(f"📄 Processing PDF: {pdf_path}")
+            logger.info(f"📄 Processing file: {pdf_path} (type: {file_extension})")
             
-            # STEP 1: Extract text from PDF using verified Simple PDF Extract Service
+            # STEP 1: Extract text based on file type
             extraction_options = options or {}
             mode = extraction_options.get('mode', 'text')  # Default to fast text mode
             
-            logger.info(f"📝 Extracting text from PDF (mode: {mode})...")
-            pdf_result = await self._pdf_extract_service.extract_pdf_to_chunks(
-                pdf_path=pdf_path,
-                user_id=user_id,
-                options={'mode': mode},
-                metadata=source_metadata or {
-                    'source': 'graph_analytics_tools',
-                    'processed_at': str(asyncio.get_event_loop().time())
-                }
-            )
-            
-            if not pdf_result.get('success'):
-                return self.create_response(
-                    "error",
-                    "process_pdf_to_knowledge_graph",
-                    {},
-                    f"PDF extraction failed: {pdf_result.get('error')}"
+            if file_extension == '.pdf':
+                logger.info(f"📝 Extracting text from PDF (mode: {mode})...")
+                extract_result = await self._pdf_extract_service.extract_pdf_to_chunks(
+                    pdf_path=pdf_path,
+                    user_id=user_id,
+                    options={'mode': mode},
+                    metadata=source_metadata or {
+                        'source': 'graph_analytics_tools',
+                        'processed_at': str(asyncio.get_event_loop().time())
+                    }
                 )
+                
+                if not extract_result.get('success'):
+                    return self.create_response(
+                        "error",
+                        "process_pdf_to_knowledge_graph",
+                        {},
+                        f"PDF extraction failed: {extract_result.get('error')}"
+                    )
+                
+                chunks = extract_result.get('chunks', [])
+                
+            else:
+                # Handle text-based files (.txt, .md, .json)
+                logger.info(f"📝 Reading text file: {file_extension}")
+                try:
+                    with open(pdf_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    if not content.strip():
+                        return self.create_response(
+                            "error",
+                            "process_pdf_to_knowledge_graph",
+                            {},
+                            f"File is empty: {pdf_path}"
+                        )
+                    
+                    # For JSON files, extract text content
+                    if file_extension == '.json':
+                        import json
+                        try:
+                            json_data = json.loads(content)
+                            # Convert JSON to readable text
+                            content = json.dumps(json_data, indent=2, ensure_ascii=False)
+                        except json.JSONDecodeError:
+                            # If not valid JSON, treat as plain text
+                            pass
+                    
+                    # Create chunks manually for non-PDF files
+                    # Split by paragraphs or sentences for better processing
+                    chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip()]
+                    if not chunks:
+                        chunks = [content]  # Use entire content as single chunk
+                        
+                except Exception as e:
+                    return self.create_response(
+                        "error",
+                        "process_pdf_to_knowledge_graph",
+                        {},
+                        f"Text extraction failed: {str(e)}"
+                    )
+                
+                extract_result = {
+                    'success': True,
+                    'chunks': chunks,
+                    'total_characters': len(content),
+                    'source_type': file_extension[1:]  # Remove dot
+                }
             
-            # Get chunks from PDF service (DON'T combine them - pass directly to avoid double chunking)
-            chunks = pdf_result.get('chunks', [])
-            
-            logger.info(f"✅ PDF extracted: {len(chunks)} chunks, {pdf_result.get('total_characters', 0)} total characters")
+            logger.info(f"✅ File extracted: {len(chunks)} chunks, {extract_result.get('total_characters', 0)} total characters")
             
             # STEP 2: Process chunks directly to knowledge graph (NO re-chunking)
             enhanced_metadata = {
                 'source_file': Path(pdf_path).name,
                 'source_path': pdf_path,
-                'source_type': 'pdf',
+                'source_type': extract_result.get('source_type', file_extension[1:]),
                 'extraction_mode': mode,
-                'total_pages': pdf_result.get('pages_processed', 0),
-                'total_characters': pdf_result.get('total_characters', 0),
-                'chunk_count': pdf_result.get('chunk_count', 0),
-                'images_processed': pdf_result.get('images_processed', 0),
+                'total_pages': extract_result.get('pages_processed', 1),
+                'total_characters': extract_result.get('total_characters', 0),
+                'chunk_count': len(chunks),
+                'images_processed': extract_result.get('images_processed', 0),
                 **(source_metadata or {})
             }
             
@@ -199,14 +250,15 @@ class GraphAnalyticsTool(BaseTool):
             
             result_summary = {
                 'success': True,
-                'pdf_processing': {
+                'file_processing': {
                     'file_path': pdf_path,
+                    'file_type': file_extension,
                     'mode': mode,
-                    'pages_processed': pdf_result.get('pages_processed', 0),
-                    'images_processed': pdf_result.get('images_processed', 0),
-                    'total_characters': pdf_result.get('total_characters', 0),
-                    'chunks_created': pdf_result.get('chunk_count', 0),
-                    'extraction_time': pdf_result.get('processing_time', 0)
+                    'pages_processed': extract_result.get('pages_processed', 1),
+                    'images_processed': extract_result.get('images_processed', 0),
+                    'total_characters': extract_result.get('total_characters', 0),
+                    'chunks_created': len(chunks),
+                    'extraction_time': extract_result.get('processing_time', 0)
                 },
                 'knowledge_graph': {
                     'resource_id': kg_result.get('resource_id'),
@@ -393,8 +445,8 @@ def register_graph_analytics_tools(mcp: FastMCP):
     async def process_pdf_to_knowledge_graph(
         pdf_path: str,
         user_id: int = 88888,
-        source_metadata: str = "{}",  # JSON string
-        options: str = "{}"  # JSON string
+        source_metadata: dict = None,  # Dictionary instead of JSON string
+        options: dict = None  # Dictionary instead of JSON string
     ) -> str:
         """
         Process PDF to knowledge graph using verified pipeline
@@ -413,19 +465,11 @@ def register_graph_analytics_tools(mcp: FastMCP):
         Args:
             pdf_path: Path to PDF file
             user_id: User ID for isolation (default: 88888)
-            source_metadata: Source metadata (JSON string)
-            options: Processing options (JSON string with 'mode': 'text'|'full')
+            source_metadata: Source metadata (dictionary)
+            options: Processing options (dictionary with 'mode': 'text'|'full')
         """
-        try:
-            metadata = json.loads(source_metadata) if source_metadata != "{}" else {}
-            opts = json.loads(options) if options != "{}" else {}
-        except json.JSONDecodeError as e:
-            return graph_tool.create_response(
-                "error",
-                "process_pdf_to_knowledge_graph",
-                {},
-                f"JSON parsing failed: {str(e)}"
-            )
+        metadata = source_metadata or {}
+        opts = options or {}
         
         return await graph_tool.process_pdf_to_knowledge_graph(
             pdf_path, user_id, metadata, opts
@@ -436,7 +480,7 @@ def register_graph_analytics_tools(mcp: FastMCP):
         query: str,
         user_id: int = 88888,
         resource_id: str = "",
-        options: str = "{}"  # JSON string
+        options: dict = None  # Dictionary instead of JSON string
     ) -> str:
         """
         Query knowledge graph using verified GraphRAG
@@ -456,17 +500,9 @@ def register_graph_analytics_tools(mcp: FastMCP):
             query: Natural language query text
             user_id: User ID for permission control (default: 88888)
             resource_id: Specific resource ID (empty = search all user resources)
-            options: Query options (JSON string)
+            options: Query options (dictionary)
         """
-        try:
-            opts = json.loads(options) if options != "{}" else {}
-        except json.JSONDecodeError as e:
-            return graph_tool.create_response(
-                "error",
-                "query_knowledge_graph",
-                {},
-                f"Options parsing failed: {str(e)}"
-            )
+        opts = options or {}
         
         res_id = resource_id if resource_id else None
         

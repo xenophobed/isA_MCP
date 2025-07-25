@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 Episodic Memory Engine
-Specialized engine for episodic memory management
+Simple, clean implementation for episodic memory management
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
-import json
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import EpisodicMemory, MemoryOperationResult
@@ -16,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class EpisodicMemoryEngine(BaseMemoryEngine):
-    """Engine for managing episodic memories"""
+    """Simple engine for managing episodic memories"""
     
     def __init__(self):
         super().__init__()
@@ -34,20 +33,16 @@ class EpisodicMemoryEngine(BaseMemoryEngine):
         self,
         user_id: str,
         dialog_content: str,
-        episode_date: Optional[datetime] = None,
+        episode_date: datetime = None,
         importance_score: float = 0.5
     ) -> MemoryOperationResult:
         """
-        Store an episodic memory by intelligently extracting information from dialog
+        Store episodic memory by extracting episode information from dialog
         
-        Args:
-            user_id: User identifier
-            dialog_content: Raw dialog between human and AI
-            episode_date: When the episode occurred (defaults to now)
-            importance_score: Manual importance override (0.0-1.0)
+        Simple workflow: TextExtractor → EpisodicMemory → base.store_memory
         """
         try:
-            # Extract structured information from dialog
+            # Extract episode info using TextExtractor
             extraction_result = await self._extract_episode_info(dialog_content)
             
             if not extraction_result['success']:
@@ -59,34 +54,32 @@ class EpisodicMemoryEngine(BaseMemoryEngine):
                     message=f"Failed to extract episode information: {extraction_result.get('error')}"
                 )
             
-            extracted_data = extraction_result['data']
+            episode_data = extraction_result['data']
             
-            # Create episodic memory with extracted data
+            # Create EpisodicMemory object - use model fields that exist in both model and DB
             episodic_memory = EpisodicMemory(
                 user_id=user_id,
-                content=extracted_data.get('clean_content', dialog_content[:500]),
-                event_type=extracted_data.get('event_type', 'conversation'),
-                location=extracted_data.get('location'),
-                participants=extracted_data.get('participants', []),
-                emotional_valence=extracted_data.get('emotional_valence', 0.0),
-                vividness=extracted_data.get('vividness', 0.5),
-                episode_date=episode_date or datetime.now(),
-                importance_score=extracted_data.get('importance_score', importance_score)
+                content=episode_data.get('summary', dialog_content[:200]),  # model需要但DB没有，会在存储时移除
+                event_type=episode_data.get('event_type', 'conversation'),
+                location=episode_data.get('location'),
+                participants=episode_data.get('participants', []),
+                emotional_valence=float(episode_data.get('emotional_valence', 0.0)),
+                vividness=float(episode_data.get('vividness', 0.5)),  # model需要但DB没有
+                importance_score=importance_score,
+                episode_date=episode_date or datetime.now(),  # 会映射为occurred_at
+                confidence=float(episode_data.get('confidence', 0.8))  # model需要但DB没有
             )
             
-            # Store the memory
+            # Let base engine handle embedding and storage
             result = await self.store_memory(episodic_memory)
             
             if result.success:
-                logger.info(f"Stored intelligent episodic memory: {episodic_memory.id}")
-                logger.info(f"Extracted: event_type={extracted_data.get('event_type')}, "
-                          f"participants={len(extracted_data.get('participants', []))}, "
-                          f"emotional_valence={extracted_data.get('emotional_valence')}")
+                logger.info(f"✅ Stored episode: {episodic_memory.event_type} memory")
             
             return result
             
         except Exception as e:
-            logger.error(f"Failed to store episode from dialog: {e}")
+            logger.error(f"❌ Failed to store episode: {e}")
             return MemoryOperationResult(
                 success=False,
                 memory_id="",
@@ -95,49 +88,48 @@ class EpisodicMemoryEngine(BaseMemoryEngine):
             )
 
     async def search_episodes_by_event_type(self, user_id: str, event_type: str, limit: int = 10) -> List[EpisodicMemory]:
-        """Search episodes by event type"""
+        """Search episodes by episode_title (since event_type column doesn't exist)"""
         try:
             result = self.db.table(self.table_name)\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .eq('event_type', event_type)\
-                .order('episode_date', desc=True)\
+                .ilike('episode_title', f'%{event_type}%')\
+                .order('occurred_at', desc=True)\
                 .limit(limit)\
                 .execute()
             
             episodes = []
             for data in result.data or []:
-                episode = await self._parse_memory_data(data)
+                episode = await self._parse_from_storage(data)
                 episodes.append(episode)
             
             return episodes
             
         except Exception as e:
-            logger.error(f"Failed to search episodes by event type {event_type}: {e}")
+            logger.error(f"❌ Failed to search episodes by event type {event_type}: {e}")
             return []
 
     async def search_episodes_by_participant(self, user_id: str, participant: str, limit: int = 10) -> List[EpisodicMemory]:
-        """Search episodes involving a specific participant"""
+        """Search episodes involving a specific participant using JSONB contains"""
         try:
-            # Get all episodes for user and filter by participant
+            # Use JSONB text search for participant (convert to string search)
             result = self.db.table(self.table_name)\
                 .select('*')\
                 .eq('user_id', user_id)\
-                .order('episode_date', desc=True)\
+                .ilike('participants', f'%"{participant}"%')\
+                .order('occurred_at', desc=True)\
+                .limit(limit)\
                 .execute()
             
             episodes = []
             for data in result.data or []:
-                episode = await self._parse_memory_data(data)
-                if participant.lower() in [p.lower() for p in episode.participants]:
-                    episodes.append(episode)
-                    if len(episodes) >= limit:
-                        break
+                episode = await self._parse_from_storage(data)
+                episodes.append(episode)
             
             return episodes
             
         except Exception as e:
-            logger.error(f"Failed to search episodes by participant {participant}: {e}")
+            logger.error(f"❌ Failed to search episodes by participant {participant}: {e}")
             return []
 
     async def search_episodes_by_location(self, user_id: str, location: str, limit: int = 10) -> List[EpisodicMemory]:
@@ -147,310 +139,184 @@ class EpisodicMemoryEngine(BaseMemoryEngine):
                 .select('*')\
                 .eq('user_id', user_id)\
                 .ilike('location', f'%{location}%')\
-                .order('episode_date', desc=True)\
+                .order('occurred_at', desc=True)\
                 .limit(limit)\
                 .execute()
             
             episodes = []
             for data in result.data or []:
-                episode = await self._parse_memory_data(data)
+                episode = await self._parse_from_storage(data)
                 episodes.append(episode)
             
             return episodes
             
         except Exception as e:
-            logger.error(f"Failed to search episodes by location {location}: {e}")
-            return []
-
-    async def search_episodes_by_timeframe(
-        self, 
-        user_id: str, 
-        start_date: datetime, 
-        end_date: datetime,
-        limit: int = 10
-    ) -> List[EpisodicMemory]:
-        """Search episodes within a timeframe"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .gte('episode_date', start_date.isoformat())\
-                .lte('episode_date', end_date.isoformat())\
-                .order('episode_date', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            episodes = []
-            for data in result.data or []:
-                episode = await self._parse_memory_data(data)
-                episodes.append(episode)
-            
-            return episodes
-            
-        except Exception as e:
-            logger.error(f"Failed to search episodes by timeframe: {e}")
-            return []
-
-    async def search_episodes_by_emotional_tone(
-        self, 
-        user_id: str, 
-        min_valence: float = -1.0, 
-        max_valence: float = 1.0,
-        limit: int = 10
-    ) -> List[EpisodicMemory]:
-        """Search episodes by emotional valence range"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .gte('emotional_valence', min_valence)\
-                .lte('emotional_valence', max_valence)\
-                .order('vividness', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            episodes = []
-            for data in result.data or []:
-                episode = await self._parse_memory_data(data)
-                episodes.append(episode)
-            
-            return episodes
-            
-        except Exception as e:
-            logger.error(f"Failed to search episodes by emotional tone: {e}")
-            return []
-
-    async def search_episodes_by_importance(
-        self, 
-        user_id: str, 
-        min_importance: float = 0.7,
-        limit: int = 10
-    ) -> List[EpisodicMemory]:
-        """Search high-importance episodes"""
-        try:
-            result = self.db.table(self.table_name)\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .gte('importance_score', min_importance)\
-                .order('importance_score', desc=True)\
-                .order('episode_date', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            episodes = []
-            for data in result.data or []:
-                episode = await self._parse_memory_data(data)
-                episodes.append(episode)
-            
-            return episodes
-            
-        except Exception as e:
-            logger.error(f"Failed to search episodes by importance: {e}")
+            logger.error(f"❌ Failed to search episodes by location {location}: {e}")
             return []
     
+    # Private helper methods
     
     async def _extract_episode_info(self, dialog_content: str) -> Dict[str, Any]:
-        """Extract structured episodic information from raw dialog"""
+        """Extract episode information using TextExtractor with simple schema"""
         try:
-            # Define extraction schema for episodic memory
+            # Schema for episode extraction - 根据数据库字段设计
             episodic_schema = {
-                "event_type": "Type of interaction or event (e.g., 'question_answering', 'planning_session', 'troubleshooting', 'brainstorming', 'learning', 'problem_solving')",
-                "clean_content": "Clean, concise summary of what happened in this episode (2-3 sentences max)",
-                "location": "Any location mentioned in the conversation (physical or virtual)",
-                "participants": "List of people or entities mentioned (exclude AI assistant)",
-                "emotional_valence": "Emotional tone as number from -1.0 (very negative) to 1.0 (very positive), 0.0 for neutral",
-                "vividness": "How detailed/memorable this episode is from 0.0 (vague) to 1.0 (very detailed)",
-                "importance_score": "How important this episode is from 0.0 (trivial) to 1.0 (very important)",
-                "key_topics": "Main topics or subjects discussed",
-                "outcomes": "Any decisions, conclusions, or results from this episode"
+                "episode_title": "Brief title for this episode",
+                "summary": "2-3 sentence summary of what happened",
+                "event_type": "Type of event (conversation, meeting, planning, problem_solving, etc.)",
+                "location": "Any location mentioned (optional)",
+                "participants": "List of people mentioned (exclude AI assistant)",
+                "temporal_context": "Time context (recent, yesterday, last_week, etc.)",
+                "key_events": "List of main events or topics discussed",
+                "emotional_context": "Emotional context (positive, negative, neutral, mixed, etc.)",  
+                "outcomes": "Any results, decisions, or conclusions",
+                "lessons_learned": "What was learned from this episode",
+                "emotional_valence": "Emotional tone from -1.0 (negative) to 1.0 (positive), 0.0 neutral",
+                "vividness": "How detailed/memorable from 0.0 (vague) to 1.0 (very detailed)",
+                "confidence": "Confidence in extraction quality (0.0-1.0)"
             }
             
-            # Extract key information using text extractor
+            # Use TextExtractor to extract structured information
             extraction_result = await self.text_extractor.extract_key_information(
                 text=dialog_content,
                 schema=episodic_schema
             )
             
-            if not extraction_result['success']:
+            if extraction_result['success']:
+                # Simple validation and cleanup
+                data = extraction_result['data']
+                
+                # Ensure required fields with safe defaults
+                if not data.get('episode_title'):
+                    data['episode_title'] = 'Episode'
+                if not data.get('summary'):
+                    data['summary'] = dialog_content[:100] + '...' if len(dialog_content) > 100 else dialog_content
+                if not data.get('event_type'):
+                    data['event_type'] = 'conversation'
+                
+                # Ensure lists are lists
+                for list_field in ['participants', 'key_events', 'outcomes']:
+                    if not isinstance(data.get(list_field), list):
+                        data[list_field] = []
+                
+                # Ensure string fields are strings
+                for string_field in ['temporal_context', 'emotional_context', 'lessons_learned']:
+                    if string_field not in data:
+                        if string_field == 'temporal_context':
+                            data[string_field] = 'recent'
+                        elif string_field == 'emotional_context':
+                            data[string_field] = 'neutral'
+                        else:
+                            data[string_field] = ''
+                
+                # Ensure numeric fields are numbers
+                for numeric_field in ['emotional_valence', 'vividness', 'confidence']:
+                    try:
+                        data[numeric_field] = float(data.get(numeric_field, 0.0))
+                    except (ValueError, TypeError):
+                        data[numeric_field] = 0.0
+                
+                return {
+                    'success': True,
+                    'data': data,
+                    'confidence': extraction_result.get('confidence', 0.7)
+                }
+            else:
                 return extraction_result
             
-            extracted_data = extraction_result['data']
-            
-            # Post-process extracted data
-            processed_data = await self._process_extracted_data(extracted_data, dialog_content)
-            
-            # Also extract entities for additional context
-            entities_result = await self.text_extractor.extract_entities(
-                text=dialog_content,
-                confidence_threshold=0.6
-            )
-            
-            if entities_result['success']:
-                entities = entities_result['data'].get('entities', {})
-                # Add detected people to participants if not already there
-                detected_people = [entity['name'] for entity in entities.get('PERSON', [])]
-                current_participants = processed_data.get('participants', [])
-                
-                for person in detected_people:
-                    if person not in current_participants and person.lower() not in ['ai', 'assistant', 'claude']:
-                        current_participants.append(person)
-                
-                processed_data['participants'] = current_participants
-                
-                # Extract location from entities if not found in schema
-                if not processed_data.get('location') and entities.get('LOCATION'):
-                    locations = [entity['name'] for entity in entities['LOCATION']]
-                    if locations:
-                        processed_data['location'] = locations[0]
-            
-            # Analyze sentiment for emotional valence
-            sentiment_result = await self.text_extractor.analyze_sentiment(
-                text=dialog_content,
-                granularity="overall"
-            )
-            
-            if sentiment_result['success']:
-                sentiment_data = sentiment_result['data']
-                overall_sentiment = sentiment_data.get('overall_sentiment', {})
-                
-                # Convert sentiment to valence score
-                if overall_sentiment.get('label') == 'positive':
-                    processed_data['emotional_valence'] = min(0.8, overall_sentiment.get('score', 0.5))
-                elif overall_sentiment.get('label') == 'negative':
-                    processed_data['emotional_valence'] = max(-0.8, -overall_sentiment.get('score', 0.5))
-                else:
-                    processed_data['emotional_valence'] = 0.0
-            
-            return {
-                'success': True,
-                'data': processed_data,
-                'confidence': extraction_result.get('confidence', 0.7),
-                'billing_info': extraction_result.get('billing_info')
-            }
-            
         except Exception as e:
-            logger.error(f"Episode information extraction failed: {e}")
+            logger.error(f"❌ Episode extraction failed: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'data': {},
+                'data': {
+                    'episode_title': 'Episode',
+                    'summary': dialog_content[:100],
+                    'event_type': 'conversation',
+                    'participants': [],
+                    'key_events': [],
+                    'outcomes': [],
+                    'emotional_valence': 0.0,
+                    'vividness': 0.5,
+                    'confidence': 0.5
+                },
                 'confidence': 0.0
             }
     
-    async def _process_extracted_data(self, raw_data: Dict[str, Any], original_content: str) -> Dict[str, Any]:
-        """Process and validate extracted episodic data"""
-        processed = {}
-        
-        # Event type processing
-        event_type = raw_data.get('event_type', 'conversation')
-        if isinstance(event_type, str):
-            processed['event_type'] = event_type.lower().replace(' ', '_')
-        else:
-            processed['event_type'] = 'conversation'
-        
-        # Clean content
-        clean_content = raw_data.get('clean_content', '')
-        if not clean_content or len(clean_content) < 10:
-            # Generate a basic summary if extraction failed
-            words = original_content.split()[:30]
-            processed['clean_content'] = ' '.join(words) + ('...' if len(words) == 30 else '')
-        else:
-            processed['clean_content'] = clean_content[:500]  # Limit length
-        
-        # Location processing
-        location = raw_data.get('location')
-        if location and isinstance(location, str) and location.lower() not in ['none', 'not mentioned', 'n/a']:
-            processed['location'] = location.strip()
-        else:
-            processed['location'] = None
-        
-        # Participants processing
-        participants = raw_data.get('participants', [])
-        if isinstance(participants, str):
-            participants = [p.strip() for p in participants.split(',') if p.strip()]
-        elif not isinstance(participants, list):
-            participants = []
-        
-        # Filter out AI references and duplicates
-        filtered_participants = []
-        for p in participants:
-            if isinstance(p, str):
-                p_lower = p.lower()
-                if p_lower not in ['ai', 'assistant', 'claude', 'chatbot', 'bot'] and p not in filtered_participants:
-                    filtered_participants.append(p.strip())
-        
-        processed['participants'] = filtered_participants
-        
-        # Numerical fields with validation
-        try:
-            emotional_valence = float(raw_data.get('emotional_valence', 0.0))
-            processed['emotional_valence'] = max(-1.0, min(1.0, emotional_valence))
-        except (ValueError, TypeError):
-            processed['emotional_valence'] = 0.0
-        
-        try:
-            vividness = float(raw_data.get('vividness', 0.5))
-            processed['vividness'] = max(0.0, min(1.0, vividness))
-        except (ValueError, TypeError):
-            processed['vividness'] = 0.5
-        
-        try:
-            importance_score = float(raw_data.get('importance_score', 0.5))
-            processed['importance_score'] = max(0.0, min(1.0, importance_score))
-        except (ValueError, TypeError):
-            processed['importance_score'] = 0.5
-        
-        # Additional context fields
-        processed['key_topics'] = raw_data.get('key_topics', [])
-        processed['outcomes'] = raw_data.get('outcomes', [])
-        
-        return processed
+    # Override base engine methods for episodic-specific handling
     
-    async def _prepare_memory_data(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare episodic memory data for storage"""
-        # Add episodic-specific fields
-        episodic_fields = [
-            'event_type', 'location', 'participants', 'emotional_valence',
-            'vividness', 'episode_date'
-        ]
+    def _customize_for_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data before storage - handle episodic-specific fields"""
+        # Remove fields that don't exist in database schema
+        # DB有：episode_title, summary, participants, location, temporal_context, key_events, 
+        #       emotional_context, outcomes, lessons_learned, emotional_intensity, occurred_at
+        # DB没有：content, memory_type, tags, confidence, context, episode_date, vividness, event_type, importance_score
+        fields_to_remove = ['content', 'memory_type', 'tags', 'confidence', 'context', 'vividness', 'event_type', 'importance_score']
         
-        for field in episodic_fields:
-            if field not in memory_data:
-                if field == 'participants':
-                    memory_data[field] = json.dumps([])
-                elif field == 'emotional_valence':
-                    memory_data[field] = 0.0
-                elif field == 'vividness':
-                    memory_data[field] = 0.5
-                elif field == 'episode_date':
-                    memory_data[field] = datetime.now().isoformat()
-                else:
-                    memory_data[field] = None
+        for field in fields_to_remove:
+            data.pop(field, None)
         
-        # Handle JSON fields
-        if isinstance(memory_data.get('participants'), list):
-            memory_data['participants'] = json.dumps(memory_data['participants'])
+        # Map episode_date to occurred_at for database
+        if 'episode_date' in data:
+            data['occurred_at'] = data.pop('episode_date')
         
-        # Ensure episode_date is string
-        if isinstance(memory_data.get('episode_date'), datetime):
-            memory_data['episode_date'] = memory_data['episode_date'].isoformat()
+        # Map emotional_valence to emotional_intensity (DB使用不同字段名)
+        if 'emotional_valence' in data:
+            # Convert from -1,1 range to 0,1 range for DB
+            valence = data.pop('emotional_valence')
+            data['emotional_intensity'] = (valence + 1.0) / 2.0
         
-        return memory_data
+        # Ensure required fields have defaults for database schema
+        if 'episode_title' not in data:
+            data['episode_title'] = 'Episode'
+        if 'summary' not in data:
+            data['summary'] = data.get('content', 'No summary')[:200]
+        if 'participants' not in data:
+            data['participants'] = []
+        if 'key_events' not in data:
+            data['key_events'] = []
+        if 'outcomes' not in data:
+            data['outcomes'] = []
+        if 'temporal_context' not in data:
+            data['temporal_context'] = 'recent'
+        if 'emotional_context' not in data:
+            data['emotional_context'] = 'neutral'
+        if 'lessons_learned' not in data:
+            data['lessons_learned'] = ''
+        
+        return data
     
-    async def _parse_memory_data(self, data: Dict[str, Any]) -> EpisodicMemory:
-        """Parse episodic memory data from database"""
-        # Parse JSON fields
-        if 'embedding' in data and isinstance(data['embedding'], str):
-            data['embedding'] = json.loads(data['embedding'])
-        if 'context' in data and isinstance(data['context'], str):
-            data['context'] = json.loads(data['context'])
-        if 'tags' in data and isinstance(data['tags'], str):
-            data['tags'] = json.loads(data['tags'])
-        if 'participants' in data and isinstance(data['participants'], str):
-            data['participants'] = json.loads(data['participants'])
+    def _customize_from_storage(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Customize data after retrieval - add model-required fields"""
+        # Map database fields back to model fields
+        if 'occurred_at' in data and 'episode_date' not in data:
+            data['episode_date'] = data['occurred_at']
         
-        # Parse datetime
-        if 'episode_date' in data and isinstance(data['episode_date'], str):
-            data['episode_date'] = datetime.fromisoformat(data['episode_date'].replace('Z', '+00:00'))
+        # Map emotional_intensity back to emotional_valence (convert 0-1 to -1,1)
+        if 'emotional_intensity' in data and 'emotional_valence' not in data:
+            intensity = data.get('emotional_intensity', 0.5)
+            data['emotional_valence'] = (intensity * 2.0) - 1.0
         
+        # Reconstruct content from summary for model
+        if 'content' not in data:
+            data['content'] = data.get('summary', 'No content available')
+        
+        # Add model-required fields with defaults (这些字段不在数据库中但model需要)
+        if 'memory_type' not in data:
+            data['memory_type'] = 'episodic'
+        if 'tags' not in data:
+            data['tags'] = []
+        if 'confidence' not in data:
+            data['confidence'] = 0.8
+        if 'vividness' not in data:
+            data['vividness'] = 0.5
+        if 'event_type' not in data:
+            data['event_type'] = 'conversation'
+        if 'importance_score' not in data:
+            data['importance_score'] = 0.5
+            
+        return data
+    
+    async def _create_memory_model(self, data: Dict[str, Any]) -> EpisodicMemory:
+        """Create EpisodicMemory model from database data"""
         return EpisodicMemory(**data)

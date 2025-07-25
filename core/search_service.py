@@ -375,6 +375,11 @@ class UnifiedSearchService:
             if not filters:
                 filters = SearchFilter()
                 
+            # Handle special "default" query to return predefined collections
+            if query.strip().lower() == "default":
+                logger.info("Processing default query for predefined collections")
+                return await self._get_default_collections(filters, max_results, user_id)
+                
             # If no embeddings available, fall back to keyword search
             if not self.embeddings_cache and query.strip():
                 logger.info("No embeddings available, falling back to keyword search")
@@ -572,6 +577,110 @@ class UnifiedSearchService:
             
         except Exception as e:
             logger.error(f"Error in fallback search: {e}")
+            return []
+            
+    async def _get_default_collections(self, filters: SearchFilter, max_results: int, user_id: Optional[str] = None) -> List[SearchResult]:
+        """Get predefined default collections of tools, prompts, and resources"""
+        try:
+            default_results = []
+            
+            # Default tools (most commonly used)
+            if not filters.types or 'tool' in filters.types:
+                default_tools = [
+                    'create_execution_plan', 'replan_execution', 'get_autonomous_status',
+                    'web_search', 'web_crawl', 'web_automation'
+                ]
+                for tool_name in default_tools:
+                    if tool_name in self.capabilities_cache.get('tools', {}):
+                        tool_info = self.capabilities_cache['tools'][tool_name]
+                        result = SearchResult(
+                            name=tool_name,
+                            type='tool',
+                            description=tool_info['description'],
+                            similarity_score=1.0,  # Perfect match for defaults
+                            category=tool_info['category'],
+                            keywords=tool_info['keywords'] + ['default'],
+                            metadata=tool_info['metadata']
+                        )
+                        default_results.append(result)
+            
+            # Default prompts (most commonly used)
+            if not filters.types or 'prompt' in filters.types:
+                default_prompts = [
+                    'default_reason_prompt', 'default_response_prompt', 'default_review_prompt'
+                ]
+                for prompt_name in default_prompts:
+                    if prompt_name in self.capabilities_cache.get('prompts', {}):
+                        prompt_info = self.capabilities_cache['prompts'][prompt_name]
+                        result = SearchResult(
+                            name=prompt_name,
+                            type='prompt',
+                            description=prompt_info['description'],
+                            similarity_score=1.0,
+                            category=prompt_info['category'],
+                            keywords=prompt_info['keywords'] + ['default'],
+                            metadata=prompt_info['metadata']
+                        )
+                        default_results.append(result)
+            
+            # Default resources (commonly accessed)
+            if not filters.types or 'resource' in filters.types:
+                # Get user-filtered resources if user_id provided
+                resources = self.capabilities_cache.get('resources', {})
+                if user_id:
+                    resources = await self._filter_resources_by_user(resources, user_id)
+                
+                # Select default resources (first few available)
+                default_resource_patterns = [
+                    'memory://', 'monitoring://', 'weather://', 'rag://'
+                ]
+                
+                for pattern in default_resource_patterns:
+                    matching_resources = [uri for uri in resources.keys() if uri.startswith(pattern)]
+                    for resource_uri in matching_resources[:2]:  # Limit to 2 per pattern
+                        if resource_uri in resources:
+                            resource_info = resources[resource_uri]
+                            result = SearchResult(
+                                name=resource_uri,
+                                type='resource',
+                                description=resource_info['description'],
+                                similarity_score=1.0,
+                                category=resource_info['category'],
+                                keywords=resource_info['keywords'] + ['default'],
+                                metadata=resource_info['metadata']
+                            )
+                            default_results.append(result)
+                            
+                            if len(default_results) >= max_results:
+                                break
+                    
+                    if len(default_results) >= max_results:
+                        break
+            
+            # Apply additional filters if specified
+            filtered_results = []
+            for result in default_results:
+                # Apply category filter
+                if filters.categories and result.category not in filters.categories:
+                    continue
+                    
+                # Apply keyword filter
+                if filters.keywords:
+                    result_keywords = [k.lower() for k in result.keywords]
+                    filter_keywords = [k.lower() for k in filters.keywords]
+                    if not any(fk in result_keywords for fk in filter_keywords):
+                        continue
+                        
+                filtered_results.append(result)
+                
+                if len(filtered_results) >= max_results:
+                    break
+            
+            logger.info(f"Returned {len(filtered_results)} default collection items")
+            return filtered_results[:max_results]
+            
+        except Exception as e:
+            logger.error(f"Error getting default collections: {e}")
             return []
             
     async def _filter_resources_by_user(self, resources: Dict[str, Any], user_id: str) -> Dict[str, Any]:

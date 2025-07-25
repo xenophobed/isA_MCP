@@ -56,8 +56,8 @@ class EmbeddingGenerator:
             params = {}
             if normalize:
                 params["normalize"] = normalize
-            if model:
-                params["model"] = model
+            # Use text-embedding-3-small by default for 1536 dimensions
+            params["model"] = model or "text-embedding-3-small"
             params.update(kwargs)
             
             # Call ISA client
@@ -77,9 +77,9 @@ class EmbeddingGenerator:
                 if 'medical' in str(text).lower() or any(term in str(text).lower() for term in ['肺', '心脏', '血', '检查', '疾病']):
                     logger.warning("Medical text embedding failed, providing zero embedding fallback")
                     if is_single:
-                        return [0.0] * 768  # Standard embedding dimension
+                        return [0.0] * 1536  # text-embedding-3-small dimension
                     else:
-                        return [[0.0] * 768 for _ in text]
+                        return [[0.0] * 1536 for _ in text]
                 else:
                     raise Exception(f"ISA embedding failed: {error_msg}")
             
@@ -90,30 +90,30 @@ class EmbeddingGenerator:
                 # For single embedding, result is the embedding array directly
                 if not result:
                     logger.error(f"Empty result for single embedding. Response: {response}")
-                    return [0.0] * 768  # Fallback zero embedding
+                    return [0.0] * 1536  # Fallback zero embedding
                 elif not isinstance(result, list):
                     logger.error(f"Invalid result type for single embedding: {type(result)}. Expected list, got: {result}")
-                    return [0.0] * 768  # Fallback zero embedding
+                    return [0.0] * 1536  # Fallback zero embedding
                 elif len(result) == 0:
                     logger.warning("Empty embedding array returned, using fallback")
-                    return [0.0] * 768
+                    return [0.0] * 1536
                 return result
             else:
                 # For batch embedding, result is array of embedding arrays
                 if not result:
                     logger.error(f"Empty result for batch embedding. Response: {response}")
-                    return [[0.0] * 768 for _ in text]  # Fallback zero embeddings
+                    return [[0.0] * 1536 for _ in text]  # Fallback zero embeddings
                 elif not isinstance(result, list):
                     logger.error(f"Invalid result type for batch embedding: {type(result)}. Expected list, got: {result}")
-                    return [[0.0] * 768 for _ in text]  # Fallback zero embeddings
+                    return [[0.0] * 1536 for _ in text]  # Fallback zero embeddings
                 elif len(result) == 0:
                     logger.warning("Empty embedding batch returned, using fallback")
-                    return [[0.0] * 768 for _ in text]
+                    return [[0.0] * 1536 for _ in text]
                 elif len(result) != len(text):
                     logger.warning(f"Embedding count mismatch: expected {len(text)}, got {len(result)}")
                     # Pad or truncate to match expected length
                     if len(result) < len(text):
-                        result.extend([[0.0] * 768 for _ in range(len(text) - len(result))])
+                        result.extend([[0.0] * 1536 for _ in range(len(text) - len(result))])
                     else:
                         result = result[:len(text)]
                 return result
@@ -183,7 +183,7 @@ class EmbeddingGenerator:
                 except Exception as e:
                     logger.warning(f"Batch chunk {i//max_concurrent + 1} failed: {e}, using fallback embeddings")
                     # Provide fallback embeddings for failed chunk
-                    fallback_embeddings = [[0.0] * 768 for _ in chunk]
+                    fallback_embeddings = [[0.0] * 1536 for _ in chunk]
                     all_embeddings.extend(fallback_embeddings)
                 
                 # Small delay between chunks to prevent ISA overload
@@ -198,7 +198,7 @@ class EmbeddingGenerator:
                 return result
             else:
                 logger.warning("Batch embedding returned unexpected format, using fallback")
-                return [[0.0] * 768 for _ in texts]
+                return [[0.0] * 1536 for _ in texts]
     
     async def compute_similarity(
         self,

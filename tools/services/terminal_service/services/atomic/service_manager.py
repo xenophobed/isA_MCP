@@ -11,6 +11,9 @@ import psutil
 import time
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ServiceManager:
@@ -425,3 +428,57 @@ class ServiceManager:
         
         with open(self.services_state_file, 'w') as f:
             json.dump(state, f, indent=2)
+    
+    async def run_command(self, command: str, cwd: Optional[str] = None) -> Dict[str, Any]:
+        """异步运行命令并返回结果"""
+        try:
+            import asyncio
+            
+            # 创建子进程
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd
+            )
+            
+            # 等待进程完成
+            stdout, stderr = await process.communicate()
+            
+            return {
+                "success": process.returncode == 0,
+                "return_code": process.returncode,
+                "stdout": stdout.decode('utf-8', errors='replace'),
+                "stderr": stderr.decode('utf-8', errors='replace'),
+                "command": command,
+                "cwd": cwd
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "command": command,
+                "cwd": cwd
+            }
+    
+    async def start_background_service(self, command: str, cwd: Optional[str] = None) -> Optional[subprocess.Popen]:
+        """在后台启动服务进程"""
+        try:
+            import asyncio
+            
+            # 启动后台进程
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                preexec_fn=os.setsid  # 创建新的进程组
+            )
+            
+            return process
+            
+        except Exception as e:
+            logger.error(f"启动后台服务失败: {e}")
+            return None

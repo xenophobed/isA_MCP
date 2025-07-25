@@ -10,10 +10,15 @@ from .project_molecules import ProjectMolecule
 from .app_analysis_molecule import AppAnalysisMolecule
 from .quick_code_molecule import QuickCodeMolecule
 from .quick_deployment_molecule import QuickDeploymentMolecule
+from .code_generation_molecule import CodeGenerationMolecule
+from .deployment_molecule import DeploymentMolecule, DeploymentResult
 
 __all__ = [
     'ProjectMolecule',
     'AppAnalysisMolecule',
     'QuickCodeMolecule',
-    'QuickDeploymentMolecule'
+    'QuickDeploymentMolecule',
+    'CodeGenerationMolecule',
+    'DeploymentMolecule',
+    'DeploymentResult'
 ] 

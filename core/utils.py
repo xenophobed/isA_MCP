@@ -1,7 +1,114 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Utility functions for MCP Server
-Common functionality used across the system
+Utility Functions and Common Services - isA MCP Core
+
+PROJECT DESCRIPTION:
+    Comprehensive utility library providing common functionality, validation, formatting, security,
+    and helper functions used throughout the isA MCP system. This module serves as the foundation
+    for data validation, security operations, file handling, JSON processing, and standardized
+    response formatting across all system components.
+
+INPUTS:
+    - User input data requiring validation and sanitization
+    - JSON strings and objects for processing
+    - File paths and content for safe I/O operations
+    - Timestamps and duration data for formatting
+    - Sensitive data requiring masking and security handling
+    - Raw data requiring hashing and cryptographic operations
+
+OUTPUTS:
+    - Validated and sanitized input data
+    - Standardized JSON responses (success/error formats)
+    - Formatted timestamps, durations, and byte counts
+    - Secure hashes and request identifiers
+    - Masked sensitive data for logging and debugging
+    - Safe file read/write operations with error handling
+
+FUNCTIONALITY:
+    - Data Validation and Sanitization:
+      * Email, user ID, and tool name format validation
+      * Input sanitization removing control characters and null bytes
+      * JSON validation and safe parsing with fallbacks
+      * Length restrictions and truncation for security
+    
+    - Security and Cryptographic Utilities:
+      * Secure hash generation (MD5, SHA1, SHA256)
+      * Sensitive data masking for logs and responses
+      * Request ID generation for tracing and audit trails
+      * Input validation against injection attacks
+    
+    - Formatting and Conversion:
+      * Human-readable timestamp formatting (ISO 8601)
+      * Duration formatting (ms, seconds, minutes, hours)
+      * Byte count formatting (B, KB, MB, GB, TB, PB)
+      * Standardized response format creation
+    
+    - File System Operations:
+      * Safe file reading with encoding and error handling
+      * Secure file writing with directory creation
+      * Path validation and directory management
+      * Cross-platform path handling with pathlib
+    
+    - JSON Processing:
+      * Safe JSON parsing with default fallback values
+      * JSON serialization with custom encoding support
+      * Multi-object merging for configuration management
+      * Error-tolerant JSON operations
+    
+    - Retry and Resilience:
+      * Decorator-based retry mechanism for functions
+      * Exponential backoff for failed operations
+      * Exception handling for both sync and async functions
+      * Configurable retry attempts and delay strategies
+
+DEPENDENCIES:
+    - json: JSON processing and serialization
+    - hashlib: Cryptographic hashing functions
+    - re: Regular expression pattern matching
+    - datetime: Timestamp and time duration handling
+    - pathlib: Cross-platform file system path operations
+    - contextlib: Context management utilities
+    - core.config: System configuration access
+    - core.exception: Custom exception handling
+    - core.logging: Structured logging infrastructure
+
+OPTIMIZATION POINTS:
+    - Implement compiled regex patterns for validation
+    - Add caching for repeated validation operations
+    - Optimize JSON serialization for large objects
+    - Add streaming file operations for large files
+    - Implement async file operations for better performance
+    - Add compression support for large data handling
+    - Optimize hash generation with hardware acceleration
+    - Add input validation caching for repeated patterns
+    - Implement batch processing for multiple operations
+    - Add memory-efficient operations for large datasets
+
+SECURITY CONSIDERATIONS:
+    - All user input is sanitized and validated
+    - Sensitive data is properly masked in logs
+    - File operations include path traversal protection
+    - Hash functions use secure algorithms
+    - Input length limits prevent buffer overflow attacks
+    - Control character removal prevents injection attacks
+    - Secure random generation for request IDs
+
+USAGE:
+    from core.utils import (
+        validate_email, sanitize_input, generate_hash,
+        format_timestamp, safe_json_loads, create_success_response
+    )
+    
+    # Validation
+    if validate_email(user_email):
+        clean_input = sanitize_input(user_data)
+    
+    # Security
+    data_hash = generate_hash(sensitive_data)
+    masked_data = mask_sensitive_data(response_data)
+    
+    # Formatting
+    response = create_success_response(data, "Operation completed")
 """
 import json
 import hashlib
