@@ -204,14 +204,27 @@ class GraphConstructor(BaseService):
         
         # Create document chunks with embeddings if source text provided
         document_chunks = {}
-        if source_text and len(source_text) > chunk_size:
-            chunks_data = await self.embedding_generator.chunk_text(
-                text=source_text,
-                chunk_size=chunk_size,
-                overlap=chunk_overlap,
-                metadata={"source_id": source_id},
-                model="text-embedding-3-small"
-            )
+        if source_text and len(source_text.strip()) > 0:
+            if len(source_text) > chunk_size:
+                # Long text: use original chunking logic
+                chunks_data = await self.embedding_generator.chunk_text(
+                    text=source_text,
+                    chunk_size=chunk_size,
+                    overlap=chunk_overlap,
+                    metadata={"source_id": source_id},
+                    model="text-embedding-3-small"
+                )
+            else:
+                # Short text: create single chunk directly
+                embedding = await self.embedding_generator.embed_single(
+                    text=source_text,
+                    model="text-embedding-3-small"
+                )
+                chunks_data = [{
+                    "text": source_text,
+                    "embedding": embedding,
+                    "metadata": {"source_id": source_id}
+                }]
             
             for i, chunk_data in enumerate(chunks_data):
                 chunk_id = f"{source_id}_chunk_{i}" if source_id else f"chunk_{i}"

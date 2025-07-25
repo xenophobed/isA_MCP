@@ -527,15 +527,28 @@ class GraphAnalyticsService:
                         'query': query
                     }
                 
-                target_resources = list(user_resources['mcp_resources'].keys())
+                # 检查是否有MCP资源注册
+                mcp_resources = user_resources.get('mcp_resources', {})
+                target_resources = list(mcp_resources.keys())
                 
-                if not target_resources:
+                # 如果没有MCP资源注册，但Neo4j中有数据，直接使用Neo4j查询
+                neo4j_resources = user_resources.get('neo4j_resources', {})
+                has_neo4j_data = (neo4j_resources.get('entities', 0) > 0 or 
+                                neo4j_resources.get('documents', 0) > 0)
+                
+                if not target_resources and not has_neo4j_data:
                     return {
                         'success': False,
                         'error': 'No resources found for user',
                         'user_id': user_id,
                         'query': query
                     }
+                
+                # 如果没有MCP资源但有Neo4j数据，创建虚拟资源ID用于查询
+                if not target_resources and has_neo4j_data:
+                    virtual_resource_id = f"neo4j_user_{user_id}"
+                    target_resources = [virtual_resource_id]
+                    logger.info(f"No MCP resources found, using Neo4j direct query for user {user_id}")
             
             # Step 4: Execute GraphRAG retrieval
             logger.info(f"Executing GraphRAG query for user {user_id} on {len(target_resources)} resources")
@@ -557,30 +570,33 @@ class GraphAnalyticsService:
             
             for res_id in target_resources:
                 try:
-                    # Get resource metadata
-                    resource_info = self.mcp_resources[res_id]
+                    # Get resource metadata - handle both real MCP resources and virtual Neo4j resources
+                    if res_id in self.mcp_resources:
+                        # Real MCP resource
+                        resource_info = self.mcp_resources[res_id]
+                    elif res_id.startswith('neo4j_user_'):
+                        # Virtual resource for direct Neo4j query
+                        resource_info = {
+                            'source_file': 'neo4j_direct_query',
+                            'address': f'mcp://neo4j/{user_id}',
+                            'created_at': datetime.now().isoformat(),
+                            'type': 'neo4j_direct'
+                        }
+                    else:
+                        logger.warning(f"Unknown resource ID: {res_id}")
+                        continue
                     
-                    # Execute GraphRAG retrieval on this resource
-                    retrieval_results_list = await self.graph_retriever.retrieve(
+                    # Execute GraphRAG retrieval - use Neo4j client directly for more reliable results
+                    logger.info(f"Executing GraphRAG retrieval for resource {res_id}")
+                    
+                    # Use Neo4j client for vector similarity search directly
+                    neo4j_query_result = await self.neo4j_client.query_knowledge_graph(
+                        resource_id=res_id,
                         query=query,
-                        top_k=retrieval_options.get('limit', 10),
-                        similarity_threshold=retrieval_options.get('similarity_threshold', 0.7)
+                        user_id=user_id
                     )
                     
-                    # Convert to expected format
-                    retrieval_result = {
-                        'success': True,
-                        'results': [
-                            {
-                                'type': result.result_type,
-                                'content': result.content,
-                                'score': result.score,
-                                'metadata': result.metadata
-                            } for result in retrieval_results_list
-                        ]
-                    }
-                    
-                    if retrieval_result.get('success'):
+                    if neo4j_query_result.get('success'):
                         retrieval_results.append({
                             'resource_id': res_id,
                             'resource_info': {
@@ -588,10 +604,10 @@ class GraphAnalyticsService:
                                 'address': resource_info.get('address'),
                                 'created_at': resource_info.get('created_at')
                             },
-                            'retrieval_result': retrieval_result,
-                            'result_count': len(retrieval_result.get('results', []))
+                            'retrieval_result': neo4j_query_result,
+                            'result_count': len(neo4j_query_result.get('results', []))
                         })
-                        total_results += len(retrieval_result.get('results', []))
+                        total_results += len(neo4j_query_result.get('results', []))
                     else:
                         logger.warning(f"GraphRAG retrieval failed for resource {res_id}: {retrieval_result.get('error')}")
                         

@@ -797,16 +797,26 @@ class Neo4jClient:
             raise RuntimeError("Neo4j client not available")
         
         try:
-            # Simple graph query - find entities related to the query terms
+            # Enhanced graph query - find both entities and documents matching query terms
             cypher = """
+            // Search entities
             MATCH (e:Entity)
             WHERE (e.user_id = $user_id OR e.source_id CONTAINS $user_string)
             AND (e.name CONTAINS $query_term OR e.canonical_form CONTAINS $query_term)
             OPTIONAL MATCH (e)-[r]-(related:Entity)
-            RETURN e.name as entity,
-                   e.type as entity_type,
-                   e.canonical_form as canonical_form,
-                   collect(DISTINCT related.name)[0..5] as related_entities
+            WITH e.name as entity, e.type as entity_type, e.canonical_form as canonical_form,
+                 collect(DISTINCT related.name)[0..5] as related_entities, 'entity' as result_type
+            
+            UNION ALL
+            
+            // Search documents
+            MATCH (d:Document)
+            WHERE (d.user_id = $user_id OR d.source_id CONTAINS $user_string)
+            AND d.text CONTAINS $query_term
+            WITH d.text[0..200] as entity, 'DOCUMENT' as entity_type, 
+                 d.id as canonical_form, [] as related_entities, 'document' as result_type
+            
+            RETURN entity, entity_type, canonical_form, related_entities
             LIMIT 10
             """
             

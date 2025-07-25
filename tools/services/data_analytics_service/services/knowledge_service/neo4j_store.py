@@ -105,6 +105,7 @@ class Neo4jStore:
                         chunk_id=document["id"],
                         text=document["text"],
                         properties={
+                            "user_id": user_id,  # Add user_id for proper isolation
                             "chunk_index": document["chunk_index"],
                             "source_document": document["source_document"]
                         },
