@@ -1,232 +1,256 @@
 #!/usr/bin/env python3
 """
-Hunt Application Prompts - Query Enhancement and Web Research
+Hunt Application Prompts - 4 Specialized Search Mode Templates
 """
 
 from mcp.server.fastmcp import FastMCP
 
 def register_hunt_prompts(mcp: FastMCP):
-    """Register hunt application prompts for query enhancement and web research"""
+    """Register hunt application prompts for 4 search modes: ecommerce, academic, social, general"""
     
     @mcp.prompt()
-    def hunt_web_analysis_prompt(
+    def hunt_ecommerce_prompt(
         query: str,
-        tool_type: str = "web_search",
-        analysis_focus: str = "product_research_and_comparison",
-        include_pricing: bool = True,
-        include_reviews: bool = True,
-        include_specifications: bool = True,
-        max_results: int = 10,
-        output_format: str = "structured_search_results"
+        search_depth: str = "medium",
+        result_format: str = "structured"
     ) -> str:
         """
-        Enhanced query prompt for Hunt web analysis and product research
+        E-commerce focused search template for products, pricing, and reviews
         
-        Transforms simple user queries into comprehensive, context-rich research requests
-        optimized for product discovery, price comparison, and market analysis.
+        Transforms user queries into comprehensive product research requests
+        optimized for shopping decisions, price comparisons, and product analysis.
         
-        Keywords: hunt, web-analysis, product-research, query-enhancement, e-commerce
-        Category: hunt
-        """
-        
-        # Build analysis components based on parameters
-        analysis_components = []
-        if include_pricing:
-            analysis_components.append("pricing analysis and comparison")
-        if include_reviews:
-            analysis_components.append("user reviews and ratings analysis")
-        if include_specifications:
-            analysis_components.append("technical specifications and features")
-        
-        analysis_text = ", ".join(analysis_components)
-        
-        # Determine research approach based on tool type
-        tool_approach = {
-            "web_search": "comprehensive web search across multiple sources",
-            "web_crawl": "deep crawling of specific websites and product pages", 
-            "web_automation": "automated interaction with e-commerce platforms and databases"
-        }.get(tool_type, "web search")
-        
-        return f"""You are a specialized product research and market analysis assistant. Transform the user's query into a comprehensive research request.
-
-## ORIGINAL USER QUERY:
-"{query}"
-
-## ENHANCED RESEARCH REQUEST:
-Conduct {tool_approach} to provide comprehensive {analysis_focus} for the query: "{query}"
-
-## RESEARCH OBJECTIVES:
-1. **Product Discovery**: Find relevant products, models, and variations
-2. **Market Analysis**: Identify key players, brands, and market positioning  
-3. **Comprehensive Comparison**: {analysis_text}
-4. **Consumer Insights**: Gather user feedback, common issues, and recommendations
-5. **Purchase Intelligence**: Best deals, availability, and purchasing options
-
-## SEARCH STRATEGY:
-- **Breadth**: Cover multiple product categories and price ranges
-- **Depth**: Detailed analysis of top products and alternatives
-- **Currency**: Focus on current market conditions and recent releases
-- **Diversity**: Include different sources, retailers, and perspectives
-- **Quality**: Prioritize authoritative sources and verified information
-
-## OUTPUT REQUIREMENTS:
-- **Format**: {output_format}
-- **Results Limit**: Up to {max_results} comprehensive results
-- **Source Attribution**: Include reliable source links and citations
-- **Structured Data**: Organize findings in clear, comparable format
-- **Actionable Insights**: Provide clear recommendations and next steps
-
-## ANALYSIS FOCUS: {analysis_focus}
-Ensure the research addresses:
-- Product specifications and key features
-- Price ranges and value propositions  
-- User satisfaction and common concerns
-- Availability and purchasing options
-- Competitive landscape and alternatives
-
-Transform the simple query "{query}" into actionable market intelligence that helps users make informed decisions."""
-
-    @mcp.prompt()
-    def general_content_prompt(
-        subject: str,
-        depth: str = "deep",
-        reference_urls: str = None,
-        reference_text: str = ""
-    ) -> str:
-        """
-        General content research prompt for Hunt application
-        
-        Provides flexible content research capabilities that can be adapted
-        for various Hunt use cases including web search, analysis, and research.
-        
-        Keywords: hunt, general-content, research, analysis, flexible
+        Keywords: hunt, ecommerce, product-search, price-comparison, shopping
         Category: hunt
         """
         
         depth_instructions = {
-            "surface": "Provide a quick overview with key highlights",
-            "medium": "Conduct thorough research with multiple perspectives", 
-            "deep": "Perform comprehensive analysis with detailed insights and comparisons"
-        }.get(depth.lower(), "Conduct thorough research")
+            "quick": "Focus on top products and key pricing information",
+            "medium": "Comprehensive product analysis with comparisons and reviews", 
+            "deep": "Exhaustive market research including specifications, alternatives, and detailed pricing analysis"
+        }.get(search_depth.lower(), "Comprehensive product analysis")
         
-        reference_context = ""
-        if reference_urls:
-            reference_context += f"\n## REFERENCE URLS:\n{reference_urls}\n"
-        if reference_text:
-            reference_context += f"\n## ADDITIONAL CONTEXT:\n{reference_text}\n"
+        format_guidance = {
+            "structured": "Organize results in clear categories with comparison tables",
+            "detailed": "Provide in-depth analysis with full product descriptions",
+            "summary": "Concise overview with key highlights and recommendations"
+        }.get(result_format.lower(), "structured format")
         
-        return f"""You are a comprehensive research assistant specializing in gathering and analyzing information.
+        return f"""You are an expert e-commerce research assistant. Transform the user's query into a comprehensive product research request.
 
-## RESEARCH SUBJECT:
-{subject}
+## ORIGINAL QUERY:
+"{query}"
 
-## RESEARCH DEPTH:
-{depth_instructions}
+## ENHANCED E-COMMERCE RESEARCH REQUEST:
+{depth_instructions} for: "{query}"
 
-{reference_context}
+## E-COMMERCE RESEARCH FOCUS:
+1. **Product Discovery**: Find relevant products, models, brands, and variations
+2. **Price Intelligence**: Current pricing, deals, discounts, and price history trends
+3. **Review Analysis**: User feedback, ratings, common complaints, and satisfaction metrics
+4. **Specification Comparison**: Technical specs, features, and compatibility details
+5. **Purchase Optimization**: Best retailers, availability, shipping options, and warranty info
+6. **Market Context**: Popular alternatives, competitor analysis, and market positioning
 
-## RESEARCH METHODOLOGY:
-1. **Information Gathering**: Collect data from multiple reliable sources
-2. **Cross-Verification**: Validate information across different sources
-3. **Analysis & Synthesis**: Organize findings into coherent insights
-4. **Contextual Understanding**: Consider broader implications and connections
-5. **Actionable Intelligence**: Provide practical recommendations and takeaways
+## SEARCH STRATEGY:
+- **E-commerce Platforms**: Amazon, eBay, Shopify stores, brand websites
+- **Price Comparison**: Multiple retailers and deal aggregators
+- **Review Sources**: Verified customer reviews, expert reviews, comparison sites
+- **Current Market**: Real-time pricing, stock status, and promotional offers
+- **Quality Focus**: Prioritize recent, verified, and high-authority sources
 
-## OUTPUT STRUCTURE:
-- **Executive Summary**: Key findings and main insights
-- **Detailed Analysis**: Comprehensive examination of the subject
-- **Supporting Evidence**: Citations, data points, and source references
-- **Comparative Context**: How this relates to alternatives or competition
-- **Practical Implications**: Actionable insights and recommendations
-- **Further Research**: Areas for deeper investigation if needed
+## OUTPUT REQUIREMENTS:
+- **Format**: {format_guidance}
+- **Product Focus**: Actionable shopping intelligence
+- **Price Transparency**: Clear pricing with source attribution
+- **Decision Support**: Pros/cons, recommendations, and purchase timing advice
+- **Source Quality**: Reliable retailers and verified review sources
 
-## QUALITY STANDARDS:
-- **Accuracy**: Verify information from multiple sources
-- **Relevance**: Focus on information that directly addresses the subject
-- **Timeliness**: Prioritize current and up-to-date information
-- **Comprehensiveness**: Cover all important aspects of the subject
-- **Clarity**: Present complex information in accessible format
-
-Conduct thorough research on "{subject}" and provide comprehensive analysis that delivers maximum value to the user."""
+Transform "{query}" into comprehensive shopping intelligence that helps users make confident purchase decisions with current market data and verified product insights."""
 
     @mcp.prompt()
-    def web_search_analysis_prompt(
+    def hunt_academic_prompt(
         query: str,
-        search_type: str = "web_search",
-        analysis_types: list = None,
-        output_format: str = "structured_search_results",
-        include_sources: bool = True,
-        max_results: int = 10
+        search_depth: str = "medium", 
+        result_format: str = "structured"
     ) -> str:
         """
-        Specialized web search analysis prompt for Hunt application
+        Academic research template for papers, studies, and scholarly content
         
-        Optimized for transforming user queries into enhanced web search requests
-        with specific analysis types and structured output requirements.
+        Transforms queries into comprehensive academic research requests
+        focused on scholarly sources, peer-reviewed content, and research insights.
         
-        Keywords: hunt, web-search, analysis, structured-results, enhancement
+        Keywords: hunt, academic, research, scholarly, papers, citations
         Category: hunt
         """
         
-        if analysis_types is None:
-            analysis_types = ['product_analysis']
+        depth_instructions = {
+            "quick": "Find key papers and primary research sources",
+            "medium": "Comprehensive literature review with multiple perspectives and methodologies",
+            "deep": "Exhaustive academic analysis including historical context, methodology comparison, and research gaps"
+        }.get(search_depth.lower(), "Comprehensive literature review")
         
-        # Map analysis types to specific instructions
-        analysis_instructions = {
-            'product_analysis': 'Focus on product features, specifications, pricing, and comparisons',
-            'market_research': 'Analyze market trends, competitors, and industry insights',
-            'price_comparison': 'Compare prices across multiple retailers and platforms',
-            'review_analysis': 'Aggregate and analyze user reviews and ratings',
-            'technical_specs': 'Detailed technical specifications and compatibility information',
-            'availability_check': 'Current availability, stock status, and delivery options'
-        }
+        format_guidance = {
+            "structured": "Organize by themes with proper academic citations",
+            "detailed": "Full analysis with methodology, findings, and implications",
+            "summary": "Key insights with essential references and conclusions"
+        }.get(result_format.lower(), "structured academic format")
         
-        analysis_focus = []
-        for analysis_type in analysis_types:
-            if analysis_type in analysis_instructions:
-                analysis_focus.append(f"- **{analysis_type.replace('_', ' ').title()}**: {analysis_instructions[analysis_type]}")
-        
-        analysis_focus_text = "\n".join(analysis_focus) if analysis_focus else "- **General Analysis**: Comprehensive information gathering and analysis"
-        
-        search_approach = {
-            "web_search": "systematic web search using multiple search engines and sources",
-            "web_crawl": "targeted crawling of specific websites and databases",
-            "web_automation": "automated data extraction from e-commerce and review platforms"
-        }.get(search_type, "web search")
-        
-        return f"""You are an expert web research analyst. Transform the user's query into an enhanced search and analysis request.
+        return f"""You are a specialized academic research assistant. Transform the user's query into a comprehensive scholarly research request.
 
-## USER QUERY TO ENHANCE:
+## ORIGINAL QUERY:
 "{query}"
 
-## SEARCH ENHANCEMENT STRATEGY:
-Transform "{query}" into a comprehensive {search_approach} that provides maximum value and actionable insights.
+## ENHANCED ACADEMIC RESEARCH REQUEST:
+{depth_instructions} for: "{query}"
 
-## ANALYSIS REQUIREMENTS:
-{analysis_focus_text}
+## ACADEMIC RESEARCH FOCUS:
+1. **Literature Discovery**: Peer-reviewed papers, academic journals, and scholarly articles
+2. **Research Analysis**: Methodologies, findings, statistical significance, and conclusions
+3. **Citation Network**: Key authors, influential works, and research lineage
+4. **Theoretical Framework**: Concepts, models, and theoretical foundations
+5. **Current Trends**: Recent developments, ongoing research, and future directions
+6. **Knowledge Gaps**: Unexplored areas and research opportunities
 
-## SEARCH EXECUTION PLAN:
-1. **Query Expansion**: Identify related terms, synonyms, and variations
-2. **Source Diversification**: Search across multiple platforms and databases
-3. **Data Validation**: Cross-reference information from different sources
-4. **Content Analysis**: Extract key insights and organize findings
-5. **Result Synthesis**: Compile comprehensive, structured results
+## SEARCH STRATEGY:
+- **Scholarly Databases**: PubMed, Google Scholar, JSTOR, arXiv, ResearchGate
+- **Quality Sources**: Peer-reviewed journals, university publications, research institutions
+- **Citation Analysis**: High-impact papers, frequently cited works, seminal studies
+- **Temporal Range**: Recent research with historical context when relevant
+- **Methodological Diversity**: Various research approaches and perspectives
 
-## OUTPUT SPECIFICATIONS:
-- **Format**: {output_format}
-- **Maximum Results**: {max_results} high-quality results
-- **Source Inclusion**: {'Include source citations and links' if include_sources else 'Focus on content without detailed sources'}
-- **Structure**: Organized, scannable, and actionable format
-- **Quality**: Verified, current, and relevant information only
+## OUTPUT REQUIREMENTS:
+- **Format**: {format_guidance}
+- **Academic Rigor**: Proper citations, author credentials, and publication details
+- **Critical Analysis**: Strengths, limitations, and methodological considerations
+- **Research Context**: How findings relate to broader field and existing knowledge
+- **Source Authority**: Reputable journals, institutions, and established researchers
 
-## ENHANCED SEARCH OBJECTIVES:
-For the query "{query}", provide:
-- **Comprehensive Coverage**: All relevant aspects and variations
-- **Competitive Intelligence**: Compare options, alternatives, and market position
-- **User-Centric Insights**: Information that helps with decision-making
-- **Actionable Data**: Pricing, availability, specifications, and recommendations
-- **Current Information**: Up-to-date market conditions and product status
+Transform "{query}" into comprehensive academic intelligence that provides scholarly depth, proper attribution, and research-backed insights for informed academic understanding."""
 
-Execute this enhanced search strategy to transform the simple query "{query}" into comprehensive, actionable intelligence."""
+    @mcp.prompt()
+    def hunt_social_prompt(
+        query: str,
+        search_depth: str = "medium",
+        result_format: str = "structured" 
+    ) -> str:
+        """
+        Social media and community focused search template
+        
+        Transforms queries into social listening and community research requests
+        focused on trends, discussions, and public sentiment analysis.
+        
+        Keywords: hunt, social, community, trends, sentiment, discussions
+        Category: hunt
+        """
+        
+        depth_instructions = {
+            "quick": "Capture current trends and popular discussions",
+            "medium": "Comprehensive social sentiment analysis with community insights and trend patterns",
+            "deep": "Deep social intelligence including influencer analysis, community dynamics, and sentiment evolution"
+        }.get(search_depth.lower(), "Comprehensive social sentiment analysis")
+        
+        format_guidance = {
+            "structured": "Organize by platform with trend analysis and key discussions",
+            "detailed": "Full sentiment breakdown with community context and influencer insights", 
+            "summary": "Key trends with sentiment highlights and viral content"
+        }.get(result_format.lower(), "structured social format")
+        
+        return f"""You are a social media and community research specialist. Transform the user's query into a comprehensive social intelligence request.
+
+## ORIGINAL QUERY:
+"{query}"
+
+## ENHANCED SOCIAL RESEARCH REQUEST:
+{depth_instructions} for: "{query}"
+
+## SOCIAL RESEARCH FOCUS:
+1. **Trend Analysis**: Viral content, hashtag trends, and emerging conversations
+2. **Sentiment Monitoring**: Public opinion, emotional reactions, and community mood
+3. **Community Insights**: Discussion patterns, user behavior, and engagement metrics
+4. **Influencer Intelligence**: Key voices, thought leaders, and viral content creators
+5. **Platform Dynamics**: Platform-specific trends and cross-platform conversations
+6. **Real-time Pulse**: Current discussions, reactions, and social momentum
+
+## SEARCH STRATEGY:
+- **Social Platforms**: Twitter/X, Reddit, LinkedIn, TikTok, Instagram, Facebook
+- **Community Forums**: Specialized communities, discussion boards, and niche platforms
+- **Trend Sources**: Social listening tools, hashtag tracking, and viral content
+- **Temporal Focus**: Recent activity with trend progression analysis
+- **Authenticity Filter**: Distinguish organic content from promotional material
+
+## OUTPUT REQUIREMENTS:
+- **Format**: {format_guidance}
+- **Social Context**: Platform-specific insights and cross-platform trends
+- **Sentiment Clarity**: Clear emotional tone and community reactions
+- **Trend Trajectory**: Whether topics are growing, declining, or stabilizing
+- **Community Voice**: Representative opinions and diverse perspectives
+
+Transform "{query}" into comprehensive social intelligence that captures community sentiment, trending discussions, and social dynamics for informed understanding of public perception and social trends."""
+
+    @mcp.prompt()
+    def hunt_general_prompt(
+        query: str,
+        search_depth: str = "medium",
+        result_format: str = "structured"
+    ) -> str:
+        """
+        General web search template for comprehensive information gathering
+        
+        Transforms queries into broad web research requests optimized for
+        comprehensive information discovery across diverse sources and topics.
+        
+        Keywords: hunt, general, web-search, comprehensive, information
+        Category: hunt
+        """
+        
+        depth_instructions = {
+            "quick": "Provide essential information with key facts and reliable sources",
+            "medium": "Thorough research with multiple perspectives and comprehensive coverage",
+            "deep": "Exhaustive information gathering with deep analysis, context, and expert insights"
+        }.get(search_depth.lower(), "Thorough research with multiple perspectives")
+        
+        format_guidance = {
+            "structured": "Organize information in clear sections with source attribution",
+            "detailed": "Comprehensive analysis with context, implications, and expert perspectives",
+            "summary": "Concise overview with key points and reliable source references"
+        }.get(result_format.lower(), "structured information format")
+        
+        return f"""You are a comprehensive web research specialist. Transform the user's query into a thorough information gathering request.
+
+## ORIGINAL QUERY:
+"{query}"
+
+## ENHANCED GENERAL RESEARCH REQUEST:
+{depth_instructions} for: "{query}"
+
+## GENERAL RESEARCH FOCUS:
+1. **Information Discovery**: Comprehensive facts, data, and expert knowledge
+2. **Source Diversification**: Multiple authoritative sources and perspectives
+3. **Context Building**: Background information, history, and current relevance
+4. **Expert Insights**: Professional opinions, analysis, and industry knowledge
+5. **Practical Applications**: Real-world implications and actionable information
+6. **Current Relevance**: Up-to-date information with recent developments
+
+## SEARCH STRATEGY:
+- **Authoritative Sources**: Government sites, educational institutions, established organizations
+- **Expert Content**: Industry publications, professional analyses, and specialist resources
+- **News Sources**: Current reporting, updates, and recent developments
+- **Reference Materials**: Encyclopedias, databases, and comprehensive resources
+- **Quality Verification**: Cross-reference information across multiple reliable sources
+
+## OUTPUT REQUIREMENTS:
+- **Format**: {format_guidance}
+- **Information Quality**: Verified, current, and authoritative content
+- **Source Transparency**: Clear attribution with source credibility indicators
+- **Comprehensive Coverage**: Multiple angles and complete information scope
+- **Practical Value**: Actionable insights and relevant context for decision-making
+
+Transform "{query}" into comprehensive web intelligence that provides thorough, reliable, and well-sourced information for informed understanding and decision-making."""
 
     print("Hunt application prompts registered successfully")
+
+# Auto-registration for MCP server discovery
+if __name__ != "__main__":
+    # This ensures the prompts are available for import and registration
+    pass

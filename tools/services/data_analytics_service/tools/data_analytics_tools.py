@@ -32,7 +32,8 @@ class DataAnalyticsTool(BaseTool):
         source_path: str,
         database_name: str = "default_analytics",
         source_type: Optional[str] = None,
-        request_id: Optional[str] = None
+        request_id: Optional[str] = None,
+        user_id: Optional[int] = None
     ) -> str:
         """
         Function 1: Data Ingestion (Steps 1-3)
@@ -43,8 +44,13 @@ class DataAnalyticsTool(BaseTool):
             database_name: Name of the analytics database
             source_type: Optional source type override ("csv", "json", etc.)
             request_id: Optional custom request identifier
+            user_id: Optional user ID for resource isolation and tracking
         """
         print(f"Starting data ingestion: {source_path}")
+        
+        # Use user_id to generate database name if provided
+        if user_id:
+            database_name = f"user_{user_id}_analytics"
         
         try:
             service = self._get_service(database_name)
@@ -52,7 +58,8 @@ class DataAnalyticsTool(BaseTool):
             result = await service.ingest_data_source(
                 source_path=source_path,
                 source_type=source_type,
-                request_id=request_id
+                request_id=request_id,
+                user_id=user_id
             )
             
             if result["success"]:
@@ -78,9 +85,10 @@ class DataAnalyticsTool(BaseTool):
     async def query_with_language(
         self,
         natural_language_query: str,
-        sqlite_database_path: str,
+        sqlite_database_path: Optional[str] = None,
         pgvector_database: Optional[str] = None,
-        request_id: Optional[str] = None
+        request_id: Optional[str] = None,
+        user_id: Optional[int] = None
     ) -> str:
         """
         Function 2: Query Processing (Steps 4-6)
@@ -91,19 +99,41 @@ class DataAnalyticsTool(BaseTool):
             sqlite_database_path: Path to SQLite database with the data
             pgvector_database: Name of pgvector database (defaults to service database)
             request_id: Optional custom request identifier
+            user_id: Optional user ID for resource isolation and tracking
         """
         print(f"Processing query: {natural_language_query}")
         
         try:
-            # Use pgvector_database as the service name if provided
-            database_name = pgvector_database or "default_analytics"
+            # Use user_id to generate database name if provided, otherwise use pgvector_database
+            if user_id:
+                database_name = f"user_{user_id}_analytics"
+                
+                # Auto-detect SQLite path from user resources if not provided
+                if not sqlite_database_path:
+                    try:
+                        from resources.data_analytics_resource import data_analytics_resources
+                        user_resources = await data_analytics_resources.get_user_resources(user_id)
+                        
+                        if user_resources['success'] and user_resources['resources']:
+                            # Find the most recent data source
+                            data_sources = [r for r in user_resources['resources'] if r['type'] == 'data_source']
+                            if data_sources:
+                                latest_source = data_sources[-1]
+                                sqlite_database_path = latest_source['metadata']['sqlite_database_path']
+                                print(f"Auto-detected SQLite path: {sqlite_database_path}")
+                    except Exception as e:
+                        print(f"Warning: Could not auto-detect SQLite path: {e}")
+            else:
+                database_name = pgvector_database or "default_analytics"
+                
             service = self._get_service(database_name)
             
             result = await service.query_with_language(
                 natural_language_query=natural_language_query,
                 sqlite_database_path=sqlite_database_path,
                 pgvector_database=pgvector_database,
-                request_id=request_id
+                request_id=request_id,
+                user_id=user_id
             )
             
             if result["success"]:
@@ -263,9 +293,10 @@ def register_data_analytics_tools(mcp: FastMCP):
     @mcp.tool()
     async def ingest_data_source(
         source_path: str,
-        database_name: str = "default_analytics",
+        user_id: int,
         source_type: str = None,
-        request_id: str = None
+        request_id: str = None,
+        database_name: str = None
     ) -> str:
         """
         Function 1: Data Ingestion (Steps 1-3)
@@ -281,21 +312,27 @@ def register_data_analytics_tools(mcp: FastMCP):
         
         Args:
             source_path: Path to data source (CSV, Excel, JSON, database)
-            database_name: Name of the analytics database (default: "default_analytics")
+            user_id: User ID for resource isolation and database naming (required)
             source_type: Optional source type override ("csv", "json", "excel", etc.)
             request_id: Optional custom request identifier
+            database_name: Optional database name override (auto-generated from user_id if not provided)
         
         Returns:
             JSON with success status, SQLite database path, pgvector database name, and processing metrics
         """
+        # Auto-generate database name from user_id if not provided
+        if not database_name:
+            database_name = f"user_{user_id}_analytics"
+        
         return await analytics_tool.ingest_data_source(
-            source_path, database_name, source_type, request_id
+            source_path, database_name, source_type, request_id, user_id
         )
     
     @mcp.tool()
     async def query_with_language(
         natural_language_query: str,
-        sqlite_database_path: str,
+        user_id: int,
+        sqlite_database_path: str = None,
         pgvector_database: str = None,
         request_id: str = None
     ) -> str:
@@ -313,15 +350,36 @@ def register_data_analytics_tools(mcp: FastMCP):
         
         Args:
             natural_language_query: User's natural language query (e.g., "Show customers from China")
-            sqlite_database_path: Path to SQLite database with the data
-            pgvector_database: Name of pgvector database (optional, defaults to service database)
+            user_id: User ID for database identification and resource isolation (required)
+            sqlite_database_path: Path to SQLite database (optional, auto-detected from user resources)
+            pgvector_database: Name of pgvector database (optional, auto-generated from user_id)
             request_id: Optional custom request identifier
         
         Returns:
             JSON with success status, generated SQL, query results, and processing metrics
         """
+        # Auto-generate database name from user_id if not provided
+        if not pgvector_database:
+            pgvector_database = f"user_{user_id}_analytics"
+        
+        # Auto-detect SQLite path from user resources if not provided
+        if not sqlite_database_path:
+            try:
+                from resources.data_analytics_resource import data_analytics_resources
+                user_resources = await data_analytics_resources.get_user_resources(user_id)
+                
+                if user_resources['success'] and user_resources['resources']:
+                    # Find the most recent data source
+                    data_sources = [r for r in user_resources['resources'] if r['type'] == 'data_source']
+                    if data_sources:
+                        latest_source = data_sources[-1]
+                        sqlite_database_path = latest_source['metadata']['sqlite_database_path']
+            except Exception as e:
+                # If resource lookup fails, we'll let the query fail with appropriate error
+                pass
+        
         return await analytics_tool.query_with_language(
-            natural_language_query, sqlite_database_path, pgvector_database, request_id
+            natural_language_query, sqlite_database_path, pgvector_database, request_id, user_id
         )
     
     @mcp.tool()

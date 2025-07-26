@@ -104,8 +104,11 @@ class BaseMemoryEngine(ABC):
             return None
     
     async def search_memories(self, query: MemorySearchQuery) -> List[MemorySearchResult]:
-        """Search memories using vector similarity - optimized"""
+        """Search memories using vector similarity - optimized with local calculation"""
         try:
+            # Generate query embedding once at the beginning
+            query_embedding = await self.embedder.embed_single(query.query)
+            
             # Build database query with filters first (more efficient)
             db_query = self.db.table(self.table_name).select('*')
             
@@ -130,28 +133,23 @@ class BaseMemoryEngine(ABC):
             if not result.data:
                 return []
             
-            # Calculate similarities in parallel for better performance
+            # Calculate similarities using local vector computation
             search_results = []
-            similarity_tasks = []
             
             for memory_data in result.data:
-                memory = await self._parse_from_storage(memory_data)
-                if memory.embedding:
-                    task = self._calculate_similarity(query.query, memory)
-                    similarity_tasks.append((task, memory))
-            
-            # Process similarities concurrently
-            for task, memory in similarity_tasks:
                 try:
-                    similarity = await task
-                    if similarity >= query.similarity_threshold:
-                        search_results.append(MemorySearchResult(
-                            memory=memory,
-                            similarity_score=similarity,
-                            rank=1  # Temporary value, will be set after sorting
-                        ))
+                    memory = await self._parse_from_storage(memory_data)
+                    if memory.embedding:
+                        # Use local vector similarity calculation (fast!)
+                        similarity = self._calculate_local_similarity(query_embedding, memory.embedding)
+                        if similarity >= query.similarity_threshold:
+                            search_results.append(MemorySearchResult(
+                                memory=memory,
+                                similarity_score=similarity,
+                                rank=1  # Temporary value, will be set after sorting
+                            ))
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to calculate similarity for memory {memory.id}: {e}")
+                    logger.warning(f"⚠️ Failed to calculate similarity for memory: {e}")
             
             # Sort by similarity and assign ranks
             search_results.sort(key=lambda x: x.similarity_score, reverse=True)
@@ -316,8 +314,27 @@ class BaseMemoryEngine(ABC):
                 data[field] = data[field].isoformat()
         return data
     
+    def _calculate_local_similarity(self, query_embedding: List[float], memory_embedding: List[float]) -> float:
+        """Calculate cosine similarity between query and memory embeddings locally (fast!)"""
+        try:
+            import numpy as np
+            
+            # Convert to numpy arrays
+            query_vec = np.array(query_embedding)
+            memory_vec = np.array(memory_embedding)
+            
+            # Calculate cosine similarity
+            similarity = np.dot(query_vec, memory_vec) / (
+                np.linalg.norm(query_vec) * np.linalg.norm(memory_vec)
+            )
+            
+            return float(similarity)
+        except Exception as e:
+            logger.warning(f"⚠️ Local similarity calculation failed: {e}")
+            return 0.0
+    
     async def _calculate_similarity(self, query: str, memory: MemoryModel) -> float:
-        """Calculate similarity between query and memory content"""
+        """Calculate similarity between query and memory content (deprecated - use _calculate_local_similarity)"""
         try:
             return await self.embedder.compute_similarity(query, memory.content)
         except Exception as e:

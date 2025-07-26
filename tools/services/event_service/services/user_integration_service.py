@@ -14,9 +14,41 @@ from core.logging import get_logger
 class UserIntegrationService:
     """Service for handling user-related operations and validation"""
     
-    def __init__(self, user_service_url: str = "http://localhost:8100"):
+    def __init__(self, user_service_url: str = "http://localhost:8100", auth_token: Optional[str] = None):
         self.user_service_url = user_service_url
+        self.auth_token = auth_token
         self.logger = get_logger(self.__class__.__name__)
+        
+        # 尝试从环境变量获取认证token (支持多种认证方式)
+        if not self.auth_token:
+            import os
+            # 优先使用JWT token
+            self.auth_token = os.getenv('USER_SERVICE_JWT_TOKEN')
+            if not self.auth_token:
+                # 备选：使用API Key
+                self.auth_token = os.getenv('USER_SERVICE_API_KEY')
+                if not self.auth_token:
+                    # 备选：使用内部服务token  
+                    self.auth_token = os.getenv('INTERNAL_SERVICE_TOKEN')
+            
+            if self.auth_token:
+                self.logger.info("Using auth token from environment variable")
+            else:
+                self.logger.warning("No auth token provided - User Service calls may fail with 403")
+    
+    def _get_headers(self) -> Dict[str, str]:
+        """Get headers with authentication if available"""
+        headers = {"Content-Type": "application/json"}
+        if self.auth_token:
+            # 检查token类型并设置正确的Authorization头
+            if self.auth_token.startswith('Bearer '):
+                headers["Authorization"] = self.auth_token
+            elif self.auth_token.startswith('api_key_'):
+                headers["X-API-Key"] = self.auth_token
+            else:
+                # 默认作为Bearer token处理
+                headers["Authorization"] = f"Bearer {self.auth_token}"
+        return headers
     
     async def validate_user_exists(self, user_id: str) -> bool:
         """Validate that user exists in user_service before creating tasks/events"""
@@ -24,6 +56,7 @@ class UserIntegrationService:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.user_service_url}/api/v1/users/{user_id}",
+                    headers=self._get_headers(),
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as response:
                     if response.status == 200:
@@ -49,6 +82,7 @@ class UserIntegrationService:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.user_service_url}/api/v1/users/{user_id}",
+                    headers=self._get_headers(),
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as response:
                     if response.status == 200:
@@ -124,6 +158,7 @@ class UserIntegrationService:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.user_service_url}/api/v1/users/{user_id}/usage",
+                    headers=self._get_headers(),
                     json=usage_data,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:

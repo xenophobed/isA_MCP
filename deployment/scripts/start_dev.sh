@@ -36,7 +36,7 @@ echo "📦 Installing isA_Model independently..."
 uv pip install -e /Users/xenodennis/Documents/Fun/isA_Model
 
 # Set environment variables
-export $(cat deployment/dev/.env | grep -v '^#' | xargs)
+export $(cat deployment/dev/.env | grep -v '^#' | grep -v '^$' | xargs)
 
 # Load User Service specific environment variables
 if [[ -f "deployment/dev/.env.user_service" ]]; then

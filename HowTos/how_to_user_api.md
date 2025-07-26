@@ -453,6 +453,32 @@ class UserServiceClient:
                 }
             )
             return response.json()
+    
+    async def upload_file(self, user_id: str, file_path: str):
+        """上传文件"""
+        async with httpx.AsyncClient() as client:
+            with open(file_path, 'rb') as file:
+                files = {'file': file}
+                # 移除Content-Type header，让httpx自动处理multipart
+                headers = {"Authorization": self.headers["Authorization"]}
+                
+                response = await client.post(
+                    f"{self.base_url}/api/v1/users/{user_id}/files/upload",
+                    headers=headers,
+                    files=files
+                )
+                return response.json()
+    
+    async def get_user_files(self, user_id: str, prefix: str = "", limit: int = 100):
+        """获取用户文件列表"""
+        async with httpx.AsyncClient() as client:
+            params = {"prefix": prefix, "limit": limit}
+            response = await client.get(
+                f"{self.base_url}/api/v1/users/{user_id}/files",
+                headers=self.headers,
+                params=params
+            )
+            return response.json()
 
 # 使用示例
 async def main():
@@ -481,8 +507,22 @@ async def main():
         description="代码生成API调用"
     )
     
+    # 上传文件
+    upload_result = await client.upload_file(
+        user_id="auth0|123456789",
+        file_path="/path/to/document.pdf"
+    )
+    
+    # 获取文件列表
+    files_result = await client.get_user_files(
+        user_id="auth0|123456789",
+        limit=10
+    )
+    
     print(f"Usage recorded: {usage_result}")
     print(f"Credits consumed: {credit_result}")
+    print(f"File uploaded: {upload_result}")
+    print(f"User files: {files_result}")
 
 # asyncio.run(main())
 ```
@@ -522,6 +562,29 @@ class UserServiceClient {
     });
     return response.json();
   }
+
+  async uploadFile(userId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${this.baseUrl}/api/v1/users/${userId}/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.headers.Authorization
+        // 注意：不要设置Content-Type，让浏览器自动设置multipart/form-data
+      },
+      body: formData
+    });
+    return response.json();
+  }
+
+  async getUserFiles(userId, prefix = '', limit = 100) {
+    const params = new URLSearchParams({ prefix, limit });
+    const response = await fetch(`${this.baseUrl}/api/v1/users/${userId}/files?${params}`, {
+      headers: this.headers
+    });
+    return response.json();
+  }
 }
 
 // 使用示例
@@ -539,6 +602,88 @@ const session = await client.createSession('auth0|123456789', {
 
 console.log('Session created:', session);
 ```
+
+## 📁 文件上传 API
+
+### 上传用户文件
+**POST** `/api/v1/users/{user_id}/files/upload`
+
+支持的文件类型：PDF, CSV, Excel, 图片(JPEG/PNG), 文本文件
+最大文件大小：50MB
+
+```bash
+curl -X POST "http://localhost:8100/api/v1/users/auth0|123456789/files/upload" \
+  -H "Authorization: Bearer <jwt_token>" \
+  -F "file=@/path/to/your/document.pdf"
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "status": "success",
+  "message": "File uploaded successfully",
+  "timestamp": "2025-07-26T07:00:00.000Z",
+  "data": {
+    "file_id": "f7d8e9a1-b2c3-4d5e-6f7g-8h9i0j1k2l3m",
+    "file_path": "users/auth0|123456789/files/2025/07/document_20250726070000.pdf",
+    "download_url": "https://presigned-url-for-download...",
+    "file_size": 2048576,
+    "content_type": "application/pdf",
+    "uploaded_at": "2025-07-26T07:00:00.000Z"
+  }
+}
+```
+
+### 获取用户文件列表
+**GET** `/api/v1/users/{user_id}/files`
+
+```bash
+curl "http://localhost:8100/api/v1/users/auth0|123456789/files?prefix=&limit=100" \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "status": "success", 
+  "message": "Files retrieved successfully",
+  "timestamp": "2025-07-26T07:05:00.000Z",
+  "data": [
+    {
+      "file_path": "users/auth0|123456789/files/2025/07/document.pdf",
+      "file_size": 2048576,
+      "content_type": "application/pdf",
+      "last_modified": "2025-07-26T07:00:00.000Z",
+      "download_url": "https://presigned-url..."
+    }
+  ]
+}
+```
+
+### 获取文件信息
+**GET** `/api/v1/users/{user_id}/files/info`
+
+```bash
+curl "http://localhost:8100/api/v1/users/auth0|123456789/files/info?file_path=users/auth0|123456789/files/2025/07/document.pdf" \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+### 删除文件
+**DELETE** `/api/v1/users/{user_id}/files`
+
+```bash
+curl -X DELETE "http://localhost:8100/api/v1/users/auth0|123456789/files?file_path=users/auth0|123456789/files/2025/07/document.pdf" \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+**文件存储特性**:
+- **本地开发**: 使用MinIO存储
+- **生产环境**: 使用AWS S3存储  
+- **文件路径**: `users/{user_id}/files/{year}/{month}/{unique_filename}`
+- **访问控制**: 预签名URL，1小时有效期
+- **安全性**: 用户只能访问自己的文件
 
 ## 📈 监控和分析
 

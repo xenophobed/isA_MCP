@@ -48,6 +48,9 @@ passlib>=1.7.0
 # Payment processing
 stripe>=7.0.0
 
+# File storage
+minio>=7.2.0
+
 # Auth0 integration
 python-jose[cryptography]>=3.3.0
 

@@ -351,12 +351,12 @@ def register_memory_tools(mcp: FastMCP):
             serialized_results = []
             for result in results:
                 serialized_results.append({
-                    "memory_id": result.memory_id,
-                    "memory_type": result.memory_type,
-                    "content": result.content,
+                    "memory_id": result.memory.id,
+                    "memory_type": result.memory.memory_type,
+                    "content": result.memory.content,
                     "similarity_score": result.similarity_score,
                     "rank": result.rank,
-                    "metadata": result.metadata
+                    "metadata": result.memory.context or {}
                 })
             
             return tools.create_response(
@@ -569,14 +569,22 @@ def register_memory_tools(mcp: FastMCP):
             
             serialized_results = []
             for memory in results:
-                serialized_results.append({
+                # Convert WorkingMemory object to dict, only using fields that exist in the model
+                result_dict = {
                     "id": memory.id,
                     "content": memory.content,
                     "priority": memory.priority,
-                    "context_type": memory.context_type,
                     "expires_at": memory.expires_at.isoformat() if memory.expires_at else None,
                     "created_at": memory.created_at.isoformat() if memory.created_at else None
-                })
+                }
+                
+                # Add optional fields that may exist
+                if hasattr(memory, 'task_context') and memory.task_context:
+                    result_dict["context_type"] = "development_task"  # Default value for documentation compatibility
+                else:
+                    result_dict["context_type"] = "task"  # Default value
+                    
+                serialized_results.append(result_dict)
             
             return tools.create_response(
                 status="success",

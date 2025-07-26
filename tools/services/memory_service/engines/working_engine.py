@@ -213,6 +213,14 @@ class WorkingMemoryEngine(BaseMemoryEngine):
         if 'importance_score' not in data:
             data['importance_score'] = 0.5
         
+        # Remove database-specific fields that model doesn't expect
+        database_only_fields = [
+            'context_type', 'current_step', 'progress_percentage', 
+            'next_actions', 'dependencies', 'blocking_issues', 'is_active'
+        ]
+        for field in database_only_fields:
+            data.pop(field, None)
+        
         return data
     
     async def _create_memory_model(self, data: Dict[str, Any]) -> WorkingMemory:

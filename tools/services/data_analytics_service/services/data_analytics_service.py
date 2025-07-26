@@ -95,7 +95,8 @@ class DataAnalyticsService:
     async def ingest_data_source(self,
                                 source_path: str,
                                 source_type: Optional[str] = None,
-                                request_id: Optional[str] = None) -> Dict[str, Any]:
+                                request_id: Optional[str] = None,
+                                user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Function 1: Data Ingestion (Steps 1-3)
         Process data source and store in SQLite + pgvector embeddings
@@ -104,6 +105,7 @@ class DataAnalyticsService:
             source_path: Path to data source (CSV, Excel, JSON, database)
             source_type: Optional source type override
             request_id: Optional custom request identifier
+            user_id: Optional user ID for resource isolation and MCP registration
             
         Returns:
             Dictionary with SQLite database path and pgvector storage info
@@ -172,6 +174,19 @@ class DataAnalyticsService:
             }
             
             logger.info(f"Request {request_id} completed successfully: SQLite DB at {sqlite_database_path}, {metadata_pipeline.embeddings_stored} embeddings stored")
+            
+            # Register MCP resource for the data source if user_id provided
+            if user_id:
+                try:
+                    await self._register_data_source_resource(
+                        resource_id=request_id,
+                        user_id=user_id,
+                        result_data=result
+                    )
+                    logger.info(f"MCP resource registered for data source: {request_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to register MCP resource: {e}")
+            
             return result
             
         except Exception as e:
@@ -191,7 +206,8 @@ class DataAnalyticsService:
                                  natural_language_query: str,
                                  sqlite_database_path: str,
                                  pgvector_database: Optional[str] = None,
-                                 request_id: Optional[str] = None) -> Dict[str, Any]:
+                                 request_id: Optional[str] = None,
+                                 user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Function 2: Query Processing (Steps 4-6)
         Process natural language query using SQLite database + pgvector embeddings
@@ -201,6 +217,7 @@ class DataAnalyticsService:
             sqlite_database_path: Path to SQLite database with the data
             pgvector_database: Name of pgvector database (defaults to service database)
             request_id: Optional request identifier
+            user_id: Optional user ID for resource isolation and MCP registration
             
         Returns:
             Query processing result with SQL execution results
@@ -278,6 +295,18 @@ class DataAnalyticsService:
             
             if result["success"]:
                 logger.info(f"Query {request_id} completed successfully: {result['results']['row_count']} rows in {processing_time:.1f}ms")
+                
+                # Register MCP resource for successful query result if user_id provided
+                if user_id:
+                    try:
+                        await self._register_query_result_resource(
+                            query_id=request_id,
+                            user_id=user_id,
+                            query_result=result
+                        )
+                        logger.info(f"MCP resource registered for query result: {request_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to register query result MCP resource: {e}")
             else:
                 logger.warning(f"Query {request_id} failed: {result['error_message']}")
                 
@@ -566,6 +595,109 @@ class DataAnalyticsService:
             await self.initialize_query_service(self._sqlite_config)
         else:
             raise Exception("Not configured for SQLite. Use create_for_sqlite_testing() first.")
+    
+    async def _register_data_source_resource(self,
+                                           resource_id: str,
+                                           user_id: int,
+                                           result_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Register MCP resource for data source ingestion result.
+        
+        Args:
+            resource_id: Unique resource identifier
+            user_id: User ID who owns the resource
+            result_data: Ingestion result data
+            
+        Returns:
+            Dict containing registration result
+        """
+        try:
+            # Import the resource manager
+            from resources.data_analytics_resource import data_analytics_resources
+            
+            # Prepare resource data for registration
+            resource_data = {
+                'source_path': result_data.get('source_path'),
+                'sqlite_database_path': result_data.get('sqlite_database_path'),
+                'pgvector_database': result_data.get('pgvector_database'),
+                'processing_time_ms': result_data.get('processing_time_ms'),
+                'cost_usd': result_data.get('cost_usd'),
+                'created_at': result_data.get('created_at'),
+                'metadata': result_data.get('metadata_pipeline', {}),
+                'source_metadata': {
+                    'service': 'DataAnalyticsService',
+                    'database_name': self.database_name,
+                    'ingestion_method': 'process_data_source'
+                }
+            }
+            
+            # Register the resource
+            registration_result = await data_analytics_resources.register_analytics_resource(
+                resource_id=resource_id,
+                user_id=user_id,
+                resource_data=resource_data
+            )
+            
+            return registration_result
+            
+        except Exception as e:
+            logger.error(f"Failed to register data source resource: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'resource_id': resource_id,
+                'user_id': user_id
+            }
+    
+    async def _register_query_result_resource(self,
+                                            query_id: str,
+                                            user_id: int,
+                                            query_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Register MCP resource for query result.
+        
+        Args:
+            query_id: Unique query identifier
+            user_id: User ID who executed the query
+            query_result: Query result data
+            
+        Returns:
+            Dict containing registration result
+        """
+        try:
+            # Import the resource manager
+            from resources.data_analytics_resource import data_analytics_resources
+            
+            # Prepare query data for registration
+            query_data = {
+                'original_query': query_result.get('original_query'),
+                'generated_sql': query_result.get('query_processing', {}).get('generated_sql'),
+                'row_count': query_result.get('results', {}).get('row_count', 0),
+                'processing_time_ms': query_result.get('processing_time_ms'),
+                'sqlite_database_path': query_result.get('sqlite_database_path'),
+                'pgvector_database': query_result.get('pgvector_database'),
+                'sql_confidence': query_result.get('query_processing', {}).get('sql_confidence', 0),
+                'metadata_matches': query_result.get('query_processing', {}).get('metadata_matches', 0),
+                'fallback_attempts': query_result.get('fallback_attempts', 0)
+            }
+            
+            # Register the query result
+            registration_result = await data_analytics_resources.register_query_result(
+                query_id=query_id,
+                user_id=user_id,
+                query_data=query_data
+            )
+            
+            return registration_result
+            
+        except Exception as e:
+            logger.error(f"Failed to register query result resource: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'resource_id': query_id,
+                'user_id': user_id
+            }
 
 
 # Global service instances

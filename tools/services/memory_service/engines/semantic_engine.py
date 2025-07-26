@@ -5,6 +5,7 @@ Simple, clean implementation for semantic memory management
 """
 
 from typing import Dict, Any, List
+from datetime import datetime
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import SemanticMemory, MemoryOperationResult
@@ -68,11 +69,11 @@ class SemanticMemoryEngine(BaseMemoryEngine):
                 importance_score=importance_score  # model需要但DB没有
             )
             
-            # Let base engine handle embedding and storage
-            result = await self.store_memory(semantic_memory)
+            # Check if concept already exists and update if so (handle duplicate key constraint)
+            result = await self._store_or_update_concept(semantic_memory)
             
             if result.success:
-                logger.info(f"✅ Stored concept: {semantic_memory.concept_type} ({semantic_memory.category})")
+                logger.info(f"✅ Stored/Updated concept: {semantic_memory.concept_type} ({semantic_memory.category})")
             
             return result
             
@@ -83,6 +84,68 @@ class SemanticMemoryEngine(BaseMemoryEngine):
                 memory_id="",
                 operation="store_semantic_memory",
                 message=f"Failed to store semantic memory: {str(e)}"
+            )
+    
+    async def _store_or_update_concept(self, semantic_memory: SemanticMemory) -> MemoryOperationResult:
+        """Store semantic memory with upsert logic to handle duplicates"""
+        try:
+            # Generate embedding if not provided
+            if not semantic_memory.embedding:
+                semantic_memory.embedding = await self.embedder.embed_single(semantic_memory.content)
+            
+            # Check if concept already exists
+            existing_result = self.db.table(self.table_name)\
+                .select('id')\
+                .eq('user_id', semantic_memory.user_id)\
+                .eq('concept_name', semantic_memory.concept_type)\
+                .eq('concept_category', semantic_memory.category)\
+                .execute()
+            
+            memory_data = self._prepare_for_storage(semantic_memory)
+            
+            if existing_result.data:
+                # Update existing concept
+                existing_id = existing_result.data[0]['id']
+                memory_data['updated_at'] = datetime.now().isoformat()
+                
+                result = self.db.table(self.table_name)\
+                    .update(memory_data)\
+                    .eq('id', existing_id)\
+                    .execute()
+                
+                if result.data:
+                    logger.info(f"✅ Updated existing concept: {semantic_memory.concept_type}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=existing_id,
+                        operation="update",
+                        message=f"Successfully updated semantic memory",
+                        data={"memory": result.data[0]}
+                    )
+            else:
+                # Insert new concept
+                result = self.db.table(self.table_name).insert(memory_data).execute()
+                
+                if result.data:
+                    logger.info(f"✅ Inserted new concept: {semantic_memory.concept_type}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=semantic_memory.id,
+                        operation="store",
+                        message=f"Successfully stored semantic memory",
+                        data={"memory": result.data[0]}
+                    )
+            
+            # If we get here, something went wrong
+            raise Exception("No data returned from database operation")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to store/update semantic memory: {e}")
+            return MemoryOperationResult(
+                success=False,
+                memory_id=semantic_memory.id,
+                operation="store_or_update",
+                message=f"Failed to store/update memory: {str(e)}"
             )
 
     async def search_concepts_by_domain(self, user_id: str, domain: str, limit: int = 10) -> List[SemanticMemory]:
