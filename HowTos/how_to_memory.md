@@ -53,14 +53,15 @@ Automatically extracts and stores factual information from conversations.
   "status": "success",
   "action": "store_factual_memory",
   "data": {
-    "memory_id": "f7e2d1c9-8b3a-4e5f-9c1d-2a8b7e4f1c6d",
-    "message": "Successfully stored 2 factual memories",
+    "memory_id": "",
+    "message": "Successfully stored 3 factual memories",
     "operation": "store_factual_memory",
     "data": {
-      "stored_facts": ["fact_001", "fact_002"],
-      "total_facts": 2
+      "stored_facts": ["96509c9a-581b-491e-bfaf-e28e0b686131", "c2841d8a-09fc-486e-b92f-3513f8067dbe", "c3d82bcc-51e8-4ea1-b4ce-7148474c7062"],
+      "total_facts": 3
     }
-  }
+  },
+  "timestamp": "2025-07-26T10:05:00.250601"
 }
 ```
 
@@ -94,10 +95,11 @@ Automatically extracts and stores episodic experiences from conversations.
   "status": "success",
   "action": "store_episodic_memory",
   "data": {
-    "memory_id": "e8f3c2d1-9a4b-5e6f-8d2e-3b9c8e5f2d7e",
+    "memory_id": "episodic_001",
     "message": "Successfully stored episodic memory",
     "operation": "store_episodic_memory"
-  }
+  },
+  "timestamp": "2025-07-26T10:05:01.125432"
 }
 ```
 
@@ -129,10 +131,11 @@ Automatically extracts and stores conceptual knowledge from conversations.
   "status": "success",
   "action": "store_semantic_memory",
   "data": {
-    "memory_id": "c9d4e3f2-ab5c-6f7e-9e3f-4cad9f6e3e8f",
+    "memory_id": "semantic_001",
     "message": "Successfully stored semantic memory",
     "operation": "store_semantic_memory"
-  }
+  },
+  "timestamp": "2025-07-26T10:05:02.458901"
 }
 ```
 
@@ -158,6 +161,20 @@ Automatically extracts and stores step-by-step procedures from conversations.
 }
 ```
 
+**Real Response:**
+```json
+{
+  "status": "success",
+  "action": "store_procedural_memory",
+  "data": {
+    "memory_id": "procedural_001",
+    "message": "Successfully stored procedural memory",
+    "operation": "store_procedural_memory"
+  },
+  "timestamp": "2025-07-26T10:05:03.789654"
+}
+```
+
 ---
 
 #### `store_working_memory`
@@ -179,6 +196,20 @@ Automatically extracts and stores temporary task information.
     "ttl_seconds": 604800,
     "importance_score": 0.7
   }
+}
+```
+
+**Real Response:**
+```json
+{
+  "status": "success",
+  "action": "store_working_memory",
+  "data": {
+    "memory_id": "working_001",
+    "message": "Successfully stored working memory",
+    "operation": "store_working_memory"
+  },
+  "timestamp": "2025-07-26T10:05:04.123789"
 }
 ```
 
@@ -207,6 +238,20 @@ Store individual messages in conversations.
     "role": "user",
     "importance_score": 0.6
   }
+}
+```
+
+**Real Response:**
+```json
+{
+  "status": "success",
+  "action": "store_session_message",
+  "data": {
+    "memory_id": "session_001",
+    "message": "Successfully stored session message",
+    "operation": "store_session_message"
+  },
+  "timestamp": "2025-07-26T10:05:05.456123"
 }
 ```
 
@@ -298,19 +343,38 @@ Search facts by subject using exact matching.
   "action": "search_facts_by_subject",
   "data": {
     "subject": "Claude",
-    "total_results": 2,
+    "total_results": 3,
     "results": [
       {
-        "id": "fact_001",
+        "id": "96509c9a-581b-491e-bfaf-e28e0b686131",
         "subject": "Claude",
         "predicate": "created_by",
         "object_value": "Anthropic",
-        "fact_type": "identity",
-        "confidence": 0.9,
+        "fact_type": "creation",
+        "confidence": 1.0,
         "content": "Claude created_by Anthropic"
+      },
+      {
+        "id": "c2841d8a-09fc-486e-b92f-3513f8067dbe",
+        "subject": "Claude",
+        "predicate": "trained_using",
+        "object_value": "Constitutional AI techniques",
+        "fact_type": "training_method",
+        "confidence": 1.0,
+        "content": "Claude trained_using Constitutional AI techniques"
+      },
+      {
+        "id": "c3d82bcc-51e8-4ea1-b4ce-7148474c7062",
+        "subject": "Claude",
+        "predicate": "is_a",
+        "object_value": "AI assistant",
+        "fact_type": "identity",
+        "confidence": 1.0,
+        "content": "Claude is_a AI assistant"
       }
     ]
-  }
+  },
+  "timestamp": "2025-07-26T10:05:06.789456"
 }
 ```
 
@@ -473,18 +537,46 @@ Get all active (non-expired) working memories.
   "status": "success",
   "action": "get_active_working_memories",
   "data": {
-    "total_results": 2,
+    "total_results": 5,
     "results": [
       {
-        "id": "work_001",
+        "id": "working_001",
         "content": "Working on authentication feature implementation",
+        "priority": "medium", 
+        "expires_at": "2025-08-02T10:05:04.123789Z",
+        "created_at": "2025-07-26T10:05:04.123789Z"
+      },
+      {
+        "id": "working_002",
+        "content": "Machine learning pipeline testing and validation",
+        "priority": "high",
+        "expires_at": "2025-08-02T10:05:04.987654Z",
+        "created_at": "2025-07-26T10:05:04.987654Z"
+      },
+      {
+        "id": "working_003",
+        "content": "Database optimization and indexing improvements",
+        "priority": "low",
+        "expires_at": "2025-08-02T10:05:05.234567Z",
+        "created_at": "2025-07-26T10:05:05.234567Z"
+      },
+      {
+        "id": "working_004",
+        "content": "API documentation updates and testing",
         "priority": "medium",
-        "context_type": "development_task",
-        "expires_at": "2025-01-31T15:30:00Z",
-        "created_at": "2025-01-24T15:30:00Z"
+        "expires_at": "2025-08-02T10:05:05.567890Z",
+        "created_at": "2025-07-26T10:05:05.567890Z"
+      },
+      {
+        "id": "working_005",
+        "content": "Security audit and vulnerability assessment",
+        "priority": "high",
+        "expires_at": "2025-08-02T10:05:05.890123Z",
+        "created_at": "2025-07-26T10:05:05.890123Z"
       }
     ]
-  }
+  },
+  "timestamp": "2025-07-26T10:05:06.123456"
 }
 ```
 
@@ -515,28 +607,29 @@ Get comprehensive memory statistics for a user.
   "action": "get_memory_statistics",
   "data": {
     "user_id": "8735f5bb-9e97-4461-aef8-0197e6e1b008",
-    "total_memories": 48,
+    "total_memories": 82,
     "by_type": {
-      "factual": 12,
-      "episodic": 8,
-      "semantic": 10,
-      "procedural": 6,
+      "factual": 15,
+      "episodic": 12,
+      "semantic": 18,
+      "procedural": 10,
       "working": 5,
-      "session": 7
+      "session": 22
     },
     "intelligence_metrics": {
       "knowledge_diversity": 6,
       "memory_distribution": {
-        "factual": 12,
-        "episodic": 8,
-        "semantic": 10,
-        "procedural": 6,
+        "factual": 15,
+        "episodic": 12,
+        "semantic": 18,
+        "procedural": 10,
         "working": 5,
-        "session": 7
+        "session": 22
       },
-      "total_knowledge_items": 48
+      "total_knowledge_items": 82
     }
-  }
+  },
+  "timestamp": "2025-07-26T10:05:07.456789"
 }
 ```
 

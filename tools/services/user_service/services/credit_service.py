@@ -68,9 +68,9 @@ class CreditService(BaseService):
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'consume',
-                'amount': amount,
-                'balance_before': current_balance,
-                'balance_after': new_balance,
+                'credits_amount': amount,
+                'credits_before': current_balance,
+                'credits_after': new_balance,
                 'usage_record_id': usage_record_id,
                 'description': description or f"Credits consumed: {amount}",
                 'metadata': metadata or {}
@@ -82,7 +82,7 @@ class CreditService(BaseService):
                 return ServiceResult.error("Failed to create credit transaction")
             
             # Update user's credit balance
-            await self.user_repo.update_credits(user_id, int(new_balance))
+            await self.user_repo.update_credits(user_id, new_balance)
             
             logger.info(f"Credits consumed for user {user_id}: {amount} (balance: {new_balance})")
             return ServiceResult.success(transaction, f"Consumed {amount} credits successfully")
@@ -128,10 +128,9 @@ class CreditService(BaseService):
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'recharge',
-                'amount': amount,
-                'balance_before': current_balance,
-                'balance_after': new_balance,
-                'reference_id': reference_id,
+                'credits_amount': amount,
+                'credits_before': current_balance,
+                'credits_after': new_balance,
                 'description': description or f"Credits recharged: {amount}",
                 'metadata': metadata or {}
             }
@@ -142,7 +141,7 @@ class CreditService(BaseService):
                 return ServiceResult.error("Failed to create credit transaction")
             
             # Update user's credit balance
-            await self.user_repo.update_credits(user_id, int(new_balance), int(current_balance + amount))
+            await self.user_repo.update_credits(user_id, new_balance)
             
             logger.info(f"Credits recharged for user {user_id}: {amount} (balance: {new_balance})")
             return ServiceResult.success(transaction, f"Recharged {amount} credits successfully")
@@ -188,10 +187,9 @@ class CreditService(BaseService):
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'refund',
-                'amount': amount,
-                'balance_before': current_balance,
-                'balance_after': new_balance,
-                'reference_id': reference_id,
+                'credits_amount': amount,
+                'credits_before': current_balance,
+                'credits_after': new_balance,
                 'description': description or f"Credits refunded: {amount}",
                 'metadata': metadata or {}
             }
@@ -202,7 +200,7 @@ class CreditService(BaseService):
                 return ServiceResult.error("Failed to create credit transaction")
             
             # Update user's credit balance
-            await self.user_repo.update_credits(user_id, int(new_balance))
+            await self.user_repo.update_credits(user_id, new_balance)
             
             logger.info(f"Credits refunded for user {user_id}: {amount} (balance: {new_balance})")
             return ServiceResult.success(transaction, f"Refunded {amount} credits successfully")
@@ -409,7 +407,7 @@ class CreditService(BaseService):
                 return ServiceResult.error("Failed to create credit transaction")
             
             # Update user's credit balance
-            await self.user_repo.update_credits(transaction_data.user_id, int(new_balance))
+            await self.user_repo.update_credits(transaction_data.user_id, new_balance)
             
             return ServiceResult.success(transaction, "Credit transaction created successfully")
             

@@ -5,10 +5,10 @@ User Service FastAPI Server
 包含认证、用户管理、订阅管理、支付处理等功能
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import uvicorn
 import logging
 from typing import Dict, Any, Optional
@@ -16,7 +16,7 @@ from datetime import datetime
 import json
 
 from .models import (
-    User, UserCreate, UserUpdate, UserResponse,
+    User, UserCreate, UserUpdate, UserResponse, UserEnsureRequest,
     SubscriptionStatus, CreditConsumption, CreditConsumptionResponse,
     PaymentIntent, CheckoutSession, WebhookEvent,
     # New unified service models
@@ -24,9 +24,11 @@ from .models import (
     Session, SessionCreate, SessionMemory, SessionMessage,
     CreditTransaction, CreditTransactionCreate
 )
-from .auth_service import Auth0Service
-from .subscription_service import SubscriptionService
-from .payment_service import PaymentService
+from .services.auth_service import Auth0Service
+from .services.supabase_auth_service import SupabaseAuthService
+from .services.unified_auth_service import UnifiedAuthService
+from .subscription_service_legacy import SubscriptionService
+from .services.payment_service import PaymentService
 # 使用新的 ServiceV2 和 Repository 模式
 from .services import UserServiceV2, SubscriptionServiceV2
 from .services.usage_service import UsageService
@@ -65,13 +67,50 @@ app.add_middleware(
 # 安全配置
 security = HTTPBearer()
 
-# 服务实例（使用配置）
-auth_service = Auth0Service(
-    domain=config.auth0_domain,
-    audience=config.auth0_audience,
-    client_id=config.auth0_client_id,
-    client_secret=config.auth0_client_secret
-)
+# 认证服务实例（支持多种认证提供者）
+auth0_service = None
+supabase_service = None
+unified_auth_service = None
+
+# 初始化Auth0服务（如果配置可用）
+if config.auth_provider in ["auth0", "both"]:
+    try:
+        auth0_service = Auth0Service(
+            domain=config.auth0_domain,
+            audience=config.auth0_audience,
+            client_id=config.auth0_client_id,
+            client_secret=config.auth0_client_secret
+        )
+        logger.info("Auth0 service initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Auth0 service: {e}")
+
+# 初始化Supabase服务（如果配置可用）
+if config.auth_provider in ["supabase", "both"]:
+    try:
+        supabase_service = SupabaseAuthService(
+            supabase_url=config.supabase_url,
+            jwt_secret=config.supabase_jwt_secret,
+            anon_key=config.supabase_anon_key,
+            service_role_key=config.supabase_service_role_key
+        )
+        logger.info("Supabase auth service initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Supabase auth service: {e}")
+
+# 创建统一认证服务
+if auth0_service or supabase_service:
+    unified_auth_service = UnifiedAuthService(
+        auth0_service=auth0_service,
+        supabase_service=supabase_service,
+        default_provider=config.auth_provider
+    )
+    logger.info(f"Unified auth service initialized with providers: {unified_auth_service.get_available_providers()}")
+else:
+    logger.error("No authentication services available!")
+
+# 向后兼容的auth_service别名
+auth_service = auth0_service or supabase_service
 
 subscription_service = SubscriptionService()
 
@@ -98,6 +137,15 @@ usage_service = UsageService()
 session_service = SessionService()
 credit_service = CreditService()
 
+# 初始化文件存储服务
+try:
+    from .services.file_storage_service import FileStorageService
+    file_storage_service = FileStorageService()
+    logger.info("File storage service initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize file storage service: {e}")
+    file_storage_service = None
+
 
 # 依赖函数
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -115,8 +163,19 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     """
     try:
         token = credentials.credentials
-        payload = await auth_service.verify_token(token)
-        return payload
+        
+        if unified_auth_service:
+            # 使用统一认证服务，自动检测认证提供者
+            payload, provider = await unified_auth_service.verify_token(token)
+            logger.debug(f"Token verified using {provider.value}")
+            return payload
+        elif auth_service:
+            # 后备方案：使用单一认证服务
+            payload = await auth_service.verify_token(token)
+            return payload
+        else:
+            raise Exception("No authentication service available")
+            
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}")
         raise HTTPException(
@@ -162,10 +221,55 @@ async def health_check():
         )
 
 
+@app.get("/auth/info", tags=["Auth"])
+async def get_auth_info():
+    """获取认证服务信息"""
+    if unified_auth_service:
+        return {
+            "status": "multi-provider",
+            "info": unified_auth_service.get_service_info(),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    else:
+        return {
+            "status": "single-provider", 
+            "auth0_available": auth0_service is not None,
+            "supabase_available": supabase_service is not None,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@app.post("/auth/dev-token", tags=["Auth"])
+async def generate_dev_token(user_id: str, email: str):
+    """生成开发测试用的JWT token (仅Supabase)"""
+    if not unified_auth_service or not unified_auth_service.supabase_service:
+        raise HTTPException(
+            status_code=404,
+            detail="Development token generation not available (requires Supabase auth)"
+        )
+    
+    try:
+        token = await unified_auth_service.generate_dev_token(user_id, email)
+        if token:
+            return {
+                "token": token,
+                "user_id": user_id,
+                "email": email,
+                "expires_in": 3600,  # 1小时
+                "provider": "supabase",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate token")
+    except Exception as e:
+        logger.error(f"Error generating dev token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Token generation failed: {str(e)}")
+
+
 # 用户管理路由
 @app.post("/api/v1/users/ensure", response_model=Dict[str, Any], tags=["Users"])
 async def ensure_user_exists(
-    user_data: UserCreate,
+    user_data: UserEnsureRequest,
     current_user = Depends(get_current_user)
 ):
     """
@@ -173,13 +277,22 @@ async def ensure_user_exists(
     替换传统的 app/api/user/ensure/route.ts
     """
     try:
-        auth0_id = current_user["sub"]
+        # 验证 JWT token 中的用户ID与请求数据中的auth0_id是否匹配
+        token_auth0_id = current_user["sub"]
+        request_auth0_id = user_data.auth0_id
         
-        # 使用新的 ServiceV2 
+        if token_auth0_id != request_auth0_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Token mismatch: token auth0_id ({token_auth0_id}) does not match request auth0_id ({request_auth0_id})"
+            )
+        
+        # 使用 Auth0 ID 作为 user_id
         result = await user_service.ensure_user_exists(
-            auth0_id=auth0_id,
+            user_id=user_data.auth0_id,
             email=user_data.email,
-            name=user_data.name
+            name=user_data.name,
+            auth0_id=user_data.auth0_id
         )
         
         if not result.is_success:
@@ -218,15 +331,15 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
     """
     try:
         auth0_id = current_user["sub"]
-        user_response = await user_service.get_user_info(auth0_id)
+        user_result = await user_service.get_user_info(auth0_id)
         
-        if not user_response:
+        if not user_result.is_success:
             raise HTTPException(
                 status_code=404,
-                detail="User not found"
+                detail=f"User not found: {auth0_id}"
             )
         
-        return user_response
+        return user_result.data
         
     except HTTPException:
         raise
@@ -240,7 +353,7 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
 
 @app.post("/api/v1/users/{user_id}/credits/consume", tags=["Users"])
 async def consume_user_credits(
-    user_id: int,
+    user_id: str,
     consumption: CreditConsumption,
     current_user = Depends(get_current_user)
 ):
@@ -249,17 +362,30 @@ async def consume_user_credits(
     """
     try:
         # 验证用户权限
-        user = await user_service.get_user_by_auth0_id(current_user["sub"])
-        if not user or user.id != user_id:
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
             raise HTTPException(
                 status_code=403,
-                detail="Access denied"
+                detail="Access denied: user_id mismatch"
             )
         
-        # 消费积分（这里需要实现实际的积分消费逻辑）
+        # 使用统一的积分服务来实际扣费
+        credit_result = await credit_service.consume_credits(
+            user_id=user_id,
+            amount=consumption.amount,
+            description=f"Credit consumption via legacy API - {consumption.reason}",
+            usage_record_id=None
+        )
+        
+        if not credit_result.is_success:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to consume credits: {credit_result.message}"
+            )
+        
         result = {
             "success": True,
-            "remaining_credits": user.credits_remaining - consumption.amount,
+            "remaining_credits": credit_result.data.credits_after,
             "consumed_amount": consumption.amount,
             "message": f"成功消费 {consumption.amount} 积分"
         }
@@ -655,7 +781,18 @@ async def create_session(
         if not result.is_success:
             raise HTTPException(status_code=400, detail=result.message)
         
-        return result.to_dict()
+        # 手动构建响应以避免 datetime 序列化问题
+        session = result.data
+        response = {
+            "success": True,
+            "session_id": session.session_id,
+            "user_id": session.user_id,
+            "status": session.status,
+            "message_count": session.message_count,
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+            "message": result.message
+        }
+        return response
         
     except HTTPException:
         raise
@@ -781,6 +918,48 @@ async def get_session_messages(
     except Exception as e:
         logger.error(f"Error getting session messages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get session messages: {str(e)}")
+
+
+@app.delete("/api/v1/sessions/{session_id}", response_model=Dict[str, Any], tags=["Sessions"])
+async def delete_session(
+    session_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Delete session
+    """
+    try:
+        # Get session to verify ownership
+        session_result = await session_service.get_session(session_id)
+        if not session_result.is_success:
+            raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+        
+        session = session_result.data
+        
+        # Verify user ownership
+        token_user_id = current_user["sub"]
+        if session.user_id != token_user_id:
+            raise HTTPException(status_code=403, detail="Access denied: You can only delete your own sessions")
+        
+        # Delete session using repository directly (since service doesn't have delete method)
+        success = await session_service.session_repo.delete(session_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete session")
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": f"Session {session_id} deleted successfully",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"session_id": session_id, "deleted": True}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 
 
 # Credit Transaction API
@@ -911,6 +1090,252 @@ async def get_transaction_history(
 
 # ============ END UNIFIED DATA MANAGEMENT API ============
 
+# ============ FILE MANAGEMENT API ============
+# File upload, download, and management endpoints
+
+@app.post("/api/v1/users/{user_id}/files/upload", response_model=Dict[str, Any], tags=["Files"])
+async def upload_file(
+    user_id: str,
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """
+    Upload user file to MinIO storage
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only upload files to your own account"
+            )
+        
+        # Check if file storage service is available
+        if not file_storage_service:
+            raise HTTPException(
+                status_code=503,
+                detail="File storage service is not available"
+            )
+        
+        # Upload file
+        result = await file_storage_service.upload_file(user_id, file)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/files", response_model=Dict[str, Any], tags=["Files"])
+async def get_user_files(
+    user_id: str,
+    prefix: str = "",
+    limit: int = 100,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user files list
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only access your own files"
+            )
+        
+        # Check if file storage service is available
+        if not file_storage_service:
+            raise HTTPException(
+                status_code=503,
+                detail="File storage service is not available"
+            )
+        
+        # Get files list
+        result = file_storage_service.list_user_files(user_id, prefix, limit)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user files: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/files/info", response_model=Dict[str, Any], tags=["Files"])
+async def get_file_info(
+    user_id: str,
+    file_path: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get file information
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only access your own files"
+            )
+        
+        # Check if file storage service is available
+        if not file_storage_service:
+            raise HTTPException(
+                status_code=503,
+                detail="File storage service is not available"
+            )
+        
+        # Get file info
+        result = file_storage_service.get_file_info(user_id, file_path)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting file info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get file info: {str(e)}")
+
+
+@app.delete("/api/v1/users/{user_id}/files", response_model=Dict[str, Any], tags=["Files"])
+async def delete_file(
+    user_id: str,
+    file_path: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Delete user file
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only delete your own files"
+            )
+        
+        # Check if file storage service is available
+        if not file_storage_service:
+            raise HTTPException(
+                status_code=503,
+                detail="File storage service is not available"
+            )
+        
+        # Delete file
+        result = file_storage_service.delete_file(user_id, file_path)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/files/download", tags=["Files"])
+async def download_file(
+    user_id: str,
+    file_path: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get download URL for user file (redirect to presigned URL)
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only download your own files"
+            )
+        
+        # Check if file storage service is available
+        if not file_storage_service:
+            raise HTTPException(
+                status_code=503,
+                detail="File storage service is not available"
+            )
+        
+        # Get download URL
+        result = file_storage_service.get_download_url(user_id, file_path)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        # Redirect to presigned URL
+        download_url = result.data["download_url"]
+        return RedirectResponse(url=download_url, status_code=302)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting download URL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get download URL: {str(e)}")
+
+# ============ END FILE MANAGEMENT API ============
+
 # 分析和管理路由
 @app.get("/api/v1/users/{user_id}/analytics", tags=["Analytics"])
 async def get_user_analytics(
@@ -960,7 +1385,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # 启动函数
-def start_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
+def start_server(host: str = "0.0.0.0", port: int = 8100, reload: bool = False):
     """
     启动 FastAPI 服务器
     

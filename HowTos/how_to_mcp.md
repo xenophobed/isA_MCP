@@ -489,6 +489,260 @@ curl -X POST http://localhost:8081/search \
 
 ---
 
+## 🔒 **工具安全等级查询**
+
+### 📝 **1. 获取所有工具安全等级**
+
+**命令：**
+```bash
+curl -s http://localhost:8081/security/levels | jq .
+```
+
+**响应示例：**
+```json
+{
+  "status": "success",
+  "security_levels": {
+    "tools": {
+      "get_weather": {
+        "name": "get_weather",
+        "category": "weather",
+        "security_level": "LOW",
+        "security_level_value": 1,
+        "requires_authorization": false,
+        "description": "Get mock weather information for testing purposes"
+      },
+      "search_memories": {
+        "name": "search_memories", 
+        "category": "web",
+        "security_level": "LOW",
+        "security_level_value": 1,
+        "requires_authorization": false,
+        "description": "Search across memory types using semantic similarity"
+      }
+    },
+    "summary": {
+      "total_tools": 60,
+      "security_levels": {
+        "LOW": 2,
+        "MEDIUM": 0,
+        "HIGH": 0,
+        "CRITICAL": 0,
+        "DEFAULT": 58
+      },
+      "authorization_required": 0,
+      "rate_limits": {
+        "default": {"calls": 100, "window": 3600},
+        "remember": {"calls": 50, "window": 3600},
+        "forget": {"calls": 10, "window": 3600}
+      }
+    }
+  },
+  "timestamp": "2025-07-26T09:59:23.399288"
+}
+```
+
+### 📝 **2. 按安全等级搜索工具**
+
+**搜索LOW级别工具：**
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"security_level": "LOW", "max_results": 5}' \
+  http://localhost:8081/security/search | jq .
+```
+
+**响应示例：**
+```json
+{
+  "status": "success",
+  "security_level": "LOW",
+  "results": [
+    {
+      "name": "get_weather",
+      "type": "tool",
+      "description": "Get mock weather information for testing purposes",
+      "similarity_score": 1.0,
+      "category": "weather",
+      "keywords": ["weather", "temperature", "forecast", "security_low"],
+      "metadata": {
+        "security_level": "LOW",
+        "security_level_value": 1,
+        "requires_authorization": false,
+        "input_schema": {
+          "properties": {
+            "city": {"title": "City", "type": "string"},
+            "user_id": {"default": "default", "title": "User Id", "type": "string"}
+          },
+          "required": ["city"]
+        }
+      }
+    },
+    {
+      "name": "search_memories",
+      "type": "tool", 
+      "description": "Search across memory types using semantic similarity",
+      "similarity_score": 1.0,
+      "category": "web",
+      "keywords": ["search", "memory", "similarity", "security_low"],
+      "metadata": {
+        "security_level": "LOW",
+        "security_level_value": 1,
+        "requires_authorization": false
+      }
+    }
+  ],
+  "result_count": 2,
+  "max_results": 5,
+  "timestamp": "2025-07-26T09:59:32.096971"
+}
+```
+
+**搜索其他级别工具：**
+```bash
+# MEDIUM级别
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"security_level": "MEDIUM", "max_results": 3}' \
+  http://localhost:8081/security/search
+
+# HIGH级别  
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"security_level": "HIGH", "max_results": 3}' \
+  http://localhost:8081/security/search
+
+# CRITICAL级别
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"security_level": "CRITICAL", "max_results": 3}' \
+  http://localhost:8081/security/search
+```
+
+### 📝 **3. 普通搜索中的安全等级信息**
+
+**命令：**
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"query": "weather", "max_results": 2}' \
+  http://localhost:8081/search | jq .
+```
+
+**响应示例（包含安全等级metadata）：**
+```json
+{
+  "status": "success", 
+  "query": "weather",
+  "results": [
+    {
+      "name": "get_weather",
+      "type": "tool",
+      "description": "Get mock weather information for testing purposes",
+      "similarity_score": 1.0,
+      "category": "weather",
+      "metadata": {
+        "security_level": "LOW",
+        "security_level_value": 1,
+        "requires_authorization": false,
+        "input_schema": {
+          "properties": {
+            "city": {"title": "City", "type": "string"}
+          },
+          "required": ["city"]
+        }
+      }
+    }
+  ],
+  "result_count": 1
+}
+```
+
+### 📝 **4. 错误处理示例**
+
+**无效安全等级：**
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"security_level": "INVALID"}' \
+  http://localhost:8081/security/search | jq .
+```
+
+**响应：**
+```json
+{
+  "status": "error",
+  "message": "Invalid security_level. Must be: LOW, MEDIUM, HIGH, CRITICAL, or DEFAULT"
+}
+```
+
+### 💡 **5. Python使用示例**
+
+```python
+import requests
+import json
+
+def get_tool_security_levels():
+    """获取所有工具的安全等级"""
+    response = requests.get('http://localhost:8081/security/levels')
+    return response.json()
+
+def search_tools_by_security(security_level, max_results=10):
+    """按安全等级搜索工具"""
+    response = requests.post(
+        'http://localhost:8081/security/search',
+        headers={'Content-Type': 'application/json'},
+        json={
+            "security_level": security_level.upper(),
+            "max_results": max_results
+        }
+    )
+    return response.json()
+
+def search_with_security_info(query, max_results=10):
+    """搜索工具（包含安全等级信息）"""
+    response = requests.post(
+        'http://localhost:8081/search',
+        headers={'Content-Type': 'application/json'},
+        json={
+            "query": query,
+            "max_results": max_results,
+            "filters": {"types": ["tool"]}
+        }
+    )
+    return response.json()
+
+# 使用示例
+print("=== 安全等级统计 ===")
+security_info = get_tool_security_levels()
+summary = security_info['security_levels']['summary']
+print(f"总工具数: {summary['total_tools']}")
+for level, count in summary['security_levels'].items():
+    print(f"{level}级别: {count}个工具")
+
+print("\n=== LOW级别工具 ===")
+low_tools = search_tools_by_security('LOW', 5)
+for tool in low_tools['results']:
+    auth_status = "需要授权" if tool['metadata']['requires_authorization'] else "无需授权"
+    print(f"- {tool['name']}: {auth_status}")
+
+print("\n=== 搜索天气工具 ===")
+weather_tools = search_with_security_info('weather', 3)
+for tool in weather_tools['results']:
+    metadata = tool['metadata']
+    print(f"- {tool['name']}")
+    print(f"  安全等级: {metadata.get('security_level', 'UNKNOWN')}")
+    print(f"  需要授权: {'是' if metadata.get('requires_authorization') else '否'}")
+```
+
+### 📊 **6. 安全等级说明**
+
+- **LOW (1)**: 基础工具，无安全风险，无需授权
+  - 示例：天气查询、内存搜索
+- **MEDIUM (2)**: 一般操作，需要基础授权
+  - 示例：数据存储、计算操作
+- **HIGH (3)**: 敏感操作，需要严格授权
+  - 示例：数据删除、系统配置
+- **CRITICAL (4)**: 关键操作，需要最高权限
+  - 示例：系统重置、管理员操作
+- **DEFAULT**: 未设置安全等级的工具（默认为LOW处理）
+
+---
+
 ## 📋 **重要说明**
 
 1. **JSON-RPC格式**：所有MCP调用都使用JSON-RPC 2.0格式
@@ -497,9 +751,14 @@ curl -X POST http://localhost:8081/search \
 4. **参数验证**：工具和提示词的参数会进行类型检查和验证
 5. **错误处理**：返回的`isError`字段指示是否有错误发生
 6. **搜索支持**：
-   - ✅ **Tools**: 完全支持搜索和语义匹配
+   - ✅ **Tools**: 完全支持搜索和语义匹配，包含安全等级信息
    - ✅ **Prompts**: 完全支持搜索，metadata包含参数信息
    - ✅ **Resources**: 完全支持搜索和语义匹配
 7. **默认集合**：搜索`"default"`可获取预定义的常用工具和提示词
+8. **安全等级**：
+   - ✅ **安全等级查询**: `/security/levels` 端点获取所有工具安全等级
+   - ✅ **按等级搜索**: `/security/search` 端点按安全等级搜索工具
+   - ✅ **搜索集成**: 普通搜索结果包含完整安全等级metadata
+   - ✅ **错误处理**: 完善的参数验证和错误信息
 
 所有示例都经过真实测试验证，可以直接使用。

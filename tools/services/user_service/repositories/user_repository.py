@@ -314,3 +314,68 @@ class UserRepository(BaseRepository[User]):
         user_data.setdefault('preferences', {})
         
         return user_data
+    
+    async def ensure_user_exists(self, user_id: str, email: str, name: str, **kwargs) -> User:
+        """
+        确保用户存在，不存在则创建
+        
+        Args:
+            user_id: 用户业务ID
+            email: 用户邮箱
+            name: 用户姓名
+            **kwargs: 其他用户数据
+            
+        Returns:
+            用户对象
+            
+        Raises:
+            RepositoryException: 操作失败
+        """
+        try:
+            # 先检查用户是否存在
+            existing_user = await self.get_by_user_id(user_id)
+            if existing_user:
+                logger.info(f"User {user_id} already exists, returning existing user")
+                return existing_user
+            
+            # 检查邮箱是否被占用
+            existing_email_user = await self.get_by_email(email)
+            if existing_email_user:
+                # 如果邮箱用户没有auth0_id，并且当前请求有auth0_id，则更新现有用户
+                auth0_id = kwargs.get('auth0_id')
+                if not existing_email_user.auth0_id and auth0_id:
+                    logger.info(f"Updating existing user {existing_email_user.user_id} with auth0_id {auth0_id}")
+                    # 只更新auth0_id，保持原有的user_id
+                    update_data = {
+                        'auth0_id': auth0_id,
+                        'name': name  # 更新名称
+                    }
+                    await self.update(existing_email_user.user_id, update_data)
+                    # 重新获取更新后的用户
+                    updated_user = await self.get_by_user_id(existing_email_user.user_id)
+                    return updated_user
+                else:
+                    logger.warning(f"Email {email} already exists for different user {existing_email_user.user_id}")
+                    raise DuplicateEntryException(f"Email {email} is already registered to a different user")
+            
+            # 创建新用户
+            user_data = {
+                'user_id': user_id,
+                'email': email,
+                'name': name,
+                'auth0_id': kwargs.get('auth0_id', user_id),  # 默认auth0_id为user_id
+                **kwargs
+            }
+            
+            new_user = await self.create(user_data)
+            if not new_user:
+                raise RepositoryException("Failed to create user")
+            
+            logger.info(f"Created new user: {user_id}")
+            return new_user
+            
+        except DuplicateEntryException:
+            raise
+        except Exception as e:
+            logger.error(f"Error ensuring user exists: {e}")
+            raise RepositoryException(f"Failed to ensure user exists: {e}")

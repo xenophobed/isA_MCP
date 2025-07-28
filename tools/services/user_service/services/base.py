@@ -107,7 +107,7 @@ class ServiceResult(Generic[T]):
         if self.data is not None:
             # 如果data是Pydantic模型，使用model_dump()
             if hasattr(self.data, 'model_dump'):
-                result["data"] = self.data.model_dump()
+                result["data"] = self.data.model_dump(mode='json')
             # 如果data有dict()方法（旧版Pydantic）
             elif hasattr(self.data, 'dict'):
                 result["data"] = self.data.dict()

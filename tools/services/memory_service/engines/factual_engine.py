@@ -5,6 +5,7 @@ Simple, clean implementation for factual memory management
 """
 
 from typing import Dict, Any, List
+from datetime import datetime
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import FactualMemory, MemoryOperationResult
@@ -77,12 +78,12 @@ class FactualMemoryEngine(BaseMemoryEngine):
                         importance_score=importance_score
                     )
                     
-                    # Let base engine handle embedding and storage
-                    result = await self.store_memory(factual_memory)
+                    # Use upsert logic to handle duplicate facts
+                    result = await self._store_or_update_fact(factual_memory)
                     
                     if result.success:
                         stored_facts.append(result.memory_id)
-                        logger.info(f"✅ Stored fact: {factual_memory.subject} {factual_memory.predicate} {factual_memory.object_value}")
+                        logger.info(f"✅ Stored/Updated fact: {factual_memory.subject} {factual_memory.predicate} {factual_memory.object_value}")
             
             if stored_facts:
                 return MemoryOperationResult(
@@ -107,6 +108,69 @@ class FactualMemoryEngine(BaseMemoryEngine):
                 memory_id="",
                 operation="store_factual_memory",
                 message=f"Failed to store factual memory: {str(e)}"
+            )
+    
+    async def _store_or_update_fact(self, factual_memory: FactualMemory) -> MemoryOperationResult:
+        """Store factual memory with upsert logic to handle duplicates"""
+        try:
+            # Generate embedding if not provided
+            if not factual_memory.embedding:
+                factual_memory.embedding = await self.embedder.embed_single(factual_memory.content)
+            
+            # Check if fact already exists (based on unique constraint)
+            existing_result = self.db.table(self.table_name)\
+                .select('id')\
+                .eq('user_id', factual_memory.user_id)\
+                .eq('fact_type', factual_memory.fact_type)\
+                .eq('subject', factual_memory.subject)\
+                .eq('predicate', factual_memory.predicate)\
+                .execute()
+            
+            memory_data = self._prepare_for_storage(factual_memory)
+            
+            if existing_result.data:
+                # Update existing fact
+                existing_id = existing_result.data[0]['id']
+                memory_data['updated_at'] = datetime.now().isoformat()
+                
+                result = self.db.table(self.table_name)\
+                    .update(memory_data)\
+                    .eq('id', existing_id)\
+                    .execute()
+                
+                if result.data:
+                    logger.info(f"✅ Updated existing fact: {factual_memory.subject} {factual_memory.predicate}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=existing_id,
+                        operation="update",
+                        message=f"Successfully updated factual memory",
+                        data={"memory": result.data[0]}
+                    )
+            else:
+                # Insert new fact
+                result = self.db.table(self.table_name).insert(memory_data).execute()
+                
+                if result.data:
+                    logger.info(f"✅ Inserted new fact: {factual_memory.subject} {factual_memory.predicate}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=factual_memory.id,
+                        operation="store",
+                        message=f"Successfully stored factual memory",
+                        data={"memory": result.data[0]}
+                    )
+            
+            # If we get here, something went wrong
+            raise Exception("No data returned from database operation")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to store/update factual memory: {e}")
+            return MemoryOperationResult(
+                success=False,
+                memory_id=factual_memory.id,
+                operation="store_or_update",
+                message=f"Failed to store/update memory: {str(e)}"
             )
     
     async def search_facts_by_subject(self, user_id: str, subject: str, limit: int = 10) -> List[FactualMemory]:

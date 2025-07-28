@@ -13,6 +13,7 @@ from tools.services.intelligence_service.language.embedding_generator import Emb
 from core.database.supabase_client import get_supabase_client
 from core.logging import get_logger
 from core.search_monitoring import get_search_monitor
+from core.security import SecurityPolicy
 
 logger = get_logger(__name__)
 
@@ -42,6 +43,9 @@ class UnifiedSearchService:
         self.mcp_server = mcp_server
         self.embedding_generator = EmbeddingGenerator()
         self.supabase = get_supabase_client()
+        
+        # Security policy for tool security levels
+        self.security_policy = SecurityPolicy()
         
         # Cache for capabilities data
         self.capabilities_cache = {
@@ -101,6 +105,11 @@ class UnifiedSearchService:
             # Process tools
             self.capabilities_cache['tools'] = {}
             for tool in tools:
+                # Get security level for the tool
+                security_level = self.security_policy.tool_policies.get(tool.name, None)
+                security_level_name = security_level.name if security_level else "DEFAULT"
+                security_level_value = security_level.value if security_level else 1
+                
                 tool_info = {
                     'name': tool.name,
                     'description': tool.description or f"Tool: {tool.name}",
@@ -108,7 +117,10 @@ class UnifiedSearchService:
                     'category': self._categorize_tool(tool.name),
                     'keywords': self._extract_keywords(tool.name, tool.description or ""),
                     'metadata': {
-                        'input_schema': getattr(tool, 'inputSchema', None)
+                        'input_schema': getattr(tool, 'inputSchema', None),
+                        'security_level': security_level_name,
+                        'security_level_value': security_level_value,
+                        'requires_authorization': security_level_value > 1 if security_level else False
                     }
                 }
                 self.capabilities_cache['tools'][tool.name] = tool_info
@@ -587,7 +599,6 @@ class UnifiedSearchService:
             # Default tools (most commonly used)
             if not filters.types or 'tool' in filters.types:
                 default_tools = [
-                    'create_execution_plan', 'replan_execution', 'get_autonomous_status',
                     'web_search', 'web_crawl', 'web_automation'
                 ]
                 for tool_name in default_tools:
@@ -969,6 +980,81 @@ class UnifiedSearchService:
         except Exception as e:
             logger.error(f"Error getting capabilities by type: {e}")
             return {'error': str(e)}
+            
+    async def get_tool_security_levels(self) -> Dict[str, Any]:
+        """Get security levels for all tools"""
+        try:
+            security_info = {}
+            
+            # Get tools from cache
+            tools = self.capabilities_cache.get('tools', {})
+            
+            for tool_name, tool_info in tools.items():
+                metadata = tool_info.get('metadata', {})
+                security_info[tool_name] = {
+                    'name': tool_name,
+                    'category': tool_info.get('category', 'general'),
+                    'security_level': metadata.get('security_level', 'DEFAULT'),
+                    'security_level_value': metadata.get('security_level_value', 1),
+                    'requires_authorization': metadata.get('requires_authorization', False),
+                    'description': tool_info.get('description', '')
+                }
+            
+            # Add security policy information
+            security_summary = {
+                'total_tools': len(security_info),
+                'security_levels': {
+                    'LOW': len([t for t in security_info.values() if t['security_level_value'] == 1]),
+                    'MEDIUM': len([t for t in security_info.values() if t['security_level_value'] == 2]),
+                    'HIGH': len([t for t in security_info.values() if t['security_level_value'] == 3]),
+                    'CRITICAL': len([t for t in security_info.values() if t['security_level_value'] == 4]),
+                    'DEFAULT': len([t for t in security_info.values() if t['security_level'] == 'DEFAULT'])
+                },
+                'authorization_required': len([t for t in security_info.values() if t['requires_authorization']]),
+                'rate_limits': self.security_policy.rate_limits
+            }
+            
+            return {
+                'tools': security_info,
+                'summary': security_summary,
+                'security_policy_version': '1.0'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting tool security levels: {e}")
+            return {'error': str(e)}
+            
+    async def search_by_security_level(self, security_level: str, max_results: int = 20) -> List[SearchResult]:
+        """Search tools by security level"""
+        try:
+            results = []
+            tools = self.capabilities_cache.get('tools', {})
+            
+            for tool_name, tool_info in tools.items():
+                metadata = tool_info.get('metadata', {})
+                tool_security_level = metadata.get('security_level', 'DEFAULT')
+                
+                if tool_security_level.upper() == security_level.upper():
+                    result = SearchResult(
+                        name=tool_name,
+                        type='tool',
+                        description=tool_info['description'],
+                        similarity_score=1.0,  # Perfect match for security level
+                        category=tool_info['category'],
+                        keywords=tool_info['keywords'] + [f'security_{security_level.lower()}'],
+                        metadata=tool_info['metadata']
+                    )
+                    results.append(result)
+                    
+                    if len(results) >= max_results:
+                        break
+            
+            logger.info(f"Found {len(results)} tools with security level {security_level}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error searching by security level: {e}")
+            return []
             
     async def _log_search(self, query: str, filters: SearchFilter, results: List[SearchResult], response_time_ms: int = None):
         """Log search for analytics with performance metrics"""

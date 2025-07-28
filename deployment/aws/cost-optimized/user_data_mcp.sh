@@ -32,6 +32,10 @@ unzip awscliv2.zip
 mkdir -p /opt/${project_name}
 cd /opt/${project_name}
 
+# Clone MCP repository  
+git clone https://github.com/xenodennis/isA_MCP.git .
+git checkout develop || git checkout main
+
 # 创建MCP服务的环境配置
 cat > .env << EOF
 # Environment Configuration  
@@ -165,8 +169,17 @@ export DISPLAY=:99
 # 等待Xvfb启动
 sleep 3
 
-# 启动MCP服务器
-python smart_mcp_server.py --port 8081
+# 启动MCP服务器和其他服务
+python smart_mcp_server.py --port 8081 &
+
+# 启动User Service (8100端口)
+cd tools/services/user_service && python -m uvicorn api_server:app --host 0.0.0.0 --port 8100 &
+
+# 启动Event Service (8101端口)  
+cd ../event_service && python -m uvicorn main:app --host 0.0.0.0 --port 8101 &
+
+# 等待所有服务启动
+wait
 EOF
 
 chmod +x start_mcp.sh

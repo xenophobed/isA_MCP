@@ -3,7 +3,7 @@ Event Service Repositories Package
 Professional data access layer following Repository pattern
 """
 
-from .base_repository import BaseRepository
+from .base_repository import BaseEventRepository as BaseRepository
 from .event_repository import EventRepository  
 from .task_repository import TaskRepository
 

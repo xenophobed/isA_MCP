@@ -59,33 +59,8 @@ class SessionMemoryEngine(BaseMemoryEngine):
                 importance_score=0.5  # model需要但DB没有
             )
             
-            # Session memories don't need embeddings - store directly
-            try:
-                # Prepare data for storage without generating embeddings
-                memory_data = self._prepare_for_storage_without_embedding(session_memory)
-                
-                # Insert into database
-                db_result = self.db.table(self.table_name).insert(memory_data).execute()
-                
-                if db_result.data:
-                    logger.info(f"✅ Stored {self.memory_type} memory: {session_memory.id}")
-                    result = MemoryOperationResult(
-                        success=True,
-                        memory_id=session_memory.id,
-                        operation="store",
-                        message=f"Successfully stored {self.memory_type} memory",
-                        data={"memory": db_result.data[0]}
-                    )
-                else:
-                    raise Exception("No data returned from insert")
-            except Exception as e:
-                logger.error(f"❌ Failed to store {self.memory_type} memory: {e}")
-                result = MemoryOperationResult(
-                    success=False,
-                    memory_id=session_memory.id,
-                    operation="store",
-                    message=f"Failed to store memory: {str(e)}"
-                )
+            # Session memories use upsert logic - update existing session or create new one
+            result = await self._store_or_update_session(session_memory)
             
             if result.success:
                 logger.info(f"✅ Stored session memory: {session_id} ({message_count} messages)")
@@ -99,6 +74,75 @@ class SessionMemoryEngine(BaseMemoryEngine):
                 memory_id="",
                 operation="store_session_memory",
                 message=f"Failed to store session memory: {str(e)}"
+            )
+    
+    async def _store_or_update_session(self, session_memory: SessionMemory) -> MemoryOperationResult:
+        """Store session memory with upsert logic to handle session updates"""
+        try:
+            # Check if session already exists
+            existing_result = self.db.table(self.table_name)\
+                .select('id')\
+                .eq('session_id', session_memory.session_id)\
+                .execute()
+            
+            memory_data = self._prepare_for_storage_without_embedding(session_memory)
+            
+            if existing_result.data:
+                # Update existing session - increment message count and update content
+                existing_id = existing_result.data[0]['id']
+                
+                # Get current message count
+                current_session = self.db.table(self.table_name)\
+                    .select('total_messages')\
+                    .eq('id', existing_id)\
+                    .single()\
+                    .execute()
+                
+                current_count = current_session.data.get('total_messages', 0) if current_session.data else 0
+                
+                # Update with incremented message count
+                memory_data['total_messages'] = current_count + 1
+                memory_data['messages_since_last_summary'] = current_count + 1
+                memory_data['updated_at'] = datetime.now().isoformat()
+                
+                result = self.db.table(self.table_name)\
+                    .update(memory_data)\
+                    .eq('id', existing_id)\
+                    .execute()
+                
+                if result.data:
+                    logger.info(f"✅ Updated existing session: {session_memory.session_id}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=existing_id,
+                        operation="update",
+                        message=f"Successfully updated session memory",
+                        data={"memory": result.data[0]}
+                    )
+            else:
+                # Insert new session
+                result = self.db.table(self.table_name).insert(memory_data).execute()
+                
+                if result.data:
+                    logger.info(f"✅ Created new session: {session_memory.session_id}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=session_memory.id,
+                        operation="store",
+                        message=f"Successfully stored session memory",
+                        data={"memory": result.data[0]}
+                    )
+            
+            # If we get here, something went wrong
+            raise Exception("No data returned from database operation")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to store/update session memory: {e}")
+            return MemoryOperationResult(
+                success=False,
+                memory_id=session_memory.id,
+                operation="store_or_update",
+                message=f"Failed to store/update session memory: {str(e)}"
             )
 
     async def get_session_by_id(self, user_id: str, session_id: str) -> SessionMemory:

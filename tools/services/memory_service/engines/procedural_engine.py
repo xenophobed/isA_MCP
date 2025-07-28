@@ -5,6 +5,7 @@ Simple, clean implementation for procedural memory management
 """
 
 from typing import Dict, Any, List
+from datetime import datetime
 from core.logging import get_logger
 from .base_engine import BaseMemoryEngine
 from ..models import ProceduralMemory, MemoryOperationResult
@@ -74,8 +75,8 @@ class ProceduralMemoryEngine(BaseMemoryEngine):
                 importance_score=importance_score  # model需要但DB没有
             )
             
-            # Let base engine handle embedding and storage
-            result = await self.store_memory(procedural_memory)
+            # Use upsert logic to handle duplicate procedures
+            result = await self._store_or_update_procedure(procedural_memory)
             
             if result.success:
                 logger.info(f"✅ Stored procedure: {procedural_memory.skill_type[:50]}...")
@@ -89,6 +90,68 @@ class ProceduralMemoryEngine(BaseMemoryEngine):
                 memory_id="",
                 operation="store_procedural_memory",
                 message=f"Failed to store procedural memory: {str(e)}"
+            )
+    
+    async def _store_or_update_procedure(self, procedural_memory: ProceduralMemory) -> MemoryOperationResult:
+        """Store procedural memory with upsert logic to handle duplicates"""
+        try:
+            # Generate embedding if not provided
+            if not procedural_memory.embedding:
+                procedural_memory.embedding = await self.embedder.embed_single(procedural_memory.content)
+            
+            # Check if procedure already exists (based on unique constraint)
+            existing_result = self.db.table(self.table_name)\
+                .select('id')\
+                .eq('user_id', procedural_memory.user_id)\
+                .eq('procedure_name', procedural_memory.skill_type)\
+                .eq('domain', procedural_memory.domain)\
+                .execute()
+            
+            memory_data = self._prepare_for_storage(procedural_memory)
+            
+            if existing_result.data:
+                # Update existing procedure
+                existing_id = existing_result.data[0]['id']
+                memory_data['updated_at'] = datetime.now().isoformat()
+                
+                result = self.db.table(self.table_name)\
+                    .update(memory_data)\
+                    .eq('id', existing_id)\
+                    .execute()
+                
+                if result.data:
+                    logger.info(f"✅ Updated existing procedure: {procedural_memory.skill_type}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=existing_id,
+                        operation="update",
+                        message=f"Successfully updated procedural memory",
+                        data={"memory": result.data[0]}
+                    )
+            else:
+                # Insert new procedure
+                result = self.db.table(self.table_name).insert(memory_data).execute()
+                
+                if result.data:
+                    logger.info(f"✅ Inserted new procedure: {procedural_memory.skill_type}")
+                    return MemoryOperationResult(
+                        success=True,
+                        memory_id=procedural_memory.id,
+                        operation="store",
+                        message=f"Successfully stored procedural memory",
+                        data={"memory": result.data[0]}
+                    )
+            
+            # If we get here, something went wrong
+            raise Exception("No data returned from database operation")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to store/update procedural memory: {e}")
+            return MemoryOperationResult(
+                success=False,
+                memory_id=procedural_memory.id,
+                operation="store_or_update",
+                message=f"Failed to store/update memory: {str(e)}"
             )
 
     async def search_procedures_by_task(self, user_id: str, task_name: str, limit: int = 10) -> List[ProceduralMemory]:

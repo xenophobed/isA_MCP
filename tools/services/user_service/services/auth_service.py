@@ -12,7 +12,7 @@ import httpx
 import logging
 from datetime import datetime, timedelta
 
-from .models import Auth0UserInfo
+from ..models import Auth0UserInfo
 
 
 logger = logging.getLogger(__name__)

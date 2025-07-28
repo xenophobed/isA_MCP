@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 import json
 
-from .models import (
+from ..models import (
     PaymentIntent, CheckoutSession, WebhookEvent, 
     SubscriptionStatus, StripeSubscriptionStatus
 )

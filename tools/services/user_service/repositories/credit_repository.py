@@ -123,7 +123,7 @@ class CreditRepository(BaseRepository[CreditTransaction]):
         """
         try:
             result = await self._execute_query(
-                lambda: self.table.select('*').eq('transaction_id', transaction_id).single().execute(),
+                lambda: self.table.select('*').eq('id', transaction_id).single().execute(),
                 f"Failed to get transaction: {transaction_id}"
             )
             
@@ -154,7 +154,14 @@ class CreditRepository(BaseRepository[CreditTransaction]):
             if result.data and len(result.data) > 0:
                 return float(result.data[0]['credits_after'])
             
-            # If no transactions, return 0
+            # If no transactions, get balance from users table
+            from .user_repository import UserRepository
+            user_repo = UserRepository()
+            user = await user_repo.get_by_user_id(user_id)
+            if user and user.credits_remaining is not None:
+                return float(user.credits_remaining)
+            
+            # Final fallback
             return 0.0
             
         except Exception as e:
@@ -288,8 +295,9 @@ class CreditRepository(BaseRepository[CreditTransaction]):
         transaction_data = data.copy()
         
         # Generate transaction ID if not provided
-        if 'transaction_id' not in transaction_data:
-            transaction_data['transaction_id'] = str(uuid.uuid4())
+        # Remove transaction_id as database uses auto-incrementing id
+        if 'transaction_id' in transaction_data:
+            transaction_data.pop('transaction_id')
         
         # Set defaults
         transaction_data.setdefault('metadata', {})
@@ -371,7 +379,7 @@ class CreditRepository(BaseRepository[CreditTransaction]):
             update_data = self._prepare_timestamps(data.copy(), is_update=True)
             
             result = await self._execute_query(
-                lambda: self.table.update(update_data).eq('transaction_id', transaction_id).execute(),
+                lambda: self.table.update(update_data).eq('id', transaction_id).execute(),
                 f"Failed to update credit transaction: {transaction_id}"
             )
             
@@ -389,7 +397,7 @@ class CreditRepository(BaseRepository[CreditTransaction]):
         """Implementation of abstract delete method"""
         try:
             result = await self._execute_query(
-                lambda: self.table.delete().eq('transaction_id', transaction_id).execute(),
+                lambda: self.table.delete().eq('id', transaction_id).execute(),
                 f"Failed to delete credit transaction: {transaction_id}"
             )
             

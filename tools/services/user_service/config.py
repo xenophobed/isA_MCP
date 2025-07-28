@@ -61,6 +61,15 @@ class UserServiceConfig:
         self.auth0_client_id = os.getenv("AUTH0_CLIENT_ID", "Vsm0s23JTKzDrq9bq0foKyYieOCyeoQJ")
         self.auth0_client_secret = os.getenv("AUTH0_CLIENT_SECRET", "kk6n0zkaavCzd5FuqpoTeWudnQBNQvhXneb-LI3TPWunhUkJNim9FEZeWXKRJd7m")
         
+        # Supabase 认证配置
+        self.supabase_url = os.getenv("SUPABASE_LOCAL_URL", "http://127.0.0.1:54321")
+        self.supabase_anon_key = os.getenv("SUPABASE_LOCAL_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMAs_-IsVo")
+        self.supabase_service_role_key = os.getenv("SUPABASE_LOCAL_SERVICE_ROLE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU")
+        self.supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET", "your-super-secret-jwt-token-with-at-least-32-characters-long")
+        
+        # 认证模式配置 (auth0 | supabase | both)
+        self.auth_provider = os.getenv("AUTH_PROVIDER", "both")
+        
         # Stripe 配置
         self.stripe_secret_key = os.getenv("STRIPE_SECRET_KEY")
         self.stripe_webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -96,9 +105,16 @@ class UserServiceConfig:
         self.health_check_interval = int(os.getenv("HEALTH_CHECK_INTERVAL", "30"))
         
         # 文件上传配置
-        self.upload_max_size = int(os.getenv("UPLOAD_MAX_SIZE", str(10 * 1024 * 1024)))  # 10MB
-        upload_types_str = os.getenv("UPLOAD_ALLOWED_TYPES", "image/jpeg,image/png,application/pdf")
+        self.upload_max_size = int(os.getenv("UPLOAD_MAX_SIZE", str(50 * 1024 * 1024)))  # 50MB
+        upload_types_str = os.getenv("UPLOAD_ALLOWED_TYPES", "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json")
         self.upload_allowed_types = [x.strip() for x in upload_types_str.split(",")]
+        
+        # MinIO存储配置 (与S3兼容)
+        self.minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+        self.minio_access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+        self.minio_secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+        self.minio_secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+        self.minio_bucket_name = os.getenv("MINIO_BUCKET_NAME", "user-files")
         
         # 邮件配置
         self.email_enabled = os.getenv("EMAIL_ENABLED", "false").lower() == "true"

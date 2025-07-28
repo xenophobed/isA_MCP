@@ -30,25 +30,30 @@ class UserServiceV2(BaseService):
         super().__init__("UserServiceV2")
         self.user_repo = user_repository or UserRepository()
     
-    async def ensure_user_exists(self, auth0_id: str, email: str, name: str) -> ServiceResult[User]:
+    async def ensure_user_exists(self, user_id: str, email: str, name: str, auth0_id: str = None) -> ServiceResult[User]:
         """
         确保用户存在，不存在则创建
         
         Args:
-            auth0_id: Auth0用户ID
+            user_id: 用户业务ID
             email: 用户邮箱
             name: 用户姓名
+            auth0_id: Auth0用户ID (可选，默认为user_id)
             
         Returns:
             ServiceResult[User]: 用户信息结果
         """
         try:
-            self._log_operation("ensure_user_exists", f"auth0_id={auth0_id}, email={email}")
+            # 如果没有提供auth0_id，使用user_id作为auth0_id
+            if auth0_id is None:
+                auth0_id = user_id
+                
+            self._log_operation("ensure_user_exists", f"user_id={user_id}, email={email}")
             
             # 验证输入参数
             validation_error = self._validate_required_fields(
-                {"auth0_id": auth0_id, "email": email, "name": name},
-                ["auth0_id", "email", "name"]
+                {"user_id": user_id, "email": email, "name": name},
+                ["user_id", "email", "name"]
             )
             if validation_error:
                 return validation_error
@@ -59,55 +64,24 @@ class UserServiceV2(BaseService):
                     error_details={"email": email}
                 )
             
-            # 首先尝试通过user_id（通常是auth0_id）查找用户
-            existing_user = await self.user_repo.get_by_user_id(auth0_id)
-            
-            if existing_user:
-                # 用户存在，检查是否需要更新信息
-                needs_update = (
-                    existing_user.email != email or 
-                    existing_user.name != name
+            # 使用Repository的ensure_user_exists方法
+            try:
+                user = await self.user_repo.ensure_user_exists(
+                    user_id=user_id,
+                    email=email,
+                    name=name,
+                    auth0_id=auth0_id
                 )
                 
-                if needs_update:
-                    update_data = {"email": email, "name": name}
-                    success = await self.user_repo.update(auth0_id, update_data)
-                    
-                    if success:
-                        # 重新获取更新后的用户信息
-                        updated_user = await self.user_repo.get_by_user_id(auth0_id)
-                        self._log_operation("user_updated", f"user_id={auth0_id}")
-                        return ServiceResult.success(
-                            data=updated_user,
-                            message="User information updated successfully"
-                        )
-                    else:
-                        return ServiceResult.error("Failed to update user information")
+                self._log_operation("user_ensured", f"user_id={user_id}")
+                return ServiceResult.success(
+                    data=user,
+                    message="User exists or created successfully"
+                )
                 
-                self._log_operation("user_found", f"user_id={auth0_id}")
-                return ServiceResult.success(
-                    data=existing_user,
-                    message="User already exists"
-                )
-            
-            # 用户不存在，创建新用户
-            user_data = {
-                'user_id': auth0_id,  # 使用auth0_id作为业务主键
-                'auth0_id': auth0_id,
-                'email': email,
-                'name': name
-            }
-            
-            new_user = await self.user_repo.create(user_data)
-            
-            if new_user:
-                self._log_operation("user_created", f"user_id={auth0_id}")
-                return ServiceResult.success(
-                    data=new_user,
-                    message="User created successfully"
-                )
-            else:
-                return ServiceResult.error("Failed to create user")
+            except Exception as repo_error:
+                logger.error(f"Repository error: {repo_error}")
+                return ServiceResult.error(f"Failed to ensure user exists: {str(repo_error)}")
                 
         except DuplicateEntryException as e:
             return ServiceResult.validation_error(
@@ -450,6 +424,18 @@ class UserServiceV2(BaseService):
             
         except Exception as e:
             return self._handle_exception(e, "get user info response")
+    
+    async def get_user_info(self, auth0_id: str) -> ServiceResult[UserResponse]:
+        """
+        获取用户信息（API兼容性方法）
+        
+        Args:
+            auth0_id: Auth0用户ID
+            
+        Returns:
+            ServiceResult[UserResponse]: 用户响应信息
+        """
+        return await self.get_user_info_response(auth0_id)
     
     async def get_user_by_id_int(self, user_id: int) -> ServiceResult[User]:
         """

@@ -1,21 +1,50 @@
+# ============================================
 # Python
+# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 env/
 venv/
 ENV/
 .venv/
+.env/
+.python-version
 
+# ============================================
 # ⚠️ 敏感信息 - 绝不提交
+# ============================================
+# Environment files
 .env
 .env.local
 .env.production
 .env.staging
 .env.development
+.env.test
 .env.user_service
+.env.user_service.*
+.env.aws
+*.env.backup
 
 # API密钥和认证信息
 *_api_key*
@@ -23,40 +52,152 @@ ENV/
 *_secret*
 *.pem
 *.key
+auth_config.json
+api_keys.txt
+credentials.json
 
-# Database
+# ============================================
+# 数据文件 - 不适合Git
+# ============================================
+# Database files
 *.db
 *.sqlite
 *.sqlite3
+resources/dbs/sqlite/*.db
+resources/dbs/sqlite/*.sqlite*
 
-# Logs
+# Log files
 logs/
 *.log
+debug_*.log
+automation_performance.log
+stripe_cli.log
+user_service.log
+event_feedback.log
 
-# IDE
+# ============================================
+# 调试和临时文件
+# ============================================
+# Debug files (generated during development)
+debug_*.py
+test_*.py
+*_debug.py
+*_test.py
+debug_screenshots/
+debug_output/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============================================
+# IDE和编辑器
+# ============================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.vim/
+.emacs.d/
 
-# OS
+# ============================================
+# 操作系统
+# ============================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Docker
+# ============================================
+# Docker和容器
+# ============================================
 .docker/
+docker-compose.override.yml
+.dockerignore.backup
 
+# ============================================
+# 运行时和缓存文件
+# ============================================
 # Temporary files
 tmp/
 temp/
+*.tmp
 sessions/
 screenshots/
 generated_images/
+media_storage/
+storage/
+models/models/
 
-# 生产环境机密
+# Cache directories
+.cache/
+.npm/
+.yarn/
+node_modules/
+
+# ============================================
+# 生产环境和部署
+# ============================================
+# Production secrets
 ssl/
 secrets/
 certificates/
+terraform.tfstate*
+.terraform/
+terraform.tfvars
 
-# 部署信息
+# Deployment artifacts
 deployment_info.json
+*.tar.gz
+*.zip
+dist/
+
+# ============================================
+# 云服务配置
+# ============================================
+# AWS
+.aws/
+*.pem
+aws-config.json
+
+# Railway
+.railway/
+
+# Vercel
+.vercel/
+
+# ============================================
+# AI/ML 相关
+# ============================================
+# Model files (too large for Git)
+*.model
+*.pkl
+*.joblib
+*.h5
+*.onnx
+models/
+checkpoints/
+wandb/
+
+# ============================================
+# 性能和监控
+# ============================================
+# Performance reports
+*.prof
+*.perf
+performance_*.json
+
+# Monitoring data
+metrics/
+traces/

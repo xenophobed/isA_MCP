@@ -25,8 +25,9 @@ unzip awscliv2.zip
 mkdir -p /opt/${project_name}
 cd /opt/${project_name}
 
-# Clone repository (placeholder - update with actual repo)
-# git clone https://github.com/your-org/isA_Agent.git .
+# Clone repository - Agent Service
+git clone https://github.com/xenodennis/isA_Agent.git .
+git checkout develop || git checkout main
 
 # Create Agent service environment file with proper service discovery
 cat > .env << EOF
@@ -112,8 +113,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
   CMD curl -f http://localhost:8080/health || exit 1
 
-# Start command
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Start command  
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 EOF
 
 # Create docker-compose for Agent service

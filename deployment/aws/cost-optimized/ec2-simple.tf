@@ -349,6 +349,45 @@ resource "aws_lb_target_group" "model_service" {
   }
 }
 
+# Additional Target Groups for User and Event services
+resource "aws_lb_target_group" "user_service" {
+  name     = "${var.project_name}-user-tg"
+  port     = 8100
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.default.id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_target_group" "event_service" {
+  name     = "${var.project_name}-event-tg"
+  port     = 8101
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.default.id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 2
+  }
+}
+
 # Target Group Attachments
 resource "aws_lb_target_group_attachment" "agent_service" {
   target_group_arn = aws_lb_target_group.agent_service.arn
@@ -360,6 +399,18 @@ resource "aws_lb_target_group_attachment" "mcp_service" {
   target_group_arn = aws_lb_target_group.mcp_service.arn
   target_id        = aws_instance.ec2_mcp_service.id
   port             = 8081
+}
+
+resource "aws_lb_target_group_attachment" "user_service" {
+  target_group_arn = aws_lb_target_group.user_service.arn
+  target_id        = aws_instance.ec2_mcp_service.id
+  port             = 8100
+}
+
+resource "aws_lb_target_group_attachment" "event_service" {
+  target_group_arn = aws_lb_target_group.event_service.arn
+  target_id        = aws_instance.ec2_mcp_service.id
+  port             = 8101
 }
 
 resource "aws_lb_target_group_attachment" "model_service" {
@@ -397,6 +448,38 @@ resource "aws_lb_listener_rule" "mcp_rule" {
   }
 }
 
+resource "aws_lb_listener_rule" "user_api_rule" {
+  listener_arn = aws_lb_listener.main.arn
+  priority     = 150
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.user_service.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/users/*", "/api/user/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "event_api_rule" {
+  listener_arn = aws_lb_listener.main.arn
+  priority     = 160
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.event_service.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/events/*", "/api/event/*"]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "model_api_rule" {
   listener_arn = aws_lb_listener.main.arn
   priority     = 200
@@ -413,7 +496,7 @@ resource "aws_lb_listener_rule" "model_api_rule" {
   }
 }
 
-resource "aws_lb_listener_rule" "model_rule" {
+resource "aws_lb_listener_rule" "model_docs_rule" {
   listener_arn = aws_lb_listener.main.arn
   priority     = 300
 
@@ -424,7 +507,7 @@ resource "aws_lb_listener_rule" "model_rule" {
 
   condition {
     path_pattern {
-      values = ["/api/models/*", "/docs", "/health"]
+      values = ["/docs", "/openapi.json", "/redoc"]
     }
   }
 }
@@ -497,6 +580,8 @@ output "service_urls" {
     agent_api    = "http://${aws_lb.main.dns_name}/"
     agent_chat   = "http://${aws_lb.main.dns_name}/api/chat"
     mcp_api      = "http://${aws_lb.main.dns_name}/mcp/"
+    user_api     = "http://${aws_lb.main.dns_name}/api/users"
+    event_api    = "http://${aws_lb.main.dns_name}/api/events"
     model_api    = "http://${aws_lb.main.dns_name}/api/v1"
     model_docs   = "http://${aws_lb.main.dns_name}/docs"
     health_check = "http://${aws_lb.main.dns_name}/health"

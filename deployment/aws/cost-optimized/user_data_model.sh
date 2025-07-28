@@ -29,8 +29,9 @@ pip3 install --upgrade pip
 mkdir -p /opt/${project_name}
 cd /opt/${project_name}
 
-# Clone repository (placeholder - update with actual repo)
-# git clone https://github.com/your-org/isA_MCP.git .
+# Clone Model repository
+git clone https://github.com/xenodennis/isA_Model.git .
+git checkout develop || git checkout main
 
 # Create basic environment file for Model service
 cat > .env << EOF

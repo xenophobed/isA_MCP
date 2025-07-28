@@ -80,9 +80,41 @@ class User(BaseModel):
 
 class UserCreate(BaseModel):
     """创建用户请求模型"""
+    user_id: str = Field(..., description="用户业务ID")
     email: EmailStr = Field(..., description="用户邮箱")
     name: str = Field(..., description="用户姓名")
     auth0_id: Optional[str] = Field(None, description="Auth0 用户ID")
+    
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """验证用户ID格式"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+
+class UserEnsureRequest(BaseModel):
+    """确保用户存在请求模型（前端调用）"""
+    auth0_id: str = Field(..., description="Auth0 用户ID")
+    email: EmailStr = Field(..., description="用户邮箱")
+    name: str = Field(..., description="用户姓名")
+    
+    @validator('auth0_id')
+    def validate_auth0_id_format(cls, v):
+        """验证Auth0 ID格式"""
+        if not v:
+            raise ValueError('auth0_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid auth0_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
 
 
 class UserUpdate(BaseModel):
@@ -172,8 +204,8 @@ class CheckoutSession(BaseModel):
 
 class CreditConsumption(BaseModel):
     """积分消费模型"""
-    user_id: int = Field(..., description="用户ID")
-    amount: int = Field(..., description="消费数量")
+    user_id: str = Field(..., description="用户ID") 
+    amount: float = Field(..., description="消费数量")
     reason: str = Field(default="api_call", description="消费原因")
     endpoint: Optional[str] = Field(None, description="API端点")
 
@@ -285,11 +317,34 @@ class Session(BaseModel):
     id: Optional[int] = None
     session_id: str = Field(..., description="Session ID")
     user_id: str = Field(..., description="User ID", max_length=255)
-    title: Optional[str] = Field(None, description="Session title")
+    conversation_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Conversation data")
     status: str = Field(default="active", description="Session status")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Session metadata")
+    is_active: bool = Field(default=True, description="Is session active")
+    message_count: int = Field(default=0, description="Message count")
+    total_tokens: int = Field(default=0, description="Total tokens")
+    total_cost: float = Field(default=0.0, description="Total cost")
+    session_summary: str = Field(default="", description="Session summary")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    last_activity: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+    @validator('created_at', pre=True)
+    def parse_created_at(cls, v):
+        """Parse created_at from string if needed"""
+        if isinstance(v, str):
+            from datetime import datetime
+            return datetime.fromisoformat(v.replace('Z', '+00:00'))
+        return v
+    
+    @validator('updated_at', pre=True)
+    def parse_updated_at(cls, v):
+        """Parse updated_at from string if needed"""
+        if isinstance(v, str):
+            from datetime import datetime
+            return datetime.fromisoformat(v.replace('Z', '+00:00'))
+        return v
 
     @validator('user_id')
     def validate_user_id_format(cls, v):
@@ -305,12 +360,15 @@ class Session(BaseModel):
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
 
 
 class SessionCreate(BaseModel):
     """Create session request model"""
     user_id: str = Field(..., description="User ID")
-    title: Optional[str] = Field(None, description="Session title")
+    conversation_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Conversation data")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Session metadata")
 
 
@@ -342,13 +400,21 @@ class SessionMemory(BaseModel):
 
 class SessionMessage(BaseModel):
     """Session message model"""
-    id: Optional[int] = None
+    id: Optional[str] = None  # UUID in database
     session_id: str = Field(..., description="Session ID")
     user_id: str = Field(..., description="User ID", max_length=255)
+    message_type: str = Field(default="chat", description="Message type")
     role: str = Field(..., description="Message role (user/assistant/system)")
     content: str = Field(..., description="Message content")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Message metadata")
+    tool_calls: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Tool calls data")
+    tool_call_id: Optional[str] = Field(None, description="Tool call ID")
+    message_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Message metadata")
+    tokens_used: Optional[int] = Field(default=0, description="Tokens used")
+    cost_usd: Optional[float] = Field(default=0.0, description="Cost in USD")
+    is_summary_candidate: Optional[bool] = Field(default=True, description="Is summary candidate")
+    importance_score: Optional[float] = Field(default=0.5, description="Importance score")
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @validator('user_id')
     def validate_user_id_format(cls, v):
@@ -371,18 +437,16 @@ class SessionMessage(BaseModel):
 class CreditTransaction(BaseModel):
     """Credit transaction model"""
     id: Optional[int] = None
-    transaction_id: str = Field(..., description="Transaction ID")
     user_id: str = Field(..., description="User ID", max_length=255)
     transaction_type: str = Field(..., description="Transaction type (consume/recharge/refund)")
-    amount: float = Field(..., description="Transaction amount")
-    balance_before: float = Field(..., description="Balance before transaction")
-    balance_after: float = Field(..., description="Balance after transaction")
-    reference_type: Optional[str] = Field(None, description="Reference type")
-    reference_id: Optional[str] = Field(None, description="Reference ID")
+    credits_amount: float = Field(..., description="Transaction amount")
+    credits_before: float = Field(..., description="Balance before transaction")
+    credits_after: float = Field(..., description="Balance after transaction")
     usage_record_id: Optional[int] = Field(None, description="Associated usage record ID")
     description: Optional[str] = Field(None, description="Transaction description")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata")
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @validator('user_id')
     def validate_user_id_format(cls, v):

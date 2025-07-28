@@ -9,6 +9,7 @@ import uvicorn
 import json
 import os
 from typing import List, Dict, Optional
+from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, FileResponse
@@ -565,6 +566,88 @@ async def portal_call_tool(request):
             return JSONResponse({"error": str(e)}, status_code=500)
     return JSONResponse({"error": "Server not available"}, status_code=503)
 
+async def security_levels_endpoint(request):
+    """Get security levels for all tools"""
+    try:
+        # Get the search service from the smart server instance
+        if hasattr(smart_server, 'search_service') and smart_server.search_service:
+            security_levels = await smart_server.search_service.get_tool_security_levels()
+            
+            return JSONResponse({
+                "status": "success",
+                "security_levels": security_levels,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": "Search service not available"
+            }, status_code=503)
+            
+    except Exception as e:
+        logger.error(f"Error in security levels endpoint: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        }, status_code=500)
+
+async def security_search_endpoint(request):
+    """Search tools by security level"""
+    try:
+        body = await request.json()
+        security_level = body.get("security_level", "").upper()
+        max_results = body.get("max_results", 20)
+        
+        if not security_level:
+            return JSONResponse({
+                "status": "error",
+                "message": "security_level is required (LOW, MEDIUM, HIGH, CRITICAL)"
+            }, status_code=400)
+            
+        if security_level not in ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'DEFAULT']:
+            return JSONResponse({
+                "status": "error", 
+                "message": "Invalid security_level. Must be: LOW, MEDIUM, HIGH, CRITICAL, or DEFAULT"
+            }, status_code=400)
+        
+        # Get the search service from the smart server instance
+        if hasattr(smart_server, 'search_service') and smart_server.search_service:
+            results = await smart_server.search_service.search_by_security_level(security_level, max_results)
+            
+            # Convert results to JSON-serializable format
+            search_results = []
+            for result in results:
+                search_results.append({
+                    "name": result.name,
+                    "type": result.type,
+                    "description": result.description,
+                    "similarity_score": result.similarity_score,
+                    "category": result.category,
+                    "keywords": result.keywords,
+                    "metadata": result.metadata
+                })
+            
+            return JSONResponse({
+                "status": "success",
+                "security_level": security_level,
+                "results": search_results,
+                "result_count": len(search_results),
+                "max_results": max_results,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": "Search service not available"
+            }, status_code=503)
+            
+    except Exception as e:
+        logger.error(f"Error in security search endpoint: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        }, status_code=500)
+
 def add_endpoints(app: Starlette):
     """Add custom API endpoints and management portal"""
     from core.secure_endpoints import add_auth_endpoints
@@ -578,6 +661,8 @@ def add_endpoints(app: Starlette):
         Route("/stats", stats_endpoint),
         Route("/capabilities", capabilities_endpoint),
         Route("/search", search_endpoint, methods=["POST"]),
+        Route("/security/levels", security_levels_endpoint),
+        Route("/security/search", security_search_endpoint, methods=["POST"]),
         # Admin API endpoints (separate from MCP endpoints)
         Route("/admin/tools", portal_tools),
         Route("/admin/prompts", portal_prompts),

@@ -133,10 +133,11 @@ class SessionRepository(BaseRepository[Session]):
             Success status
         """
         try:
+            now_iso = datetime.utcnow().isoformat()
             update_data = {
                 'status': status,
-                'updated_at': datetime.utcnow(),
-                'last_activity': datetime.utcnow()
+                'updated_at': now_iso,
+                'last_activity': now_iso
             }
             
             result = await self._execute_query(
@@ -165,9 +166,10 @@ class SessionRepository(BaseRepository[Session]):
             Success status
         """
         try:
+            now_iso = datetime.utcnow().isoformat()
             update_data = {
-                'last_activity': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
+                'last_activity': now_iso,
+                'updated_at': now_iso
             }
             
             result = await self._execute_query(
@@ -199,12 +201,13 @@ class SessionRepository(BaseRepository[Session]):
             if not session:
                 return False
             
+            now_iso = datetime.utcnow().isoformat()
             update_data = {
                 'message_count': (getattr(session, 'message_count', 0) or 0) + 1,
                 'total_tokens': (getattr(session, 'total_tokens', 0) or 0) + tokens_used,
                 'total_cost': float((getattr(session, 'total_cost', 0) or 0)) + cost,
-                'last_activity': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
+                'last_activity': now_iso,
+                'updated_at': now_iso
             }
             
             result = await self._execute_query(
@@ -230,12 +233,13 @@ class SessionRepository(BaseRepository[Session]):
         """
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=hours_old)
+            now_iso = datetime.utcnow().isoformat()
             
             update_data = {
                 'status': 'expired',
                 'is_active': False,
-                'expires_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
+                'expires_at': now_iso,
+                'updated_at': now_iso
             }
             
             result = await self._execute_query(
@@ -273,9 +277,9 @@ class SessionRepository(BaseRepository[Session]):
         session_data.setdefault('metadata', {})
         session_data.setdefault('session_summary', '')
         
-        # Set activity timestamps
-        now = datetime.utcnow()
-        session_data.setdefault('last_activity', now)
+        # Set activity timestamps (as ISO strings)
+        now_iso = datetime.utcnow().isoformat()
+        session_data.setdefault('last_activity', now_iso)
         
         return session_data
     

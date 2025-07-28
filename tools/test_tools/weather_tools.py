@@ -8,7 +8,7 @@ import random
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
-from core.security import get_security_manager
+from core.security import get_security_manager, SecurityLevel
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -82,7 +82,7 @@ def register_weather_tools(mcp):
     security_manager = get_security_manager()
     
     @mcp.tool()
-    @security_manager.security_check
+    @security_manager.require_authorization(SecurityLevel.HIGH)
     async def get_weather(city: str, user_id: str = "default") -> str:
         """Get mock weather information for testing purposes
         

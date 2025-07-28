@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>isA Unified Management Platform</title>
+    <link rel="stylesheet" href="/static/css/unified-styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Service Status Bar -->
+        <div class="service-status-bar" id="service-status-bar">
+            <div class="service-status" id="agent-status" data-service="agent" data-port="8080">
+                <div class="status-indicator checking" id="agent-indicator">
+                    <span class="status-dot"></span>
+                </div>
+                <span class="service-name">Agent</span>
+            </div>
+            <div class="service-status" id="mcp-status" data-service="mcp" data-port="8081">
+                <div class="status-indicator checking" id="mcp-indicator">
+                    <span class="status-dot"></span>
+                </div>
+                <span class="service-name">MCP</span>
+            </div>
+            <div class="service-status" id="model-status" data-service="model" data-port="8082">
+                <div class="status-indicator checking" id="model-indicator">
+                    <span class="status-dot"></span>
+                </div>
+                <span class="service-name">Model</span>
+            </div>
+        </div>
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="logo">
+                    <div class="logo-icon">
+                        <i data-lucide="layers"></i>
+                    </div>
+                    isA Unified Platform
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Overview Section -->
+                <div class="nav-section">
+                    <div class="nav-title">Overview</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link active" data-page="dashboard">
+                                <i data-lucide="layout-dashboard" class="nav-icon"></i>
+                                Unified Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="analytics">
+                                <i data-lucide="trending-up" class="nav-icon"></i>
+                                Analytics
+                                <span class="nav-badge accent">Live</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Agent Services Section -->
+                <div class="nav-section" id="agent-section">
+                    <div class="nav-title">
+                        Agent Services
+                        <span class="service-indicator" id="agent-nav-indicator"></span>
+                    </div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="agents" data-service="agent">
+                                <i data-lucide="bot" class="nav-icon"></i>
+                                Agents
+                                <span class="nav-badge" id="agents-count">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="workflows" data-service="agent">
+                                <i data-lucide="git-branch" class="nav-icon"></i>
+                                Workflows
+                                <span class="nav-badge">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="tracing" data-service="agent">
+                                <i data-lucide="activity" class="nav-icon"></i>
+                                Tracing
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="agent-playground" data-service="agent">
+                                <i data-lucide="play-circle" class="nav-icon"></i>
+                                Agent Playground
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- MCP Services Section -->
+                <div class="nav-section" id="mcp-section">
+                    <div class="nav-title">
+                        MCP Services
+                        <span class="service-indicator" id="mcp-nav-indicator"></span>
+                    </div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="tools" data-service="mcp">
+                                <i data-lucide="wrench" class="nav-icon"></i>
+                                Tools
+                                <span class="nav-badge" id="tools-count">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="prompts" data-service="mcp">
+                                <i data-lucide="message-square" class="nav-icon"></i>
+                                Prompts
+                                <span class="nav-badge" id="prompts-count">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="resources" data-service="mcp">
+                                <i data-lucide="database" class="nav-icon"></i>
+                                Resources
+                                <span class="nav-badge" id="resources-count">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="playground" data-service="mcp">
+                                <i data-lucide="play-circle" class="nav-icon"></i>
+                                MCP Playground
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Model Services Section -->
+                <div class="nav-section" id="model-section">
+                    <div class="nav-title">
+                        Model Services
+                        <span class="service-indicator" id="model-nav-indicator"></span>
+                    </div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="models" data-service="model">
+                                <i data-lucide="brain" class="nav-icon"></i>
+                                Models
+                                <span class="nav-badge" id="models-count">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="training" data-service="model">
+                                <i data-lucide="zap" class="nav-icon"></i>
+                                Training
+                                <span class="nav-badge accent">AI</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="deployments" data-service="model">
+                                <i data-lucide="rocket" class="nav-icon"></i>
+                                Deployments
+                                <span class="nav-badge">0</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="evaluation" data-service="model">
+                                <i data-lucide="bar-chart-3" class="nav-icon"></i>
+                                Evaluation
+                                <span class="nav-badge accent">Beta</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="model-playground" data-service="model">
+                                <i data-lucide="play-circle" class="nav-icon"></i>
+                                Model Playground
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Monitoring Section -->
+                <div class="nav-section">
+                    <div class="nav-title">System Management</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="monitoring">
+                                <i data-lucide="monitor" class="nav-icon"></i>
+                                System Monitoring
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="logs">
+                                <i data-lucide="file-text" class="nav-icon"></i>
+                                Unified Logs
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="settings">
+                                <i data-lucide="settings" class="nav-icon"></i>
+                                Platform Settings
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Top Bar -->
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div class="breadcrumb">
+                        <span class="breadcrumb-item" id="current-page">Unified Dashboard</span>
+                        <span class="service-tag" id="current-service-tag" style="display: none;"></span>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <div class="search-box">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" placeholder="Search across all services..." class="search-input" id="global-search">
+                    </div>
+                    <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Toggle theme">
+                        <i data-lucide="sun"></i>
+                    </button>
+                    <button class="btn btn-ghost btn-icon" title="Notifications">
+                        <i data-lucide="bell"></i>
+                    </button>
+                    <button class="btn btn-primary" id="refresh-all">
+                        <i data-lucide="refresh-cw"></i>
+                        Refresh All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Page Content Container -->
+            <div class="page-content">
+                <div class="page" id="current-page-content">
+                    <!-- Loading screen -->
+                    <div class="loading-container" id="page-loading">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <div class="loading-text">
+                                <span>Initializing Unified Platform...</span>
+                                <div class="loading-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="loading-progress"></div>
+                                    </div>
+                                    <span class="progress-text" id="loading-progress-text">Checking services...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Unified Platform Script -->
+    <script src="/static/js/unified-platform.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
