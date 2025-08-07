@@ -432,6 +432,218 @@ class SessionMessage(BaseModel):
         from_attributes = True
 
 
+# ============ Organization Models ============
+
+class OrganizationStatus(str, Enum):
+    """Organization status enumeration"""
+    ACTIVE = "active"
+    SUSPENDED = "suspended" 
+    TRIAL = "trial"
+    INACTIVE = "inactive"
+
+
+class OrganizationPlan(str, Enum):
+    """Organization plan enumeration"""
+    STARTUP = "startup"
+    BUSINESS = "business"
+    ENTERPRISE = "enterprise"
+
+
+class OrganizationRole(str, Enum):
+    """Organization member role enumeration"""
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+    VIEWER = "viewer"
+
+
+class OrganizationMemberStatus(str, Enum):
+    """Organization member status enumeration"""
+    ACTIVE = "active"
+    PENDING = "pending"
+    SUSPENDED = "suspended"
+
+
+class Organization(BaseModel):
+    """Organization model"""
+    id: Optional[int] = None
+    organization_id: str = Field(..., description="Organization ID", max_length=255)
+    name: str = Field(..., description="Organization name", max_length=255)
+    domain: Optional[str] = Field(None, description="Organization domain", max_length=255)
+    plan: OrganizationPlan = Field(default=OrganizationPlan.STARTUP, description="Organization plan")
+    billing_email: EmailStr = Field(..., description="Billing email")
+    status: OrganizationStatus = Field(default=OrganizationStatus.ACTIVE, description="Organization status")
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Organization settings")
+    credits_pool: float = Field(default=0.0, description="Shared organization credits")
+    api_keys: Optional[List[str]] = Field(default_factory=list, description="Organization API keys")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationCreate(BaseModel):
+    """Create organization request model"""
+    name: str = Field(..., description="Organization name", max_length=255)
+    domain: Optional[str] = Field(None, description="Organization domain", max_length=255)
+    plan: OrganizationPlan = Field(default=OrganizationPlan.STARTUP, description="Organization plan")
+    billing_email: EmailStr = Field(..., description="Billing email")
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Organization settings")
+
+
+class OrganizationUpdate(BaseModel):
+    """Update organization request model"""
+    name: Optional[str] = Field(None, description="Organization name", max_length=255)
+    domain: Optional[str] = Field(None, description="Organization domain", max_length=255)
+    plan: Optional[OrganizationPlan] = Field(None, description="Organization plan")
+    billing_email: Optional[EmailStr] = Field(None, description="Billing email")
+    status: Optional[OrganizationStatus] = Field(None, description="Organization status")
+    settings: Optional[Dict[str, Any]] = Field(None, description="Organization settings")
+
+
+class OrganizationMember(BaseModel):
+    """Organization member model"""
+    id: Optional[int] = None
+    user_id: str = Field(..., description="User ID", max_length=255)
+    organization_id: str = Field(..., description="Organization ID", max_length=255)
+    role: OrganizationRole = Field(..., description="Member role")
+    permissions: Optional[List[str]] = Field(default_factory=list, description="Member permissions")
+    status: OrganizationMemberStatus = Field(default=OrganizationMemberStatus.ACTIVE, description="Member status")
+    joined_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationMemberCreate(BaseModel):
+    """Create organization member request model"""
+    user_id: Optional[str] = Field(None, description="User ID (if existing user)")
+    email: Optional[EmailStr] = Field(None, description="Email (if inviting new user)")
+    role: OrganizationRole = Field(..., description="Member role")
+    permissions: Optional[List[str]] = Field(default_factory=list, description="Member permissions")
+
+
+class OrganizationMemberUpdate(BaseModel):
+    """Update organization member request model"""
+    role: Optional[OrganizationRole] = Field(None, description="Member role")
+    permissions: Optional[List[str]] = Field(None, description="Member permissions")
+    status: Optional[OrganizationMemberStatus] = Field(None, description="Member status")
+
+
+class OrganizationUsage(BaseModel):
+    """Organization usage record model"""
+    id: Optional[int] = None
+    organization_id: str = Field(..., description="Organization ID", max_length=255)
+    user_id: str = Field(..., description="User ID", max_length=255)
+    session_id: Optional[str] = Field(None, description="Session ID")
+    trace_id: Optional[str] = Field(None, description="Trace ID")
+    endpoint: str = Field(..., description="API endpoint")
+    event_type: str = Field(..., description="Event type")
+    credits_charged: float = Field(default=0.0, description="Credits charged")
+    cost_usd: float = Field(default=0.0, description="USD cost")
+    calculation_method: Optional[str] = Field(default="unknown", description="Calculation method")
+    tokens_used: Optional[int] = Field(default=0, description="Tokens used")
+    prompt_tokens: Optional[int] = Field(default=0, description="Prompt tokens")
+    completion_tokens: Optional[int] = Field(default=0, description="Completion tokens")
+    model_name: Optional[str] = Field(None, description="Model name")
+    provider: Optional[str] = Field(None, description="Service provider")
+    tool_name: Optional[str] = Field(None, description="Tool name")
+    operation_name: Optional[str] = Field(None, description="Operation name")
+    department: Optional[str] = Field(None, description="Department")
+    project_id: Optional[str] = Field(None, description="Project ID")
+    billing_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Billing metadata")
+    request_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Request data")
+    response_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Response data")
+    created_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationUsageCreate(BaseModel):
+    """Create organization usage record request model"""
+    organization_id: str = Field(..., description="Organization ID")
+    user_id: str = Field(..., description="User ID")
+    session_id: Optional[str] = Field(None, description="Session ID")
+    trace_id: Optional[str] = Field(None, description="Trace ID")
+    endpoint: str = Field(..., description="API endpoint")
+    event_type: str = Field(..., description="Event type")
+    credits_charged: float = Field(default=0.0, description="Credits charged")
+    cost_usd: float = Field(default=0.0, description="USD cost")
+    calculation_method: Optional[str] = Field(default="unknown", description="Calculation method")
+    tokens_used: Optional[int] = Field(default=0, description="Tokens used")
+    prompt_tokens: Optional[int] = Field(default=0, description="Prompt tokens")
+    completion_tokens: Optional[int] = Field(default=0, description="Completion tokens")
+    model_name: Optional[str] = Field(None, description="Model name")
+    provider: Optional[str] = Field(None, description="Service provider")
+    tool_name: Optional[str] = Field(None, description="Tool name")
+    operation_name: Optional[str] = Field(None, description="Operation name")
+    department: Optional[str] = Field(None, description="Department")
+    project_id: Optional[str] = Field(None, description="Project ID")
+    billing_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Billing metadata")
+    request_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Request data")
+    response_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Response data")
+
+
+class OrganizationCreditTransaction(BaseModel):
+    """Organization credit transaction model"""
+    id: Optional[int] = None
+    organization_id: str = Field(..., description="Organization ID", max_length=255)
+    transaction_type: str = Field(..., description="Transaction type (consume/recharge/refund)")
+    credits_amount: float = Field(..., description="Transaction amount")
+    credits_before: float = Field(..., description="Balance before transaction")
+    credits_after: float = Field(..., description="Balance after transaction")
+    user_id: Optional[str] = Field(None, description="User who triggered transaction", max_length=255)
+    usage_record_id: Optional[int] = Field(None, description="Associated usage record ID")
+    description: Optional[str] = Field(None, description="Transaction description")
+    reference_id: Optional[str] = Field(None, description="Reference ID")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """Validate user ID format"""
+        if not v:
+            return v  # Allow None for system-level transactions
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
 # ============ Credit Transaction Models ============
 
 class CreditTransaction(BaseModel):
@@ -473,4 +685,70 @@ class CreditTransactionCreate(BaseModel):
     reference_id: Optional[str] = Field(None, description="Reference ID")
     usage_record_id: Optional[int] = Field(None, description="Associated usage record ID")
     description: Optional[str] = Field(None, description="Transaction description")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata") 
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Transaction metadata")
+
+
+# ============ Organization Invitation Models ============
+
+class InvitationStatus(str, Enum):
+    """Organization invitation status enumeration"""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
+class OrganizationInvitation(BaseModel):
+    """Organization invitation model"""
+    id: Optional[int] = None
+    invitation_id: str = Field(..., description="Unique invitation ID", max_length=255)
+    organization_id: str = Field(..., description="Organization ID", max_length=255)
+    email: EmailStr = Field(..., description="Invited user email")
+    role: OrganizationRole = Field(..., description="Invited role")
+    invited_by: str = Field(..., description="Inviter user ID", max_length=255)
+    invitation_token: str = Field(..., description="Invitation token")
+    status: InvitationStatus = Field(default=InvitationStatus.PENDING, description="Invitation status")
+    expires_at: datetime = Field(..., description="Invitation expiry time")
+    accepted_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('invited_by')
+    def validate_inviter_user_id_format(cls, v):
+        """Validate inviter user ID format"""
+        if not v:
+            raise ValueError('invited_by cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid invited_by format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationInvitationCreate(BaseModel):
+    """Create organization invitation request model"""
+    email: EmailStr = Field(..., description="Email to invite")
+    role: OrganizationRole = Field(..., description="Role to assign")
+    message: Optional[str] = Field(None, description="Personal message", max_length=500)
+
+
+class OrganizationInvitationResponse(BaseModel):
+    """Organization invitation response model"""
+    invitation_id: str = Field(..., description="Invitation ID")
+    organization_name: str = Field(..., description="Organization name")
+    email: str = Field(..., description="Invited email")
+    role: str = Field(..., description="Invited role")
+    status: str = Field(..., description="Invitation status")
+    expires_at: datetime = Field(..., description="Expiry time")
+    created_at: datetime = Field(..., description="Creation time")
+
+
+class AcceptInvitationRequest(BaseModel):
+    """Accept invitation request model"""
+    invitation_token: str = Field(..., description="Invitation token")
+    user_id: Optional[str] = Field(None, description="User ID (if existing user)")
+    user_data: Optional[Dict[str, Any]] = Field(None, description="New user data (if creating account)") 

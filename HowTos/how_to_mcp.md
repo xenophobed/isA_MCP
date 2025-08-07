@@ -743,6 +743,273 @@ for tool in weather_tools['results']:
 
 ---
 
+## 🎮 **Widget Resources 使用方法**
+
+### 📝 **1. 搜索Widget资源**
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "widget"}'
+```
+
+**搜索结果示例：**
+```json
+{
+  "status": "success",
+  "query": "widget",
+  "results": [
+    {
+      "name": "widget://system/info",
+      "type": "resource",
+      "description": "Get system-wide widget information and capabilities",
+      "similarity_score": 1.0,
+      "category": "widget",
+      "keywords": ["system", "widget", "capabilities", "information"],
+      "metadata": {
+        "uri": "widget://system/info",
+        "mime_type": "text/plain"
+      }
+    },
+    {
+      "name": "widget://user/{user_id}/configs",
+      "type": "resource", 
+      "description": "Get user's widget configurations and preferences",
+      "similarity_score": 1.0,
+      "category": "widget",
+      "keywords": ["user", "widget", "configurations", "preferences"],
+      "metadata": {
+        "uri": "widget://user/{user_id}/configs",
+        "mime_type": "text/plain"
+      }
+    },
+    {
+      "name": "widget://user/{user_id}/usage",
+      "type": "resource",
+      "description": "Get widget usage statistics for a user", 
+      "similarity_score": 1.0,
+      "category": "widget",
+      "keywords": ["user", "widget", "usage", "statistics"],
+      "metadata": {
+        "uri": "widget://user/{user_id}/usage",
+        "mime_type": "text/plain"
+      }
+    }
+  ],
+  "result_count": 6
+}
+```
+
+### 🚀 **2. 读取系统Widget信息**
+
+**端点：** `http://localhost:8081/mcp/resources/read`
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/mcp/resources/read \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "resources/read",
+    "params": {
+      "uri": "widget://system/info"
+    }
+  }'
+```
+
+**使用结果示例：**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://system/info","mimeType":"text/plain","text":"# Widget System Information\n\n## System Overview\n- **Total Widgets**: 5\n- **Active Widgets**: 5\n- **Plugin System Version**: 1.0.0\n- **Last Updated**: 2025-01-24 16:32:15\n\n## System Configuration\n- **Max Concurrent Widgets**: 3\n- **Default Timeout**: 30,000ms\n- **Retry Attempts**: 2\n- **Cache Enabled**: ✅ Yes\n- **Supported Output Formats**: text, image, data, analysis, search, knowledge\n\n## Available Widgets\n\n### 🎨 Dream Image Generator\n- **ID**: `dream`\n- **Version**: 1.0.0\n- **Description**: Generate beautiful images from text descriptions using AI\n- **Capabilities**: text_to_image, image_style_transfer, professional_headshots\n- **Triggers**: \"generate image\", \"create image\", \"draw\" ...\n\n### 🔍 Hunt Search Widget\n- **ID**: `hunt`\n- **Version**: 1.0.0\n- **Description**: Advanced search and discovery capabilities\n- **Capabilities**: web_search, product_search, content_discovery\n- **Triggers**: \"search\", \"find\", \"hunt\" ...\n\n### 🤖 Omni Assistant Widget\n- **ID**: `omni`\n- **Version**: 1.0.0\n- **Description**: General-purpose AI assistant for various tasks\n- **Capabilities**: text_generation, content_creation, task_assistance\n- **Triggers**: \"help\", \"assist\", \"generate\" ...\n\n### 📚 Knowledge Widget\n- **ID**: `knowledge`\n- **Version**: 1.0.0\n- **Description**: Knowledge retrieval and Q&A capabilities\n- **Capabilities**: document_search, qa_system, knowledge_base\n- **Triggers**: \"what is\", \"explain\", \"define\" ...\n\n### 📊 Data Scientist Widget\n- **ID**: `data_scientist`\n- **Version**: 1.0.0\n- **Description**: Data analysis and visualization capabilities\n- **Capabilities**: data_analysis, visualization, statistical_analysis\n- **Triggers**: \"analyze\", \"chart\", \"graph\" ...\n\n## Plugin Triggers Summary\n\n| Widget | Primary Triggers | Capabilities Count |\n|--------|-----------------|-------------------|\n| 🎨 Dream Image Generator | \"generate image\" | 3 |\n| 🔍 Hunt Search Widget | \"search\" | 3 |\n| 🤖 Omni Assistant Widget | \"help\" | 3 |\n| 📚 Knowledge Widget | \"what is\" | 3 |\n| 📊 Data Scientist Widget | \"analyze\" | 3 |\n\n## Integration Notes\n- Widgets are implemented as plugins in the frontend application\n- Each widget supports multiple trigger phrases for natural language activation\n- All widgets support streaming responses and real-time status updates\n- Widget configurations can be customized per user\n\n---\n*System Information Generated at 2025-01-24T16:32:15.123456*"}]}}
+```
+
+### 📊 **3. 读取用户Widget配置**
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/mcp/resources/read \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "resources/read",
+    "params": {
+      "uri": "widget://user/auth0|123456/configs"
+    }
+  }'
+```
+
+**使用结果示例：**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/configs","mimeType":"text/plain","text":"# User Widget Configurations: auth0|123456\n\n## Summary\n- **Available Widgets**: 5\n- **Configured Widgets**: 2\n- **Last Updated**: 2025-01-24 16:35:42\n\n## Available Widget Types\n- **Dream**: ✅ Configured\n- **Hunt**: ⚙️ Default\n- **Omni**: ✅ Configured\n- **Knowledge**: ⚙️ Default\n- **Data_Scientist**: ⚙️ Default\n\n## Widget Configurations\n\n### Dream Widget\n- **Status**: Custom Configuration\n- **Enabled**: True\n- **Timeout**: 35000ms\n- **Settings**: style=artistic, quality=high\n\n### Hunt Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 15000ms\n- **Settings**: search_depth=medium, result_format=detailed, max_results=10\n\n### Omni Widget\n- **Status**: Custom Configuration\n- **Enabled**: True\n- **Timeout**: 25000ms\n- **Settings**: tone=casual, length=short\n\n### Knowledge Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 25000ms\n- **Settings**: search_depth=deep, context_size=medium, search_type=hybrid\n\n### Data_Scientist Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 45000ms\n- **Settings**: analysis_type=exploratory, visualization_type=chart, auto_insights=True\n\n## Default Configurations Available\n- **dream**: 5 settings\n- **hunt**: 4 settings\n- **omni**: 4 settings\n- **knowledge**: 4 settings\n- **data_scientist**: 4 settings\n\n---\n*Generated at 2025-01-24T16:35:42.789123*"}]}}
+```
+
+### 📈 **4. 读取用户Widget使用统计**
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/mcp/resources/read \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "resources/read",
+    "params": {
+      "uri": "widget://user/auth0|123456/usage"
+    }
+  }'
+```
+
+**使用结果示例：**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/usage","mimeType":"text/plain","text":"{\n  \"user_id\": \"auth0|123456\",\n  \"usage_summary\": {\n    \"total_executions\": 47,\n    \"total_processing_time\": 125430,\n    \"most_used_widget\": \"dream\",\n    \"last_activity\": \"2025-01-24T16:30:15.123456\"\n  },\n  \"by_widget_type\": {\n    \"dream\": {\n      \"execution_count\": 25,\n      \"success_count\": 23,\n      \"error_count\": 2,\n      \"total_time\": 75000,\n      \"last_used\": \"2025-01-24T16:30:15.123456\",\n      \"avg_response_time\": 3000,\n      \"user_rating\": 4.8,\n      \"is_favorite\": true,\n      \"last_error\": null\n    },\n    \"omni\": {\n      \"execution_count\": 15,\n      \"success_count\": 15,\n      \"error_count\": 0,\n      \"total_time\": 30000,\n      \"last_used\": \"2025-01-24T15:45:30.456789\",\n      \"avg_response_time\": 2000,\n      \"user_rating\": 4.5,\n      \"is_favorite\": false,\n      \"last_error\": null\n    },\n    \"knowledge\": {\n      \"execution_count\": 7,\n      \"success_count\": 6,\n      \"error_count\": 1,\n      \"total_time\": 20430,\n      \"last_used\": \"2025-01-24T14:20:10.789012\",\n      \"avg_response_time\": 2918,\n      \"user_rating\": 4.0,\n      \"is_favorite\": false,\n      \"last_error\": \"Knowledge base temporarily unavailable\"\n    }\n  },\n  \"performance_metrics\": {\n    \"average_response_time\": 2669.57,\n    \"success_rate\": 93.62,\n    \"error_rate\": 6.38\n  },\n  \"timestamp\": \"2025-01-24T16:35:58.123456\"\n}"}]}}
+```
+
+### 🎯 **5. 读取特定Widget配置**
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/mcp/resources/read \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "resources/read",
+    "params": {
+      "uri": "widget://user/auth0|123456/config/dream"
+    }
+  }'
+```
+
+**使用结果示例：**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/config/dream","mimeType":"text/plain","text":"{\n  \"user_id\": \"auth0|123456\",\n  \"widget_type\": \"dream\",\n  \"config\": {\n    \"style\": \"artistic\",\n    \"quality\": \"high\",\n    \"size\": \"1024x1024\",\n    \"enabled\": true,\n    \"timeout\": 35000\n  },\n  \"has_custom_config\": true,\n  \"default_config\": {\n    \"style\": \"default\",\n    \"quality\": \"standard\",\n    \"size\": \"1024x1024\",\n    \"enabled\": true,\n    \"timeout\": 30000\n  },\n  \"last_updated\": \"2025-01-24T14:25:30.123456\",\n  \"timestamp\": \"2025-01-24T16:37:12.456789\"\n}"}]}}
+```
+
+### 📚 **6. 读取Widget模板**
+
+**命令：**
+```bash
+curl -X POST http://localhost:8081/mcp/resources/read \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "resources/read",
+    "params": {
+      "uri": "widget://templates/dream"
+    }
+  }'
+```
+
+**使用结果示例：**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://templates/dream","mimeType":"text/plain","text":"{\n  \"widget_type\": \"dream\",\n  \"templates\": [\n    {\n      \"id\": \"text_to_image\",\n      \"name\": \"Text to Image\",\n      \"category\": \"generation\",\n      \"description\": \"Generate image from text description\",\n      \"parameters\": [\"prompt\", \"style\", \"quality\"]\n    },\n    {\n      \"id\": \"professional_headshot\",\n      \"name\": \"Professional Headshot\",\n      \"category\": \"portrait\",\n      \"description\": \"Generate professional headshot photos\",\n      \"parameters\": [\"prompt\", \"industry\", \"style\"]\n    }\n  ],\n  \"total_templates\": 2,\n  \"template_categories\": [\"generation\", \"portrait\"],\n  \"timestamp\": \"2025-01-24T16:38:45.123456\"\n}"}]}}
+```
+
+### 💡 **7. Python使用示例**
+
+```python
+import requests
+import json
+
+def search_widget_resources(query="widget"):
+    """搜索Widget资源"""
+    response = requests.post(
+        'http://localhost:8081/search',
+        headers={'Content-Type': 'application/json'},
+        json={"query": query, "max_results": 10}
+    )
+    return response.json()
+
+def read_widget_resource(uri):
+    """读取Widget资源内容"""
+    response = requests.post(
+        'http://localhost:8081/mcp/resources/read',
+        headers={
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream'
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "resources/read",
+            "params": {"uri": uri}
+        }
+    )
+    
+    # 解析事件流响应
+    lines = response.text.strip().split('\n')
+    for line in lines:
+        if line.startswith('data: '):
+            data = json.loads(line[6:])
+            if 'result' in data:
+                content = data['result']['contents'][0]['text']
+                try:
+                    return json.loads(content)  # 尝试解析JSON
+                except:
+                    return content  # 返回原始Markdown
+    return None
+
+def get_user_widget_usage(user_id):
+    """获取用户Widget使用统计"""
+    uri = f"widget://user/{user_id}/usage"
+    return read_widget_resource(uri)
+
+def get_widget_system_info():
+    """获取Widget系统信息"""
+    return read_widget_resource("widget://system/info")
+
+def get_user_widget_configs(user_id):
+    """获取用户Widget配置"""
+    uri = f"widget://user/{user_id}/configs"
+    return read_widget_resource(uri)
+
+# 使用示例
+print("=== 搜索Widget资源 ===")
+widget_resources = search_widget_resources()
+for resource in widget_resources['results']:
+    print(f"- {resource['name']}: {resource['description'][:60]}...")
+
+print("\n=== Widget系统信息 ===")
+system_info = get_widget_system_info()
+print(system_info[:200] + "..." if len(system_info) > 200 else system_info)
+
+print("\n=== 用户Widget使用统计 ===")
+usage_stats = get_user_widget_usage('auth0|123456')
+if isinstance(usage_stats, dict):
+    summary = usage_stats.get('usage_summary', {})
+    print(f"总执行次数: {summary.get('total_executions', 0)}")
+    print(f"最常用Widget: {summary.get('most_used_widget', 'N/A')}")
+    print(f"平均响应时间: {usage_stats.get('performance_metrics', {}).get('average_response_time', 0):.2f}ms")
+
+print("\n=== 用户Widget配置 ===")
+user_configs = get_user_widget_configs('auth0|123456')
+print(user_configs[:300] + "..." if len(user_configs) > 300 else user_configs)
+```
+
+### 📊 **8. Widget资源特性**
+
+- **🎯 个性化配置**: 每个用户可以自定义Widget的配置参数
+- **📈 实时统计**: 记录详细的使用统计和性能指标
+- **🔍 智能搜索**: 支持基于关键词的Widget资源发现
+- **🎨 多样化模板**: 提供不同类型的Widget操作模板
+- **⚙️ 灵活集成**: 与现有的前端plugin系统完全兼容
+- **🛡️ 安全控制**: 基于用户权限的资源访问控制
+
+---
+
 ## 📋 **重要说明**
 
 1. **JSON-RPC格式**：所有MCP调用都使用JSON-RPC 2.0格式
@@ -754,6 +1021,7 @@ for tool in weather_tools['results']:
    - ✅ **Tools**: 完全支持搜索和语义匹配，包含安全等级信息
    - ✅ **Prompts**: 完全支持搜索，metadata包含参数信息
    - ✅ **Resources**: 完全支持搜索和语义匹配
+   - ✅ **Widget Resources**: 支持用户专属Widget资源搜索和个性化配置
 7. **默认集合**：搜索`"default"`可获取预定义的常用工具和提示词
 8. **安全等级**：
    - ✅ **安全等级查询**: `/security/levels` 端点获取所有工具安全等级

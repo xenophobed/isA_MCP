@@ -286,6 +286,8 @@ class UnifiedSearchService:
             return "reasoning"
         elif uri_lower.startswith("rag://"):
             return "rag"
+        elif uri_lower.startswith("widget://"):
+            return "widget"
         return "general"
         
     async def _compute_embeddings(self):
@@ -695,10 +697,40 @@ class UnifiedSearchService:
             return []
             
     async def _filter_resources_by_user(self, resources: Dict[str, Any], user_id: str) -> Dict[str, Any]:
-        """Filter resources based on user access permissions"""
+        """Filter resources based on user access permissions and custom configurations"""
         try:
             # Try to get user-specific resources from resource managers
             user_resources = {}
+            
+            # Check widget resources - get user-specific widget configurations
+            try:
+                from resources.user_widget_resources import UserWidgetResource
+                widget_resource = UserWidgetResource()
+                
+                # Get user's widget configurations from database
+                user_widget_configs = await widget_resource._fetch_user_widget_configs(user_id)
+                
+                # Filter widget resources to only include user's configured widgets
+                widget_resources = {uri: info for uri, info in resources.items() 
+                                 if info.get('category') == 'widget'}
+                
+                for uri, info in widget_resources.items():
+                    # Extract widget name from URI (e.g., "widget://system/info" -> check for widget configs)
+                    if uri.startswith('widget://'):
+                        # For system info and template resources, always include
+                        if '/info' in uri or '/templates/' in uri:
+                            user_resources[uri] = info
+                        # For user-specific resources, check if user has configurations
+                        elif f'/user/{user_id}/' in uri:
+                            user_resources[uri] = info
+                        # For widget type resources, check if user has that widget configured
+                        elif any(widget_name in uri for widget_name in user_widget_configs.keys()):
+                            user_resources[uri] = info
+                
+                logger.info(f"Found {len(user_resources)} widget resources for user {user_id}")
+                
+            except Exception as e:
+                logger.debug(f"Could not access widget resources: {e}")
             
             # Check graph knowledge resources
             try:

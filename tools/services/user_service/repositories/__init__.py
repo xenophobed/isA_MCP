@@ -9,10 +9,14 @@ from .exceptions import RepositoryException
 from .base import BaseRepository
 from .user_repository import UserRepository
 from .subscription_repository import SubscriptionRepository
+from .organization_repository import OrganizationRepository
+from .invitation_repository import InvitationRepository
 
 __all__ = [
     'BaseRepository',
     'RepositoryException', 
     'UserRepository',
-    'SubscriptionRepository'
+    'SubscriptionRepository',
+    'OrganizationRepository',
+    'InvitationRepository'
 ]

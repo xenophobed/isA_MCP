@@ -433,6 +433,140 @@ Solution: Try simpler queries first, then build complexity
 Example: Start with "Show 5 records" before "Complex JOIN analysis"
 ```
 
+## AI Prompt Enhancement System
+
+### Data Science Prompt Enhancement (ds_prompts.py)
+
+The system includes intelligent prompt enhancement that transforms simple user analysis requests into comprehensive, professional data analysis inquiries.
+
+**Location**: `prompts/apps/ds/ds_prompts.py`
+
+#### csv_analyze_prompt Enhancement
+
+Transform basic requests into detailed analysis specifications:
+
+```python
+from prompts.apps.ds.ds_prompts import register_ds_prompts
+from mcp.server.fastmcp import FastMCP
+
+# Register prompts with MCP server
+mcp = FastMCP()
+register_ds_prompts(mcp)
+
+# Use the enhanced prompt
+enhanced_prompt = await mcp.call_prompt('csv_analyze_prompt', {
+    'prompt': 'analyze my sales data',
+    'csv_url': '/path/to/sales.csv', 
+    'depth': 'comprehensive'
+})
+```
+
+#### Prompt Enhancement Levels
+
+1. **Basic**: `"basic"` - Conducts basic data exploration and key metrics
+2. **Comprehensive**: `"comprehensive"` - Full statistical insights and business recommendations  
+3. **Advanced**: `"advanced"` - Predictive modeling, hypothesis testing, deep analysis
+
+#### Enhanced Analysis Framework
+
+The prompt enhancement automatically includes:
+
+**1. Data Quality Assessment**
+- Data integrity checks
+- Missing value analysis  
+- Outlier detection
+- Data type validation
+- Cleaning recommendations
+
+**2. Exploratory Data Analysis**
+- Descriptive statistical summaries
+- Data distribution characteristics
+- Correlation analysis
+- Pattern and trend identification
+
+**3. Key Insights Discovery** 
+- Core business question answering
+- Statistically significant findings
+- Anomaly pattern identification
+- Opportunity area discovery
+
+**4. Visualization Recommendations**
+- Appropriate chart type suggestions
+- Visual reasoning explanations
+- Data presentation optimization
+
+**5. Business Value Translation**
+- Actionable business recommendations
+- Decision support insights
+- Strategic implications
+
+**6. Methodology Transparency**
+- Statistical method explanations
+- Assumption documentation
+- Analysis limitation disclosure
+
+#### Real Usage Example
+
+**Before Enhancement:**
+```
+"analyze my customer data"
+```
+
+**After Enhancement:**
+```
+"As a professional data analyst, please conduct comprehensive data analysis including statistical insights and business recommendations.
+
+**Data Source**: /path/to/customers.csv
+
+**Analysis Request**: analyze my customer data
+
+**Specific Requirements**:
+1. Data Quality Assessment: Check data integrity, missing values, outliers...
+2. Exploratory Data Analysis: Provide descriptive statistics, correlations...
+3. Key Insights Discovery: Answer core business questions...
+4. Visualization Recommendations: Suggest appropriate chart types...
+5. Business Value: Transform results into actionable recommendations...
+6. Methodology Transparency: Explain statistical methods used..."
+```
+
+#### Integration with Data Analytics Tools
+
+The prompt enhancement works seamlessly with the data analytics pipeline:
+
+```python
+async def enhanced_analysis_workflow():
+    # Step 1: Enhance the user prompt
+    enhanced_prompt = await mcp.call_prompt('csv_analyze_prompt', {
+        'prompt': user_simple_request,
+        'csv_url': data_source_path,
+        'depth': 'comprehensive'
+    })
+    
+    # Step 2: Process data with analytics tools
+    tool = DataAnalyticsTool()
+    result = await tool.ingest_data_source(
+        source_path=data_source_path,
+        user_id=user_id
+    )
+    
+    # Step 3: Query with enhanced prompt context
+    analysis_result = await tool.query_with_language(
+        natural_language_query=enhanced_prompt,
+        user_id=user_id
+    )
+    
+    return analysis_result
+```
+
+#### Prompt Categories and Keywords
+
+**Keywords for Discovery:**
+- `csv`, `data-analysis`, `prompt-enhancement`, `statistics`, `insights`
+
+**Category**: `data-science`
+
+**MCP Integration**: Automatically registered with MCP server for discovery
+
 ## System Requirements
 
 - **Python 3.11+** with asyncio support

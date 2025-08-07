@@ -22,7 +22,14 @@ from .models import (
     # New unified service models
     UsageRecord, UsageRecordCreate, UsageStatistics,
     Session, SessionCreate, SessionMemory, SessionMessage,
-    CreditTransaction, CreditTransactionCreate
+    CreditTransaction, CreditTransactionCreate,
+    # Organization models
+    Organization, OrganizationCreate, OrganizationUpdate,
+    OrganizationMember, OrganizationMemberCreate, OrganizationMemberUpdate,
+    OrganizationUsage, OrganizationUsageCreate,
+    OrganizationCreditTransaction,
+    # Invitation models
+    OrganizationInvitation, OrganizationInvitationCreate, AcceptInvitationRequest
 )
 from .services.auth_service import Auth0Service
 from .services.supabase_auth_service import SupabaseAuthService
@@ -30,11 +37,12 @@ from .services.unified_auth_service import UnifiedAuthService
 from .subscription_service_legacy import SubscriptionService
 from .services.payment_service import PaymentService
 # 使用新的 ServiceV2 和 Repository 模式
-from .services import UserServiceV2, SubscriptionServiceV2
+from .services import UserServiceV2, SubscriptionServiceV2, OrganizationService
 from .services.usage_service import UsageService
 from .services.session_service import SessionService  
 from .services.credit_service import CreditService
-from .repositories import UserRepository, SubscriptionRepository
+from .services.invitation_service import InvitationService
+from .repositories import UserRepository, SubscriptionRepository, OrganizationRepository
 from .config import get_config
 
 
@@ -124,6 +132,7 @@ payment_service = PaymentService(
 # 初始化 Repository 层
 user_repository = UserRepository()
 subscription_repository = SubscriptionRepository()
+organization_repository = OrganizationRepository()
 
 # 初始化新的 Service V2 层
 user_service = UserServiceV2(user_repository=user_repository)
@@ -136,6 +145,8 @@ subscription_service_v2 = SubscriptionServiceV2(
 usage_service = UsageService()
 session_service = SessionService()
 credit_service = CreditService()
+organization_service = OrganizationService()
+invitation_service = InvitationService()
 
 # 初始化文件存储服务
 try:
@@ -145,6 +156,16 @@ try:
 except Exception as e:
     logger.warning(f"Failed to initialize file storage service: {e}")
     file_storage_service = None
+
+# 启动事件处理
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    try:
+        await organization_service.initialize()
+        logger.info("Organization service initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize organization service: {e}")
 
 
 # 依赖函数
@@ -1089,6 +1110,688 @@ async def get_transaction_history(
 
 
 # ============ END UNIFIED DATA MANAGEMENT API ============
+
+# ============ ORGANIZATION MANAGEMENT API ============
+# Organization and tenant management endpoints
+
+@app.post("/api/v1/organizations", response_model=Dict[str, Any], tags=["Organizations"])
+async def create_organization(
+    org_data: OrganizationCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Create a new organization
+    The requesting user becomes the organization owner
+    """
+    try:
+        owner_user_id = current_user["sub"]
+        
+        result = await organization_service.create_organization(org_data, owner_user_id)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "organization_id": result.data.organization_id,
+                "name": result.data.name,
+                "domain": result.data.domain,
+                "plan": result.data.plan.value,
+                "billing_email": result.data.billing_email,
+                "status": result.data.status.value,
+                "credits_pool": result.data.credits_pool,
+                "created_at": result.data.created_at.isoformat() if result.data.created_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating organization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create organization: {str(e)}")
+
+
+@app.get("/api/v1/organizations/{organization_id}", response_model=Dict[str, Any], tags=["Organizations"])
+async def get_organization(
+    organization_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get organization details
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        # Check if user has access to this organization
+        if not await organization_service.check_organization_access(organization_id, user_id):
+            raise HTTPException(status_code=403, detail="Access denied: You are not a member of this organization")
+        
+        result = await organization_service.get_organization(organization_id)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success", 
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "organization_id": result.data.organization_id,
+                "name": result.data.name,
+                "domain": result.data.domain,
+                "plan": result.data.plan.value,
+                "billing_email": result.data.billing_email,
+                "status": result.data.status.value,
+                "settings": result.data.settings,
+                "credits_pool": result.data.credits_pool,
+                "created_at": result.data.created_at.isoformat() if result.data.created_at else None,
+                "updated_at": result.data.updated_at.isoformat() if result.data.updated_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get organization: {str(e)}")
+
+
+@app.put("/api/v1/organizations/{organization_id}", response_model=Dict[str, Any], tags=["Organizations"])
+async def update_organization(
+    organization_id: str,
+    update_data: OrganizationUpdate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Update organization (requires admin/owner permissions)
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        result = await organization_service.update_organization(organization_id, update_data, user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "organization_id": result.data.organization_id,
+                "name": result.data.name,
+                "domain": result.data.domain,
+                "plan": result.data.plan.value,
+                "billing_email": result.data.billing_email,
+                "status": result.data.status.value,
+                "settings": result.data.settings,
+                "credits_pool": result.data.credits_pool,
+                "updated_at": result.data.updated_at.isoformat() if result.data.updated_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating organization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update organization: {str(e)}")
+
+
+@app.delete("/api/v1/organizations/{organization_id}", response_model=Dict[str, Any], tags=["Organizations"])
+async def delete_organization(
+    organization_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Delete organization (requires owner permissions)
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        result = await organization_service.delete_organization(organization_id, user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"organization_id": organization_id, "deleted": True}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting organization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete organization: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/organizations", response_model=Dict[str, Any], tags=["Organizations"])
+async def get_user_organizations(
+    user_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get all organizations for a user
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(status_code=403, detail="Access denied: You can only view your own organizations")
+        
+        result = await organization_service.get_user_organizations(user_id)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user organizations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user organizations: {str(e)}")
+
+
+@app.post("/api/v1/users/{user_id}/switch-context", response_model=Dict[str, Any], tags=["Organizations"])
+async def switch_user_context(
+    user_id: str,
+    organization_id: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    Switch user context to organization or back to individual
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(status_code=403, detail="Access denied: You can only switch your own context")
+        
+        result = await organization_service.switch_user_context(user_id, organization_id)
+        
+        if not result.is_success:
+            raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error switching user context: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to switch user context: {str(e)}")
+
+
+# ============ Organization Member Management ============
+
+@app.post("/api/v1/organizations/{organization_id}/members", response_model=Dict[str, Any], tags=["Organizations"])
+async def add_organization_member(
+    organization_id: str,
+    member_data: OrganizationMemberCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Add member to organization
+    """
+    try:
+        requesting_user_id = current_user["sub"]
+        
+        result = await organization_service.add_organization_member(organization_id, member_data, requesting_user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "already a member" in result.message.lower():
+                raise HTTPException(status_code=409, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "user_id": result.data.user_id,
+                "organization_id": result.data.organization_id,
+                "role": result.data.role.value,
+                "permissions": result.data.permissions,
+                "status": result.data.status.value,
+                "joined_at": result.data.joined_at.isoformat() if result.data.joined_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding organization member: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add organization member: {str(e)}")
+
+
+@app.get("/api/v1/organizations/{organization_id}/members", response_model=Dict[str, Any], tags=["Organizations"])
+async def get_organization_members(
+    organization_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get all members of an organization
+    """
+    try:
+        requesting_user_id = current_user["sub"]
+        
+        result = await organization_service.get_organization_members(organization_id, requesting_user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        members_data = []
+        for member in result.data:
+            members_data.append({
+                "user_id": member.user_id,
+                "organization_id": member.organization_id,
+                "role": member.role.value,
+                "permissions": member.permissions,
+                "status": member.status.value,
+                "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+                "created_at": member.created_at.isoformat() if member.created_at else None,
+                "updated_at": member.updated_at.isoformat() if member.updated_at else None
+            })
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": members_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organization members: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get organization members: {str(e)}")
+
+
+@app.put("/api/v1/organizations/{organization_id}/members/{user_id}", response_model=Dict[str, Any], tags=["Organizations"])
+async def update_organization_member(
+    organization_id: str,
+    user_id: str,
+    update_data: OrganizationMemberUpdate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Update organization member role/permissions
+    """
+    try:
+        requesting_user_id = current_user["sub"]
+        
+        result = await organization_service.update_organization_member(organization_id, user_id, update_data, requesting_user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "user_id": result.data.user_id,
+                "organization_id": result.data.organization_id,
+                "role": result.data.role.value,
+                "permissions": result.data.permissions,
+                "status": result.data.status.value,
+                "updated_at": result.data.updated_at.isoformat() if result.data.updated_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating organization member: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update organization member: {str(e)}")
+
+
+@app.delete("/api/v1/organizations/{organization_id}/members/{user_id}", response_model=Dict[str, Any], tags=["Organizations"])
+async def remove_organization_member(
+    organization_id: str,
+    user_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Remove member from organization
+    """
+    try:
+        requesting_user_id = current_user["sub"]
+        
+        result = await organization_service.remove_organization_member(organization_id, user_id, requesting_user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"user_id": user_id, "organization_id": organization_id, "removed": True}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing organization member: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove organization member: {str(e)}")
+
+
+@app.get("/api/v1/organizations/{organization_id}/stats", response_model=Dict[str, Any], tags=["Organizations"])
+async def get_organization_stats(
+    organization_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get organization statistics
+    """
+    try:
+        requesting_user_id = current_user["sub"]
+        
+        result = await organization_service.get_organization_stats(organization_id, requesting_user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organization stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get organization stats: {str(e)}")
+
+# ============ END ORGANIZATION MANAGEMENT API ============
+
+# ============ ORGANIZATION INVITATION API ============
+
+@app.post("/api/v1/organizations/{organization_id}/invitations", response_model=Dict[str, Any], tags=["Invitations"])
+async def create_organization_invitation(
+    organization_id: str,
+    invitation_data: OrganizationInvitationCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Send invitation to join organization via email
+    """
+    try:
+        inviter_user_id = current_user["sub"]
+        
+        result = await invitation_service.create_invitation(organization_id, inviter_user_id, invitation_data)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower() or "permission" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "already exists" in result.message.lower():
+                raise HTTPException(status_code=409, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating organization invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create invitation: {str(e)}")
+
+
+@app.get("/api/v1/organizations/{organization_id}/invitations", response_model=Dict[str, Any], tags=["Invitations"])
+async def get_organization_invitations(
+    organization_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get all invitations for organization
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        result = await invitation_service.get_organization_invitations(organization_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organization invitations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get invitations: {str(e)}")
+
+
+@app.get("/api/v1/invitations/{invitation_token}", response_model=Dict[str, Any], tags=["Invitations"])
+async def get_invitation_by_token(invitation_token: str):
+    """
+    Get invitation details by token (public endpoint for invitation links)
+    """
+    try:
+        result = await invitation_service.get_invitation_by_token(invitation_token)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "expired" in result.message.lower():
+                raise HTTPException(status_code=410, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting invitation by token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get invitation: {str(e)}")
+
+
+@app.post("/api/v1/invitations/accept", response_model=Dict[str, Any], tags=["Invitations"])
+async def accept_invitation(
+    accept_request: AcceptInvitationRequest,
+    current_user = Depends(get_current_user)
+):
+    """
+    Accept organization invitation
+    """
+    try:
+        # Add user_id from token if not provided
+        if not accept_request.user_id:
+            accept_request.user_id = current_user["sub"]
+        
+        result = await invitation_service.accept_invitation(accept_request)
+        
+        if not result.is_success:
+            if "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            elif "expired" in result.message.lower():
+                raise HTTPException(status_code=410, detail=result.message)
+            elif "mismatch" in result.message.lower():
+                raise HTTPException(status_code=400, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to accept invitation: {str(e)}")
+
+
+@app.delete("/api/v1/invitations/{invitation_id}", response_model=Dict[str, Any], tags=["Invitations"])
+async def cancel_invitation(
+    invitation_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Cancel organization invitation
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        result = await invitation_service.cancel_invitation(invitation_id, user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower() or "permission" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"cancelled": result.data}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to cancel invitation: {str(e)}")
+
+
+@app.post("/api/v1/invitations/{invitation_id}/resend", response_model=Dict[str, Any], tags=["Invitations"])
+async def resend_invitation(
+    invitation_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Resend organization invitation email
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        result = await invitation_service.resend_invitation(invitation_id, user_id)
+        
+        if not result.is_success:
+            if "access denied" in result.message.lower() or "permission" in result.message.lower():
+                raise HTTPException(status_code=403, detail=result.message)
+            elif "not found" in result.message.lower():
+                raise HTTPException(status_code=404, detail=result.message)
+            else:
+                raise HTTPException(status_code=400, detail=result.message)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": result.message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resending invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to resend invitation: {str(e)}")
+
+# ============ END ORGANIZATION INVITATION API ============
 
 # ============ FILE MANAGEMENT API ============
 # File upload, download, and management endpoints

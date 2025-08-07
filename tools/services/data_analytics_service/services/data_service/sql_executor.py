@@ -40,7 +40,35 @@ from .query_matcher import QueryPlan, QueryContext
 from .semantic_enricher import SemanticMetadata
 from .sql_generator import SQLGenerationResult
 
+# Import professional DuckDB service
+try:
+    from resources.dbs.duckdb import (
+        DuckDBService, 
+        DuckDBServiceConfig,
+        DuckDBResourceProvider
+    )
+    DUCKDB_SERVICE_AVAILABLE = True
+except ImportError as e:
+    DUCKDB_SERVICE_AVAILABLE = False
+    # Create placeholder classes to avoid NameError
+    class DuckDBService:
+        pass
+    class DuckDBServiceConfig:
+        pass
+    class DuckDBResourceProvider:
+        pass
+
+# Try basic DuckDB import as fallback
+try:
+    import duckdb
+    DUCKDB_AVAILABLE = True
+except ImportError:
+    DUCKDB_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
+
+if not DUCKDB_SERVICE_AVAILABLE:
+    logger.warning("Professional DuckDB service not available - using basic DuckDB support")
 
 @dataclass
 class ExecutionResult:
@@ -84,6 +112,12 @@ class SQLExecutor:
         self.max_rows = database_config.get('max_rows', 10000)
         self.fallback_strategies = self._initialize_fallback_strategies()
         self.execution_history = []  # Store execution feedback for learning
+        
+        # Initialize professional DuckDB service if available and requested
+        self.duckdb_service = None
+        self.duckdb_resource_provider = None
+        if self.db_type == 'duckdb' and DUCKDB_SERVICE_AVAILABLE:
+            self._initialize_professional_duckdb_service()
         
     def initialize_connection(self):
         """Initialize database connection"""
@@ -858,6 +892,21 @@ class SQLExecutor:
                 # Set row factory for dict-like access
                 self.connection.row_factory = sqlite3.Row
             
+            elif self.db_type == 'duckdb':
+                # DuckDB connection handled by professional service or fallback
+                if self.duckdb_service:
+                    logger.info("Using professional DuckDB service - connection managed internally")
+                    return
+                elif DUCKDB_AVAILABLE:
+                    # Fallback to basic DuckDB connection
+                    import duckdb
+                    db_path = self.database_config.get('database', ':memory:')
+                    self.connection = duckdb.connect(db_path)
+                    logger.info(f"Connected to DuckDB database: {db_path}")
+                    return
+                else:
+                    raise Exception("DuckDB not available - please install duckdb package")
+            
             else:
                 raise Exception(f"Database type {self.db_type} not supported or required packages not installed")
             
@@ -1292,3 +1341,232 @@ class SQLExecutor:
             )
             
             return error_result, fallback_attempts
+    
+    # ===== Professional DuckDB Integration Methods =====
+    
+    def _initialize_professional_duckdb_service(self):
+        """Initialize the professional DuckDB service with configuration"""
+        try:
+            # Import additional config classes
+            from resources.dbs.duckdb import DatabaseConfig, PoolConfig, SecurityConfig
+            
+            # Create DuckDB service configuration with proper structure
+            database_config = DatabaseConfig(
+                database_path=self.database_config.get('database', ':memory:'),
+                memory_limit=f"{self.database_config.get('max_memory_mb', 1024)}MB"
+            )
+            
+            pool_config = PoolConfig(
+                min_connections=1,
+                max_connections=self.database_config.get('max_connections', 10),
+                connection_timeout=self.database_config.get('connection_timeout', 30.0)
+            )
+            
+            security_config = SecurityConfig(
+                enable_security=self.database_config.get('enable_security', True)
+            )
+            
+            duckdb_config = DuckDBServiceConfig(
+                database=database_config,
+                pool=pool_config,
+                security=security_config
+            )
+            
+            # Initialize the professional DuckDB service
+            self.duckdb_service = DuckDBService(duckdb_config)
+            
+            # Initialize MCP resource provider for advanced data operations
+            self.duckdb_resource_provider = DuckDBResourceProvider(self.duckdb_service)
+            
+            logger.info("Professional DuckDB service initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize professional DuckDB service: {e}")
+            self.duckdb_service = None
+            self.duckdb_resource_provider = None
+    
+    async def _execute_duckdb_sql(self, sql: str, timeout_seconds: int, start_time: datetime) -> ExecutionResult:
+        """Execute SQL using the professional DuckDB service"""
+        try:
+            if self.duckdb_service:
+                # Use professional DuckDB service
+                result = await self.duckdb_service.execute_query(
+                    sql,
+                    timeout=timeout_seconds,
+                    max_rows=self.max_rows
+                )
+                
+                if result['success']:
+                    execution_time = (datetime.now() - start_time).total_seconds() * 1000
+                    
+                    # Convert professional service result to ExecutionResult format
+                    data = result['data']
+                    column_names = result.get('columns', [])
+                    
+                    # Apply row limit if needed
+                    warnings = []
+                    if len(data) > self.max_rows:
+                        data = data[:self.max_rows]
+                        warnings.append(f"Result truncated to {self.max_rows} rows")
+                    
+                    return ExecutionResult(
+                        success=True,
+                        data=data,
+                        column_names=column_names,
+                        row_count=len(data),
+                        execution_time_ms=execution_time,
+                        sql_executed=sql,
+                        warnings=warnings
+                    )
+                else:
+                    execution_time = (datetime.now() - start_time).total_seconds() * 1000
+                    return ExecutionResult(
+                        success=False,
+                        data=[],
+                        column_names=[],
+                        row_count=0,
+                        execution_time_ms=execution_time,
+                        sql_executed=sql,
+                        error_message=result.get('error', 'Unknown DuckDB error')
+                    )
+            
+            elif DUCKDB_AVAILABLE and self.connection:
+                # Fallback to basic DuckDB execution
+                cursor = self.connection.cursor()
+                cursor.execute(sql)
+                
+                # Fetch results
+                if cursor.description:
+                    rows = cursor.fetchall()
+                    column_names = [desc[0] for desc in cursor.description]
+                    data = [dict(zip(column_names, row)) for row in rows]
+                    
+                    # Apply row limit
+                    warnings = []
+                    if len(data) > self.max_rows:
+                        data = data[:self.max_rows]
+                        warnings.append(f"Result truncated to {self.max_rows} rows")
+                    
+                else:
+                    data = []
+                    column_names = []
+                    warnings = []
+                
+                execution_time = (datetime.now() - start_time).total_seconds() * 1000
+                cursor.close()
+                
+                return ExecutionResult(
+                    success=True,
+                    data=data,
+                    column_names=column_names,
+                    row_count=len(data),
+                    execution_time_ms=execution_time,
+                    sql_executed=sql,
+                    warnings=warnings
+                )
+            
+            else:
+                raise Exception("No DuckDB connection available")
+                
+        except Exception as e:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            return ExecutionResult(
+                success=False,
+                data=[],
+                column_names=[],
+                row_count=0,
+                execution_time_ms=execution_time,
+                sql_executed=sql,
+                error_message=str(e)
+            )
+    
+    async def execute_duckdb_data_wrangling(self, operations: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Execute data wrangling operations using professional DuckDB service"""
+        if not self.duckdb_resource_provider:
+            return {
+                'success': False,
+                'error': 'Professional DuckDB service not available for data wrangling'
+            }
+        
+        try:
+            # Use the professional DuckDB resource provider for advanced operations
+            results = []
+            
+            for operation in operations:
+                op_type = operation.get('type')
+                
+                if op_type == 'load_data':
+                    # Load data from file
+                    result = await self.duckdb_resource_provider.load_data_from_file(
+                        operation['file_path'],
+                        operation.get('format', 'csv'),
+                        operation.get('options', {})
+                    )
+                    results.append(result)
+                
+                elif op_type == 'transform':
+                    # Execute transformation SQL
+                    result = await self.duckdb_service.execute_query(
+                        operation['sql'],
+                        timeout=operation.get('timeout', self.max_execution_time)
+                    )
+                    results.append(result)
+                
+                elif op_type == 'export':
+                    # Export results
+                    result = await self.duckdb_resource_provider.export_query_results(
+                        operation['sql'],
+                        operation['output_path'],
+                        operation.get('format', 'csv')
+                    )
+                    results.append(result)
+            
+            return {
+                'success': True,
+                'operations_completed': len(results),
+                'results': results
+            }
+            
+        except Exception as e:
+            logger.error(f"DuckDB data wrangling failed: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def get_duckdb_performance_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics from professional DuckDB service"""
+        if not self.duckdb_service:
+            return {'error': 'Professional DuckDB service not available'}
+        
+        try:
+            return await self.duckdb_service.get_performance_metrics()
+        except Exception as e:
+            logger.error(f"Failed to get DuckDB performance metrics: {e}")
+            return {'error': str(e)}
+    
+    @classmethod
+    def create_duckdb_executor(cls, database_path: str = ':memory:', **kwargs) -> 'SQLExecutor':
+        """Create SQL executor for DuckDB with professional service support
+        
+        Args:
+            database_path: Path to DuckDB database file (defaults to in-memory)
+            **kwargs: Additional configuration options
+            
+        Returns:
+            SQLExecutor configured for DuckDB with professional service support
+        """
+        database_config = {
+            'type': 'duckdb',
+            'database': database_path,
+            'max_execution_time': kwargs.get('max_execution_time', 30),
+            'max_rows': kwargs.get('max_rows', 10000),
+            'max_connections': kwargs.get('max_connections', 10),
+            'connection_timeout': kwargs.get('connection_timeout', 30.0),
+            'query_timeout': kwargs.get('query_timeout', 30.0),
+            'max_memory_mb': kwargs.get('max_memory_mb', 1024),
+            'enable_monitoring': kwargs.get('enable_monitoring', True),
+            'enable_security': kwargs.get('enable_security', True)
+        }
+        
+        return cls(database_config)
