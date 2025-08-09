@@ -66,6 +66,24 @@ class DatabaseAdapter(BaseAdapter, IDataSource, IDataTarget):
                 await self._initialize_mysql()
             elif self.db_type == "sqlite":
                 await self._initialize_sqlite()
+            elif self.db_type == "oracle":
+                await self._initialize_oracle()
+            elif self.db_type == "mongodb":
+                await self._initialize_mongodb()
+            elif self.db_type == "redis":
+                await self._initialize_redis()
+            elif self.db_type == "elasticsearch":
+                await self._initialize_elasticsearch()
+            elif self.db_type == "snowflake":
+                await self._initialize_snowflake()
+            elif self.db_type == "bigquery":
+                await self._initialize_bigquery()
+            elif self.db_type == "clickhouse":
+                await self._initialize_clickhouse()
+            elif self.db_type == "deltalake":
+                await self._initialize_deltalake()
+            elif self.db_type == "s3":
+                await self._initialize_s3()
             else:
                 raise ValueError(f"Unsupported database type: {self.db_type}")
                 
@@ -136,6 +154,210 @@ class DatabaseAdapter(BaseAdapter, IDataSource, IDataTarget):
             raise ImportError("aiosqlite is required for SQLite support")
         except Exception as e:
             raise RuntimeError(f"Failed to test SQLite connection: {e}")
+    
+    async def _initialize_oracle(self) -> None:
+        """Initialize Oracle connection pool"""
+        try:
+            import cx_Oracle
+            
+            # Build connection string
+            if 'service_name' in self.config:
+                dsn = cx_Oracle.makedsn(
+                    self.config['host'], 
+                    self.config.get('port', 1521), 
+                    service_name=self.config['service_name']
+                )
+            else:
+                dsn = cx_Oracle.makedsn(
+                    self.config['host'], 
+                    self.config.get('port', 1521), 
+                    service_name=self.config['database']
+                )
+            
+            # Test connection
+            conn = cx_Oracle.connect(
+                user=self.config['username'],
+                password=self.config['password'],
+                dsn=dsn
+            )
+            conn.close()
+            
+        except ImportError:
+            raise ImportError("cx_Oracle is required for Oracle support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create Oracle connection: {e}")
+    
+    async def _initialize_mongodb(self) -> None:
+        """Initialize MongoDB connection"""
+        try:
+            import pymongo
+            
+            # Build connection string
+            if 'connection_string' in self.config:
+                connection_string = self.config['connection_string']
+            else:
+                auth_part = ""
+                if 'username' in self.config and 'password' in self.config:
+                    auth_part = f"{self.config['username']}:{self.config['password']}@"
+                
+                connection_string = f"mongodb://{auth_part}{self.config['host']}:{self.config.get('port', 27017)}"
+            
+            # Test connection
+            client = pymongo.MongoClient(connection_string)
+            client.server_info()  # Test connection
+            client.close()
+            
+        except ImportError:
+            raise ImportError("pymongo is required for MongoDB support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create MongoDB connection: {e}")
+    
+    async def _initialize_redis(self) -> None:
+        """Initialize Redis connection"""
+        try:
+            import redis
+            
+            # Test connection
+            r = redis.Redis(
+                host=self.config['host'],
+                port=self.config.get('port', 6379),
+                db=self.config.get('database', 0),
+                password=self.config.get('password'),
+                socket_timeout=30
+            )
+            r.ping()
+            r.close()
+            
+        except ImportError:
+            raise ImportError("redis is required for Redis support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create Redis connection: {e}")
+    
+    async def _initialize_elasticsearch(self) -> None:
+        """Initialize Elasticsearch connection"""
+        try:
+            from elasticsearch import Elasticsearch
+            
+            # Build connection parameters
+            connection_params = {
+                'hosts': [{'host': self.config['host'], 'port': self.config.get('port', 9200)}],
+                'timeout': 30
+            }
+            
+            if 'username' in self.config and 'password' in self.config:
+                connection_params['http_auth'] = (self.config['username'], self.config['password'])
+            
+            # Test connection
+            client = Elasticsearch(**connection_params)
+            if not client.ping():
+                raise ConnectionError("Failed to connect to Elasticsearch")
+            
+        except ImportError:
+            raise ImportError("elasticsearch is required for Elasticsearch support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create Elasticsearch connection: {e}")
+    
+    async def _initialize_snowflake(self) -> None:
+        """Initialize Snowflake connection"""
+        try:
+            import snowflake.connector
+            
+            # Test connection
+            conn = snowflake.connector.connect(
+                user=self.config['username'],
+                password=self.config['password'],
+                account=self.config['account'],
+                warehouse=self.config.get('warehouse'),
+                database=self.config.get('database'),
+                schema=self.config.get('schema', 'PUBLIC')
+            )
+            conn.close()
+            
+        except ImportError:
+            raise ImportError("snowflake-connector-python is required for Snowflake support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create Snowflake connection: {e}")
+    
+    async def _initialize_bigquery(self) -> None:
+        """Initialize BigQuery connection"""
+        try:
+            from google.cloud import bigquery
+            
+            # Test connection
+            client = bigquery.Client(project=self.config['project_id'])
+            # Simple query to test connection
+            query = "SELECT 1 as test"
+            query_job = client.query(query)
+            query_job.result()  # Wait for job to complete
+            
+        except ImportError:
+            raise ImportError("google-cloud-bigquery is required for BigQuery support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create BigQuery connection: {e}")
+    
+    async def _initialize_clickhouse(self) -> None:
+        """Initialize ClickHouse connection"""
+        try:
+            from clickhouse_driver import Client
+            
+            # Test connection
+            client = Client(
+                host=self.config['host'],
+                port=self.config.get('port', 9000),
+                database=self.config.get('database', 'default'),
+                user=self.config.get('username', 'default'),
+                password=self.config.get('password', '')
+            )
+            client.execute('SELECT 1')
+            
+        except ImportError:
+            raise ImportError("clickhouse-driver is required for ClickHouse support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create ClickHouse connection: {e}")
+    
+    async def _initialize_deltalake(self) -> None:
+        """Initialize Delta Lake connection"""
+        try:
+            from deltalake import DeltaTable
+            import os
+            
+            # Test access to base path
+            base_path = self.config.get('path', self.config.get('base_path'))
+            if not base_path:
+                raise ValueError("Delta Lake requires 'path' or 'base_path' in config")
+            
+            # For local paths, check if directory exists
+            if not base_path.startswith(('s3://', 'azure://', 'gs://')):
+                os.makedirs(base_path, exist_ok=True)
+            
+        except ImportError:
+            raise ImportError("deltalake is required for Delta Lake support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize Delta Lake: {e}")
+    
+    async def _initialize_s3(self) -> None:
+        """Initialize S3 connection"""
+        try:
+            import boto3
+            
+            # Test connection
+            session = boto3.Session(
+                aws_access_key_id=self.config.get('access_key_id'),
+                aws_secret_access_key=self.config.get('secret_access_key'),
+                region_name=self.config.get('region', 'us-east-1')
+            )
+            
+            client_config = {}
+            if 'endpoint_url' in self.config:
+                client_config['endpoint_url'] = self.config['endpoint_url']
+            
+            s3_client = session.client('s3', **client_config)
+            s3_client.head_bucket(Bucket=self.config['bucket_name'])
+            
+        except ImportError:
+            raise ImportError("boto3 is required for S3 support")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create S3 connection: {e}")
     
     async def _perform_health_check(self) -> bool:
         """Perform database health check"""
@@ -696,6 +918,87 @@ class DatabaseAdapter(BaseAdapter, IDataSource, IDataTarget):
                 'date': 'TEXT',
                 'datetime': 'TEXT',
                 'json': 'TEXT'
+            },
+            'oracle': {
+                'string': 'VARCHAR2(4000)',
+                'integer': 'NUMBER',
+                'float': 'NUMBER',
+                'boolean': 'NUMBER(1)',
+                'date': 'DATE',
+                'datetime': 'TIMESTAMP',
+                'json': 'CLOB'
+            },
+            'mongodb': {
+                'string': 'String',
+                'integer': 'NumberInt',
+                'float': 'NumberDouble',
+                'boolean': 'Boolean',
+                'date': 'Date',
+                'datetime': 'Date',
+                'json': 'Object'
+            },
+            'redis': {
+                'string': 'string',
+                'integer': 'string',
+                'float': 'string',
+                'boolean': 'string',
+                'date': 'string',
+                'datetime': 'string',
+                'json': 'string'
+            },
+            'elasticsearch': {
+                'string': 'text',
+                'integer': 'integer',
+                'float': 'float',
+                'boolean': 'boolean',
+                'date': 'date',
+                'datetime': 'date',
+                'json': 'object'
+            },
+            'snowflake': {
+                'string': 'VARCHAR',
+                'integer': 'INTEGER',
+                'float': 'FLOAT',
+                'boolean': 'BOOLEAN',
+                'date': 'DATE',
+                'datetime': 'TIMESTAMP',
+                'json': 'VARIANT'
+            },
+            'bigquery': {
+                'string': 'STRING',
+                'integer': 'INTEGER',
+                'float': 'FLOAT64',
+                'boolean': 'BOOLEAN',
+                'date': 'DATE',
+                'datetime': 'DATETIME',
+                'json': 'JSON'
+            },
+            'clickhouse': {
+                'string': 'String',
+                'integer': 'Int32',
+                'float': 'Float64',
+                'boolean': 'UInt8',
+                'date': 'Date',
+                'datetime': 'DateTime',
+                'json': 'String'
+            },
+            'deltalake': {
+                'string': 'string',
+                'integer': 'int',
+                'float': 'double',
+                'boolean': 'boolean',
+                'date': 'date',
+                'datetime': 'timestamp',
+                'json': 'string'
+            },
+            's3': {
+                'string': 'string',
+                'integer': 'int64',
+                'float': 'float64',
+                'boolean': 'bool',
+                'date': 'date',
+                'datetime': 'timestamp',
+                'json': 'string'
             }
         }
         

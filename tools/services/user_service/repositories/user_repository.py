@@ -102,7 +102,12 @@ class UserRepository(BaseRepository[User]):
             用户对象或None
         """
         try:
-            result = self.table.select('*').eq('user_id', user_id).execute()
+            result = await self._execute_query(
+                lambda: self.table.select('*').eq('user_id', user_id).execute(),
+                f"Failed to get user by user_id: {user_id}"
+            )
+            
+            logger.info(f"Query result for user_id {user_id}: data={result.data}, count={len(result.data) if result.data else 0}")
             
             if result.data and len(result.data) > 0:
                 return User(**result.data[0])

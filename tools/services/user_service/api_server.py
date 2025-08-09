@@ -29,7 +29,12 @@ from .models import (
     OrganizationUsage, OrganizationUsageCreate,
     OrganizationCreditTransaction,
     # Invitation models
-    OrganizationInvitation, OrganizationInvitationCreate, AcceptInvitationRequest
+    OrganizationInvitation, OrganizationInvitationCreate, AcceptInvitationRequest,
+    # Resource authorization models
+    ResourceType, AccessLevel, ResourcePermission, UserResourceAccess,
+    ResourceAccessCheck, ResourceAccessResponse, UserResourceSummary,
+    GrantResourceAccessRequest, RevokeResourceAccessRequest,
+    ResourcePermissionCreate, ResourcePermissionUpdate
 )
 from .services.auth_service import Auth0Service
 from .services.supabase_auth_service import SupabaseAuthService
@@ -42,6 +47,7 @@ from .services.usage_service import UsageService
 from .services.session_service import SessionService  
 from .services.credit_service import CreditService
 from .services.invitation_service import InvitationService
+from .services.resource_authorization_service import ResourceAuthorizationService
 from .repositories import UserRepository, SubscriptionRepository, OrganizationRepository
 from .config import get_config
 
@@ -147,6 +153,7 @@ session_service = SessionService()
 credit_service = CreditService()
 organization_service = OrganizationService()
 invitation_service = InvitationService()
+resource_authorization_service = ResourceAuthorizationService()
 
 # 初始化文件存储服务
 try:
@@ -2038,6 +2045,308 @@ async def download_file(
         raise HTTPException(status_code=500, detail=f"Failed to get download URL: {str(e)}")
 
 # ============ END FILE MANAGEMENT API ============
+
+# ============ RESOURCE AUTHORIZATION API ============
+# Resource permission and access control endpoints
+
+@app.post("/api/v1/resources/check-access", response_model=ResourceAccessResponse, tags=["Resource Authorization"])
+async def check_resource_access(
+    check_request: ResourceAccessCheck,
+    current_user = Depends(get_current_user)
+):
+    """
+    Check user's access to a specific resource
+    
+    Checks user permissions for MCP tools, prompts, and resources
+    based on subscription level, organization membership, and admin grants
+    """
+    try:
+        # Verify user permission - users can only check their own access
+        token_user_id = current_user["sub"]
+        if check_request.user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only check your own resource access"
+            )
+        
+        # Check resource access
+        access_response = await resource_authorization_service.check_resource_access(check_request)
+        
+        return access_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking resource access: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check resource access: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/resources/summary", response_model=Dict[str, Any], tags=["Resource Authorization"])
+async def get_user_resource_summary(
+    user_id: str,
+    current_user = Depends(get_current_user)
+):
+    """
+    Get user's resource access summary
+    
+    Returns overview of accessible resources by type and access source
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only view your own resource summary"
+            )
+        
+        # Get resource summary
+        summary = await resource_authorization_service.get_user_resource_summary(user_id)
+        
+        if not summary:
+            raise HTTPException(status_code=404, detail="User not found or no resource access data")
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": "User resource summary retrieved successfully",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": summary.dict()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user resource summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user resource summary: {str(e)}")
+
+
+@app.get("/api/v1/users/{user_id}/resources/accessible", response_model=Dict[str, Any], tags=["Resource Authorization"])
+async def get_user_accessible_resources(
+    user_id: str,
+    resource_type: Optional[ResourceType] = None,
+    current_user = Depends(get_current_user)
+):
+    """
+    List all resources accessible to user
+    
+    Returns detailed list of accessible MCP tools, prompts, and resources
+    """
+    try:
+        # Verify user permission
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only view your own accessible resources"
+            )
+        
+        # Get accessible resources
+        resources = await resource_authorization_service.list_user_accessible_resources(user_id, resource_type)
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": f"Retrieved {len(resources)} accessible resources",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "resources": resources,
+                "total_count": len(resources),
+                "resource_type_filter": resource_type
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user accessible resources: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user accessible resources: {str(e)}")
+
+
+# Admin-only endpoints for resource management
+@app.post("/api/v1/admin/resources/permissions", response_model=Dict[str, Any], tags=["Admin - Resource Authorization"])
+async def create_resource_permission(
+    permission_data: ResourcePermissionCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    Create new resource permission configuration (Admin only)
+    
+    Defines access requirements for MCP tools, prompts, and resources
+    """
+    try:
+        # TODO: Add admin role check here when role system is implemented
+        # For now, assuming all authenticated users can create permissions for demo
+        
+        permission = ResourcePermission(
+            **permission_data.dict(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        # Create permission through repository
+        result = await resource_authorization_service.repo.create_resource_permission(permission)
+        
+        if not result:
+            raise HTTPException(status_code=400, detail="Failed to create resource permission")
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": "Resource permission created successfully",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": result.dict()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating resource permission: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create resource permission: {str(e)}")
+
+
+@app.post("/api/v1/admin/resources/grant-access", response_model=Dict[str, Any], tags=["Admin - Resource Authorization"])
+async def grant_user_resource_access(
+    grant_request: GrantResourceAccessRequest,
+    current_user = Depends(get_current_user)
+):
+    """
+    Grant special resource access to user (Admin only)
+    
+    Allows admin to override normal subscription-based access rules
+    """
+    try:
+        # TODO: Add admin role check here when role system is implemented
+        # For now, assuming all authenticated users can grant access for demo
+        
+        success = await resource_authorization_service.grant_resource_access(grant_request)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to grant resource access")
+        
+        return {
+            "success": True,
+            "status": "success", 
+            "message": f"Resource access granted to user {grant_request.user_id}",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "user_id": grant_request.user_id,
+                "resource_type": grant_request.resource_type,
+                "resource_name": grant_request.resource_name,
+                "access_level": grant_request.access_level,
+                "granted_by_admin": grant_request.granted_by_admin
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error granting resource access: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to grant resource access: {str(e)}")
+
+
+@app.delete("/api/v1/admin/resources/revoke-access", response_model=Dict[str, Any], tags=["Admin - Resource Authorization"])
+async def revoke_user_resource_access(
+    revoke_request: RevokeResourceAccessRequest,
+    current_user = Depends(get_current_user)
+):
+    """
+    Revoke user's resource access (Admin only)
+    
+    Removes special access grants (does not affect subscription-based access)
+    """
+    try:
+        # TODO: Add admin role check here when role system is implemented
+        # For now, assuming all authenticated users can revoke access for demo
+        
+        success = await resource_authorization_service.revoke_resource_access(revoke_request)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="No resource access found to revoke")
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": f"Resource access revoked from user {revoke_request.user_id}",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "user_id": revoke_request.user_id,
+                "resource_type": revoke_request.resource_type,
+                "resource_name": revoke_request.resource_name,
+                "revoked": True
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking resource access: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to revoke resource access: {str(e)}")
+
+
+@app.post("/api/v1/admin/resources/initialize-defaults", response_model=Dict[str, Any], tags=["Admin - Resource Authorization"])
+async def initialize_default_permissions(
+    current_user = Depends(get_current_user)
+):
+    """
+    Initialize default resource permissions (Admin only)
+    
+    Sets up basic permission configurations for common resources
+    """
+    try:
+        # TODO: Add admin role check here when role system is implemented
+        # For now, assuming all authenticated users can initialize for demo
+        
+        success = await resource_authorization_service.initialize_default_permissions()
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to initialize default permissions")
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": "Default resource permissions initialized successfully",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"initialized": True}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initializing default permissions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize default permissions: {str(e)}")
+
+
+@app.post("/api/v1/admin/resources/cleanup-expired", response_model=Dict[str, Any], tags=["Admin - Resource Authorization"])
+async def cleanup_expired_permissions(
+    current_user = Depends(get_current_user)
+):
+    """
+    Clean up expired resource permissions (Admin only)
+    
+    Removes expired access grants and permissions
+    """
+    try:
+        # TODO: Add admin role check here when role system is implemented
+        # For now, assuming all authenticated users can cleanup for demo
+        
+        cleaned_count = await resource_authorization_service.cleanup_expired_permissions()
+        
+        return {
+            "success": True,
+            "status": "success",
+            "message": f"Cleaned up {cleaned_count} expired permissions",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {"cleaned_count": cleaned_count}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cleaning up expired permissions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clean up expired permissions: {str(e)}")
+
+# ============ END RESOURCE AUTHORIZATION API ============
 
 # 分析和管理路由
 @app.get("/api/v1/users/{user_id}/analytics", tags=["Analytics"])

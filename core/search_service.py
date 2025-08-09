@@ -601,7 +601,8 @@ class UnifiedSearchService:
             # Default tools (most commonly used)
             if not filters.types or 'tool' in filters.types:
                 default_tools = [
-                    'web_search', 'web_crawl', 'web_automation'
+                    'web_search', 'web_crawl', 'web_automation',
+                    'create_execution_plan', 'replan_execution', 'get_autonomous_status'
                 ]
                 for tool_name in default_tools:
                     if tool_name in self.capabilities_cache.get('tools', {}):

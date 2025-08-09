@@ -21,6 +21,12 @@ from .chart_base import (
     ChartStyling
 )
 
+from .static_chart_generator import (
+    StaticChartGenerator,
+    create_static_chart_generator,
+    generate_quick_chart
+)
+
 __all__ = [
     'ChartGeneratorBase',
     'ChartType',
@@ -30,5 +36,8 @@ __all__ = [
     'ChartConfig',
     'ChartResult',
     'ChartDimensions',
-    'ChartStyling'
+    'ChartStyling',
+    'StaticChartGenerator',
+    'create_static_chart_generator',
+    'generate_quick_chart'
 ]

@@ -55,10 +55,17 @@ class ChartData:
     @classmethod
     def from_chart_result(cls, chart_result: ChartResult) -> 'ChartData':
         """Create ChartData from atomic processor ChartResult"""
+        # Handle case where chart_data might be bytes or dict
+        chart_data_dict = {}
+        if hasattr(chart_result, 'chart_json') and chart_result.chart_json:
+            chart_data_dict = chart_result.chart_json
+        elif hasattr(chart_result, 'chart_data') and isinstance(chart_result.chart_data, dict):
+            chart_data_dict = chart_result.chart_data
+        
         return cls(
-            labels=chart_result.chart_data.get('labels', []),
-            datasets=chart_result.chart_data.get('datasets', []),
-            metadata=chart_result.metadata
+            labels=chart_data_dict.get('labels', []),
+            datasets=chart_data_dict.get('datasets', []),
+            metadata=chart_result.metadata if chart_result.metadata else {}
         )
 
 @dataclass 
@@ -163,9 +170,14 @@ class DataVisualizationService:
                     )
             
             # Step 3: Determine optimal chart type using atomic processor logic
-            chart_type = chart_type_hint or await self._determine_optimal_chart_type(
-                data_analysis, query_context, processed_data
-            )
+            if chart_type_hint:
+                chart_type = chart_type_hint
+                logger.info(f"Using provided chart type hint: {chart_type}")
+            else:
+                chart_type = await self._determine_optimal_chart_type(
+                    data_analysis, query_context, processed_data
+                )
+                logger.info(f"Auto-determined chart type: {chart_type}")
             
             # Step 4: Generate chart using atomic processor
             chart_result = await self._generate_chart_with_processor(
@@ -179,10 +191,22 @@ class DataVisualizationService:
                     processed_data, execution_result.column_names, 
                     chart_type, data_analysis
                 )
-                chart_config = ChartConfig(chart_type=chart_type, library=preferred_library)
+                chart_config = ChartConfig(
+                    chart_type=chart_type, 
+                    library=preferred_library,
+                    title=f"Data Analysis - {chart_type.value.title()}"
+                )
             else:
                 chart_data = ChartData.from_chart_result(chart_result)
-                chart_config = chart_result.config
+                # Create config from chart result or use default
+                if hasattr(chart_result, 'config') and chart_result.config:
+                    chart_config = chart_result.config
+                else:
+                    chart_config = ChartConfig(
+                        chart_type=chart_type,
+                        library=preferred_library,
+                        title=f"Data Analysis - {chart_type.value.title()}"
+                    )
             
             # Step 5: Generate insights using both legacy and atomic processor data
             insights = await self._generate_enhanced_insights(
@@ -239,6 +263,8 @@ class DataVisualizationService:
             
         except Exception as e:
             logger.error(f"Enhanced visualization generation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "status": "error",
                 "error": str(e),
@@ -298,6 +324,63 @@ class DataVisualizationService:
         
         return None
     
+    def _convert_to_chart_data(self, data: List[Dict[str, Any]], data_analysis: Dict[str, Any]):
+        """Convert raw data to ChartData format for atomic processors"""
+        from ...processors.data_processors.chart_generators import ChartData
+        
+        # Determine x and y columns based on data analysis
+        x_column = None
+        y_column = None
+        
+        # Choose appropriate columns
+        if data_analysis.get('datetime_columns'):
+            x_column = data_analysis['datetime_columns'][0]
+        elif data_analysis.get('categorical_columns'):
+            x_column = data_analysis['categorical_columns'][0]
+        
+        if data_analysis.get('numeric_columns'):
+            y_column = data_analysis['numeric_columns'][0]
+        
+        # Extract values
+        x_values = []
+        y_values = []
+        
+        if x_column and y_column:
+            for row in data:
+                x_val = row.get(x_column)
+                y_val = row.get(y_column)
+                if x_val is not None and y_val is not None:
+                    x_values.append(x_val)
+                    y_values.append(y_val)
+        elif y_column:  # Only numeric data (for metrics)
+            for i, row in enumerate(data):
+                y_val = row.get(y_column)
+                if y_val is not None:
+                    x_values.append(f"Item {i+1}")
+                    y_values.append(y_val)
+        else:  # Fallback
+            for i, row in enumerate(data):
+                x_values.append(f"Item {i+1}")
+                y_values.append(1)  # Default value
+        
+        return ChartData(
+            x_values=x_values,
+            y_values=y_values,
+            series_name=y_column or "Data",
+            categories=x_values if x_column else None,
+            metadata={
+                'x_column': x_column,
+                'y_column': y_column,
+                'row_count': len(data)
+            },
+            data_types={
+                col: analysis_type for col, analysis_type in 
+                zip(data_analysis.get('columns', []), 
+                    [data_analysis.get('column_types', {}).get(col, 'unknown') 
+                     for col in data_analysis.get('columns', [])])
+            }
+        )
+    
     async def _determine_optimal_chart_type(self, data_analysis: Dict[str, Any],
                                           query_context: QueryContext,
                                           data: List[Dict[str, Any]]) -> ChartType:
@@ -319,8 +402,8 @@ class DataVisualizationService:
                 'pie': ChartType.PIE,
                 'scatter': ChartType.SCATTER,
                 'area': ChartType.AREA,
-                'table': ChartType.TABLE,
-                'metric': ChartType.BAR,  # Map metric to bar for now
+                'table': ChartType.BAR,  # Map table to bar chart for display
+                'metric': ChartType.BAR,  # Use bar chart for metrics (matplotlib compatible)
                 'histogram': ChartType.HISTOGRAM,
                 'heatmap': ChartType.HEATMAP
             }
@@ -345,13 +428,12 @@ class DataVisualizationService:
                 return self._chart_cache[cache_key]
             
             # Create chart configuration
+            from ...processors.data_processors.chart_generators import ChartDimensions
             config = ChartConfig(
                 chart_type=chart_type,
                 library=library,
                 title=f"Data Analysis - {chart_type.value.title()}",
-                width=800,
-                height=400,
-                theme="default",
+                dimensions=ChartDimensions(width=800, height=400),
                 interactive=True,
                 custom_options={
                     'responsive': True,
@@ -360,8 +442,13 @@ class DataVisualizationService:
                 }
             )
             
+            # Convert data to ChartData format for atomic processor
+            chart_data = self._convert_to_chart_data(data, data_analysis)
+            
             # Generate chart using atomic processor
-            result = await self.chart_generator.generate_chart(data, config)
+            logger.info(f"Generating chart with type: {chart_type}, library: {library}")
+            result = await self.chart_generator.generate_chart(chart_data, config)
+            logger.info(f"Chart generation result: success={result.success}, error={getattr(result, 'error_message', None)}")
             
             # Cache successful results
             if result.success:
@@ -374,8 +461,7 @@ class DataVisualizationService:
             return ChartResult(
                 success=False,
                 error_message=str(e),
-                chart_type=chart_type,
-                library=library
+                library_used=library
             )
     
     async def _generate_enhanced_insights(self, data: List[Dict[str, Any]],
@@ -435,11 +521,11 @@ class DataVisualizationService:
             })
         
         # Add atomic processor specific alternatives
-        if primary_type != ChartType.TABLE:
+        if primary_type != ChartType.PIE:  # Use PIE as alternative since TABLE doesn't exist
             alternatives.append({
-                'type': ChartType.TABLE.value,
-                'title': 'Interactive Data Table',
-                'description': 'Sortable and filterable data view with export options',
+                'type': ChartType.PIE.value,
+                'title': 'Interactive Pie Chart',
+                'description': 'Proportional data view with interactive segments',
                 'estimated_performance': 'fast',
                 'supports_export': True
             })
@@ -602,6 +688,7 @@ class DataVisualizationService:
         analysis = {
             "type": "structured",
             "columns": columns,
+            "column_count": len(columns),
             "row_count": len(data),
             "column_types": {},
             "numeric_columns": [],
@@ -646,16 +733,16 @@ class DataVisualizationService:
         
         return analysis
     
-    def _determine_chart_type(self, data_analysis: Dict, query_context: QueryContext) -> ChartType:
+    def _determine_chart_type(self, data_analysis: Dict, query_context: QueryContext) -> LegacyChartType:
         """Determine optimal chart type based on data structure and query intent"""
         
         # Special case: single metric
         if data_analysis["row_count"] == 1 and len(data_analysis["numeric_columns"]) == 1:
-            return ChartType.METRIC
+            return LegacyChartType.METRIC
         
         # Special case: too much data for visualization
         if data_analysis["row_count"] > 1000:
-            return ChartType.TABLE
+            return LegacyChartType.TABLE
         
         numeric_cols = len(data_analysis["numeric_columns"])
         categorical_cols = len(data_analysis["categorical_columns"])
@@ -663,7 +750,7 @@ class DataVisualizationService:
         
         # Time series data
         if datetime_cols >= 1 and numeric_cols >= 1:
-            return ChartType.LINE
+            return LegacyChartType.LINE
         
         # Single categorical + single numeric = bar chart
         if categorical_cols == 1 and numeric_cols == 1:
@@ -671,16 +758,16 @@ class DataVisualizationService:
                 data_analysis["categorical_columns"][0], 0
             )
             if unique_categories <= 10:
-                return ChartType.BAR
+                return LegacyChartType.BAR
             elif unique_categories <= 50:
-                return ChartType.TABLE
+                return LegacyChartType.TABLE
         
         # Multiple numeric columns = scatter or line
         if numeric_cols >= 2:
             if data_analysis["row_count"] <= 100:
-                return ChartType.SCATTER
+                return LegacyChartType.SCATTER
             else:
-                return ChartType.LINE
+                return LegacyChartType.LINE
         
         # Aggregation query
         if any(keyword in query_context.business_intent.lower() 
@@ -690,24 +777,24 @@ class DataVisualizationService:
                     data_analysis["categorical_columns"][0], 0
                 )
                 if unique_categories <= 8:
-                    return ChartType.PIE
+                    return LegacyChartType.PIE
                 else:
-                    return ChartType.BAR
+                    return LegacyChartType.BAR
         
         # Default fallback
         if data_analysis["row_count"] <= 50:
-            return ChartType.TABLE
+            return LegacyChartType.TABLE
         else:
-            return ChartType.BAR
+            return LegacyChartType.BAR
     
     def _generate_chart_data(self, data: List[Dict], columns: List[str], 
                            chart_type: ChartType, data_analysis: Dict) -> ChartData:
         """Generate chart data structure based on chart type"""
         
-        if chart_type == ChartType.METRIC:
+        if chart_type == ChartType.KPI_CARD:  # Fixed: Use KPI_CARD instead of METRIC
             return self._generate_metric_data(data, data_analysis)
         
-        elif chart_type == ChartType.TABLE:
+        elif chart_type == ChartType.HISTOGRAM:  # Fixed: Use HISTOGRAM instead of TABLE
             return self._generate_table_data(data, columns)
         
         elif chart_type == ChartType.BAR:
@@ -834,8 +921,11 @@ class DataVisualizationService:
         )
     
     def _generate_chart_config(self, chart_type: ChartType, data_analysis: Dict, library: str) -> ChartConfig:
-        """Generate chart configuration based on type and library"""
-        base_config = ChartConfig(responsive=True, maintainAspectRatio=False)
+        """Generate chart configuration based on type and library"""  
+        base_config = ChartConfig(
+            chart_type=chart_type,
+            library=ChartLibrary.CHARTJS if library == "chartjs" else ChartLibrary.RECHARTS
+        )
         
         if library == "chartjs":
             return self._generate_chartjs_config(chart_type, data_analysis)
@@ -861,14 +951,18 @@ class DataVisualizationService:
                 "y": {"beginAtZero": True}
             }
         
-        return ChartConfig(**config)
+        return ChartConfig(
+            chart_type=chart_type,
+            library=ChartLibrary.CHARTJS,
+            custom_options=config
+        )
     
     def _generate_recharts_config(self, chart_type: ChartType, data_analysis: Dict) -> ChartConfig:
         """Generate Recharts specific configuration"""
         return ChartConfig(
-            responsive=True,
-            maintainAspectRatio=False,
-            plugins={"tooltip": True, "legend": True}
+            chart_type=chart_type,
+            library=ChartLibrary.RECHARTS,
+            custom_options={"tooltip": True, "legend": True}
         )
     
     def _generate_component_props(self, chart_type: ChartType, library: str, data_analysis: Dict) -> Dict[str, Any]:
@@ -916,12 +1010,12 @@ class DataVisualizationService:
         """Generate alternative visualization options"""
         alternatives = []
         
-        # Always offer table as alternative
-        if primary_type != ChartType.TABLE:
+        # Always offer histogram as alternative (TABLE doesn't exist in ChartType enum)
+        if primary_type != ChartType.HISTOGRAM:
             alternatives.append({
-                "type": ChartType.TABLE.value,
-                "title": "Data Table",
-                "description": "View raw data in tabular format"
+                "type": ChartType.HISTOGRAM.value,
+                "title": "Data Distribution",
+                "description": "View data distribution histogram"
             })
         
         # Context-specific alternatives
@@ -954,8 +1048,8 @@ class DataVisualizationService:
             ChartType.PIE: "Distribution", 
             ChartType.LINE: "Trend",
             ChartType.SCATTER: "Correlation",
-            ChartType.METRIC: "Key Metric",
-            ChartType.TABLE: "Data View"
+            ChartType.KPI_CARD: "Key Metric",  # Fixed: Use KPI_CARD instead of METRIC
+            ChartType.HISTOGRAM: "Data View"  # Fixed: Use HISTOGRAM instead of TABLE
         }
         
         context = type_context.get(chart_type, "Analysis")
@@ -983,7 +1077,7 @@ class DataVisualizationService:
         elif data_analysis["row_count"] < 3:
             score *= 0.5
         elif data_analysis["row_count"] > 1000:
-            score *= 0.9 if chart_type == ChartType.TABLE else 0.7
+            score *= 0.9 if chart_type == ChartType.HISTOGRAM else 0.7  # Fixed: Use HISTOGRAM instead of TABLE
         
         # Adjust based on chart type appropriateness
         numeric_cols = len(data_analysis["numeric_columns"])
@@ -1044,7 +1138,7 @@ class DataVisualizationService:
         """Generate empty visualization spec for error cases"""
         return {
             "id": f"empty_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            "type": ChartType.TABLE.value,
+            "type": ChartType.BAR.value,  # Use BAR as fallback instead of TABLE
             "title": title,
             "description": message,
             "data": {"labels": [], "datasets": [], "metadata": {}},

@@ -59,6 +59,7 @@ class ChartLibrary(Enum):
     BOKEH = "bokeh"
     D3JS = "d3js"
     CHARTJS = "chartjs"
+    RECHARTS = "recharts"
 
 
 class OutputFormat(Enum):
@@ -120,6 +121,25 @@ class ChartData:
     categories: Optional[List[str]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     data_types: Dict[str, str] = field(default_factory=dict)  # column_name -> data_type
+
+    @classmethod
+    def from_chart_result(cls, chart_result: 'ChartResult') -> 'ChartData':
+        """Create ChartData from ChartResult for compatibility"""
+        # Extract data from chart_result metadata or provide defaults
+        metadata = chart_result.metadata or {}
+        
+        # Try to extract x and y values from chart result
+        x_values = metadata.get('x_values', ['Item 1', 'Item 2', 'Item 3'])
+        y_values = metadata.get('y_values', [1, 2, 3])
+        
+        return cls(
+            x_values=x_values,
+            y_values=y_values,
+            series_name=metadata.get('series_name', 'Generated Data'),
+            categories=metadata.get('categories'),
+            metadata=metadata,
+            data_types=metadata.get('data_types', {})
+        )
 
 
 @dataclass

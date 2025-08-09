@@ -11,16 +11,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-# Import the two main sub-services
+# Import the three main sub-services
 from .data_service.metadata_store_service import MetadataStoreService, PipelineResult
 from .data_service.sql_query_service import SQLQueryService, QueryResult
+from .data_service.data_visualization import DataVisualizationService, VisualizationSpec
 from .data_service.semantic_enricher import SemanticMetadata
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class AnalyticsResult:
-    """Complete analytics processing result combining both services"""
+    """Complete analytics processing result combining all services"""
     success: bool
     request_id: str
     
@@ -29,6 +30,9 @@ class AnalyticsResult:
     
     # Query processing (Steps 4-6) 
     query_result: Optional[QueryResult]
+    
+    # Visualization processing (Step 7)
+    visualization_result: Optional[Dict[str, Any]]
     
     # Overall metrics
     total_processing_time_ms: float
@@ -40,13 +44,15 @@ class DataAnalyticsService:
     """
     Complete Data Analytics Service - End-to-End Pipeline
     
-    Combines two main sub-services:
+    Combines three main sub-services:
     1. MetadataStoreService (Steps 1-3): Extract, enrich, embed, store metadata
     2. SQLQueryService (Steps 4-6): Query match, SQL generation, SQL execution
+    3. DataVisualizationService (Step 7): Chart generation and data visualization
     
     Provides unified interface for:
     - Data source ingestion and preparation
     - Natural language querying
+    - Data visualization and chart generation
     - Complete analytics workflows
     """
     
@@ -63,6 +69,7 @@ class DataAnalyticsService:
         # Initialize sub-services
         self.metadata_service = MetadataStoreService(database_name)
         self.query_service = None  # Initialized when database config is provided
+        self.visualization_service = DataVisualizationService()  # Initialized immediately
         
         # Service tracking
         self.analytics_history = []
@@ -72,6 +79,7 @@ class DataAnalyticsService:
             'failed_requests': 0,
             'total_data_sources_processed': 0,
             'total_queries_executed': 0,
+            'total_visualizations_generated': 0,
             'total_cost_usd': 0.0
         }
         
@@ -270,6 +278,19 @@ class DataAnalyticsService:
             
             processing_time = self._calculate_processing_time(start_time)
             
+            # Generate visualization if query was successful and returned data
+            visualization_result = None
+            if query_result.success and query_result.execution_result and query_result.execution_result.data:
+                try:
+                    visualization_result = await self._generate_visualization_for_query(
+                        query_result, natural_language_query, request_id
+                    )
+                    if visualization_result and visualization_result.get('status') == 'success':
+                        self.service_stats['total_visualizations_generated'] += 1
+                except Exception as e:
+                    logger.warning(f"Visualization generation failed for query {request_id}: {e}")
+                    visualization_result = {"status": "failed", "error": str(e)}
+            
             result = {
                 "success": query_result.success,
                 "request_id": request_id,
@@ -287,6 +308,7 @@ class DataAnalyticsService:
                     "data": query_result.execution_result.data if query_result.execution_result else [],
                     "columns": getattr(query_result.execution_result, 'columns', []) if query_result.execution_result else []
                 },
+                "visualization": visualization_result,  # New: Visualization result
                 "fallback_attempts": len(query_result.fallback_attempts),
                 "processing_time_ms": processing_time,
                 "error_message": query_result.error_message,
@@ -698,6 +720,239 @@ class DataAnalyticsService:
                 'resource_id': query_id,
                 'user_id': user_id
             }
+    
+    async def generate_visualization(self,
+                                   query_result_data: Dict[str, Any],
+                                   chart_type_hint: Optional[str] = None,
+                                   export_formats: Optional[List[str]] = None,
+                                   request_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate visualization from query results
+        
+        Args:
+            query_result_data: Query result data with columns and data
+            chart_type_hint: Optional chart type preference (bar, line, pie, etc.)
+            export_formats: Optional list of export formats (png, svg, json, etc.)
+            request_id: Optional request identifier
+        
+        Returns:
+            Visualization specification and metadata
+        """
+        start_time = datetime.now()
+        
+        if not request_id:
+            request_id = f"viz_{int(start_time.timestamp())}"
+        
+        logger.info(f"Generating visualization for request {request_id}")
+        
+        try:
+            # Extract data from query result
+            data = query_result_data.get('data', [])
+            columns = query_result_data.get('columns', [])
+            
+            if not data or not columns:
+                return {
+                    "success": False,
+                    "request_id": request_id,
+                    "error_message": "No data available for visualization",
+                    "processing_time_ms": self._calculate_processing_time(start_time)
+                }
+            
+            # Create execution result format expected by visualization service
+            from .data_service.sql_executor import ExecutionResult
+            execution_result = ExecutionResult(
+                success=True,
+                data=data,
+                column_names=columns,
+                row_count=len(data),
+                execution_time_ms=0,
+                sql_executed="Custom visualization request"
+            )
+            
+            # Create query context
+            from .data_service.query_matcher import QueryContext
+            query_context = QueryContext(
+                entities_mentioned=columns,
+                attributes_mentioned=columns,
+                operations=["select", "visualize"],
+                filters=[],
+                aggregations=[],
+                temporal_references=[],
+                business_intent="Create visualization from data",
+                confidence_score=1.0
+            )
+            
+            # Create semantic metadata
+            semantic_metadata = self._create_basic_semantic_metadata(data, columns)
+            
+            # Map chart type hint if provided
+            chart_type_enum = None
+            if chart_type_hint:
+                try:
+                    from ..processors.data_processors.chart_generators.chart_base import ChartType
+                    type_mapping = {
+                        'bar': ChartType.BAR,
+                        'line': ChartType.LINE,
+                        'pie': ChartType.PIE,
+                        'scatter': ChartType.SCATTER,
+                        'area': ChartType.AREA,
+                        'histogram': ChartType.HISTOGRAM,
+                        'kpi': ChartType.BAR,  # Map KPI to BAR (matplotlib compatible)
+                        'metric': ChartType.BAR  # Map metric to BAR (matplotlib compatible)
+                    }
+                    chart_type_enum = type_mapping.get(chart_type_hint.lower())
+                    if chart_type_enum:
+                        logger.info(f"Mapped chart type hint '{chart_type_hint}' to {chart_type_enum}")
+                except Exception as e:
+                    logger.warning(f"Invalid chart type hint: {chart_type_hint}, using auto-detection: {e}")
+            
+            # Map export formats if provided
+            export_format_enums = None
+            if export_formats:
+                try:
+                    from .data_service.data_visualization import ExportFormat
+                    format_mapping = {
+                        'png': ExportFormat.PNG,
+                        'svg': ExportFormat.SVG,
+                        'pdf': ExportFormat.PDF,
+                        'json': ExportFormat.JSON,
+                        'csv': ExportFormat.CSV
+                    }
+                    export_format_enums = [format_mapping.get(fmt.lower()) for fmt in export_formats if fmt.lower() in format_mapping]
+                except Exception as e:
+                    logger.warning(f"Invalid export formats: {export_formats}, using defaults")
+            
+            # Generate visualization
+            visualization_result = await self.visualization_service.generate_visualization_spec(
+                execution_result=execution_result,
+                query_context=query_context,
+                semantic_metadata=semantic_metadata,
+                chart_type_hint=chart_type_enum,
+                export_formats=export_format_enums or []
+            )
+            
+            processing_time = self._calculate_processing_time(start_time)
+            
+            # Update stats
+            if visualization_result.get('status') == 'success':
+                self.service_stats['total_visualizations_generated'] += 1
+            
+            result = {
+                "success": visualization_result.get('status') == 'success',
+                "request_id": request_id,
+                "visualization_result": visualization_result,
+                "input_data_summary": {
+                    "row_count": len(data),
+                    "column_count": len(columns),
+                    "columns": columns
+                },
+                "processing_time_ms": processing_time,
+                "chart_type_used": chart_type_hint or "auto-detected",
+                "export_formats_available": export_formats or ["png", "svg", "json"]
+            }
+            
+            logger.info(f"Visualization {request_id} completed successfully in {processing_time:.1f}ms")
+            return result
+            
+        except Exception as e:
+            processing_time = self._calculate_processing_time(start_time)
+            logger.error(f"Visualization generation {request_id} failed: {e}")
+            
+            return {
+                "success": False,
+                "request_id": request_id,
+                "error_message": str(e),
+                "processing_time_ms": processing_time
+            }
+    
+    async def _generate_visualization_for_query(self,
+                                              query_result: QueryResult,
+                                              original_query: str,
+                                              request_id: str) -> Optional[Dict[str, Any]]:
+        """Generate visualization for query result"""
+        try:
+            if not query_result.execution_result or not query_result.execution_result.data:
+                return None
+            
+            # Create query context from original query
+            from .data_service.query_matcher import QueryContext
+            query_context = QueryContext(
+                entities_mentioned=getattr(query_result.execution_result, 'column_names', []),
+                attributes_mentioned=getattr(query_result.execution_result, 'column_names', []),
+                operations=["select", "analyze"],
+                filters=[],
+                aggregations=[],
+                temporal_references=[],
+                business_intent=original_query,
+                confidence_score=0.8
+            )
+            
+            # Get or create semantic metadata
+            available_metadata = await self._get_available_metadata()
+            if not available_metadata:
+                available_metadata = self._create_basic_semantic_metadata(
+                    query_result.execution_result.data,
+                    query_result.execution_result.column_names
+                )
+            
+            # Generate visualization
+            visualization_result = await self.visualization_service.generate_visualization_spec(
+                execution_result=query_result.execution_result,
+                query_context=query_context,
+                semantic_metadata=available_metadata
+            )
+            
+            return visualization_result
+            
+        except Exception as e:
+            logger.error(f"Failed to generate visualization for query {request_id}: {e}")
+            return {"status": "error", "error_message": str(e)}
+    
+    def _create_basic_semantic_metadata(self, data: List[Dict], columns: List[str]):
+        """Create basic semantic metadata from data"""
+        try:
+            # Analyze data types
+            data_types = {}
+            for col in columns:
+                if data:
+                    sample_value = data[0].get(col)
+                    if isinstance(sample_value, (int, float)):
+                        data_types[col] = "numeric"
+                    elif isinstance(sample_value, str):
+                        # Simple date detection
+                        if any(date_word in col.lower() for date_word in ['date', 'time', 'created', 'updated']):
+                            data_types[col] = "datetime"
+                        else:
+                            data_types[col] = "categorical"
+                    else:
+                        data_types[col] = "unknown"
+            
+            from .data_service.semantic_enricher import SemanticMetadata
+            return SemanticMetadata(
+                original_metadata={col: {"type": dt} for col, dt in data_types.items()},
+                business_entities=[],
+                semantic_tags={col: [data_types.get(col, "unknown")] for col in columns},
+                data_patterns=[],
+                business_rules=[],
+                domain_classification={"domain": "data_analysis", "confidence": 0.5},
+                confidence_scores={"overall": 0.5},
+                ai_analysis={"context": "Visualization request"}
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to create semantic metadata: {e}")
+            # Return minimal metadata
+            from .data_service.semantic_enricher import SemanticMetadata
+            return SemanticMetadata(
+                original_metadata={},
+                business_entities=[],
+                semantic_tags={},
+                data_patterns=[],
+                business_rules=[],
+                domain_classification={},
+                confidence_scores={},
+                ai_analysis={}
+            )
 
 
 # Global service instances
