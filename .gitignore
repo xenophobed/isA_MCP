@@ -59,6 +59,9 @@ credentials.json
 # ============================================
 # 数据文件 - 不适合Git
 # ============================================
+# Demo and test data
+demo_data/
+
 # Database files
 *.db
 *.sqlite
