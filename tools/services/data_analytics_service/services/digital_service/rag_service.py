@@ -13,7 +13,7 @@ import uuid
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
-from tools.services.intelligence_service.language.embedding_generator import embed, search, chunk, rerank
+from tools.services.intelligence_service.language.embedding_generator import embed, search, chunk, rerank, hybrid_search_local, enhanced_search, store_knowledge_local
 from core.database.supabase_client import get_supabase_client
 from resources.graph_knowledge_resources import graph_knowledge_resources
 
@@ -105,6 +105,24 @@ class RAGService:
                     'user_id': user_id
                 }
             
+            # Also store in enhanced vector database for hybrid search capabilities
+            try:
+                enhanced_result = await store_knowledge_local(
+                    user_id=user_id,
+                    text=text,
+                    metadata={
+                        'knowledge_id': knowledge_id,
+                        'source': metadata.get('source') if metadata else None,
+                        'stored_at': now,
+                        **((metadata or {}))
+                    }
+                )
+                enhanced_storage_success = enhanced_result.get('success', False)
+                logger.info(f"Enhanced vector storage {'succeeded' if enhanced_storage_success else 'failed'} for knowledge {knowledge_id}")
+            except Exception as e:
+                logger.warning(f"Enhanced vector storage failed for knowledge {knowledge_id}: {e}")
+                enhanced_storage_success = False
+            
             # Register MCP resource
             mcp_result = await graph_knowledge_resources.register_resource(
                 resource_id=knowledge_id,
@@ -130,7 +148,8 @@ class RAGService:
                 'user_id': user_id,
                 'text_length': len(text),
                 'embedding_dimensions': len(embedding),
-                'mcp_registration': mcp_result.get('success', False)
+                'mcp_registration': mcp_result.get('success', False),
+                'enhanced_storage': enhanced_storage_success
             }
             
         except Exception as e:
@@ -144,14 +163,18 @@ class RAGService:
     async def retrieve_context(self, 
                              user_id: str, 
                              query: str, 
-                             top_k: int = None) -> Dict[str, Any]:
+                             top_k: int = None,
+                             search_mode: str = "hybrid",
+                             use_enhanced_search: bool = True) -> Dict[str, Any]:
         """
-        Retrieve relevant context from user's knowledge base using semantic search.
+        Retrieve relevant context from user's knowledge base using enhanced hybrid search.
         
         Args:
             user_id: User identifier
             query: Search query
             top_k: Number of results to return (default: 5)
+            search_mode: "semantic", "lexical", or "hybrid" (default: "hybrid")
+            use_enhanced_search: Whether to use the new enhanced search capabilities
             
         Returns:
             Dict containing retrieved context items
@@ -159,6 +182,46 @@ class RAGService:
         try:
             top_k = top_k or self.default_top_k
             
+            # Strategy 1: Try enhanced hybrid search first
+            if use_enhanced_search:
+                try:
+                    enhanced_results = await enhanced_search(
+                        query_text=query,
+                        user_id=user_id,
+                        top_k=top_k,
+                        search_mode=search_mode
+                    )
+                    
+                    if enhanced_results:
+                        # Convert enhanced search results to context format
+                        context_items = []
+                        for result in enhanced_results:
+                            context_items.append({
+                                'knowledge_id': result.get('id'),
+                                'text': result.get('text'),
+                                'similarity_score': result.get('score', 0),
+                                'semantic_score': result.get('semantic_score'),
+                                'lexical_score': result.get('lexical_score'),
+                                'metadata': result.get('metadata', {}),
+                                'created_at': result.get('metadata', {}).get('created_at'),
+                                'search_method': result.get('method', 'enhanced')
+                            })
+                        
+                        logger.info(f"Retrieved {len(context_items)} context items using enhanced search for user {user_id}")
+                        
+                        return {
+                            'success': True,
+                            'user_id': user_id,
+                            'query': query,
+                            'context_items': context_items,
+                            'total_knowledge_items': len(context_items),
+                            'search_method': 'enhanced_hybrid'
+                        }
+                        
+                except Exception as e:
+                    logger.warning(f"Enhanced search failed for user {user_id}: {e}, falling back to traditional search")
+            
+            # Strategy 2: Fallback to traditional database search
             # Get user's knowledge base
             result = self.supabase.table(self.table_name)\
                                  .select('id, text, metadata, created_at')\
@@ -171,7 +234,8 @@ class RAGService:
                     'user_id': user_id,
                     'query': query,
                     'context_items': [],
-                    'total_knowledge_items': 0
+                    'total_knowledge_items': 0,
+                    'search_method': 'traditional_fallback'
                 }
             
             # Extract texts for search
@@ -191,19 +255,23 @@ class RAGService:
                             'knowledge_id': item['id'],
                             'text': text,
                             'similarity_score': similarity_score,
+                            'semantic_score': similarity_score,
+                            'lexical_score': None,
                             'metadata': item['metadata'],
-                            'created_at': item['created_at']
+                            'created_at': item['created_at'],
+                            'search_method': 'traditional_isa'
                         })
                         break
             
-            logger.info(f"Retrieved {len(context_items)} context items for user {user_id}")
+            logger.info(f"Retrieved {len(context_items)} context items using traditional search for user {user_id}")
             
             return {
                 'success': True,
                 'user_id': user_id,
                 'query': query,
                 'context_items': context_items,
-                'total_knowledge_items': len(knowledge_items)
+                'total_knowledge_items': len(knowledge_items),
+                'search_method': 'traditional_isa'
             }
             
         except Exception as e:
@@ -219,22 +287,32 @@ class RAGService:
                              user_id: str, 
                              query: str, 
                              top_k: int = None,
-                             enable_rerank: bool = None) -> Dict[str, Any]:
+                             enable_rerank: bool = None,
+                             search_mode: str = "hybrid",
+                             use_enhanced_search: bool = True) -> Dict[str, Any]:
         """
-        Search user's knowledge base with optional ranking and relevance scoring.
+        Search user's knowledge base with enhanced hybrid search and optional ranking.
         
         Args:
             user_id: User identifier
             query: Search query
             top_k: Number of results to return
             enable_rerank: Enable reranking (overrides default setting)
+            search_mode: "semantic", "lexical", or "hybrid" search mode
+            use_enhanced_search: Whether to use enhanced search capabilities
             
         Returns:
             Dict containing search results with relevance scores
         """
         try:
-            # First get semantic search results
-            context_result = await self.retrieve_context(user_id, query, top_k)
+            # Get search results using enhanced context retrieval
+            context_result = await self.retrieve_context(
+                user_id=user_id, 
+                query=query, 
+                top_k=top_k,
+                search_mode=search_mode,
+                use_enhanced_search=use_enhanced_search
+            )
             
             if not context_result['success'] or not context_result['context_items']:
                 # Return the search results in the expected format
@@ -244,10 +322,12 @@ class RAGService:
                     'query': query,
                     'search_results': [],
                     'total_knowledge_items': context_result.get('total_knowledge_items', 0),
+                    'search_method': context_result.get('search_method', 'unknown'),
                     'error': context_result.get('error')
                 }
             
             context_items = context_result['context_items']
+            search_method = context_result.get('search_method', 'unknown')
             
             # Check if reranking is enabled
             use_rerank = enable_rerank if enable_rerank is not None else self.enable_rerank
@@ -257,14 +337,14 @@ class RAGService:
                 documents = [item['text'] for item in context_items]
                 
                 try:
-                    # Use reranker with correct parameters
-                    from tools.services.intelligence_service.language.embedding_generator import embedding_generator
-                    reranked_results = await embedding_generator.rerank_documents(
+                    # Use advanced reranking with MMR for diversity
+                    from tools.services.intelligence_service.language.embedding_generator import advanced_rerank
+                    
+                    reranked_results = await advanced_rerank(
                         query=query,
                         documents=documents,
-                        top_k=top_k or self.default_top_k,
-                        model="isa-jina-reranker-v2-service",
-                        return_documents=True
+                        method="combined",  # Use both MMR and ISA reranking
+                        top_k=top_k or self.default_top_k
                     )
                     
                     # Combine reranking with original context items
@@ -280,44 +360,55 @@ class RAGService:
                                     'knowledge_id': item['knowledge_id'],
                                     'text': document_text,
                                     'relevance_score': relevance_score,
-                                    'similarity_score': item['similarity_score'],
+                                    'similarity_score': item.get('similarity_score', 0),
+                                    'semantic_score': item.get('semantic_score'),
+                                    'lexical_score': item.get('lexical_score'),
+                                    'mmr_score': rerank_result.get('mmr_score'),
+                                    'isa_score': rerank_result.get('isa_score'),
                                     'metadata': item['metadata'],
                                     'created_at': item['created_at'],
-                                    'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
+                                    'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}",
+                                    'rerank_method': rerank_result.get('method', 'combined')
                                 })
                                 break
                     
-                    logger.info(f"Search with reranking completed for user {user_id}, {len(final_results)} results")
+                    logger.info(f"Enhanced search with advanced reranking completed for user {user_id}, {len(final_results)} results")
                     
                 except Exception as rerank_error:
-                    logger.warning(f"Reranking failed for user {user_id}: {rerank_error}, falling back to similarity search")
-                    # Fall back to similarity search without reranking
+                    logger.warning(f"Advanced reranking failed for user {user_id}: {rerank_error}, falling back to original scores")
+                    # Fall back to original search scores
                     final_results = []
                     for item in context_items:
                         final_results.append({
                             'knowledge_id': item['knowledge_id'],
                             'text': item['text'],
-                            'relevance_score': item['similarity_score'],  # Use similarity as relevance
-                            'similarity_score': item['similarity_score'],
+                            'relevance_score': item.get('similarity_score', item.get('semantic_score', 0)),
+                            'similarity_score': item.get('similarity_score'),
+                            'semantic_score': item.get('semantic_score'),
+                            'lexical_score': item.get('lexical_score'),
                             'metadata': item['metadata'],
                             'created_at': item['created_at'],
-                            'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
+                            'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}",
+                            'search_method': item.get('search_method', search_method)
                         })
             else:
-                # No reranking, use similarity search results directly
+                # No reranking, use search results directly
                 final_results = []
                 for item in context_items:
                     final_results.append({
                         'knowledge_id': item['knowledge_id'],
                         'text': item['text'],
-                        'relevance_score': item['similarity_score'],  # Use similarity as relevance
-                        'similarity_score': item['similarity_score'],
+                        'relevance_score': item.get('similarity_score', item.get('semantic_score', 0)),
+                        'similarity_score': item.get('similarity_score'),
+                        'semantic_score': item.get('semantic_score'),
+                        'lexical_score': item.get('lexical_score'),
                         'metadata': item['metadata'],
                         'created_at': item['created_at'],
-                        'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}"
+                        'mcp_address': f"mcp://rag/{user_id}/{item['knowledge_id']}",
+                        'search_method': item.get('search_method', search_method)
                     })
                 
-                logger.info(f"Search without reranking completed for user {user_id}, {len(final_results)} results")
+                logger.info(f"Enhanced search without reranking completed for user {user_id}, {len(final_results)} results")
             
             return {
                 'success': True,
@@ -325,7 +416,10 @@ class RAGService:
                 'query': query,
                 'search_results': final_results,
                 'total_knowledge_items': context_result['total_knowledge_items'],
-                'reranking_used': use_rerank
+                'search_method': search_method,
+                'search_mode': search_mode,
+                'reranking_used': use_rerank,
+                'enhanced_search_used': use_enhanced_search
             }
             
         except Exception as e:

@@ -69,24 +69,64 @@ class UnifiedAuthService:
             else:
                 raise ValueError(f"Provider {provider} not available")
         
-        # 自动检测认证提供者
+        # 自动检测认证提供者 - 智能选择基于token类型
         errors = []
         
-        # 根据default_provider决定尝试顺序
-        if self.default_provider == "auth0" or self.default_provider == "both":
-            if self.auth0_service:
+        # 首先尝试根据token header检测算法来决定使用哪个provider
+        try:
+            import jwt
+            header = jwt.get_unverified_header(token)
+            token_alg = header.get('alg', '')
+            logger.debug(f"Detected token algorithm: {token_alg}")
+            
+            # RS256 通常是Auth0, HS256 通常是Supabase
+            if token_alg == 'RS256' and self.auth0_service:
                 try:
                     payload = await self.auth0_service.verify_token(token)
-                    logger.debug("Token verified using Auth0")
+                    logger.debug("Token verified using Auth0 (detected RS256)")
+                    return payload, AuthProvider.AUTH0
+                except Exception as e:
+                    errors.append(f"Auth0: {str(e)}")
+                    logger.debug(f"Auth0 verification failed for RS256 token: {e}")
+                    # 对于RS256 token，如果Auth0失败了，不要再尝试Supabase
+                    error_msg = "; ".join(errors)
+                    logger.error(f"RS256 token verification failed: {error_msg}")
+                    raise ValueError(f"Token verification failed: {error_msg}")
+            
+            elif token_alg == 'HS256' and self.supabase_service:
+                try:
+                    payload = await self.supabase_service.verify_token(token)
+                    logger.debug("Token verified using Supabase (detected HS256)")
+                    return payload, AuthProvider.SUPABASE
+                except Exception as e:
+                    errors.append(f"Supabase: {str(e)}")
+                    logger.debug(f"Supabase verification failed for HS256 token: {e}")
+                    # 对于HS256 token，如果Supabase失败了，不要再尝试Auth0
+                    error_msg = "; ".join(errors)
+                    logger.error(f"HS256 token verification failed: {error_msg}")
+                    raise ValueError(f"Token verification failed: {error_msg}")
+                    
+        except ValueError:
+            # 重新抛出我们自己的ValueError
+            raise
+        except Exception as e:
+            logger.debug(f"Could not detect token algorithm: {e}")
+        
+        # 如果算法检测失败或对应的service不可用，回退到默认顺序
+        if self.default_provider == "auth0" or self.default_provider == "both":
+            if self.auth0_service and not any("Auth0:" in error for error in errors):
+                try:
+                    payload = await self.auth0_service.verify_token(token)
+                    logger.debug("Token verified using Auth0 (fallback)")
                     return payload, AuthProvider.AUTH0
                 except Exception as e:
                     errors.append(f"Auth0: {str(e)}")
         
         if self.default_provider == "supabase" or self.default_provider == "both":
-            if self.supabase_service:
+            if self.supabase_service and not any("Supabase:" in error for error in errors):
                 try:
                     payload = await self.supabase_service.verify_token(token)
-                    logger.debug("Token verified using Supabase")
+                    logger.debug("Token verified using Supabase (fallback)")
                     return payload, AuthProvider.SUPABASE
                 except Exception as e:
                     errors.append(f"Supabase: {str(e)}")

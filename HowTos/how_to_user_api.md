@@ -1,22 +1,22 @@
-# User Service API 使用指南
+# User Service API Guide
 
-## 🎯 概述
+## 🎯 Overview
 
-User Service API 是统一的用户数据管理服务，提供用户认证、使用记录、会话管理和积分交易等核心功能。所有其他服务必须通过此API访问用户相关数据，确保数据一致性和服务边界的清晰性。
+User Service API is a unified user data management service providing user authentication, usage recording, session management, and credit transactions. All other services must access user-related data through this API to ensure data consistency and clear service boundaries.
 
-**🌐 基础信息**
-- **服务地址**: `http://localhost:8100`
-- **API文档**: `http://localhost:8100/docs`
-- **认证方式**: Bearer Token (Auth0 JWT)
-- **数据格式**: JSON
+**🌐 Basic Information**
+- **Service URL**: `http://localhost:8100`
+- **API Documentation**: `http://localhost:8100/docs`
+- **Authentication**: Bearer Token (Auth0 JWT or Supabase JWT)
+- **Data Format**: JSON
 
-## 📊 性能指标 (已测试)
+## 📊 Performance Metrics (Tested)
 
-**🚀 实测性能数据**:
-- **响应时间**: 0.5-10ms (正常负载)
-- **并发处理**: 171.9 RPS 峰值性能
-- **扩展性**: 支持50+并发请求，成功率100%
-- **错误处理**: 45ms平均响应时间
+**🚀 Real Performance Data**:
+- **Response Time**: 0.5-10ms (normal load)
+- **Concurrent Processing**: 171.9 RPS peak performance
+- **Scalability**: Supports 50+ concurrent requests, 100% success rate
+- **Error Handling**: 45ms average response time
 
 ## 🔧 快速开始
 
@@ -37,7 +37,7 @@ curl -X POST "http://localhost:8100/api/v1/users/ensure" \
   -d '{"auth0_id": "auth0|test123", "email": "test@test.com", "name": "Test User"}'
 ```
 
-**成功响应**:
+**Success Response**:
 ```json
 {
   "success": true,
@@ -61,7 +61,7 @@ curl -X POST "http://localhost:8100/api/v1/users/auth0%7Ctest123/sessions" \
   -d '{"user_id": "auth0|test123", "conversation_data": {"topic": "test session"}, "metadata": {"source": "test"}}'
 ```
 
-**成功响应**:
+**Success Response**:
 ```json
 {
   "success": true,
@@ -79,7 +79,7 @@ curl -X POST "http://localhost:8100/api/v1/users/auth0%7Ctest123/sessions" \
 curl http://localhost:8100/health
 ```
 
-**响应示例**:
+**Response Example**:
 ```json
 {
   "status": "healthy",
@@ -108,7 +108,7 @@ curl http://localhost:8100/health
 curl http://localhost:8100/api/v1/subscriptions/plans
 ```
 
-**响应示例**:
+**Response Example**:
 ```json
 {
   "plans": {
@@ -180,8 +180,13 @@ Content-Type: application/json
 
 ## 📈 使用记录 API
 
-### 记录AI使用事件
+### 记录AI使用事件 (⚠️ 只记录使用历史，不扣除积分)
 **POST** `/api/v1/users/{user_id}/usage`
+
+**⚠️ 重要提醒**：此API **仅用于记录使用历史到数据库**，**不会扣除用户积分**！
+- ✅ 记录详细的AI使用信息（tokens、模型、成本等）
+- ❌ **不会从用户账户扣除积分**
+- 如需扣费，必须额外调用 `/credits/consume` API
 
 ```bash
 curl -X POST "http://localhost:8100/api/v1/users/auth0|123456789/usage" \
@@ -533,107 +538,37 @@ curl -X DELETE "http://localhost:8100/api/v1/sessions/975e7037-9a9a-475f-ac2a-3d
 }
 ```
 
-**安全特性** ⚠️:
-- 只能删除属于当前用户的会话
-- 删除会话会同时删除相关的消息和内存数据
-- 403错误：尝试删除其他用户的会话
-- 404错误：会话不存在或已被删除
+**Security Features** ⚠️:
+- Can only delete sessions belonging to current user
+- Deleting session will also delete related messages and memory data
+- 403 error: Attempting to delete another user's session
+- 404 error: Session does not exist or has been deleted
 
-## 💰 积分交易 API
+## 💰 Credit Management
 
-### 消费积分 ✅ (已测试)
-**POST** `/api/v1/users/{user_id}/credits/consume`
+**🔗 For complete credit management documentation, see:** [`how_to_user_credit.md`](how_to_user_credit.md)
 
-#### 真实测试示例
-```bash
-# 步骤1: 生成Token (使用实际user_id)
-curl -X POST "http://localhost:8100/auth/dev-token?user_id=google-oauth2%7C107896640181181053492&email=tmacdennisdddd@gmail.com"
+The User Service API provides credit management endpoints including:
+- Credit consumption: `POST /api/v1/users/{user_id}/credits/consume`
+- Credit balance query: `GET /api/v1/users/{user_id}/credits/balance`
+- Credit recharge: `POST /api/v1/users/{user_id}/credits/recharge`
+- Transaction history: `GET /api/v1/users/{user_id}/credits/transactions`
 
-# 步骤2: 消费积分
-curl -X POST "http://localhost:8100/api/v1/users/google-oauth2%7C107896640181181053492/credits/consume" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzNjkxNTEzLCJzdWIiOiJnb29nbGUtb2F1dGgyfDEwNzg5NjY0MDE4MTE4MTA1MzQ5MiIsImVtYWlsIjoidG1hY2Rlbm5pc2RkZGRAZ21haWwuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1MzY4Nzg1M30.J1Gt1eYoIrdvN26CGlTeNHBmd5jii058massdD_G3Dw" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "google-oauth2|107896640181181053492",
-    "amount": 25.5,
-    "reason": "GPT-4 API调用测试",
-    "endpoint": "/api/chat/completion"
-  }'
-```
+**⚠️ Important: API Responsibility Separation**
 
-**真实响应示例** ✅:
-```json
-{
-  "success": true,
-  "remaining_credits": 923.5,
-  "consumed_amount": 25.5,
-  "message": "成功消费 25.5 积分"
-}
-```
+| API Endpoint | Function | Deducts Credits | Records Usage |
+|--------------|----------|-----------------|---------------|
+| `POST /usage` | Record usage history | ❌ **No** | ✅ Detailed records |
+| `POST /credits/consume` | Consume credits | ✅ **Yes** | ❌ No usage details |
+| `GET /credits/balance` | Query balance | ❌ No | ❌ No |
 
-#### 重要说明 ⚠️
-- **user_id格式**: 必须使用数据库中的完整user_id (如: `google-oauth2|107896640181181053492`)
-- **amount类型**: 支持浮点数，如 `25.5` 积分
-- **真实扣费**: API会从数据库中实际扣除积分，并创建交易记录
-- **Token匹配**: JWT token中的`sub`字段必须与请求的`user_id`匹配
+**Best Practice**: Complete billing workflow should **call both APIs**:
+1. First call `/usage` to record detailed usage information
+2. Then call `/credits/consume` to deduct corresponding credits
 
-### 充值积分
-**POST** `/api/v1/users/{user_id}/credits/recharge`
+## 🔒 Security and Error Handling
 
-```bash
-curl -X POST "http://localhost:8100/api/v1/users/auth0|123456789/credits/recharge" \
-  -H "Authorization: Bearer <jwt_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "amount": 1000.0,
-    "description": "月度订阅充值 - Pro套餐",
-    "reference_id": "stripe_pi_abc123def456",
-    "metadata": {
-      "payment_method": "stripe",
-      "subscription_type": "pro_monthly",
-      "billing_cycle": "2025-07",
-      "invoice_id": "inv_xyz789"
-    }
-  }'
-```
-
-### 查询积分余额 ✅ (已测试)
-**GET** `/api/v1/users/{user_id}/credits/balance`
-
-#### 真实测试示例
-```bash
-# 查询当前积分余额
-curl "http://localhost:8100/api/v1/users/google-oauth2%7C107896640181181053492/credits/balance" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzNjkxNTEzLCJzdWIiOiJnb29nbGUtb2F1dGgyfDEwNzg5NjY0MDE4MTE4MTA1MzQ5MiIsImVtYWlsIjoidG1hY2Rlbm5pc2RkZGRAZ21haWwuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1MzY4Nzg1M30.J1Gt1eYoIrdvN26CGlTeNHBmd5jii058massdD_G3Dw"
-```
-
-**真实响应示例** ✅:
-```json
-{
-  "success": true,
-  "status": "success", 
-  "message": "Credit balance retrieved successfully",
-  "timestamp": "2025-07-28T00:35:31.550198",
-  "data": 1000.0
-}
-```
-
-#### 余额计算逻辑
-- **初始余额**: 从 `users` 表的 `credits_remaining` 字段获取 (如: 1000.0)
-- **交易历史**: 如果有交易记录，使用最新交易的 `credits_after` 值
-- **实时更新**: 每次积分操作后立即更新余额
-
-### 获取交易历史
-**GET** `/api/v1/users/{user_id}/credits/transactions`
-
-```bash
-curl "http://localhost:8100/api/v1/users/auth0|123456789/credits/transactions?transaction_type=consume&limit=20&offset=0&start_date=2025-07-01T00:00:00Z" \
-  -H "Authorization: Bearer <jwt_token>"
-```
-
-## 🔒 安全和错误处理
-
-### 错误响应格式
+### Error Response Format
 ```json
 {
   "success": false,
@@ -649,24 +584,24 @@ curl "http://localhost:8100/api/v1/users/auth0|123456789/credits/transactions?tr
 }
 ```
 
-### HTTP状态码
-- `200 OK` - 请求成功
-- `400 Bad Request` - 请求参数错误
-- `401 Unauthorized` - 未提供认证token
-- `403 Forbidden` - 认证失败或权限不足
-- `404 Not Found` - 资源不存在
-- `429 Too Many Requests` - 请求频率过高
-- `500 Internal Server Error` - 服务器内部错误
+### HTTP Status Codes
+- `200 OK` - Request successful
+- `400 Bad Request` - Request parameter error
+- `401 Unauthorized` - Authentication token not provided
+- `403 Forbidden` - Authentication failed or insufficient permissions
+- `404 Not Found` - Resource not found
+- `429 Too Many Requests` - Request rate too high
+- `500 Internal Server Error` - Internal server error
 
-### 安全最佳实践
-1. **始终使用HTTPS** (生产环境)
-2. **妥善保管JWT Token** - 不要在前端代码中硬编码
-3. **实现Token刷新机制** - 处理token过期
-4. **验证用户权限** - 确保用户只能访问自己的数据
-5. **输入验证** - 所有用户输入都会被验证
-6. **频率限制** - API实现了智能频率限制
+### Security Best Practices
+1. **Always use HTTPS** (production environment)
+2. **Properly manage JWT Tokens** - Do not hard-code in frontend code
+3. **Implement token refresh mechanism** - Handle token expiration
+4. **Verify user permissions** - Ensure users can only access their own data
+5. **Input validation** - All user input is validated
+6. **Rate limiting** - API implements intelligent rate limiting
 
-## 📊 集成示例
+## 📊 Integration Examples
 
 ### Python集成示例
 ```python
@@ -1138,42 +1073,48 @@ echo $SESSION_RESPONSE | jq
 SESSION_ID=$(echo $SESSION_RESPONSE | jq -r '.session_id')
 echo "Session ID: $SESSION_ID"
 
-echo -e "\n=== 测试完成 ==="
+echo -e "\n=== Testing Complete ==="
 ```
 
-## 📞 支持
+## 📞 Support
 
-- **API文档**: http://localhost:8100/docs
-- **健康检查**: http://localhost:8100/health  
-- **GitHub仓库**: [项目链接]
-- **技术支持**: [联系方式]
+- **API Documentation**: http://localhost:8100/docs
+- **Health Check**: http://localhost:8100/health  
+- **GitHub Repository**: [Project Link]
+- **Technical Support**: [Contact Information]
 
 ---
 
-## 📝 更新日志
+## 📝 Changelog
+
+### 2025-08-10
+- ✅ **Documentation Cleanup**: Standardized language to English, removed duplications
+- ✅ **Credit Management**: Moved detailed credit documentation to separate file
+- ✅ **Authentication**: Updated to support both Auth0 and Supabase JWT tokens
+- ✅ **Consistency**: Improved consistency across all documentation files
 
 ### 2025-07-28
-- ✅ **重大修复**: 积分扣费功能完全修复
-- ✅ **模型修复**: CreditConsumption和CreditTransaction模型字段类型和命名
-- ✅ **API修复**: user_id参数类型 (int→str)，支持完整OAuth格式
-- ✅ **数据库修复**: 字段映射 (amount→credits_amount, balance→credits_before/after)
-- ✅ **余额逻辑修复**: 正确计算初始余额和交易后余额
-- ✅ **真实测试**: 验证完整扣费流程，实际扣除用户积分77积分
-- 📝 **文档更新**: 添加积分扣费API真实测试示例和故障排除指南
+- ✅ **Major Fix**: Credit deduction functionality completely fixed
+- ✅ **Model Fix**: CreditConsumption and CreditTransaction model field types and naming
+- ✅ **API Fix**: user_id parameter type (int→str), supports complete OAuth format
+- ✅ **Database Fix**: Field mapping (amount→credits_amount, balance→credits_before/after)
+- ✅ **Balance Logic Fix**: Correctly calculate initial balance and post-transaction balance
+- ✅ **Real Testing**: Verified complete deduction process, actually deducted 77 credits
+- 📝 **Documentation Update**: Added real credit deduction API test examples and troubleshooting guide
 
 ### 2025-07-27
-- ✅ **修复**: Session API datetime 序列化问题
-- ✅ **修复**: SessionMessage 模型字段不匹配 (UUID vs int)
-- ✅ **新增**: 完整的真实测试示例和响应数据
-- ✅ **新增**: 开发环境 JWT Token 生成端点说明
-- ✅ **新增**: 详细的故障排除指南和调试脚本
-- ✅ **验证**: 会话创建、状态更新、消息添加/获取、分页等功能
-- ✅ **测试**: 会话管理完整流程 (创建→添加消息→获取消息→更新状态→删除)
-- ✅ **新增**: 会话删除功能及完整测试验证
-- 📝 **文档**: 添加真实API调用示例和完整响应数据
+- ✅ **Fix**: Session API datetime serialization issue
+- ✅ **Fix**: SessionMessage model field mismatch (UUID vs int)
+- ✅ **Added**: Complete real test examples and response data
+- ✅ **Added**: Development environment JWT Token generation endpoint description
+- ✅ **Added**: Detailed troubleshooting guide and debugging scripts
+- ✅ **Verified**: Session creation, status updates, message addition/retrieval, pagination functions
+- ✅ **Tested**: Complete session management workflow (create→add message→get message→update status→delete)
+- ✅ **Added**: Session deletion functionality and complete test verification
+- 📝 **Documentation**: Added real API call examples and complete response data
 
 ### 2025-07-25 
-- 📖 初始文档创建
-- 📊 性能指标和API规范
+- 📖 Initial documentation creation
+- 📊 Performance metrics and API specifications
 
-**📝 最后更新**: 2025-07-28 | API版本: v1.0 | 服务版本: 2.0.0 | 状态: ✅ 已测试验证 | 积分扣费: ✅ 完全修复
+**📝 Last Updated**: 2025-08-10 | API Version: v1.0 | Service Version: 2.0.0 | Status: ✅ Tested and Verified | Credit Deduction: ✅ Completely Fixed

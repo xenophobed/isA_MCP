@@ -29,10 +29,43 @@ pgvector>=0.2.0           # PostgreSQL vector extension
 # Data processing
 pandas>=1.5.0             # For CSV/Excel processing
 openpyxl>=3.1.0           # For Excel files
+xlrd>=2.0.0               # For legacy Excel files
 numpy>=1.24.0             # Numerical computing
 PyMuPDF>=1.23.0           # For PDF processing (fitz module)
 PyPDF2>=3.0.0             # For PDF processing
 dask[complete]>=2023.12.0 # Distributed computing for pipeline acceleration
+
+# Time series analysis
+prophet>=1.1.4            # Facebook Prophet for time series forecasting
+statsmodels>=0.14.0       # Statistical models for time series
+scikit-learn>=1.3.0       # Machine learning algorithms
+
+# Advanced ML libraries
+tensorflow>=2.15.0        # Deep learning framework
+torch>=2.1.0              # PyTorch for deep learning
+torchvision>=0.16.0       # PyTorch vision utilities
+xgboost>=2.0.0            # Gradient boosting framework
+lightgbm>=4.1.0           # Microsoft's gradient boosting
+catboost>=1.2.0           # Yandex's gradient boosting
+
+# Data visualization
+matplotlib>=3.8.0         # Core plotting library
+seaborn>=0.13.0           # Statistical data visualization
+plotly>=5.17.0            # Interactive web-based plots
+bokeh>=3.3.0              # Interactive visualization
+altair>=5.2.0             # Declarative statistical visualization
+
+# ML model interpretation
+shap>=0.44.0              # SHapley Additive exPlanations
+lime>=0.2.0               # Local Interpretable Model-agnostic Explanations
+
+# Dimensionality reduction and clustering
+umap-learn>=0.5.0         # UMAP dimensionality reduction
+hdbscan>=0.8.0            # Hierarchical density-based clustering
+
+# Model serving and deployment
+flask>=3.0.0              # Lightweight web framework for model APIs
+joblib>=1.3.0             # Model persistence
 
 # Web automation
 playwright>=1.40.0

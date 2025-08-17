@@ -379,55 +379,7 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
         )
 
 
-@app.post("/api/v1/users/{user_id}/credits/consume", tags=["Users"])
-async def consume_user_credits(
-    user_id: str,
-    consumption: CreditConsumption,
-    current_user = Depends(get_current_user)
-):
-    """
-    消费用户积分
-    """
-    try:
-        # 验证用户权限
-        token_user_id = current_user["sub"]
-        if user_id != token_user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: user_id mismatch"
-            )
-        
-        # 使用统一的积分服务来实际扣费
-        credit_result = await credit_service.consume_credits(
-            user_id=user_id,
-            amount=consumption.amount,
-            description=f"Credit consumption via legacy API - {consumption.reason}",
-            usage_record_id=None
-        )
-        
-        if not credit_result.is_success:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Failed to consume credits: {credit_result.message}"
-            )
-        
-        result = {
-            "success": True,
-            "remaining_credits": credit_result.data.credits_after,
-            "consumed_amount": consumption.amount,
-            "message": f"成功消费 {consumption.amount} 积分"
-        }
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error consuming credits: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to consume credits: {str(e)}"
-        )
+# Legacy credits consume endpoint removed - using V2 unified endpoint only
 
 
 # 订阅管理路由
@@ -994,27 +946,39 @@ async def delete_session(
 @app.post("/api/v1/users/{user_id}/credits/consume", response_model=Dict[str, Any], tags=["Credits"])
 async def consume_credits_v2(
     user_id: str,
-    amount: float,
-    description: Optional[str] = None,
-    usage_record_id: Optional[int] = None,
+    consumption: CreditConsumption,
     current_user = Depends(get_current_user)
 ):
     """
     Consume user credits (V2 - unified)
-    Replaces the existing credits consumption endpoint
+    Supports both Auth0 and Supabase tokens via UnifiedAuthService
     """
     try:
+        # 验证用户权限
+        token_user_id = current_user["sub"]
+        if user_id != token_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: user_id mismatch"
+            )
+        
         result = await credit_service.consume_credits(
             user_id=user_id,
-            amount=amount,
-            description=description,
-            usage_record_id=usage_record_id
+            amount=consumption.amount,
+            description=consumption.reason,
+            usage_record_id=getattr(consumption, 'usage_record_id', None)
         )
         
         if not result.is_success:
             raise HTTPException(status_code=400, detail=result.message)
         
-        return result.to_dict()
+        # 返回与旧API兼容的格式
+        return {
+            "success": True,
+            "remaining_credits": result.data.credits_after,
+            "consumed_amount": consumption.amount,
+            "message": f"成功消费 {consumption.amount} 积分"
+        }
         
     except HTTPException:
         raise

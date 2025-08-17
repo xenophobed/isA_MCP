@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Import pipeline components
-from ...processors.data_processors.metadata_extractor import extract_metadata, MetadataExtractor
+from ...processors.data_processors.core.metadata_extractor import extract_metadata, MetadataExtractor
 from .semantic_enricher import enrich_metadata, AISemanticEnricher
 from .metadata_embedding import get_embedding_service, AIMetadataEmbeddingService
 

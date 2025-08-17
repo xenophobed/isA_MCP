@@ -127,33 +127,53 @@ async def process_with_chat_api(event_data: Dict[str, Any], event_id: Optional[s
         # Create intelligent prompt based on event type
         prompt = create_event_processing_prompt(event_data)
         
-        # Prepare payload for chat API
+        # Prepare payload for chat API (correct format)
         chat_payload = {
             "message": prompt,
             "user_id": event_data.get("data", {}).get("user_id", "event_system"),
-            "metadata": {
-                "event_id": event_id,
-                "event_type": event_data.get("event_type"),
-                "source": "event_service",
-                "timestamp": datetime.now().isoformat()
-            }
+            "session_id": f"event_session_{event_data.get('task_id', 'unknown')}",
+            "prompt_name": None,
+            "prompt_args": {}
         }
         
-        # Send to chat API
+        # Send to chat API (correct endpoint)
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{CHAT_API_URL}/api/chat/message",
+                f"{CHAT_API_URL}/api/chat",
                 json=chat_payload,
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer dev_key_test"
+                },
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
-                    result = await response.json()
-                    logger.info(f"📤 Chat API processed event successfully")
+                    # Process SSE stream from Chat API
+                    complete_response = ""
+                    chat_events = []
+                    
+                    async for line in response.content:
+                        line_text = line.decode('utf-8').strip()
+                        
+                        if line_text.startswith('data: ') and line_text != 'data: [DONE]':
+                            try:
+                                event_data = json.loads(line_text[6:])  # Remove 'data: ' prefix
+                                chat_events.append(event_data)
+                                
+                                # Accumulate LLM chunks for complete response
+                                if (event_data.get("type") == "custom_stream" and 
+                                    event_data.get("content", {}).get("custom_llm_chunk")):
+                                    complete_response += event_data["content"]["custom_llm_chunk"]
+                                    
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"Failed to parse SSE event: {e}")
+                                continue
+                    
+                    logger.info(f"📤 Chat API processed event successfully: {len(chat_events)} events")
                     return {
-                        "chat_response": result.get("response", ""),
-                        "processing_time": result.get("processing_time", 0),
-                        "model_used": result.get("model", "unknown"),
+                        "chat_response": complete_response,
+                        "chat_events": chat_events,
+                        "events_count": len(chat_events),
                         "processed_at": datetime.now().isoformat()
                     }
                 else:

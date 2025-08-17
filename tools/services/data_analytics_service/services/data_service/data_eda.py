@@ -296,14 +296,21 @@ class DataEDAService:
             if include_ai_insights and self.text_generator is not None:
                 try:
                     import asyncio
-                    # Check if we're in an async context
-                    try:
-                        loop = asyncio.get_running_loop()
-                        # If we're in an async context, we need to schedule the coroutine properly
-                        ai_insights = loop.run_until_complete(self._generate_ai_insights(eda_results, target_column))
-                    except RuntimeError:
-                        # No event loop running, create a new one
-                        ai_insights = asyncio.run(self._generate_ai_insights(eda_results, target_column))
+                    import concurrent.futures
+                    
+                    # Use a thread pool to avoid event loop conflicts
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        # Create a new event loop in the thread
+                        def run_ai_insights():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            try:
+                                return loop.run_until_complete(self._generate_ai_insights(eda_results, target_column))
+                            finally:
+                                loop.close()
+                        
+                        future = executor.submit(run_ai_insights)
+                        ai_insights = future.result(timeout=30)  # 30 second timeout
                     
                     insights["ai_insights"] = ai_insights
                 except Exception as e:

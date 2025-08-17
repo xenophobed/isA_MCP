@@ -1,21 +1,35 @@
 #!/usr/bin/env python3
 """
 Data Processors Package
-Advanced data processing tools building on existing infrastructure
+Advanced data processing tools organized by functionality for better maintainability
 """
 
-from .csv_processor import CSVProcessor
-from .metadata_extractor import MetadataExtractor
-from .statistics_processor import StatisticsProcessor
-from .data_quality_processor import DataQualityProcessor
-from .feature_processor import FeatureProcessor
-from .ml_processor import MLProcessor
+# Core data processing
+from .core import CSVProcessor, DataQualityProcessor, MetadataExtractor
+
+# ML/DL models  
+from .ml_models import (
+    TimeSeriesProcessor, DeepLearningProcessor, UnsupervisedProcessor,
+    EnsembleProcessor, MLProcessor, ModelServingProcessor
+)
+
+# Analysis engines
+from .analysis_engines import AIAnalysisEngine, SemanticAnalyzer, StatisticsProcessor
+
+# Utilities
+from .utilities import FeatureProcessor
 
 __all__ = [
-    'CSVProcessor',
-    'MetadataExtractor', 
-    'StatisticsProcessor',
-    'DataQualityProcessor',
-    'FeatureProcessor',
-    'MLProcessor'
+    # Core
+    'CSVProcessor', 'DataQualityProcessor', 'MetadataExtractor',
+    
+    # ML/DL Models
+    'TimeSeriesProcessor', 'DeepLearningProcessor', 'UnsupervisedProcessor', 
+    'EnsembleProcessor', 'MLProcessor', 'ModelServingProcessor',
+    
+    # Analysis
+    'AIAnalysisEngine', 'SemanticAnalyzer', 'StatisticsProcessor',
+    
+    # Utilities  
+    'FeatureProcessor'
 ]

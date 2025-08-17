@@ -36,7 +36,9 @@ class Auth0Service:
         self.audience = audience
         self.client_id = client_id
         self.client_secret = client_secret
-        self.jwks_client = PyJWKClient(f"https://{domain}/.well-known/jwks.json")
+        self.jwks_client = PyJWKClient(
+            f"https://{domain}/.well-known/jwks.json"
+        )
         self._management_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
         
@@ -61,16 +63,40 @@ class Auth0Service:
         """
         try:
             # 获取signing key
+            logger.debug(f"Attempting to get signing key from token with kid: {jwt.get_unverified_header(token).get('kid')}")
             signing_key = self.jwks_client.get_signing_key_from_jwt(token)
+            logger.debug(f"Successfully obtained signing key of type: {type(signing_key.key)}")
 
-            # 验证token
-            payload = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["RS256"],
-                audience=self.audience,
-                issuer=f"https://{self.domain}/"
-            )
+            # 尝试标准JWT验证（支持单一audience）
+            try:
+                payload = jwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    audience=self.audience,
+                    issuer=f"https://{self.domain}/"
+                )
+                logger.info(f"Token verified for user: {payload.get('sub')}")
+                return payload
+            except jwt.InvalidAudienceError as e:
+                # 如果audience验证失败，尝试手动验证多个audience
+                logger.debug(f"Standard audience verification failed, trying manual verification: {e}")
+                payload = jwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    issuer=f"https://{self.domain}/",
+                    options={"verify_aud": False}  # 禁用自动audience验证
+                )
+                
+                # 手动验证audience：如果token包含多个audience，确保我们的audience在其中
+                token_audiences = payload.get("aud", [])
+                if isinstance(token_audiences, str):
+                    token_audiences = [token_audiences]
+                
+                if self.audience not in token_audiences:
+                    logger.error(f"Audience mismatch. Expected: {self.audience}, Token audiences: {token_audiences}")
+                    raise jwt.InvalidAudienceError(f"Invalid audience. Expected {self.audience} in {token_audiences}")
 
             logger.info(f"Token verified for user: {payload.get('sub')}")
             return payload

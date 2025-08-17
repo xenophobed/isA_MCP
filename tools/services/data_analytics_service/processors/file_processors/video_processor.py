@@ -14,8 +14,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from .audio_processor import AudioProcessor
-from .vlm_processor import VLMProcessor
+# Import will be done dynamically to avoid circular imports
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +65,9 @@ class VideoProcessor:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
-        self.audio_processor = AudioProcessor(config)
-        self.vlm_processor = VLMProcessor(config)
+        # Initialize processors lazily to avoid circular imports
+        self._audio_processor = None
+        self._vlm_processor = None
         
         # Video processing settings
         self.key_frame_interval = self.config.get('key_frame_interval', 30)  # frames
@@ -274,13 +274,23 @@ class VideoProcessor:
             analyzed_frames = []
             for frame_info in key_frames:
                 if 'frame_path' in frame_info:
-                    vlm_result = await self.vlm_processor.analyze_image_content(
-                        frame_info['frame_path'],
-                        {'analysis_type': 'comprehensive'}
-                    )
-                    
-                    if vlm_result.get('success'):
-                        frame_info['vlm_analysis'] = vlm_result['result']
+                    # Use intelligence service for frame analysis
+                    try:
+                        from tools.services.intelligence_service.vision.image_analyzer import ImageAnalyzer
+                        analyzer = ImageAnalyzer()
+                        vlm_result = await analyzer.analyze(
+                            image=frame_info['frame_path'],
+                            prompt="Analyze this video frame comprehensively. Describe what you see, identify objects, and provide context."
+                        )
+                        
+                        if vlm_result.success:
+                            frame_info['vlm_analysis'] = {
+                                'description': vlm_result.response,
+                                'model_used': vlm_result.model_used
+                            }
+                    except Exception as e:
+                        logger.warning(f"VLM analysis failed for frame: {e}")
+                        frame_info['vlm_analysis'] = {'description': 'Analysis unavailable'}
                     
                     analyzed_frames.append(frame_info)
             

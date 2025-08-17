@@ -180,14 +180,21 @@ class DataModelingService:
                 logger.info("Generating AI guidance...")
                 try:
                     import asyncio
-                    # Check if we're in an async context
-                    try:
-                        loop = asyncio.get_running_loop()
-                        # If we're in an async context, we need to schedule the coroutine properly
-                        ai_guidance = loop.run_until_complete(self._generate_ai_guidance(results, target_column))
-                    except RuntimeError:
-                        # No event loop running, create a new one
-                        ai_guidance = asyncio.run(self._generate_ai_guidance(results, target_column))
+                    import concurrent.futures
+                    
+                    # Use a thread pool to avoid event loop conflicts
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        # Create a new event loop in the thread
+                        def run_ai_guidance():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            try:
+                                return loop.run_until_complete(self._generate_ai_guidance(results, target_column))
+                            finally:
+                                loop.close()
+                        
+                        future = executor.submit(run_ai_guidance)
+                        ai_guidance = future.result(timeout=30)  # 30 second timeout
                     
                     results["ai_guidance"] = ai_guidance
                 except Exception as e:

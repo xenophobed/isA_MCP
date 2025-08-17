@@ -8,7 +8,7 @@ Determines the most appropriate processing strategy for each asset.
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 import mimetypes
 
@@ -37,7 +37,28 @@ except ImportError:
     HAS_MAGIC = False
     logger.warning("python-magic not available, using mimetypes fallback")
 
-from ...models.base_models import AssetType
+try:
+    import cv2
+    import numpy as np
+    HAS_OPENCV = True
+except ImportError:
+    HAS_OPENCV = False
+    logger.warning("OpenCV not available, advanced image analysis will be limited")
+
+# Define AssetType enum locally
+from enum import Enum
+
+class AssetType(Enum):
+    """Digital asset types"""
+    PDF_NATIVE = "pdf_native"
+    PDF_SCANNED = "pdf_scanned" 
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+    POWERPOINT = "powerpoint"
+    WORD = "word"
+    EXCEL = "excel"
+    UNKNOWN = "unknown"
 
 class AssetDetector:
     """

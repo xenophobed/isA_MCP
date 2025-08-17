@@ -444,6 +444,213 @@ def register_data_analytics_tools(mcp: FastMCP):
         )
     
     @mcp.tool()
+    async def perform_eda_analysis(
+        data_path: str,
+        target_column: str = None,
+        include_ai_insights: bool = True,
+        request_id: str = None
+    ) -> str:
+        """
+        Perform comprehensive exploratory data analysis (EDA) on any dataset
+        
+        This tool analyzes datasets to understand data patterns, relationships, and quality:
+        - Statistical analysis and correlations
+        - Feature importance and contribution analysis  
+        - Data quality assessment
+        - AI-generated insights and recommendations
+        
+        Perfect for: understanding data patterns, finding key factors, data quality checks
+        
+        Keywords: eda, analysis, explore, statistics, correlation, features, insights, patterns
+        Category: data_analytics
+        
+        Args:
+            data_path: Path to data file (CSV, Excel, JSON, etc.)
+            target_column: Optional target column to focus analysis on (e.g., "sales", "revenue")
+            include_ai_insights: Whether to include AI-generated insights (default: True)
+            request_id: Optional custom request identifier
+        
+        Returns:
+            JSON with comprehensive EDA results including statistics, correlations, and insights
+        """
+        analytics_tool = DataAnalyticsTool()
+        service = analytics_tool._get_service("default_analytics")
+        
+        result = await service.perform_exploratory_data_analysis(
+            data_path=data_path,
+            target_column=target_column,
+            include_ai_insights=include_ai_insights,
+            request_id=request_id
+        )
+        
+        return analytics_tool.create_response(
+            "success" if result["success"] else "error",
+            "perform_eda_analysis", 
+            result,
+            result.get("error_message") if not result["success"] else None
+        )
+
+    @mcp.tool()
+    async def develop_ml_model(
+        data_path: str,
+        target_column: str,
+        problem_type: str = None,
+        include_feature_engineering: bool = True,
+        include_ai_guidance: bool = True,
+        request_id: str = None
+    ) -> str:
+        """
+        Develop machine learning models for prediction and forecasting
+        
+        This tool builds ML models for various prediction tasks:
+        - Time series forecasting (Prophet, ARIMA) for sales/revenue prediction
+        - Classification models for categorical predictions
+        - Regression models for numerical predictions
+        - Automatic feature engineering and model selection
+        
+        Perfect for: sales forecasting, demand prediction, trend analysis, predictive modeling
+        
+        Keywords: model, prediction, forecast, prophet, time series, ml, machine learning
+        Category: data_analytics
+        
+        Args:
+            data_path: Path to data file (CSV, Excel, JSON, etc.)
+            target_column: Target variable to predict (e.g., "sales", "revenue", "demand")
+            problem_type: Type of problem - "regression", "classification", "time_series", or auto-detect
+            include_feature_engineering: Whether to perform automatic feature engineering (default: True)
+            include_ai_guidance: Whether to include AI modeling guidance (default: True)
+            request_id: Optional custom request identifier
+        
+        Returns:
+            JSON with model results including performance metrics, predictions, and recommendations
+        """
+        analytics_tool = DataAnalyticsTool()
+        service = analytics_tool._get_service("default_analytics")
+        
+        result = await service.develop_machine_learning_model(
+            data_path=data_path,
+            target_column=target_column,
+            problem_type=problem_type,
+            include_feature_engineering=include_feature_engineering,
+            include_ai_guidance=include_ai_guidance,
+            request_id=request_id
+        )
+        
+        return analytics_tool.create_response(
+            "success" if result["success"] else "error",
+            "develop_ml_model",
+            result, 
+            result.get("error_message") if not result["success"] else None
+        )
+
+    @mcp.tool()
+    async def perform_statistical_analysis(
+        data_path: str,
+        analysis_type: str = "comprehensive",
+        target_columns: str = None,
+        request_id: str = None
+    ) -> str:
+        """
+        Perform comprehensive statistical analysis including hypothesis testing, correlations, and distributions
+        
+        This tool provides advanced statistical analysis capabilities:
+        - Hypothesis testing (t-tests, Mann-Whitney U, chi-square tests)
+        - Correlation analysis (Pearson, Spearman, Kendall)
+        - Distribution analysis and normality testing
+        - Outlier detection using multiple methods
+        - Categorical variable analysis
+        
+        Perfect for: understanding data relationships, validating assumptions, detecting patterns
+        
+        Keywords: statistics, hypothesis, correlation, distribution, significance, testing, analysis
+        Category: data_analytics
+        
+        Args:
+            data_path: Path to data file (CSV, Excel, JSON, etc.)
+            analysis_type: Type of analysis ("comprehensive", "hypothesis_testing", "correlations", "distributions")
+            target_columns: Optional comma-separated list of specific columns to analyze
+            request_id: Optional custom request identifier
+        
+        Returns:
+            JSON with comprehensive statistical analysis results including tests, correlations, and insights
+        """
+        analytics_tool = DataAnalyticsTool()
+        service = analytics_tool._get_service("default_analytics")
+        
+        # Parse target columns if provided
+        target_columns_list = None
+        if target_columns:
+            target_columns_list = [col.strip() for col in target_columns.split(",")]
+        
+        result = await service.perform_statistical_analysis(
+            data_path=data_path,
+            analysis_type=analysis_type,
+            target_columns=target_columns_list,
+            request_id=request_id
+        )
+        
+        return analytics_tool.create_response(
+            "success" if result["success"] else "error",
+            "perform_statistical_analysis",
+            result,
+            result.get("error_message") if not result["success"] else None
+        )
+
+    @mcp.tool()
+    async def perform_ab_testing(
+        data_path: str,
+        control_group_column: str,
+        treatment_group_column: str,
+        metric_column: str,
+        confidence_level: float = 0.95,
+        request_id: str = None
+    ) -> str:
+        """
+        Perform A/B testing analysis with statistical significance testing and confidence intervals
+        
+        This tool provides comprehensive A/B testing capabilities:
+        - Statistical significance testing (t-test, Mann-Whitney U)
+        - Effect size calculation (Cohen's d)
+        - Confidence intervals for differences
+        - Power analysis and sample size assessment
+        - Business impact interpretation
+        
+        Perfect for: experiment evaluation, treatment effectiveness, business decision support
+        
+        Keywords: ab testing, experiment, significance, treatment, control, hypothesis, effect
+        Category: data_analytics
+        
+        Args:
+            data_path: Path to data file containing experiment data
+            control_group_column: Column name identifying control group (should contain 1 for control group members)
+            treatment_group_column: Column name identifying treatment group (should contain 1 for treatment group members)
+            metric_column: Column name containing the metric to test (e.g., conversion_rate, revenue)
+            confidence_level: Confidence level for statistical tests (default: 0.95)
+            request_id: Optional custom request identifier
+        
+        Returns:
+            JSON with A/B testing results including statistical tests, effect sizes, and business recommendations
+        """
+        analytics_tool = DataAnalyticsTool()
+        service = analytics_tool._get_service("default_analytics")
+        
+        result = await service.perform_ab_testing(
+            data_path=data_path,
+            control_group_column=control_group_column,
+            treatment_group_column=treatment_group_column,
+            metric_column=metric_column,
+            confidence_level=confidence_level,
+            request_id=request_id
+        )
+        
+        return analytics_tool.create_response(
+            "success" if result["success"] else "error",
+            "perform_ab_testing",
+            result,
+            result.get("error_message") if not result["success"] else None
+        )
+
+    @mcp.tool()
     async def get_analytics_status(
         database_name: str = "default_analytics"
     ) -> str:

@@ -9,17 +9,17 @@ import json
 from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from tools.base_tool import BaseTool
-from tools.services.data_analytics_service.services.digital_service.rag_service import rag_service
+from tools.services.data_analytics_service.services.digital_analytics_service import get_digital_analytics_service
 from core.logging import get_logger
 
 logger = get_logger(__name__)
 
 class DigitalAnalyticsTool(BaseTool):
-    """Digital analytics tool for knowledge management and RAG operations"""
+    """Digital analytics tool for knowledge management and RAG operations using unified service"""
     
     def __init__(self):
         super().__init__()
-        self.rag = rag_service
+        self.analytics_service = get_digital_analytics_service()
     
     async def store_knowledge(
         self,
@@ -36,7 +36,7 @@ class DigitalAnalyticsTool(BaseTool):
             metadata: Optional metadata for the knowledge item
         """
         try:
-            result = await self.rag.store_knowledge(user_id, text, metadata)
+            result = await self.analytics_service.store_knowledge(user_id, text, metadata)
             
             return self.create_response(
                 "success" if result['success'] else "error",
@@ -70,7 +70,7 @@ class DigitalAnalyticsTool(BaseTool):
             enable_rerank: Enable reranking for better relevance
         """
         try:
-            result = await self.rag.search_knowledge(
+            result = await self.analytics_service.search_knowledge(
                 user_id, query, top_k, enable_rerank
             )
             
@@ -104,7 +104,7 @@ class DigitalAnalyticsTool(BaseTool):
             context_limit: Maximum context items to use
         """
         try:
-            result = await self.rag.generate_response(
+            result = await self.analytics_service.generate_rag_response(
                 user_id, query, context_limit
             )
             
@@ -142,7 +142,7 @@ class DigitalAnalyticsTool(BaseTool):
             metadata: Metadata for all chunks
         """
         try:
-            result = await self.rag.add_document(
+            result = await self.analytics_service.add_document(
                 user_id, document, chunk_size, overlap, metadata
             )
             
@@ -169,7 +169,7 @@ class DigitalAnalyticsTool(BaseTool):
             user_id: User identifier
         """
         try:
-            result = await self.rag.list_user_knowledge(user_id)
+            result = await self.analytics_service.list_user_knowledge(user_id)
             
             return self.create_response(
                 "success" if result['success'] else "error",
@@ -199,7 +199,7 @@ class DigitalAnalyticsTool(BaseTool):
             knowledge_id: Knowledge item identifier
         """
         try:
-            result = await self.rag.get_knowledge(user_id, knowledge_id)
+            result = await self.analytics_service.get_knowledge_item(user_id, knowledge_id)
             
             return self.create_response(
                 "success" if result['success'] else "error",
@@ -229,7 +229,7 @@ class DigitalAnalyticsTool(BaseTool):
             knowledge_id: Knowledge item identifier
         """
         try:
-            result = await self.rag.delete_knowledge(user_id, knowledge_id)
+            result = await self.analytics_service.delete_knowledge_item(user_id, knowledge_id)
             
             return self.create_response(
                 "success" if result['success'] else "error",
@@ -261,7 +261,7 @@ class DigitalAnalyticsTool(BaseTool):
             top_k: Number of context items to return
         """
         try:
-            result = await self.rag.retrieve_context(user_id, query, top_k)
+            result = await self.analytics_service.retrieve_context(user_id, query, top_k)
             
             return self.create_response(
                 "success" if result['success'] else "error",
@@ -458,33 +458,17 @@ def register_digital_analytics_tools(mcp: FastMCP):
         return await digital_tool.retrieve_context(user_id, query, top_k)
     
     @mcp.tool()
-    def get_rag_service_status() -> str:
+    async def get_analytics_service_status() -> str:
         """
-        Get current status and configuration of the RAG service
+        Get current status and configuration of the Digital Analytics Service
         
-        This tool provides information about the RAG service configuration and health status.
+        This tool provides information about the analytics service configuration and health status.
         
-        Keywords: status, health, configuration, service, RAG
+        Keywords: status, health, configuration, service, analytics
         Category: system_info
         """
-        status = {
-            "service_name": "RAG Service",
-            "status": "active",
-            "table_name": rag_service.table_name,
-            "default_chunk_size": rag_service.default_chunk_size,
-            "default_overlap": rag_service.default_overlap,
-            "default_top_k": rag_service.default_top_k,
-            "embedding_model": rag_service.embedding_model,
-            "rerank_enabled": rag_service.enable_rerank,
-            "capabilities": [
-                "knowledge_storage",
-                "semantic_search", 
-                "document_chunking",
-                "rag_generation",
-                "mcp_integration",
-                "user_isolation"
-            ]
-        }
+        service = get_digital_analytics_service()
+        status = await service.get_service_stats()
         
         return json.dumps(status, indent=2, ensure_ascii=False)
     

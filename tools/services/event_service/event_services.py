@@ -23,6 +23,13 @@ class EventSourceTaskType(Enum):
     SCHEDULE = "schedule"
     NEWS_DIGEST = "news_digest"
     THRESHOLD_WATCH = "threshold_watch"
+    # 新增事件触发任务
+    NEWS_MONITOR = "news_monitor"        # 新闻监控
+    WEATHER_ALERT = "weather_alert"      # 天气预警
+    PRICE_TRACKER = "price_tracker"      # 价格跟踪
+    # 新增定时任务
+    DAILY_WEATHER = "daily_weather"      # 每日天气
+    DAILY_NEWS = "daily_news"            # 每日新闻
 
 @dataclass
 class EventSourceTask:
