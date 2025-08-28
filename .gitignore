@@ -140,7 +140,6 @@ sessions/
 screenshots/
 generated_images/
 media_storage/
-storage/
 models/models/
 
 # Cache directories

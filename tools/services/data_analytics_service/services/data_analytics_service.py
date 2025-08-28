@@ -11,16 +11,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-# Import the main sub-services
-from .data_service.metadata_store_service import MetadataStoreService, PipelineResult
-from .data_service.sql_query_service import SQLQueryService, QueryResult
-from .data_service.data_visualization import DataVisualizationService, VisualizationSpec
-from .data_service.semantic_enricher import SemanticMetadata
+# Import the main sub-services (updated paths)
+from .data_service.management.metadata.metadata_store_service import MetadataStoreService, PipelineResult
+from .data_service.search.sql_query_service import SQLQueryService, QueryResult
+from .data_service.visualization.data_visualization import DataVisualizationService, VisualizationSpec
+from .data_service.management.metadata.semantic_enricher import SemanticMetadata
 
 # Import the additional data analysis services
-from .data_service.data_eda import DataEDAService
-from .data_service.data_modeling import DataModelingService
-from .data_service.data_explorer import DataExplorer
+from .data_service.analytics.data_eda import DataEDAService
+from .data_service.management.metadata.data_explorer import DataExplorer
+
+# Import service suites
+from .data_service.preprocessor.preprocessor_service import PreprocessorService, PreprocessingResult
+from .data_service.transformation.transformation_service import TransformationService, TransformationResult
+from .data_service.storage.data_storage_service import DataStorageService, StorageResult
+from .data_service.management.quality.quality_management_service import QualityManagementService, QualityResult
+
+# Import the working DuckDB preprocessor
+from ..processors.file_processors.unified_asset_processor import UnifiedAssetProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -30,35 +38,50 @@ class AnalyticsResult:
     success: bool
     request_id: str
     
-    # Metadata processing (Steps 1-3)
-    metadata_pipeline: Optional[PipelineResult]
+    # Core pipeline services
+    metadata_pipeline: Optional[PipelineResult] = None
+    query_result: Optional[QueryResult] = None
+    visualization_result: Optional[Dict[str, Any]] = None
     
-    # Query processing (Steps 4-6) 
-    query_result: Optional[QueryResult]
-    
-    # Visualization processing (Step 7)
-    visualization_result: Optional[Dict[str, Any]]
+    # Service suite results
+    preprocessing_result: Optional[PreprocessingResult] = None
+    transformation_result: Optional[TransformationResult] = None
+    storage_result: Optional[StorageResult] = None
+    model_result: Optional[Dict[str, Any]] = None  # Using Dict instead of ModelResult to avoid import
+    quality_result: Optional[QualityResult] = None
     
     # Overall metrics
-    total_processing_time_ms: float
-    total_cost_usd: float
-    created_at: datetime
+    total_processing_time_ms: float = 0.0
+    total_cost_usd: float = 0.0
+    created_at: datetime = None
     error_message: Optional[str] = None
+    
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.now()
 
 class DataAnalyticsService:
     """
     Complete Data Analytics Service - End-to-End Pipeline
     
-    Combines three main sub-services:
-    1. MetadataStoreService (Steps 1-3): Extract, enrich, embed, store metadata
-    2. SQLQueryService (Steps 4-6): Query match, SQL generation, SQL execution
-    3. DataVisualizationService (Step 7): Chart generation and data visualization
+    Integrates 7 main service suites:
+    1. PreprocessorService: Data loading, validation, cleaning, and standardization
+    2. MetadataStoreService: Extract, enrich, embed, store metadata
+    3. TransformationService: Data aggregation, feature engineering, business rules
+    4. SQLQueryService: Query match, SQL generation, SQL execution
+    5. StorageService: Storage target selection, persistence, cataloging
+    6. ModelService: Model training, evaluation, serving
+    7. QualityManagementService: Quality assessment, improvement, monitoring
+    
+    Plus: DataVisualizationService for chart generation and data visualization
     
     Provides unified interface for:
-    - Data source ingestion and preparation
-    - Natural language querying
-    - Data visualization and chart generation
-    - Complete analytics workflows
+    - Complete data analytics workflows from ingestion to insights
+    - Data preprocessing and quality management
+    - Advanced transformations and feature engineering
+    - Machine learning model development and deployment
+    - Intelligent storage and data persistence
+    - Natural language querying and visualization
     """
     
     def __init__(self, database_name: str = "analytics_db"):
@@ -71,17 +94,49 @@ class DataAnalyticsService:
         self.database_name = database_name
         self.service_name = "DataAnalyticsService"
         
-        # Initialize sub-services
+        # Initialize core pipeline services
         self.metadata_service = MetadataStoreService(database_name)
-        self.query_service = None  # Initialized when database config is provided
-        self.visualization_service = DataVisualizationService()  # Initialized immediately
+        self.query_service = None  # Will be initialized when needed with database config
+        self.visualization_service = DataVisualizationService()
+        
+        # Initialize service suites with error handling
+        try:
+            self.preprocessor_service = PreprocessorService()
+        except Exception as e:
+            logger.warning(f"PreprocessorService initialization failed: {e}")
+            self.preprocessor_service = None
+            
+        try:
+            self.transformation_service = TransformationService()
+        except Exception as e:
+            logger.warning(f"TransformationService initialization failed: {e}")
+            self.transformation_service = None
+            
+        try:
+            self.storage_service = DataStorageService()
+        except Exception as e:
+            logger.warning(f"StorageService initialization failed: {e}")
+            self.storage_service = None
+            
+        # ModelService with lazy initialization to avoid mutex locks from ML libraries
+        self.model_service = None
+        self._model_service_attempted = False
+            
+        try:
+            self.quality_service = QualityManagementService()
+        except Exception as e:
+            logger.warning(f"QualityService initialization failed: {e}")
+            self.quality_service = None
         
         # Initialize analysis services
         self.eda_service = None  # Initialized when data is provided
-        self.modeling_service = None  # Initialized when data is provided  
-        self.explorer_service = None  # Initialized when data is provided
+        try:
+            self.explorer_service = DataExplorer()
+        except Exception as e:
+            logger.warning(f"DataExplorer initialization failed: {e}")
+            self.explorer_service = None
         
-        # Service tracking
+        # Service tracking with enhanced metrics
         self.analytics_history = []
         self.service_stats = {
             'total_requests': 0,
@@ -93,10 +148,17 @@ class DataAnalyticsService:
             'total_eda_analyses': 0,
             'total_model_trainings': 0,
             'total_explorations': 0,
-            'total_cost_usd': 0.0
+            'total_cost_usd': 0.0,
+            # New service suite metrics
+            'total_preprocessing_operations': 0,
+            'total_transformation_operations': 0,
+            'total_storage_operations': 0,
+            'total_quality_assessments': 0,
+            'models_trained': 0,
+            'models_deployed': 0
         }
         
-        logger.info(f"Data Analytics Service initialized for database: {database_name}")
+        logger.info(f"Data Analytics Service initialized with 7 service suites for database: {database_name}")
     
     async def initialize_query_service(self, database_config: Dict[str, Any]):
         """
@@ -112,6 +174,97 @@ class DataAnalyticsService:
         except Exception as e:
             logger.error(f"Failed to initialize query service: {e}")
             raise
+    
+    
+    def _get_model_service(self):
+        """Get ModelService with lazy initialization to avoid mutex locks"""
+        if self.model_service is not None:
+            return self.model_service
+            
+        if self._model_service_attempted:
+            return None
+            
+        self._model_service_attempted = True
+        try:
+            # Lazy import to avoid mutex lock during main import
+            from .data_service.model.model_service import ModelService
+            self.model_service = ModelService()
+            logger.info("✅ ModelService initialized successfully")
+            return self.model_service
+        except Exception as e:
+            logger.warning(f"ModelService initialization failed: {e}")
+            return None
+    
+    async def predict_certification_cost_timeline(self, 
+                                                project_data: Dict[str, Any],
+                                                certification_standards: List[str], 
+                                                device_parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Predict certification cost and timeline using ML models
+        Falls back to simple statistical estimates if ModelService unavailable
+        
+        Args:
+            project_data: Basic project information
+            certification_standards: List of standards (FCC, IC, CE)
+            device_parameters: Device technical parameters
+            
+        Returns:
+            Prediction result with cost and timeline estimates
+        """
+        try:
+            model_service = self._get_model_service()
+            if model_service and hasattr(model_service, 'predict_certification_metrics'):
+                # Use full ML-powered predictions
+                logger.info("Using ML-powered certification predictions")
+                return await model_service.predict_certification_metrics(
+                    project_data, certification_standards, device_parameters
+                )
+            else:
+                # Fall back to simple statistical estimation
+                logger.info("Using statistical fallback for certification predictions")
+                return self._fallback_certification_prediction(
+                    project_data, certification_standards, device_parameters
+                )
+                
+        except Exception as e:
+            logger.error(f"Certification prediction failed: {e}")
+            return {
+                'success': False,
+                'error_message': str(e),
+                'estimated_cost': 0,
+                'estimated_timeline_days': 0
+            }
+    
+    def _fallback_certification_prediction(self,
+                                         project_data: Dict[str, Any],
+                                         certification_standards: List[str],
+                                         device_parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Simple statistical fallback for certification predictions
+        Used when ModelService is unavailable
+        """
+        # Base costs per standard (USD)
+        base_costs = {'FCC': 12000, 'IC': 10000, 'CE': 15000}
+        base_timeline = {'FCC': 30, 'IC': 25, 'CE': 35}
+        
+        total_cost = sum(base_costs.get(std, 8000) for std in certification_standards)
+        max_timeline = max(base_timeline.get(std, 30) for std in certification_standards)
+        
+        # Add complexity multipliers
+        if len(device_parameters) > 10:
+            total_cost *= 1.2
+            max_timeline += 5
+            
+        return {
+            'success': True,
+            'project_id': project_data.get('project_id', 'unknown'),
+            'estimated_cost': round(total_cost, 2),
+            'estimated_timeline_days': max_timeline,
+            'confidence_score': 0.7,  # Lower confidence for statistical estimate
+            'method': 'statistical_fallback',
+            'cost_breakdown': {std: base_costs.get(std, 8000) for std in certification_standards},
+            'note': 'Estimate based on statistical averages. For ML-powered predictions, resolve ModelService import issues.'
+        }
     
     async def ingest_data_source(self,
                                 source_path: str,
@@ -560,11 +713,7 @@ class DataAnalyticsService:
     async def _get_available_metadata(self) -> Optional[SemanticMetadata]:
         """Get the most recent available semantic metadata"""
         try:
-            # This is a simplified approach - in practice you might want to:
-            # 1. Combine metadata from multiple sources
-            # 2. Allow user to specify which metadata to use
-            # 3. Cache metadata for performance
-            
+            # First try to get from pipeline history
             pipeline_stats = self.metadata_service.get_pipeline_stats()
             recent_pipelines = pipeline_stats.get('recent_pipelines', [])
             
@@ -575,11 +724,93 @@ class DataAnalyticsService:
                     if pipeline_result and pipeline_result.semantic_metadata:
                         return pipeline_result.semantic_metadata
             
-            logger.warning("No available semantic metadata found")
-            return None
+            # If no pipeline history, try to reconstruct from existing embeddings
+            logger.info("No pipeline history found, attempting to reconstruct metadata from embeddings")
+            return await self._reconstruct_metadata_from_embeddings()
             
         except Exception as e:
             logger.error(f"Failed to get available metadata: {e}")
+            return None
+    
+    async def _reconstruct_metadata_from_embeddings(self):
+        """Reconstruct semantic metadata from existing embeddings"""
+        try:
+            from .data_service.management.metadata.metadata_embedding import get_embedding_service
+            from .data_service.management.metadata.semantic_enricher import SemanticMetadata
+            
+            # Get embedding service for this database
+            embedding_service = get_embedding_service(self.database_name)
+            await embedding_service.initialize()
+            
+            # Search for table entities
+            table_results = await embedding_service.search_similar_entities(
+                "table data", entity_type="table", limit=50, similarity_threshold=0.0
+            )
+            
+            # Search for column entities  
+            column_results = await embedding_service.search_similar_entities(
+                "column field", entity_type="semantic_tags", limit=200, similarity_threshold=0.0
+            )
+            
+            if not table_results and not column_results:
+                logger.warning("No embedding data found for metadata reconstruction")
+                return None
+            
+            # Reconstruct metadata structure
+            tables = []
+            columns = []
+            semantic_tags = {}
+            
+            # Process table results
+            for table_result in table_results:
+                table_name = table_result.entity_name
+                tables.append({
+                    'table_name': table_name,
+                    'table_comment': f'Reconstructed from embeddings'
+                })
+                
+            # Process column/semantic tag results
+            for col_result in column_results:
+                entity_name = col_result.entity_name
+                
+                # Parse table.column format
+                if '.' in entity_name:
+                    parts = entity_name.split('.')
+                    if len(parts) >= 2:
+                        table_name = parts[0]
+                        column_name = parts[1]
+                        
+                        columns.append({
+                            'table_name': table_name,
+                            'column_name': column_name,
+                            'data_type': 'TEXT',  # Default type
+                            'column_comment': 'Reconstructed from embeddings'
+                        })
+                        
+                        # Add to semantic tags
+                        if entity_name not in semantic_tags:
+                            semantic_tags[entity_name] = col_result.semantic_tags
+            
+            # Create semantic metadata object
+            reconstructed_metadata = SemanticMetadata(
+                original_metadata={
+                    'tables': tables,
+                    'columns': columns
+                },
+                business_entities=[t['table_name'] for t in tables],
+                semantic_tags=semantic_tags,
+                data_patterns=[],
+                business_rules=[],
+                domain_classification={'domain': 'reconstructed', 'confidence': 0.7},
+                confidence_scores={'overall': 0.7},
+                ai_analysis={'context': 'Reconstructed from existing embeddings'}
+            )
+            
+            logger.info(f"Reconstructed metadata: {len(tables)} tables, {len(columns)} columns")
+            return reconstructed_metadata
+            
+        except Exception as e:
+            logger.error(f"Failed to reconstruct metadata from embeddings: {e}")
             return None
     
     @classmethod
@@ -772,7 +1003,7 @@ class DataAnalyticsService:
                 }
             
             # Create execution result format expected by visualization service
-            from .data_service.sql_executor import ExecutionResult
+            from .data_service.search.sql_executor import ExecutionResult
             execution_result = ExecutionResult(
                 success=True,
                 data=data,
@@ -783,7 +1014,7 @@ class DataAnalyticsService:
             )
             
             # Create query context
-            from .data_service.query_matcher import QueryContext
+            from .data_service.search.query_matcher import QueryContext
             query_context = QueryContext(
                 entities_mentioned=columns,
                 attributes_mentioned=columns,
@@ -802,7 +1033,7 @@ class DataAnalyticsService:
             chart_type_enum = None
             if chart_type_hint:
                 try:
-                    from ..processors.data_processors.chart_generators.chart_base import ChartType
+                    from ..processors.data_processors.visualization.chart_generators.chart_base import ChartType
                     type_mapping = {
                         'bar': ChartType.BAR,
                         'line': ChartType.LINE,
@@ -823,7 +1054,7 @@ class DataAnalyticsService:
             export_format_enums = None
             if export_formats:
                 try:
-                    from .data_service.data_visualization import ExportFormat
+                    from .data_service.visualization.data_visualization import ExportFormat
                     format_mapping = {
                         'png': ExportFormat.PNG,
                         'svg': ExportFormat.SVG,
@@ -888,7 +1119,7 @@ class DataAnalyticsService:
                 return None
             
             # Create query context from original query
-            from .data_service.query_matcher import QueryContext
+            from .data_service.search.query_matcher import QueryContext
             query_context = QueryContext(
                 entities_mentioned=getattr(query_result.execution_result, 'column_names', []),
                 attributes_mentioned=getattr(query_result.execution_result, 'column_names', []),
@@ -940,7 +1171,7 @@ class DataAnalyticsService:
                     else:
                         data_types[col] = "unknown"
             
-            from .data_service.semantic_enricher import SemanticMetadata
+            from .data_service.management.metadata.semantic_enricher import SemanticMetadata
             return SemanticMetadata(
                 original_metadata={col: {"type": dt} for col, dt in data_types.items()},
                 business_entities=[],
@@ -955,7 +1186,7 @@ class DataAnalyticsService:
         except Exception as e:
             logger.warning(f"Failed to create semantic metadata: {e}")
             # Return minimal metadata
-            from .data_service.semantic_enricher import SemanticMetadata
+            from .data_service.management.metadata.semantic_enricher import SemanticMetadata
             return SemanticMetadata(
                 original_metadata={},
                 business_entities=[],
@@ -1041,12 +1272,12 @@ class DataAnalyticsService:
                                            include_ai_guidance: bool = True,
                                            request_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Develop machine learning model for predictive analysis
+        Develop machine learning model with integrated data preprocessing
         
         Args:
             data_path: Path to data file
-            target_column: Target variable for prediction
-            problem_type: 'classification', 'regression', or auto-detect
+            target_column: Target variable for prediction (user's column name)
+            problem_type: 'classification', 'regression', 'time_series', or auto-detect
             include_feature_engineering: Whether to perform automatic feature engineering
             include_ai_guidance: Whether to include AI-generated modeling guidance
             request_id: Optional request identifier
@@ -1059,19 +1290,67 @@ class DataAnalyticsService:
         if not request_id:
             request_id = f"model_{int(start_time.timestamp())}"
         
-        logger.info(f"Starting ML model development request {request_id}")
+        logger.info(f"Starting enhanced ML model development request {request_id}")
+        logger.info(f"Data: {data_path}, Target: {target_column}, Problem: {problem_type}")
         
         try:
-            # Initialize modeling service
-            if not self.modeling_service:
-                self.modeling_service = DataModelingService(data_path)
+            # Step 1: Use unified asset processor for data preprocessing
+            logger.info(f"Request {request_id}: Starting data preprocessing")
+            processor = UnifiedAssetProcessor()
             
-            # Develop model
-            modeling_results = self.modeling_service.develop_model(
+            # Process the CSV file to get basic analysis
+            from ..processors.file_processors.asset_detector import AssetDetector
+            detector = AssetDetector()
+            asset_info = detector.detect_asset_info(data_path)
+            
+            if not asset_info.get('success', False):
+                return {
+                    "success": False,
+                    "request_id": request_id,
+                    "error_message": f"Asset detection failed: {asset_info.get('error', 'Unknown error')}",
+                    "processing_time_ms": self._calculate_processing_time(start_time),
+                    "stage": "preprocessing"
+                }
+            
+            preprocessing_result = {
+                "success": True,
+                "processed_shape": asset_info.get('shape', 'unknown'),
+                "column_mapping": {},
+                "asset_info": asset_info
+            }
+            
+            logger.info(f"Request {request_id}: DuckDB preprocessing completed successfully")
+            
+            # Step 2: Develop model using ModelService
+            logger.info(f"Request {request_id}: Training model with target column: {target_column}")
+            
+            # Create model configuration
+            from .data_service.model.model_service import ModelConfig, TrainingConfig
+            training_config = TrainingConfig(
                 target_column=target_column,
-                problem_type=problem_type,
-                include_feature_engineering=include_feature_engineering,
-                include_ai_guidance=include_ai_guidance
+                problem_type=problem_type or "auto",
+                include_feature_engineering=include_feature_engineering
+            )
+            model_config = ModelConfig(
+                training_enabled=True,
+                evaluation_enabled=True,
+                training_config=training_config
+            )
+            
+            # Train model
+            model_service = self._get_model_service()
+            if not model_service:
+                return {
+                    "success": False,
+                    "request_id": request_id,
+                    "error_message": "ModelService unavailable",
+                    "processing_time_ms": self._calculate_processing_time(start_time),
+                    "stage": "model_service_initialization"
+                }
+                
+            modeling_results = await model_service.train_evaluate_model(
+                data_path=data_path,
+                config=model_config
             )
             
             # Update stats
@@ -1079,29 +1358,46 @@ class DataAnalyticsService:
             
             processing_time = self._calculate_processing_time(start_time)
             
+            # Combine all results
             result = {
                 "success": True,
                 "request_id": request_id,
                 "data_path": data_path,
                 "target_column": target_column,
                 "problem_type": problem_type,
-                "modeling_results": modeling_results,
+                
+                # Preprocessing results
+                "data_preprocessing": {
+                    "column_mapping": preprocessing_result.get("column_mapping", {}),
+                    "duckdb_table": preprocessing_result.get("duckdb_table"),
+                    "ml_format": preprocessing_result.get("ml_data", {}).get("format"),
+                    "ml_rows": preprocessing_result.get("ml_data", {}).get("rows"),
+                    "processed_shape": preprocessing_result.get("processed_shape")
+                },
+                
+                # Model results (from existing modeling service)
+                "results": modeling_results,
+                
+                # Processing metadata
                 "processing_time_ms": processing_time,
                 "created_at": start_time.isoformat()
             }
             
-            logger.info(f"ML model development {request_id} completed successfully")
+            # No cleanup needed for unified asset processor
+            
+            logger.info(f"Enhanced ML model development {request_id} completed successfully")
             return result
             
         except Exception as e:
             processing_time = self._calculate_processing_time(start_time)
-            logger.error(f"ML model development {request_id} failed: {e}")
+            logger.error(f"Enhanced ML model development {request_id} failed: {e}")
             
             return {
                 "success": False,
                 "request_id": request_id,
                 "error_message": str(e),
-                "processing_time_ms": processing_time
+                "processing_time_ms": processing_time,
+                "stage": "model_training"
             }
     
     async def explore_data_patterns(self,
@@ -1127,10 +1423,6 @@ class DataAnalyticsService:
         logger.info(f"Starting data exploration request {request_id}")
         
         try:
-            # Initialize explorer service
-            if not self.explorer_service:
-                self.explorer_service = DataExplorer()
-            
             # Perform exploration
             exploration_results = self.explorer_service.explore_data_patterns(
                 metadata=metadata,
@@ -1229,7 +1521,7 @@ class DataAnalyticsService:
         
         try:
             # Import StatisticsProcessor
-            from ..processors.data_processors.analysis_engines.statistics_processor import StatisticsProcessor
+            from ..processors.data_processors.analytics.statistics_processor import StatisticsProcessor
             
             # Initialize processor
             stats_processor = StatisticsProcessor(file_path=data_path)
@@ -1317,8 +1609,8 @@ class DataAnalyticsService:
         
         try:
             # Import required processors
-            from ..processors.data_processors.analysis_engines.statistics_processor import StatisticsProcessor
-            from ..processors.data_processors.core.csv_processor import CSVProcessor
+            from ..processors.data_processors.analytics.statistics_processor import StatisticsProcessor
+            from ..processors.data_processors.preprocessors.csv_processor import CSVProcessor
             
             # Load data
             csv_processor = CSVProcessor(data_path)

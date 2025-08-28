@@ -11,7 +11,7 @@ import os
 # Add the parent directories to the path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-from ..tools.terminal_tools import TerminalTools
+from tools.services.terminal_service.tools.terminal_tools import TerminalTools
 
 
 class TestTerminalTools(unittest.TestCase):

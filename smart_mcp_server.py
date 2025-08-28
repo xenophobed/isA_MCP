@@ -3,6 +3,7 @@
 Smart MCP Server with AI-Powered Capability Discovery
 Auto-discovery system for tools, prompts, and resources
 """
+
 import argparse
 import asyncio
 import uvicorn
@@ -76,14 +77,14 @@ class SmartMCPServer:
         print("✅ Core services ready")
     
     async def _register_all_capabilities(self):
-        """Auto-discover and register all capabilities, then extract metadata from MCP server"""
-        print("📦 Auto-discovering and registering capabilities...")
+        """Use auto-discovery system to register all capabilities"""
+        print("📦 Auto-discovering and registering all capabilities...")
         
-        # Use auto-discovery system for registration
-        if self.mcp is not None:
-            await self.auto_discovery.auto_register_with_mcp(self.mcp, self.config)
+        # Use the auto-discovery system
+        auto_discovery = AutoDiscoverySystem()
+        await auto_discovery.auto_register_with_mcp(self.mcp)
         
-        print("✅ All capabilities auto-registered")
+        print("✅ Auto-discovery completed")
     
     async def _initialize_ai_selectors(self):
         """Initialize AI-powered capability selectors"""
@@ -690,17 +691,6 @@ def add_endpoints(app: Starlette):
 async def run_server(port: int = 8081):
     """Run the Smart MCP Server"""
     global smart_server
-    
-    print("🧠 Smart MCP Server")
-    print("=" * 50)
-    print("🎯 Features:")
-    print("   • AI-powered capability discovery")
-    print("   • Vector similarity matching")  
-    print("   • Dynamic tool selection")
-    print("   • Smart prompt routing")
-    print("   • Intelligent resource discovery")
-    print("   • Security and monitoring integration")
-    print()
     
     # Initialize server
     smart_server = SmartMCPServer()

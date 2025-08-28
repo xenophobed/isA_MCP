@@ -121,6 +121,38 @@ class SessionRepository(BaseRepository[Session]):
             logger.error(f"Error getting sessions for user {user_id}: {e}")
             return []
     
+    async def get_user_recent_sessions(self, user_id: str, days: int = 30) -> List[Session]:
+        """
+        Get user's recent sessions within specified days
+        
+        Args:
+            user_id: User ID
+            days: Number of days back to look (default: 30)
+            
+        Returns:
+            List of recent sessions
+        """
+        try:
+            # Calculate cutoff date
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            
+            result = await self._execute_query(
+                lambda: self.table.select('*')
+                    .eq('user_id', user_id)
+                    .gte('created_at', cutoff_date.isoformat())
+                    .order('created_at', desc=True)
+                    .limit(100)  # Reasonable limit for recent sessions
+                    .execute(),
+                f"Failed to get recent sessions for user: {user_id}"
+            )
+            
+            data_list = self._handle_list_result(result)
+            return [Session(**data) for data in data_list]
+            
+        except Exception as e:
+            logger.error(f"Error getting recent sessions for user {user_id}: {e}")
+            return []
+    
     async def update_session_status(self, session_id: str, status: str) -> bool:
         """
         Update session status

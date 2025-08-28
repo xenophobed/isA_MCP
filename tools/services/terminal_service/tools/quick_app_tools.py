@@ -18,7 +18,7 @@ project_root = os.path.dirname(tools_root)
 sys.path.insert(0, project_root)
 
 from tools.base_tool import BaseTool
-from ..services.organisms.quick_app_organism import QuickAppOrganism
+from tools.services.terminal_service.services.organisms.quick_app_organism import QuickAppOrganism
 
 
 class QuickAppTools(BaseTool):

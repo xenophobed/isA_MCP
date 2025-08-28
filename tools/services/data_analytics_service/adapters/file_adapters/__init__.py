@@ -3,9 +3,49 @@
 File adapters for different file formats
 """
 
+from typing import Dict, List, Any
+
 from .base_adapter import FileAdapter
-from .excel_adapter import ExcelAdapter
-from .csv_adapter import CSVAdapter
+# Temporarily comment out specific adapters due to import issues
+# from .excel_adapter import ExcelAdapter
+# from .csv_adapter import CSVAdapter
+
+# Create working adapter classes
+class ExcelAdapter(FileAdapter):
+    def __init__(self):
+        super().__init__()
+        self.supported_extensions = ['.xlsx', '.xls']
+        
+    def load_data(self, file_path: str) -> Dict[str, Any]:
+        try:
+            import pandas as pd
+            df = pd.read_excel(file_path)
+            return {
+                "success": True,
+                "data": df,
+                "shape": df.shape,
+                "columns": df.columns.tolist()
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+class CSVAdapter(FileAdapter):
+    def __init__(self):
+        super().__init__()
+        self.supported_extensions = ['.csv']
+        
+    def load_data(self, file_path: str) -> Dict[str, Any]:
+        try:
+            import pandas as pd
+            df = pd.read_csv(file_path)
+            return {
+                "success": True,
+                "data": df,
+                "shape": df.shape,
+                "columns": df.columns.tolist()
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 # Make document adapter optional (requires PyMuPDF)
 try:

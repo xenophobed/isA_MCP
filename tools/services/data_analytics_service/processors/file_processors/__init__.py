@@ -10,6 +10,7 @@ from .audio_processor import AudioProcessor
 from .video_processor import VideoProcessor
 from .office_processor import OfficeProcessor
 from .table_processor import TableProcessor
+from .text_processor import TextProcessor
 from .asset_detector import AssetDetector
 from .unified_asset_processor import UnifiedAssetProcessor, ProcessingMode
 from .ai_enhanced_processor import AIEnhancedProcessor
@@ -27,6 +28,7 @@ __all__ = [
     'VideoProcessor',
     'OfficeProcessor',
     'TableProcessor',
+    'TextProcessor',
     'AssetDetector',
     'UnifiedAssetProcessor',
     'ProcessingMode',

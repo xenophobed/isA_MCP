@@ -6,7 +6,95 @@ Base file adapter abstract class
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from pathlib import Path
-from ...processors.data_processors.metadata_extractor import MetadataExtractor, TableInfo, ColumnInfo, RelationshipInfo, IndexInfo
+from dataclasses import dataclass
+
+# Create minimal MetadataExtractor base class without import issues
+class MetadataExtractor:
+    def extract_metadata(self, source_path: str, source_type: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        try:
+            # Connect to the file to extract metadata
+            config = {'file_path': source_path}
+            if hasattr(self, 'connect') and self.connect(config):
+                # Successfully connected and loaded file
+                tables = self.get_tables() if hasattr(self, 'get_tables') else []
+                columns = self.get_columns() if hasattr(self, 'get_columns') else []
+                
+                return {
+                    "valid": True,
+                    "source_path": source_path,
+                    "source_type": source_type or "file",
+                    "tables": tables,
+                    "columns": columns,
+                    "metadata_available": True,
+                    "file_info": self.get_file_info() if hasattr(self, 'get_file_info') else {}
+                }
+            else:
+                return {
+                    "valid": False,
+                    "error": f"Failed to load file: {source_path}",
+                    "source_path": source_path,
+                    "source_type": source_type or "file",
+                    "metadata_available": False
+                }
+        except Exception as e:
+            return {
+                "valid": False,
+                "error": str(e),
+                "source_path": source_path,
+                "source_type": source_type or "file",
+                "metadata_available": False
+            }
+
+# Define missing data classes
+@dataclass
+class TableInfo:
+    table_name: str
+    schema_name: str = None
+    table_type: str = "table"
+    record_count: int = 0
+    table_comment: str = ""
+    created_date: str = ""
+    last_modified: str = ""
+    business_category: str = "general"
+    update_frequency: str = "unknown"
+    data_quality_score: float = 0.0
+    key_columns: List[str] = None
+    
+    def __post_init__(self):
+        if self.key_columns is None:
+            self.key_columns = []
+    
+@dataclass 
+class ColumnInfo:
+    table_name: str
+    column_name: str
+    data_type: str
+    max_length: Optional[int] = None
+    is_nullable: bool = True
+    default_value: str = ""
+    column_comment: str = ""
+    ordinal_position: int = 0
+    business_type: str = "general"
+    value_range: Optional[Dict[str, Any]] = None
+    null_percentage: float = 0.0
+    unique_percentage: float = 0.0
+    sample_values: List[Any] = None
+    
+    def __post_init__(self):
+        if self.sample_values is None:
+            self.sample_values = []
+    
+@dataclass
+class RelationshipInfo:
+    from_table: str
+    to_table: str
+    relationship_type: str = "unknown"
+    
+@dataclass
+class IndexInfo:
+    name: str
+    table: str
+    columns: List[str]
 
 class FileAdapter(MetadataExtractor):
     """Abstract base class for file adapters"""

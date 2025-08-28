@@ -135,6 +135,11 @@ class AutoDiscoverySystem:
         for python_file in self.tools_dir.rglob("*.py"):
             if python_file.name.startswith("__"):
                 continue
+            
+            # CRITICAL: Skip ML models to prevent mutex lock issues
+            if any(ml_path in str(python_file) for ml_path in ["ml_models", "deep_learning", "sota_models", "real_sota"]):
+                logger.warning(f"⚠️ Skipping ML module {python_file.name} to prevent mutex lock")
+                continue
                 
             # logger.info(f"  📄 Scanning {python_file.name}")  # 减少冷余日志
             functions = self.discover_functions_in_file(python_file)
@@ -269,6 +274,11 @@ class AutoDiscoverySystem:
                 continue
             # Skip services directory UNLESS it's a *_tools.py file
             if "services" in str(python_file) and not python_file.name.endswith("_tools.py"):
+                continue
+            
+            # CRITICAL: Skip ML models to prevent mutex lock issues
+            if any(ml_path in str(python_file) for ml_path in ["ml_models", "deep_learning", "sota_models", "real_sota"]):
+                logger.warning(f"⚠️ Skipping ML module {python_file.name} to prevent mutex lock")
                 continue
             # Skip client folder but not client_interaction_tools.py
             if "/client" in str(python_file) and "client_interaction_tools.py" not in str(python_file):

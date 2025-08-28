@@ -22,6 +22,7 @@ from .video_processor import VideoProcessor
 from .office_processor import OfficeProcessor
 from .table_processor import TableProcessor
 from .markdown_processor import MarkdownProcessor
+from .text_processor import TextProcessor
 from .asset_detector import AssetDetector
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ class UnifiedAssetProcessor:
         self.office_processor = OfficeProcessor(self.config.get('office', {}))
         self.table_processor = TableProcessor(self.config.get('table', {}))
         self.markdown_processor = MarkdownProcessor(self.config.get('markdown', {}))
+        self.text_processor = TextProcessor(self.config.get('text', {}))
         
         # Processing settings
         self.max_parallel_jobs = self.config.get('max_parallel_jobs', 4)
@@ -391,6 +393,20 @@ class UnifiedAssetProcessor:
                     results['office_structure'] = await self.office_processor.analyze_structure(request.file_path, processor_options)
                 if 'table_detection' in request.requested_features and asset_type in ['.xlsx', '.xls']:
                     results['office_analysis'] = await self.office_processor.analyze_document(request.file_path, processor_options)
+            
+            elif asset_type in ['.txt', '.text']:
+                if 'text_extraction' in request.requested_features:
+                    results['text_content'] = await self.text_processor.extract_text(request.file_path, processor_options)
+                if 'content_analysis' in request.requested_features:
+                    results['text_analysis'] = await self.text_processor.analyze_text(request.file_path, processor_options)
+            
+            elif asset_type in ['.md', '.markdown']:
+                if 'text_extraction' in request.requested_features:
+                    results['text_content'] = await self.text_processor.extract_text(request.file_path, processor_options)
+                if 'content_analysis' in request.requested_features:
+                    results['text_analysis'] = await self.text_processor.analyze_text(request.file_path, processor_options)
+                if 'structure_analysis' in request.requested_features:
+                    results['markdown_structure'] = await self.markdown_processor.analyze_markdown(request.file_path, processor_options)
             
             # Always extract metadata if requested
             if 'metadata_extraction' in request.requested_features:

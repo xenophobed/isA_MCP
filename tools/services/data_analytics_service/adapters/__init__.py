@@ -3,9 +3,10 @@
 Database, file, and graph adapters for metadata extraction
 """
 
-from .database_adapters import DatabaseAdapter, PostgreSQLAdapter, MySQLAdapter, SQLServerAdapter
+from .source_adapters import DatabaseAdapter, PostgreSQLAdapter, MySQLAdapter, SQLServerAdapter
 from .file_adapters import FileAdapter, ExcelAdapter, CSVAdapter, DocumentAdapter
-from .graph_adapters import Neo4jAdapter
+# Graph adapters not available
+# from .graph_adapters import Neo4jAdapter
 
 __all__ = [
     "DatabaseAdapter",
@@ -16,5 +17,5 @@ __all__ = [
     "ExcelAdapter",
     "CSVAdapter",
     "DocumentAdapter",
-    "Neo4jAdapter"
+    # "Neo4jAdapter"  # Not available
 ]

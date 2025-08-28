@@ -28,11 +28,19 @@ except ImportError:
     logging.warning("scikit-learn not available. Feature engineering capabilities will be limited.")
 
 try:
-    from ..core.csv_processor import CSVProcessor
-    from ..analysis_engines.statistics_processor import StatisticsProcessor
+    from ..preprocessors.csv_processor import CSVProcessor
+    from ..analytics.statistics_processor import StatisticsProcessor
 except ImportError:
-    from csv_processor import CSVProcessor
-    from statistics_processor import StatisticsProcessor
+    # Fallback - create minimal classes if needed
+    class CSVProcessor:
+        def __init__(self, file_path):
+            self.file_path = file_path
+            self.df = None
+        def load_csv(self):
+            return False
+    class StatisticsProcessor:
+        def __init__(self, file_path):
+            self.file_path = file_path
 
 logger = logging.getLogger(__name__)
 

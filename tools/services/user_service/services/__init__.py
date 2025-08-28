@@ -11,6 +11,7 @@ from .subscription_service_v2 import SubscriptionServiceV2
 from .organization_service import OrganizationService
 from .email_service import EmailService
 from .invitation_service import InvitationService
+from .user_portrait_service import UserPortraitService
 from .compatibility_adapter import (
     UserServiceCompatibilityAdapter,
     SubscriptionServiceCompatibilityAdapter
@@ -24,6 +25,7 @@ __all__ = [
     'OrganizationService',
     'EmailService',
     'InvitationService',
+    'UserPortraitService',
     'UserServiceCompatibilityAdapter',
     'SubscriptionServiceCompatibilityAdapter'
 ]

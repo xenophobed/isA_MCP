@@ -11,8 +11,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import asyncio
 
-from .terminal_tools import TerminalTools
-from ..services.terminal_service import TerminalService
+from tools.services.terminal_service.tools.terminal_tools import TerminalTools
+from tools.services.terminal_service.services.terminal_service import TerminalService
 from tools.base_tool import BaseTool
 
 

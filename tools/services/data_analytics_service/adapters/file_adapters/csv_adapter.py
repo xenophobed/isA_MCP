@@ -7,7 +7,7 @@ import csv
 from typing import Dict, List, Any, Optional
 from collections import Counter
 from .base_adapter import FileAdapter
-from ...processors.data_processors.metadata_extractor import TableInfo, ColumnInfo
+from .base_adapter import TableInfo, ColumnInfo
 
 try:
     import pandas as pd

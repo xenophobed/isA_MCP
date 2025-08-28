@@ -19,8 +19,8 @@ project_root = os.path.dirname(tools_root)  # project root/
 sys.path.insert(0, project_root)
 
 from tools.base_tool import BaseTool
-from ..services.terminal_service import TerminalService
-from ..models.terminal_models import CommandResult, TerminalSession
+from tools.services.terminal_service.services.terminal_service import TerminalService
+from tools.services.terminal_service.models.terminal_models import CommandResult, TerminalSession
 
 
 class TerminalTools(BaseTool):

@@ -14,7 +14,7 @@ import re
 import json
 from pathlib import Path
 
-# Anomaly detection libraries
+# Anomaly detection libraries - now safe with global mutex fix
 try:
     from sklearn.ensemble import IsolationForest
     from sklearn.preprocessing import StandardScaler
@@ -25,7 +25,7 @@ except ImportError:
     logging.warning("scikit-learn not available. Some anomaly detection methods will be disabled.")
 
 try:
-    from .csv_processor import CSVProcessor
+    from ..preprocessors.csv_processor import CSVProcessor
 except ImportError:
     from csv_processor import CSVProcessor
 

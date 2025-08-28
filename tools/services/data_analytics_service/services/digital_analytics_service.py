@@ -59,6 +59,14 @@ class AnalyticsConfig:
     enable_pdf_processing: bool = True
     enable_large_file_processing: bool = True
     max_file_size_mb: int = 100
+    
+    # Digital Asset Processing settings
+    enable_digital_asset_processing: bool = True
+    enable_ai_enhancement: bool = True
+    ai_enhancement_threshold: float = 0.7
+    asset_processing_mode: str = "comprehensive"  # fast, comprehensive, selective
+    enable_cross_asset_analysis: bool = True
+    max_asset_processing_time: int = 600  # 10 minutes
 
 class DigitalAnalyticsService:
     """
@@ -130,6 +138,35 @@ class DigitalAnalyticsService:
         if self._rag_service is None:
             self._rag_service = self._create_rag_service()
         return self._rag_service
+    
+    @property
+    def enhanced_unified_processor(self):
+        """Lazy load enhanced unified processor for digital assets"""
+        if not hasattr(self, '_enhanced_unified_processor') or self._enhanced_unified_processor is None:
+            if self.config.enable_digital_asset_processing:
+                try:
+                    from tools.services.data_analytics_service.processors.file_processors import EnhancedUnifiedProcessor
+                    processor_config = {
+                        'enable_ai_enhancement': self.config.enable_ai_enhancement,
+                        'ai_enhancement_threshold': self.config.ai_enhancement_threshold,
+                        'max_processing_time': self.config.max_asset_processing_time,
+                        'unified': {
+                            'processing_mode': self.config.asset_processing_mode,
+                            'enable_cross_analysis': self.config.enable_cross_asset_analysis
+                        },
+                        'ai_enhancement': {
+                            'enable_ai_enhancement': self.config.enable_ai_enhancement,
+                            'ai_enhancement_threshold': self.config.ai_enhancement_threshold
+                        }
+                    }
+                    self._enhanced_unified_processor = EnhancedUnifiedProcessor(processor_config)
+                    logger.info("Enhanced unified processor initialized successfully")
+                except ImportError as e:
+                    logger.error(f"Failed to initialize enhanced unified processor: {e}")
+                    self._enhanced_unified_processor = None
+            else:
+                self._enhanced_unified_processor = None
+        return self._enhanced_unified_processor
     
     def _select_vector_db(self):
         """
@@ -800,6 +837,545 @@ class DigitalAnalyticsService:
         except Exception as e:
             logger.error(f"Context retrieval failed: {e}")
             return {'success': False, 'error': str(e)}
+    
+    # === DIGITAL ASSET PROCESSING METHODS ===
+    
+    async def process_digital_asset(
+        self,
+        file_path: str,
+        user_id: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Process a digital asset with enhanced capabilities.
+        
+        Args:
+            file_path: Path to the digital asset file
+            user_id: User identifier for knowledge storage
+            options: Processing options
+            
+        Returns:
+            Enhanced processing results
+        """
+        try:
+            if not self.config.enable_digital_asset_processing:
+                return {'success': False, 'error': 'Digital asset processing disabled'}
+            
+            if not self.enhanced_unified_processor:
+                return {'success': False, 'error': 'Enhanced unified processor not available'}
+            
+            start_time = datetime.now()
+            options = options or {}
+            
+            # Set default options based on service configuration
+            options.setdefault('enable_ai', self.config.enable_ai_enhancement)
+            options.setdefault('ai_threshold', self.config.ai_enhancement_threshold)
+            options.setdefault('processing_mode', self.config.asset_processing_mode)
+            
+            # Process the asset
+            result = await self.enhanced_unified_processor.process_asset_enhanced(file_path, options)
+            
+            # Store knowledge if processing was successful and contains text
+            if (result.get('success') and 
+                options.get('store_knowledge', True) and 
+                user_id):
+                
+                await self._store_asset_knowledge(file_path, result, user_id)
+            
+            # Apply guardrails if enabled
+            if self.guardrail_system and result.get('success'):
+                result = await self._apply_asset_guardrails(result)
+            
+            processing_time = (datetime.now() - start_time).total_seconds()
+            result['service_processing_time'] = processing_time
+            result['user_id'] = user_id
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Digital asset processing failed for {file_path}: {e}")
+            return {
+                'file_path': file_path,
+                'success': False,
+                'error': str(e),
+                'user_id': user_id
+            }
+    
+    async def process_multiple_assets(
+        self,
+        file_paths: List[str],
+        user_id: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Process multiple digital assets with cross-correlation analysis.
+        
+        Args:
+            file_paths: List of file paths to process
+            user_id: User identifier
+            options: Processing options
+            
+        Returns:
+            Batch processing results with cross-analysis
+        """
+        try:
+            if not self.config.enable_digital_asset_processing:
+                return {'success': False, 'error': 'Digital asset processing disabled'}
+            
+            if not self.enhanced_unified_processor:
+                return {'success': False, 'error': 'Enhanced unified processor not available'}
+            
+            start_time = datetime.now()
+            options = options or {}
+            
+            # Set default options
+            options.setdefault('enable_ai', self.config.enable_ai_enhancement)
+            options.setdefault('enable_cross_analysis', self.config.enable_cross_asset_analysis)
+            options.setdefault('store_knowledge', True)
+            
+            # Process assets in batch
+            batch_result = await self.enhanced_unified_processor.process_batch_enhanced(file_paths, options)
+            
+            # Store knowledge for successful results
+            if options.get('store_knowledge', True) and user_id:
+                successful_results = batch_result.get('successful_results', [])
+                for result in successful_results:
+                    try:
+                        await self._store_asset_knowledge(result['file_path'], result, user_id)
+                    except Exception as e:
+                        logger.warning(f"Knowledge storage failed for {result.get('file_path')}: {e}")
+            
+            processing_time = (datetime.now() - start_time).total_seconds()
+            batch_result['service_processing_time'] = processing_time
+            batch_result['user_id'] = user_id
+            
+            return batch_result
+            
+        except Exception as e:
+            logger.error(f"Multiple asset processing failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'total_files': len(file_paths) if file_paths else 0,
+                'user_id': user_id
+            }
+    
+    async def analyze_asset_correlations(
+        self,
+        file_paths: List[str],
+        user_id: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Analyze correlations and relationships between multiple assets.
+        
+        Args:
+            file_paths: List of file paths to analyze
+            user_id: User identifier
+            options: Analysis options
+            
+        Returns:
+            Correlation analysis results
+        """
+        try:
+            if not self.config.enable_cross_asset_analysis:
+                return {'success': False, 'error': 'Cross-asset analysis disabled'}
+            
+            # Process assets first if needed
+            results = await self.process_multiple_assets(file_paths, user_id, options)
+            
+            if not results.get('successful_results'):
+                return {'success': False, 'error': 'No successful asset processing results for correlation analysis'}
+            
+            # Extract correlation data
+            correlation_data = await self._extract_correlation_features(results['successful_results'])
+            
+            # Perform enhanced correlation analysis
+            correlation_analysis = await self._perform_correlation_analysis(correlation_data)
+            
+            return {
+                'success': True,
+                'correlation_analysis': correlation_analysis,
+                'asset_count': len(file_paths),
+                'processed_count': results.get('successful_count', 0),
+                'user_id': user_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Asset correlation analysis failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'user_id': user_id
+            }
+    
+    async def get_asset_processing_capabilities(self) -> Dict[str, Any]:
+        """Get comprehensive asset processing capabilities."""
+        try:
+            if not self.enhanced_unified_processor:
+                return {
+                    'digital_asset_processing_enabled': False,
+                    'error': 'Enhanced unified processor not available'
+                }
+            
+            capabilities = await self.enhanced_unified_processor.get_comprehensive_capabilities()
+            
+            return {
+                'digital_asset_processing_enabled': self.config.enable_digital_asset_processing,
+                'ai_enhancement_enabled': self.config.enable_ai_enhancement,
+                'cross_asset_analysis_enabled': self.config.enable_cross_asset_analysis,
+                'asset_processing_mode': self.config.asset_processing_mode,
+                'capabilities': capabilities,
+                'service_integration': {
+                    'vector_db_integration': True,
+                    'rag_service_integration': True,
+                    'guardrail_system_integration': self.config.enable_guardrails,
+                    'knowledge_storage_integration': True
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get asset processing capabilities: {e}")
+            return {
+                'digital_asset_processing_enabled': False,
+                'error': str(e)
+            }
+    
+    # === HELPER METHODS FOR DIGITAL ASSET PROCESSING ===
+    
+    async def _store_asset_knowledge(
+        self,
+        file_path: str,
+        processing_result: Dict[str, Any],
+        user_id: str
+    ) -> None:
+        """Store knowledge extracted from digital asset processing."""
+        try:
+            # Extract text content from processing results
+            text_content = self._extract_text_from_processing_result(processing_result)
+            
+            if not text_content or len(text_content.strip()) < 10:
+                logger.debug(f"No significant text content to store for {file_path}")
+                return
+            
+            # Create metadata
+            metadata = {
+                'source_file': Path(file_path).name,
+                'file_path': file_path,
+                'asset_type': processing_result.get('asset_type', 'unknown'),
+                'processing_timestamp': datetime.now().isoformat(),
+                'ai_enhanced': processing_result.get('ai_enhancement_enabled', False),
+                'quality_score': processing_result.get('enhanced_processing', {}).get('quality_score', 0.0),
+                'processing_mode': processing_result.get('enhanced_processing', {}).get('processing_mode', 'standard')
+            }
+            
+            # Store in RAG service
+            if self.rag_service:
+                store_result = await self.rag_service.store_knowledge(
+                    user_id=user_id,
+                    text=text_content,
+                    metadata=metadata
+                )
+                
+                if store_result.get('success'):
+                    logger.info(f"Successfully stored knowledge for {Path(file_path).name}")
+                else:
+                    logger.warning(f"Failed to store knowledge for {Path(file_path).name}: {store_result.get('error')}")
+            else:
+                logger.warning("RAG service not available for knowledge storage")
+                
+        except Exception as e:
+            logger.error(f"Knowledge storage failed for {file_path}: {e}")
+    
+    def _extract_text_from_processing_result(self, result: Dict[str, Any]) -> str:
+        """Extract all available text from processing results."""
+        text_parts = []
+        
+        # Traditional processing results
+        traditional = result.get('traditional_processing', {}).get('results', {})
+        enhanced = result.get('enhanced_processing', {})
+        
+        # Common text fields to extract
+        text_fields = [
+            'text', 'combined_text', 'full_text', 'transcript', 
+            'content', 'extracted_text', 'ocr_text'
+        ]
+        
+        # Extract from traditional results
+        for field in text_fields:
+            if field in traditional and traditional[field]:
+                text_parts.append(str(traditional[field]))
+        
+        # Extract from enhanced results
+        for field in text_fields:
+            if field in enhanced and enhanced[field]:
+                text_parts.append(str(enhanced[field]))
+        
+        # Extract from AI analysis
+        ai_analysis = enhanced.get('ai_content_analysis', {})
+        if ai_analysis.get('analysis'):
+            text_parts.append(str(ai_analysis['analysis']))
+        
+        # Extract insights and recommendations
+        ai_insights = enhanced.get('ai_insights_and_recommendations', {})
+        if ai_insights.get('insights'):
+            text_parts.append(f"Insights: {ai_insights['insights']}")
+        if ai_insights.get('recommendations'):
+            text_parts.append(f"Recommendations: {ai_insights['recommendations']}")
+        
+        return '\n\n'.join(filter(None, text_parts))
+    
+    async def _apply_asset_guardrails(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply guardrails to asset processing results."""
+        if not self.guardrail_system:
+            return result
+        
+        try:
+            # Extract text for guardrail validation
+            text_content = self._extract_text_from_processing_result(result)
+            
+            if text_content:
+                # Apply guardrails
+                guardrail_result = await self.guardrail_system.validate_content(text_content)
+                
+                # Add guardrail information to result
+                result['guardrail_validation'] = {
+                    'validated': True,
+                    'passed': guardrail_result.get('passed', True),
+                    'confidence': guardrail_result.get('confidence', 1.0),
+                    'warnings': guardrail_result.get('warnings', []),
+                    'compliance_score': guardrail_result.get('compliance_score', 1.0)
+                }
+                
+                if not guardrail_result.get('passed', True):
+                    logger.warning(f"Guardrail validation failed for asset processing")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Guardrail application failed: {e}")
+            result['guardrail_validation'] = {
+                'validated': False,
+                'error': str(e)
+            }
+            return result
+    
+    async def _extract_correlation_features(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract features for correlation analysis."""
+        try:
+            correlation_features = {
+                'assets': [],
+                'content_themes': [],
+                'quality_scores': [],
+                'asset_types': [],
+                'processing_metadata': []
+            }
+            
+            for result in results:
+                file_path = result.get('file_path', '')
+                asset_type = result.get('asset_type', 'unknown')
+                enhanced = result.get('enhanced_processing', {})
+                
+                # Extract features
+                asset_features = {
+                    'file_name': Path(file_path).name,
+                    'asset_type': asset_type,
+                    'quality_score': enhanced.get('quality_score', 0.0),
+                    'text_content': self._extract_text_from_processing_result(result),
+                    'ai_insights': enhanced.get('ai_insights_and_recommendations', {}),
+                    'processing_time': result.get('processing_time', 0.0)
+                }
+                
+                correlation_features['assets'].append(asset_features)
+                correlation_features['quality_scores'].append(asset_features['quality_score'])
+                correlation_features['asset_types'].append(asset_type)
+            
+            return correlation_features
+            
+        except Exception as e:
+            logger.error(f"Feature extraction for correlation analysis failed: {e}")
+            return {'error': str(e)}
+    
+    async def _perform_correlation_analysis(self, correlation_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform enhanced correlation analysis on assets."""
+        try:
+            if 'error' in correlation_data:
+                return correlation_data
+            
+            assets = correlation_data.get('assets', [])
+            if len(assets) < 2:
+                return {'error': 'Need at least 2 assets for correlation analysis'}
+            
+            # Basic statistical analysis
+            quality_scores = correlation_data.get('quality_scores', [])
+            asset_types = correlation_data.get('asset_types', [])
+            
+            analysis = {
+                'statistical_summary': {
+                    'asset_count': len(assets),
+                    'average_quality': sum(quality_scores) / len(quality_scores) if quality_scores else 0.0,
+                    'quality_variance': self._calculate_variance(quality_scores),
+                    'asset_type_distribution': self._calculate_distribution(asset_types)
+                },
+                'content_correlations': await self._analyze_content_correlations(assets),
+                'thematic_analysis': await self._analyze_themes(assets),
+                'recommendations': await self._generate_correlation_recommendations(assets)
+            }
+            
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Correlation analysis failed: {e}")
+            return {'error': str(e)}
+    
+    async def _analyze_content_correlations(self, assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze content correlations between assets."""
+        try:
+            # Simple keyword-based correlation for now
+            all_texts = [asset.get('text_content', '') for asset in assets]
+            
+            # Extract keywords from each text
+            correlations = []
+            for i, text1 in enumerate(all_texts):
+                for j, text2 in enumerate(all_texts[i+1:], start=i+1):
+                    similarity = self._calculate_text_similarity(text1, text2)
+                    correlations.append({
+                        'asset1': assets[i]['file_name'],
+                        'asset2': assets[j]['file_name'],
+                        'similarity_score': similarity
+                    })
+            
+            return {
+                'correlations': correlations,
+                'high_correlation_pairs': [c for c in correlations if c['similarity_score'] > 0.7]
+            }
+            
+        except Exception as e:
+            logger.error(f"Content correlation analysis failed: {e}")
+            return {'error': str(e)}
+    
+    async def _analyze_themes(self, assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze common themes across assets."""
+        try:
+            # Extract insights from all assets
+            all_insights = []
+            for asset in assets:
+                insights = asset.get('ai_insights', {})
+                if insights.get('insights'):
+                    all_insights.append(insights['insights'])
+            
+            # Simple thematic analysis
+            common_keywords = self._extract_common_keywords(all_insights)
+            
+            return {
+                'common_themes': common_keywords[:10],  # Top 10 themes
+                'theme_distribution': self._calculate_keyword_distribution(all_insights),
+                'asset_theme_mapping': self._map_assets_to_themes(assets, common_keywords)
+            }
+            
+        except Exception as e:
+            logger.error(f"Thematic analysis failed: {e}")
+            return {'error': str(e)}
+    
+    async def _generate_correlation_recommendations(self, assets: List[Dict[str, Any]]) -> List[str]:
+        """Generate recommendations based on correlation analysis."""
+        try:
+            recommendations = []
+            
+            # Quality-based recommendations
+            quality_scores = [asset.get('quality_score', 0.0) for asset in assets]
+            avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+            
+            if avg_quality < 0.6:
+                recommendations.append("Consider improving asset quality through enhanced processing or better source materials")
+            
+            # Asset type diversity recommendations
+            asset_types = [asset.get('asset_type') for asset in assets]
+            type_diversity = len(set(asset_types)) / len(asset_types) if asset_types else 0.0
+            
+            if type_diversity > 0.7:
+                recommendations.append("High asset type diversity detected - consider creating unified documentation or cross-references")
+            elif type_diversity < 0.3:
+                recommendations.append("Low asset type diversity - consider expanding with complementary asset types")
+            
+            # Content-based recommendations
+            if len(assets) > 5:
+                recommendations.append("Large asset collection detected - consider implementing automated categorization or indexing")
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"Recommendation generation failed: {e}")
+            return [f"Recommendation generation failed: {str(e)}"]
+    
+    # === UTILITY METHODS ===
+    
+    def _calculate_variance(self, values: List[float]) -> float:
+        """Calculate variance of a list of values."""
+        if not values:
+            return 0.0
+        mean = sum(values) / len(values)
+        return sum((x - mean) ** 2 for x in values) / len(values)
+    
+    def _calculate_distribution(self, items: List[str]) -> Dict[str, int]:
+        """Calculate distribution of items."""
+        distribution = {}
+        for item in items:
+            distribution[item] = distribution.get(item, 0) + 1
+        return distribution
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple text similarity."""
+        if not text1 or not text2:
+            return 0.0
+        
+        # Simple word-based similarity
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = len(words1.intersection(words2))
+        union = len(words1.union(words2))
+        
+        return intersection / union if union > 0 else 0.0
+    
+    def _extract_common_keywords(self, texts: List[str]) -> List[str]:
+        """Extract common keywords from texts."""
+        if not texts:
+            return []
+        
+        # Simple keyword extraction
+        all_words = []
+        for text in texts:
+            words = [w.lower() for w in text.split() if len(w) > 3]
+            all_words.extend(words)
+        
+        # Count frequencies
+        word_counts = {}
+        for word in all_words:
+            word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Return most common words
+        return sorted(word_counts.keys(), key=lambda x: word_counts[x], reverse=True)
+    
+    def _calculate_keyword_distribution(self, texts: List[str]) -> Dict[str, int]:
+        """Calculate keyword distribution."""
+        keywords = self._extract_common_keywords(texts)
+        return {kw: texts.count(kw) for kw in keywords[:20]}  # Top 20
+    
+    def _map_assets_to_themes(self, assets: List[Dict[str, Any]], themes: List[str]) -> Dict[str, List[str]]:
+        """Map assets to themes."""
+        asset_theme_map = {}
+        
+        for asset in assets:
+            file_name = asset.get('file_name', '')
+            text_content = asset.get('text_content', '').lower()
+            asset_themes = [theme for theme in themes[:10] if theme in text_content]
+            asset_theme_map[file_name] = asset_themes
+        
+        return asset_theme_map
 
 # Global service instance
 _digital_analytics_service = None
@@ -905,3 +1481,37 @@ async def retrieve_context(
     """Retrieve context using integrated RAG service"""
     service = get_digital_analytics_service()
     return await service.retrieve_context(user_id, query, top_k, search_mode)
+
+# === DIGITAL ASSET PROCESSING CONVENIENCE FUNCTIONS ===
+
+async def process_digital_asset(
+    file_path: str,
+    user_id: str,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Process a digital asset with enhanced capabilities"""
+    service = get_digital_analytics_service()
+    return await service.process_digital_asset(file_path, user_id, options)
+
+async def process_multiple_assets(
+    file_paths: List[str],
+    user_id: str,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Process multiple digital assets with cross-correlation analysis"""
+    service = get_digital_analytics_service()
+    return await service.process_multiple_assets(file_paths, user_id, options)
+
+async def analyze_asset_correlations(
+    file_paths: List[str],
+    user_id: str,
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Analyze correlations and relationships between multiple assets"""
+    service = get_digital_analytics_service()
+    return await service.analyze_asset_correlations(file_paths, user_id, options)
+
+async def get_asset_processing_capabilities() -> Dict[str, Any]:
+    """Get comprehensive asset processing capabilities"""
+    service = get_digital_analytics_service()
+    return await service.get_asset_processing_capabilities()

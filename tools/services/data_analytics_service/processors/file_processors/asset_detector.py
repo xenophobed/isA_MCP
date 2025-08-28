@@ -58,6 +58,8 @@ class AssetType(Enum):
     POWERPOINT = "powerpoint"
     WORD = "word"
     EXCEL = "excel"
+    TEXT = "text"
+    MARKDOWN = "markdown"
     UNKNOWN = "unknown"
 
 class AssetDetector:
@@ -75,14 +77,27 @@ class AssetDetector:
             'image/png': AssetType.IMAGE,
             'image/tiff': AssetType.IMAGE,
             'image/bmp': AssetType.IMAGE,
+            'image/gif': AssetType.IMAGE,
+            'image/webp': AssetType.IMAGE,
             'application/vnd.ms-powerpoint': AssetType.POWERPOINT,
             'application/vnd.openxmlformats-officedocument.presentationml.presentation': AssetType.POWERPOINT,
+            'application/vnd.ms-excel': AssetType.EXCEL,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': AssetType.EXCEL,
+            'application/msword': AssetType.WORD,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': AssetType.WORD,
+            'text/plain': AssetType.TEXT,
+            'text/markdown': AssetType.MARKDOWN,
+            'text/x-markdown': AssetType.MARKDOWN,
             'audio/mpeg': AssetType.AUDIO,
             'audio/wav': AssetType.AUDIO,
             'audio/mp4': AssetType.AUDIO,
+            'audio/x-wav': AssetType.AUDIO,
+            'audio/ogg': AssetType.AUDIO,
             'video/mp4': AssetType.VIDEO,
             'video/avi': AssetType.VIDEO,
             'video/quicktime': AssetType.VIDEO,
+            'video/x-msvideo': AssetType.VIDEO,
+            'video/webm': AssetType.VIDEO,
         }
     
     async def detect_asset_type(self, file_path: str) -> AssetType:

@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import aiohttp
 
@@ -36,6 +37,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Event Feedback Server", version="2.0.0")
+
+# CORS Configuration
+try:
+    from .cors_config import get_cors_config
+    app.add_middleware(CORSMiddleware, **get_cors_config())
+    logger.info("✅ CORS middleware configured successfully")
+except ImportError:
+    # Fallback to default CORS config if config file not available
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",  # Frontend development server
+            "http://localhost:3000",  # Alternative frontend port
+            "http://127.0.0.1:5173", # Alternative localhost format
+            "http://127.0.0.1:3000", # Alternative localhost format
+        ],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+    logger.info("✅ CORS middleware configured with fallback config")
 
 # Configuration from environment variables
 CHAT_API_URL = os.getenv('CHAT_API_URL', 'http://localhost:8080')
@@ -360,6 +382,7 @@ def main():
     print(f"📤 Will process events with Chat API: {CHAT_API_URL}")
     print(f"📊 Monitor at: http://localhost:{EVENT_SERVICE_PORT}/events/recent")
     print(f"💾 Database service: {'Available' if db_service else 'Not available'}")
+    print("🌐 CORS enabled for frontend origins: localhost:5173, localhost:3000")
     
     uvicorn.run(
         app,

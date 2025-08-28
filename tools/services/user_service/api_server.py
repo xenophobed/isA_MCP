@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import json
 
-from .models import (
+from tools.services.user_service.models import (
     User, UserCreate, UserUpdate, UserResponse, UserEnsureRequest,
     SubscriptionStatus, CreditConsumption, CreditConsumptionResponse,
     PaymentIntent, CheckoutSession, WebhookEvent,
@@ -34,22 +34,27 @@ from .models import (
     ResourceType, AccessLevel, ResourcePermission, UserResourceAccess,
     ResourceAccessCheck, ResourceAccessResponse, UserResourceSummary,
     GrantResourceAccessRequest, RevokeResourceAccessRequest,
-    ResourcePermissionCreate, ResourcePermissionUpdate
+    ResourcePermissionCreate, ResourcePermissionUpdate,
+    # User Portrait models
+    UserPortrait, UserPortraitCreate, UserPortraitUpdate,
+    UserPortraitAnalysisRequest, UserPortraitResponse,
+    UserBehaviorInsight, UserPortraitSummary
 )
-from .services.auth_service import Auth0Service
-from .services.supabase_auth_service import SupabaseAuthService
-from .services.unified_auth_service import UnifiedAuthService
-from .subscription_service_legacy import SubscriptionService
-from .services.payment_service import PaymentService
+from tools.services.user_service.services.auth_service import Auth0Service
+from tools.services.user_service.services.supabase_auth_service import SupabaseAuthService
+from tools.services.user_service.services.unified_auth_service import UnifiedAuthService
+from tools.services.user_service.subscription_service_legacy import SubscriptionService
+from tools.services.user_service.services.payment_service import PaymentService
 # 使用新的 ServiceV2 和 Repository 模式
-from .services import UserServiceV2, SubscriptionServiceV2, OrganizationService
-from .services.usage_service import UsageService
-from .services.session_service import SessionService  
-from .services.credit_service import CreditService
-from .services.invitation_service import InvitationService
-from .services.resource_authorization_service import ResourceAuthorizationService
-from .repositories import UserRepository, SubscriptionRepository, OrganizationRepository
-from .config import get_config
+from tools.services.user_service.services import UserServiceV2, SubscriptionServiceV2, OrganizationService
+from tools.services.user_service.services.usage_service import UsageService
+from tools.services.user_service.services.session_service import SessionService  
+from tools.services.user_service.services.credit_service import CreditService
+from tools.services.user_service.services.invitation_service import InvitationService
+from tools.services.user_service.services.resource_authorization_service import ResourceAuthorizationService
+from tools.services.user_service.services.user_portrait_service import UserPortraitService
+from tools.services.user_service.repositories import UserRepository, SubscriptionRepository, OrganizationRepository
+from tools.services.user_service.config import get_config
 
 
 # 获取配置
@@ -157,7 +162,7 @@ resource_authorization_service = ResourceAuthorizationService()
 
 # 初始化文件存储服务
 try:
-    from .services.file_storage_service import FileStorageService
+    from tools.services.user_service.services.file_storage_service import FileStorageService
     file_storage_service = FileStorageService()
     logger.info("File storage service initialized")
 except Exception as e:

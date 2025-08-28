@@ -4,11 +4,24 @@ Base Tool Class for ISA MCP Tools
 """
 import json
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Any, Optional, List, Union, Callable
 import logging
 from isa_model.client import ISAModelClient
 
 logger = logging.getLogger(__name__)
+
+def json_serializer(obj):
+    """Custom JSON serializer for datetime and other objects"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    elif hasattr(obj, 'dict') and callable(obj.dict):  # Pydantic models
+        return obj.dict()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 class BaseTool:
     """基础工具类，提供统一的ISA客户端调用和billing信息处理"""
@@ -124,7 +137,7 @@ class BaseTool:
         if error_message:
             response["error"] = error_message
         
-        return json.dumps(response, ensure_ascii=False)
+        return json.dumps(response, ensure_ascii=False, default=json_serializer)
     
     def reset_billing(self):
         """重置billing信息"""
@@ -160,7 +173,7 @@ class BaseTool:
                                 "operations": self.billing_info,
                                 "currency": "USD"
                             }
-                        return json.dumps(result_dict, ensure_ascii=False)
+                        return json.dumps(result_dict, ensure_ascii=False, default=json_serializer)
                     except json.JSONDecodeError:
                         # 如果不是JSON，直接返回
                         return result
@@ -185,7 +198,7 @@ class BaseTool:
                         "currency": "USD"
                     }
                 
-                return json.dumps(error_response, ensure_ascii=False)
+                return json.dumps(error_response, ensure_ascii=False, default=json_serializer)
         
         # 应用装饰器
         decorated_func = self.security_manager.security_check(wrapped_func)

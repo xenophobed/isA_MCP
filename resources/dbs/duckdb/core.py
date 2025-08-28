@@ -69,7 +69,7 @@ class ConnectionConfig:
             'threads': self.threads,
             'memory_limit': self.memory_limit,
             'enable_object_cache': self.enable_object_cache,
-            'enable_checkpoint_on_shutdown': self.enable_checkpoint_on_shutdown,
+            # 'enable_checkpoint_on_shutdown': self.enable_checkpoint_on_shutdown,  # 不支持的选项
         }
         if self.temp_directory:
             config['temp_directory'] = self.temp_directory

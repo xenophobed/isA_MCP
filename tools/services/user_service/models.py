@@ -413,6 +413,126 @@ class SessionMemory(BaseModel):
         from_attributes = True
 
 
+class SessionAnalysisResult(BaseModel):
+    """Session记忆分析结果模型"""
+    session_id: str = Field(..., description="会话ID")
+    user_id: str = Field(..., description="用户ID")
+    analysis_type: str = Field(..., description="分析类型")
+    
+    # 基础会话指标
+    total_messages: int = Field(default=0, description="消息总数")
+    total_tokens: int = Field(default=0, description="Token总数")
+    total_cost: float = Field(default=0.0, description="总成本")
+    duration_minutes: float = Field(default=0.0, description="会话时长（分钟）")
+    
+    # 记忆分析指标
+    memory_patterns: Dict[str, Any] = Field(default_factory=dict, description="记忆模式分析")
+    learning_indicators: Dict[str, Any] = Field(default_factory=dict, description="学习指标")
+    cognitive_load: Dict[str, Any] = Field(default_factory=dict, description="认知负荷分析")
+    
+    # AI增强分析
+    semantic_coherence: float = Field(default=0.0, description="语义连贯性评分")
+    knowledge_extraction: Dict[str, Any] = Field(default_factory=dict, description="知识提取结果")
+    behavioral_insights: List[str] = Field(default_factory=list, description="行为洞察")
+    
+    # 预测指标
+    session_quality_score: float = Field(default=0.0, description="会话质量评分")
+    engagement_level: str = Field(default="medium", description="参与度级别")
+    satisfaction_prediction: float = Field(default=0.5, description="满意度预测")
+    
+    # 元数据
+    analysis_timestamp: datetime = Field(default_factory=datetime.utcnow, description="分析时间戳")
+    confidence_score: float = Field(default=0.0, description="分析置信度")
+    
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
+
+
+class SessionMemoryPattern(BaseModel):
+    """Session记忆模式模型"""
+    pattern_id: str = Field(..., description="模式ID")
+    pattern_type: str = Field(..., description="模式类型")
+    frequency: int = Field(default=1, description="出现频次")
+    strength: float = Field(default=0.0, description="模式强度")
+    context: Dict[str, Any] = Field(default_factory=dict, description="上下文信息")
+    
+    # 时间特征
+    first_occurrence: datetime = Field(..., description="首次出现")
+    last_occurrence: datetime = Field(..., description="最后出现")
+    
+    # 关联性
+    related_patterns: List[str] = Field(default_factory=list, description="相关模式ID列表")
+    impact_score: float = Field(default=0.0, description="影响评分")
+    
+    class Config:
+        from_attributes = True
+
+
+class SessionLearningMetrics(BaseModel):
+    """Session学习指标模型"""
+    session_id: str = Field(..., description="会话ID")
+    user_id: str = Field(..., description="用户ID")
+    
+    # 知识获取指标
+    new_concepts_learned: int = Field(default=0, description="学习新概念数")
+    concept_reinforcement_count: int = Field(default=0, description="概念强化次数")
+    knowledge_depth_score: float = Field(default=0.0, description="知识深度评分")
+    
+    # 技能发展指标
+    skill_progression: Dict[str, float] = Field(default_factory=dict, description="技能进展评分")
+    problem_solving_improvement: float = Field(default=0.0, description="问题解决能力提升")
+    
+    # 认知发展
+    critical_thinking_indicators: List[str] = Field(default_factory=list, description="批判性思维指标")
+    creativity_markers: List[str] = Field(default_factory=list, description="创造性标记")
+    
+    # 学习效率
+    learning_velocity: float = Field(default=0.0, description="学习速度")
+    retention_prediction: float = Field(default=0.0, description="记忆保持预测")
+    
+    class Config:
+        from_attributes = True
+
+
+class SessionCognitiveLoad(BaseModel):
+    """Session认知负荷分析模型"""
+    session_id: str = Field(..., description="会话ID")
+    
+    # 认知负荷维度
+    intrinsic_load: float = Field(default=0.0, description="内在认知负荷")
+    extraneous_load: float = Field(default=0.0, description="外在认知负荷")
+    germane_load: float = Field(default=0.0, description="有效认知负荷")
+    
+    # 负荷指标
+    total_cognitive_load: float = Field(default=0.0, description="总认知负荷")
+    optimal_load_threshold: float = Field(default=0.7, description="最优负荷阈值")
+    overload_risk: float = Field(default=0.0, description="过载风险")
+    
+    # 适应性建议
+    load_optimization_suggestions: List[str] = Field(default_factory=list, description="负荷优化建议")
+    difficulty_adjustment: str = Field(default="maintain", description="难度调整建议")
+    
+    class Config:
+        from_attributes = True
+
+
+class SessionAnalysisRequest(BaseModel):
+    """Session分析请求模型"""
+    session_id: str = Field(..., description="会话ID")
+    analysis_types: List[str] = Field(
+        default=["memory_patterns", "learning_metrics", "cognitive_load"],
+        description="分析类型列表"
+    )
+    include_ai_analysis: bool = Field(default=True, description="是否包含AI分析")
+    depth_level: str = Field(default="comprehensive", description="分析深度级别")
+    
+    class Config:
+        from_attributes = True
+
+
 class SessionMessage(BaseModel):
     """Session message model"""
     id: Optional[str] = None  # UUID in database
@@ -920,3 +1040,144 @@ class ResourcePermissionUpdate(BaseModel):
     access_level: Optional[AccessLevel] = Field(None, description="访问级别")
     is_enabled: Optional[bool] = Field(None, description="是否启用")
     description: Optional[str] = Field(None, description="权限描述", max_length=500)
+
+
+# ============ User Portrait Models ============
+
+class UserPortraitStatus(str, Enum):
+    """用户画像状态枚举"""
+    ACTIVE = "active"
+    PENDING = "pending"
+    INACTIVE = "inactive"
+    ERROR = "error"
+
+
+class UserPortrait(BaseModel):
+    """用户画像模型"""
+    id: Optional[int] = None
+    user_id: str = Field(..., description="用户ID", max_length=255)
+    
+    # 基础画像信息
+    total_memories: int = Field(default=0, description="总记忆数量")
+    knowledge_diversity: int = Field(default=0, description="知识多样性分数")
+    
+    # Memory Service分析结果
+    memory_distribution: Dict[str, int] = Field(default_factory=dict, description="记忆类型分布")
+    intelligence_metrics: Dict[str, Any] = Field(default_factory=dict, description="智能指标")
+    
+    # 行为分析数据
+    behavior_patterns: Dict[str, Any] = Field(default_factory=dict, description="行为模式")
+    usage_patterns: Dict[str, Any] = Field(default_factory=dict, description="使用模式")
+    
+    # 偏好和特征
+    user_preferences: Dict[str, Any] = Field(default_factory=dict, description="用户偏好")
+    communication_style: Dict[str, Any] = Field(default_factory=dict, description="沟通风格")
+    expertise_areas: List[str] = Field(default_factory=list, description="专业领域")
+    
+    # 画像生成元数据
+    last_analysis_date: Optional[datetime] = None
+    confidence_score: float = Field(default=0.0, description="画像置信度", ge=0.0, le=1.0)
+    data_completeness: float = Field(default=0.0, description="数据完整性", ge=0.0, le=1.0)
+    portrait_version: str = Field(default="1.0", description="画像版本")
+    status: UserPortraitStatus = Field(default=UserPortraitStatus.PENDING, description="画像状态")
+    
+    # 时间戳
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """验证用户ID格式"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class UserPortraitCreate(BaseModel):
+    """创建用户画像请求模型"""
+    user_id: str = Field(..., description="用户ID")
+    force_regenerate: bool = Field(default=False, description="是否强制重新生成")
+
+
+class UserPortraitUpdate(BaseModel):
+    """更新用户画像请求模型"""
+    memory_distribution: Optional[Dict[str, int]] = Field(None, description="记忆类型分布")
+    intelligence_metrics: Optional[Dict[str, Any]] = Field(None, description="智能指标")
+    behavior_patterns: Optional[Dict[str, Any]] = Field(None, description="行为模式")
+    usage_patterns: Optional[Dict[str, Any]] = Field(None, description="使用模式")
+    user_preferences: Optional[Dict[str, Any]] = Field(None, description="用户偏好")
+    communication_style: Optional[Dict[str, Any]] = Field(None, description="沟通风格")
+    expertise_areas: Optional[List[str]] = Field(None, description="专业领域")
+    confidence_score: Optional[float] = Field(None, description="画像置信度", ge=0.0, le=1.0)
+    data_completeness: Optional[float] = Field(None, description="数据完整性", ge=0.0, le=1.0)
+    status: Optional[UserPortraitStatus] = Field(None, description="画像状态")
+
+
+class UserPortraitAnalysisRequest(BaseModel):
+    """用户画像分析请求模型"""
+    user_id: str = Field(..., description="用户ID")
+    analysis_type: str = Field(default="comprehensive", description="分析类型")
+    include_memory_analysis: bool = Field(default=True, description="是否包含记忆分析")
+    include_usage_analysis: bool = Field(default=True, description="是否包含使用分析")
+    include_behavior_analysis: bool = Field(default=True, description="是否包含行为分析")
+    days_back: int = Field(default=30, description="分析回溯天数", ge=1, le=365)
+
+
+class UserPortraitResponse(BaseModel):
+    """用户画像响应模型"""
+    user_id: str = Field(..., description="用户ID")
+    total_memories: int = Field(..., description="总记忆数量")
+    knowledge_diversity: int = Field(..., description="知识多样性分数")
+    memory_distribution: Dict[str, int] = Field(..., description="记忆类型分布")
+    behavior_summary: Dict[str, Any] = Field(..., description="行为摘要")
+    expertise_areas: List[str] = Field(..., description="专业领域")
+    confidence_score: float = Field(..., description="画像置信度")
+    last_analysis_date: Optional[datetime] = Field(None, description="最后分析时间")
+    status: str = Field(..., description="画像状态")
+
+
+class UserBehaviorInsight(BaseModel):
+    """用户行为洞察模型"""
+    id: Optional[int] = None
+    user_id: str = Field(..., description="用户ID", max_length=255)
+    insight_type: str = Field(..., description="洞察类型", max_length=100)
+    insight_category: str = Field(..., description="洞察分类", max_length=100)
+    insight_data: Dict[str, Any] = Field(default_factory=dict, description="洞察数据")
+    confidence_score: float = Field(..., description="置信度分数", ge=0.0, le=1.0)
+    source_data_period: str = Field(..., description="源数据时间段")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @validator('user_id')
+    def validate_user_id_format(cls, v):
+        """验证用户ID格式"""
+        if not v:
+            raise ValueError('user_id cannot be empty')
+        
+        result = validate_user_id(v)
+        if not result.is_valid:
+            raise ValueError(f'Invalid user_id format: {result.error_message}')
+        
+        return UserIdValidator.normalize(v)
+
+    class Config:
+        from_attributes = True
+
+
+class UserPortraitSummary(BaseModel):
+    """用户画像摘要模型"""
+    user_id: str = Field(..., description="用户ID")
+    portrait_exists: bool = Field(..., description="是否存在画像")
+    last_updated: Optional[datetime] = Field(None, description="最后更新时间")
+    data_freshness: str = Field(..., description="数据新鲜度")
+    key_characteristics: List[str] = Field(default_factory=list, description="关键特征")
+    suggested_actions: List[str] = Field(default_factory=list, description="建议行动")
+    completeness_percentage: float = Field(..., description="完整度百分比", ge=0.0, le=100.0)
