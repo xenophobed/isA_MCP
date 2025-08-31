@@ -12,31 +12,105 @@ import logging
 import warnings
 warnings.filterwarnings('ignore')
 
-# Time series libraries
-try:
-    from prophet import Prophet
-    from prophet.diagnostics import cross_validation, performance_metrics
-    PROPHET_AVAILABLE = True
-except ImportError:
-    PROPHET_AVAILABLE = False
-    logging.warning("Prophet not available. Prophet forecasting will be disabled.")
+# Time series libraries - LAZY LOADING TO PREVENT MUTEX LOCKS
+PROPHET_AVAILABLE = None
+STATSMODELS_AVAILABLE = None  
+SKLEARN_AVAILABLE = None
 
-try:
-    from statsmodels.tsa.arima.model import ARIMA
-    from statsmodels.tsa.seasonal import seasonal_decompose
-    from statsmodels.tsa.stattools import adfuller, kpss
-    from statsmodels.tsa.api import ExponentialSmoothing
-    from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-    STATSMODELS_AVAILABLE = True
-except ImportError:
-    STATSMODELS_AVAILABLE = False
-    logging.warning("Statsmodels not available. ARIMA and statistical tests will be disabled.")
+def _lazy_import_prophet():
+    """Lazy import Prophet only when needed"""
+    global PROPHET_AVAILABLE
+    if PROPHET_AVAILABLE is None:
+        try:
+            from prophet import Prophet
+            from prophet.diagnostics import cross_validation, performance_metrics
+            PROPHET_AVAILABLE = True
+            return {
+                'Prophet': Prophet,
+                'cross_validation': cross_validation,
+                'performance_metrics': performance_metrics
+            }
+        except ImportError:
+            PROPHET_AVAILABLE = False
+            logging.warning("Prophet not available. Prophet forecasting will be disabled.")
+            return None
+    elif PROPHET_AVAILABLE:
+        from prophet import Prophet
+        from prophet.diagnostics import cross_validation, performance_metrics
+        return {
+            'Prophet': Prophet,
+            'cross_validation': cross_validation,
+            'performance_metrics': performance_metrics
+        }
+    else:
+        return None
 
-try:
-    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
+def _lazy_import_statsmodels():
+    """Lazy import Statsmodels only when needed"""
+    global STATSMODELS_AVAILABLE
+    if STATSMODELS_AVAILABLE is None:
+        try:
+            from statsmodels.tsa.arima.model import ARIMA
+            from statsmodels.tsa.seasonal import seasonal_decompose
+            from statsmodels.tsa.stattools import adfuller, kpss
+            from statsmodels.tsa.api import ExponentialSmoothing
+            from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+            STATSMODELS_AVAILABLE = True
+            return {
+                'ARIMA': ARIMA,
+                'seasonal_decompose': seasonal_decompose,
+                'adfuller': adfuller,
+                'kpss': kpss,
+                'ExponentialSmoothing': ExponentialSmoothing,
+                'plot_acf': plot_acf,
+                'plot_pacf': plot_pacf
+            }
+        except ImportError:
+            STATSMODELS_AVAILABLE = False
+            logging.warning("Statsmodels not available. ARIMA and statistical tests will be disabled.")
+            return None
+    elif STATSMODELS_AVAILABLE:
+        from statsmodels.tsa.arima.model import ARIMA
+        from statsmodels.tsa.seasonal import seasonal_decompose
+        from statsmodels.tsa.stattools import adfuller, kpss
+        from statsmodels.tsa.api import ExponentialSmoothing
+        from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+        return {
+            'ARIMA': ARIMA,
+            'seasonal_decompose': seasonal_decompose,
+            'adfuller': adfuller,
+            'kpss': kpss,
+            'ExponentialSmoothing': ExponentialSmoothing,
+            'plot_acf': plot_acf,
+            'plot_pacf': plot_pacf
+        }
+    else:
+        return None
+
+def _lazy_import_sklearn():
+    """Lazy import sklearn metrics only when needed"""
+    global SKLEARN_AVAILABLE
+    if SKLEARN_AVAILABLE is None:
+        try:
+            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+            SKLEARN_AVAILABLE = True
+            return {
+                'mean_absolute_error': mean_absolute_error,
+                'mean_squared_error': mean_squared_error,
+                'r2_score': r2_score
+            }
+        except ImportError:
+            SKLEARN_AVAILABLE = False
+            return None
+    elif SKLEARN_AVAILABLE:
+        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+        return {
+            'mean_absolute_error': mean_absolute_error,
+            'mean_squared_error': mean_squared_error,
+            'r2_score': r2_score
+        }
+    else:
+        return None
 
 try:
     from ..preprocessors.csv_processor import CSVProcessor
@@ -367,6 +441,88 @@ class TimeSeriesProcessor:
             
         except Exception as e:
             logger.error(f"Error analyzing stationarity: {e}")
+            return {"error": str(e)}
+    
+    def detect_seasonality(self, series_key: str) -> Dict[str, Any]:
+        """
+        Detect seasonal patterns in the time series
+        
+        Args:
+            series_key: Key identifying the time series data
+            
+        Returns:
+            Seasonality detection results
+        """
+        try:
+            if series_key not in self.time_series_data:
+                return {"error": f"Time series '{series_key}' not found"}
+            
+            ts_data = self.time_series_data[series_key]["data"]
+            series = ts_data['y']
+            
+            # Basic seasonality detection using autocorrelation
+            seasonality_results = {
+                "has_seasonality": False,
+                "seasonal_periods": [],
+                "strength": 0.0,
+                "confidence": "low"
+            }
+            
+            if len(series) < 24:  # Need at least 24 points for meaningful analysis
+                seasonality_results["error"] = "Insufficient data for seasonality detection"
+                return seasonality_results
+            
+            # Test common seasonal periods based on frequency
+            freq = self.time_series_data[series_key]["metadata"]["frequency"]
+            test_periods = []
+            
+            if freq == 'H':  # Hourly data
+                test_periods = [24, 168]  # Daily, weekly
+            elif freq == 'D':  # Daily data  
+                test_periods = [7, 30, 365]  # Weekly, monthly, yearly
+            elif freq == 'W':  # Weekly data
+                test_periods = [52]  # Yearly
+            elif freq == 'M':  # Monthly data
+                test_periods = [12]  # Yearly
+            else:
+                test_periods = [7, 12, 24]  # Default periods to test
+            
+            max_autocorr = 0
+            best_period = None
+            
+            for period in test_periods:
+                if len(series) > 2 * period:  # Need at least 2 cycles
+                    try:
+                        # Calculate autocorrelation at lag = period
+                        autocorr = series.autocorr(lag=period)
+                        if not np.isnan(autocorr) and abs(autocorr) > max_autocorr:
+                            max_autocorr = abs(autocorr)
+                            best_period = period
+                            seasonality_results["seasonal_periods"].append({
+                                "period": period,
+                                "autocorrelation": float(autocorr),
+                                "strength": float(abs(autocorr))
+                            })
+                    except Exception:
+                        continue
+            
+            # Determine if seasonality exists
+            if max_autocorr > 0.3:  # Strong seasonality
+                seasonality_results["has_seasonality"] = True
+                seasonality_results["strength"] = float(max_autocorr)
+                seasonality_results["confidence"] = "high" if max_autocorr > 0.6 else "medium"
+            elif max_autocorr > 0.1:  # Weak seasonality
+                seasonality_results["has_seasonality"] = True
+                seasonality_results["strength"] = float(max_autocorr)
+                seasonality_results["confidence"] = "low"
+            
+            if best_period:
+                seasonality_results["dominant_period"] = best_period
+            
+            return seasonality_results
+            
+        except Exception as e:
+            logger.error(f"Error detecting seasonality: {e}")
             return {"error": str(e)}
     
     def seasonal_decomposition(self, series_key: str, period: Optional[int] = None,

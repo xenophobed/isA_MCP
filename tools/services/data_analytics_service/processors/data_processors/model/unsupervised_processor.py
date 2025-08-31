@@ -13,39 +13,114 @@ import logging
 import warnings
 warnings.filterwarnings('ignore')
 
-# Core unsupervised learning libraries
-try:
-    from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, SpectralClustering
-    from sklearn.cluster import MeanShift, OPTICS, Birch, MiniBatchKMeans
-    from sklearn.mixture import GaussianMixture
-    from sklearn.decomposition import PCA, TruncatedSVD, FactorAnalysis, FastICA
-    from sklearn.decomposition import NMF, LatentDirichletAllocation
-    from sklearn.manifold import TSNE, MDS, Isomap, LocallyLinearEmbedding
-    from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-    from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
-    from sklearn.neighbors import NearestNeighbors
-    from sklearn.ensemble import IsolationForest
-    from sklearn.svm import OneClassSVM
-    from sklearn.covariance import EllipticEnvelope
-    from sklearn.neighbors import LocalOutlierFactor
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-    logging.warning("Scikit-learn not available. Unsupervised learning capabilities will be disabled.")
+# Core unsupervised learning libraries - LAZY LOADING TO PREVENT MUTEX LOCKS
+SKLEARN_AVAILABLE = None
 
-try:
-    import umap.umap_ as umap
-    UMAP_AVAILABLE = True
-except ImportError:
-    UMAP_AVAILABLE = False
-    logging.warning("UMAP not available. UMAP dimensionality reduction will be disabled.")
+def _lazy_import_sklearn():
+    """Lazy import sklearn components only when needed"""
+    global SKLEARN_AVAILABLE
+    if SKLEARN_AVAILABLE is None:
+        try:
+            from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, SpectralClustering
+            from sklearn.cluster import MeanShift, OPTICS, Birch, MiniBatchKMeans
+            from sklearn.mixture import GaussianMixture
+            from sklearn.decomposition import PCA, TruncatedSVD, FactorAnalysis, FastICA
+            from sklearn.decomposition import NMF, LatentDirichletAllocation
+            from sklearn.manifold import TSNE, MDS, Isomap, LocallyLinearEmbedding
+            from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+            from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+            from sklearn.neighbors import NearestNeighbors
+            from sklearn.ensemble import IsolationForest
+            from sklearn.svm import OneClassSVM
+            from sklearn.covariance import EllipticEnvelope
+            from sklearn.neighbors import LocalOutlierFactor
+            SKLEARN_AVAILABLE = True
+            return {
+                'KMeans': KMeans, 'DBSCAN': DBSCAN, 'AgglomerativeClustering': AgglomerativeClustering,
+                'SpectralClustering': SpectralClustering, 'MeanShift': MeanShift, 'OPTICS': OPTICS,
+                'Birch': Birch, 'MiniBatchKMeans': MiniBatchKMeans, 'GaussianMixture': GaussianMixture,
+                'PCA': PCA, 'TruncatedSVD': TruncatedSVD, 'FactorAnalysis': FactorAnalysis,
+                'FastICA': FastICA, 'NMF': NMF, 'LatentDirichletAllocation': LatentDirichletAllocation,
+                'TSNE': TSNE, 'MDS': MDS, 'Isomap': Isomap, 'LocallyLinearEmbedding': LocallyLinearEmbedding,
+                'StandardScaler': StandardScaler, 'MinMaxScaler': MinMaxScaler, 'RobustScaler': RobustScaler,
+                'silhouette_score': silhouette_score, 'calinski_harabasz_score': calinski_harabasz_score,
+                'davies_bouldin_score': davies_bouldin_score, 'NearestNeighbors': NearestNeighbors,
+                'IsolationForest': IsolationForest, 'OneClassSVM': OneClassSVM,
+                'EllipticEnvelope': EllipticEnvelope, 'LocalOutlierFactor': LocalOutlierFactor
+            }
+        except ImportError:
+            SKLEARN_AVAILABLE = False
+            logging.warning("Scikit-learn not available. Unsupervised learning capabilities will be disabled.")
+            return None
+    elif SKLEARN_AVAILABLE:
+        from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, SpectralClustering
+        from sklearn.cluster import MeanShift, OPTICS, Birch, MiniBatchKMeans
+        from sklearn.mixture import GaussianMixture
+        from sklearn.decomposition import PCA, TruncatedSVD, FactorAnalysis, FastICA
+        from sklearn.decomposition import NMF, LatentDirichletAllocation
+        from sklearn.manifold import TSNE, MDS, Isomap, LocallyLinearEmbedding
+        from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+        from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+        from sklearn.neighbors import NearestNeighbors
+        from sklearn.ensemble import IsolationForest
+        from sklearn.svm import OneClassSVM
+        from sklearn.covariance import EllipticEnvelope
+        from sklearn.neighbors import LocalOutlierFactor
+        return {
+            'KMeans': KMeans, 'DBSCAN': DBSCAN, 'AgglomerativeClustering': AgglomerativeClustering,
+            'SpectralClustering': SpectralClustering, 'MeanShift': MeanShift, 'OPTICS': OPTICS,
+            'Birch': Birch, 'MiniBatchKMeans': MiniBatchKMeans, 'GaussianMixture': GaussianMixture,
+            'PCA': PCA, 'TruncatedSVD': TruncatedSVD, 'FactorAnalysis': FactorAnalysis,
+            'FastICA': FastICA, 'NMF': NMF, 'LatentDirichletAllocation': LatentDirichletAllocation,
+            'TSNE': TSNE, 'MDS': MDS, 'Isomap': Isomap, 'LocallyLinearEmbedding': LocallyLinearEmbedding,
+            'StandardScaler': StandardScaler, 'MinMaxScaler': MinMaxScaler, 'RobustScaler': RobustScaler,
+            'silhouette_score': silhouette_score, 'calinski_harabasz_score': calinski_harabasz_score,
+            'davies_bouldin_score': davies_bouldin_score, 'NearestNeighbors': NearestNeighbors,
+            'IsolationForest': IsolationForest, 'OneClassSVM': OneClassSVM,
+            'EllipticEnvelope': EllipticEnvelope, 'LocalOutlierFactor': LocalOutlierFactor
+        }
+    else:
+        return None
 
-try:
-    from hdbscan import HDBSCAN
-    HDBSCAN_AVAILABLE = True
-except ImportError:
-    HDBSCAN_AVAILABLE = False
-    logging.warning("HDBSCAN not available. HDBSCAN clustering will be disabled.")
+# Additional libraries - LAZY LOADING 
+UMAP_AVAILABLE = None
+HDBSCAN_AVAILABLE = None
+
+def _lazy_import_umap():
+    """Lazy import UMAP only when needed"""
+    global UMAP_AVAILABLE
+    if UMAP_AVAILABLE is None:
+        try:
+            import umap.umap_ as umap
+            UMAP_AVAILABLE = True
+            return umap
+        except ImportError:
+            UMAP_AVAILABLE = False
+            logging.warning("UMAP not available. UMAP dimensionality reduction will be disabled.")
+            return None
+    elif UMAP_AVAILABLE:
+        import umap.umap_ as umap
+        return umap
+    else:
+        return None
+
+def _lazy_import_hdbscan():
+    """Lazy import HDBSCAN only when needed"""
+    global HDBSCAN_AVAILABLE
+    if HDBSCAN_AVAILABLE is None:
+        try:
+            from hdbscan import HDBSCAN
+            HDBSCAN_AVAILABLE = True
+            return HDBSCAN
+        except ImportError:
+            HDBSCAN_AVAILABLE = False
+            logging.warning("HDBSCAN not available. HDBSCAN clustering will be disabled.")
+            return None
+    elif HDBSCAN_AVAILABLE:
+        from hdbscan import HDBSCAN
+        return HDBSCAN
+    else:
+        return None
 
 try:
     import matplotlib.pyplot as plt

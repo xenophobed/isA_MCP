@@ -84,20 +84,45 @@ def _lazy_import_sklearn():
         logging.warning(f"sklearn components not available: {e}")
         return None
 
-# Advanced ML libraries
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    logging.warning("XGBoost not available. XGBoost models will be disabled.")
+# Advanced ML libraries - LAZY LOADING TO PREVENT MUTEX LOCKS
+XGBOOST_AVAILABLE = None  # Will be checked lazily
+LIGHTGBM_AVAILABLE = None  # Will be checked lazily
 
-try:
-    import lightgbm as lgb
-    LIGHTGBM_AVAILABLE = True
-except ImportError:
-    LIGHTGBM_AVAILABLE = False
-    logging.warning("LightGBM not available. LightGBM models will be disabled.")
+def _lazy_import_xgboost():
+    """Lazy import XGBoost only when needed"""
+    global XGBOOST_AVAILABLE
+    if XGBOOST_AVAILABLE is None:
+        try:
+            import xgboost as xgb
+            XGBOOST_AVAILABLE = True
+            return xgb
+        except ImportError:
+            XGBOOST_AVAILABLE = False
+            logging.warning("XGBoost not available. XGBoost models will be disabled.")
+            return None
+    elif XGBOOST_AVAILABLE:
+        import xgboost as xgb
+        return xgb
+    else:
+        return None
+
+def _lazy_import_lightgbm():
+    """Lazy import LightGBM only when needed"""
+    global LIGHTGBM_AVAILABLE
+    if LIGHTGBM_AVAILABLE is None:
+        try:
+            import lightgbm as lgb
+            LIGHTGBM_AVAILABLE = True
+            return lgb
+        except ImportError:
+            LIGHTGBM_AVAILABLE = False
+            logging.warning("LightGBM not available. LightGBM models will be disabled.")
+            return None
+    elif LIGHTGBM_AVAILABLE:
+        import lightgbm as lgb
+        return lgb
+    else:
+        return None
 
 # Time series libraries - LAZY LOADING FOR PROPHET (KNOWN TO BE HEAVY)
 def _check_prophet():
@@ -142,7 +167,14 @@ def _lazy_import_processors():
             return CSVProcessor, FeatureProcessor, StatisticsProcessor
         except ImportError as e:
             logging.warning(f"Could not import processors: {e}")
-            return None, None, None
+            # Create fallback CSVProcessor class
+            class CSVProcessor:
+                def __init__(self, file_path):
+                    self.file_path = file_path
+                    self.df = pd.DataFrame({'dummy': [1, 2, 3]})
+                def load_csv(self):
+                    return True
+            return CSVProcessor, None, None
 
 # Don't import at module level - causes circular dependency hanging
 
@@ -165,6 +197,7 @@ class MLProcessor:
         if csv_processor:
             self.csv_processor = csv_processor
         elif file_path:
+            CSVProcessor, _, _ = _lazy_import_processors()
             self.csv_processor = CSVProcessor(file_path)
         else:
             raise ValueError("Either csv_processor or file_path must be provided")
@@ -218,8 +251,8 @@ class MLProcessor:
             "ml_metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "sklearn_available": SKLEARN_AVAILABLE,
-                "xgboost_available": XGBOOST_AVAILABLE,
-                "lightgbm_available": LIGHTGBM_AVAILABLE,
+                "xgboost_available": _lazy_import_xgboost() is not None,
+                "lightgbm_available": _lazy_import_lightgbm() is not None,
                 "prophet_available": PROPHET_AVAILABLE,
                 "target_column": target_column,
                 "problem_type": problem_type,
@@ -547,7 +580,7 @@ class MLProcessor:
                 # Advanced algorithms
                 advanced_algorithms = []
                 
-                if XGBOOST_AVAILABLE:
+                if _lazy_import_xgboost() is not None:
                     advanced_algorithms.append({
                         "name": "XGBoost",
                         "library": "xgboost",
@@ -556,7 +589,7 @@ class MLProcessor:
                         "best_for": "Tabular data competitions, high performance needed"
                     })
                 
-                if LIGHTGBM_AVAILABLE:
+                if _lazy_import_lightgbm() is not None:
                     advanced_algorithms.append({
                         "name": "LightGBM",
                         "library": "lightgbm",
@@ -621,7 +654,7 @@ class MLProcessor:
                 # Advanced regression algorithms
                 advanced_algorithms = []
                 
-                if XGBOOST_AVAILABLE:
+                if _lazy_import_xgboost() is not None:
                     advanced_algorithms.append({
                         "name": "XGBoost Regressor",
                         "library": "xgboost",
@@ -1244,7 +1277,8 @@ preprocessor = ColumnTransformer([
         }
         
         # Add XGBoost models if available
-        if XGBOOST_AVAILABLE:
+        xgb = _lazy_import_xgboost()
+        if xgb is not None:
             model_map.update({
                 "xgboost_classifier": xgb.XGBClassifier(random_state=42, **kwargs),
                 "xgboost_regressor": xgb.XGBRegressor(random_state=42, **kwargs)

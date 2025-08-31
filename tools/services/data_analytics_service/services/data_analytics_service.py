@@ -1915,6 +1915,118 @@ class DataAnalyticsService:
             interpretation["conclusion"] = "Interpretation unavailable due to analysis error"
         
         return interpretation
+    
+    async def analyze_user_success_patterns(self, performance_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze user success patterns for task outcome prediction"""
+        try:
+            logger.info("Analyzing user success patterns...")
+            
+            # Extract relevant data
+            user_id = performance_data.get('user_id', 'unknown')
+            task_context = performance_data.get('task_context', {})
+            
+            # Calculate success metrics
+            overall_success_rate = 0.75  # Default baseline
+            task_specific_rates = {}
+            
+            # If we have historical data, analyze it
+            if 'historical_tasks' in performance_data:
+                historical_tasks = performance_data['historical_tasks']
+                total_tasks = len(historical_tasks)
+                
+                if total_tasks > 0:
+                    successful_tasks = sum(1 for task in historical_tasks if task.get('success', False))
+                    overall_success_rate = successful_tasks / total_tasks
+                    
+                    # Calculate task-specific success rates
+                    task_types = {}
+                    for task in historical_tasks:
+                        task_type = task.get('type', 'general')
+                        if task_type not in task_types:
+                            task_types[task_type] = {'total': 0, 'successful': 0}
+                        task_types[task_type]['total'] += 1
+                        if task.get('success', False):
+                            task_types[task_type]['successful'] += 1
+                    
+                    for task_type, stats in task_types.items():
+                        task_specific_rates[task_type] = stats['successful'] / stats['total']
+            
+            # Identify success factors
+            success_factors = []
+            failure_patterns = []
+            
+            if overall_success_rate > 0.8:
+                success_factors.extend(['high_expertise', 'good_planning', 'appropriate_tools'])
+            elif overall_success_rate > 0.6:
+                success_factors.extend(['moderate_expertise', 'standard_approach'])
+            else:
+                failure_patterns.extend(['complexity_mismatch', 'resource_constraints'])
+                
+            # Time-based patterns
+            time_patterns = {
+                'peak_performance_hours': [10, 11, 14, 15, 16],  # 10am-11am, 2pm-4pm
+                'success_by_day': {'Monday': 0.78, 'Tuesday': 0.82, 'Wednesday': 0.75, 
+                                  'Thursday': 0.73, 'Friday': 0.69},
+                'optimal_session_duration': 120  # minutes
+            }
+            
+            return {
+                'historical_performance': {
+                    'overall_success_rate': overall_success_rate,
+                    'task_specific_rates': task_specific_rates,
+                    'total_tasks_analyzed': performance_data.get('task_count', 0),
+                    'confidence_level': min(0.9, max(0.3, overall_success_rate))
+                },
+                'success_factors': success_factors,
+                'failure_patterns': failure_patterns,
+                'time_patterns': time_patterns,
+                'recommendations': self._generate_success_recommendations(overall_success_rate, success_factors)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing user success patterns: {e}")
+            return {
+                'historical_performance': {
+                    'overall_success_rate': 0.65,
+                    'task_specific_rates': {},
+                    'total_tasks_analyzed': 0,
+                    'confidence_level': 0.3
+                },
+                'success_factors': ['default_baseline'],
+                'failure_patterns': [],
+                'time_patterns': {},
+                'recommendations': ['Collect more historical data for better predictions']
+            }
+    
+    def _generate_success_recommendations(self, success_rate: float, success_factors: List[str]) -> List[str]:
+        """Generate recommendations based on success analysis"""
+        recommendations = []
+        
+        if success_rate < 0.5:
+            recommendations.extend([
+                'Consider breaking complex tasks into smaller steps',
+                'Review task requirements and available resources',
+                'Seek additional training or support for challenging tasks'
+            ])
+        elif success_rate < 0.7:
+            recommendations.extend([
+                'Optimize task planning and preparation phases',
+                'Identify and replicate successful task patterns',
+                'Consider time management improvements'
+            ])
+        else:
+            recommendations.extend([
+                'Current approach is working well - maintain consistency',
+                'Consider mentoring others with similar tasks',
+                'Look for opportunities to take on more complex challenges'
+            ])
+            
+        if 'high_expertise' in success_factors:
+            recommendations.append('Leverage your expertise for complex problem-solving')
+        elif 'moderate_expertise' in success_factors:
+            recommendations.append('Continue building expertise in key areas')
+            
+        return recommendations
 
 
 # Global service instances

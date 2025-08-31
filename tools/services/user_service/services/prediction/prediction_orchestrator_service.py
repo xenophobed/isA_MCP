@@ -10,19 +10,25 @@ from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import uuid
 
-from .prediction_models import (
+from tools.services.user_service.services.prediction.prediction_models import (
     PredictionResponse, PredictionServiceHealth,
     PredictionType, PredictionConfidenceLevel
 )
 
 # Import DataAnalyticsService for real ML capabilities
-from tools.services.data_analytics_service.services.data_analytics_service import DataAnalyticsService
+try:
+    from tools.services.data_analytics_service.services.data_analytics_service import DataAnalyticsService
+    DATA_ANALYTICS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"DataAnalyticsService not available: {e}")
+    DataAnalyticsService = None
+    DATA_ANALYTICS_AVAILABLE = False
 
 # Import all suite services
-from .user_behavior_analytics.user_behavior_analytics_service import UserBehaviorAnalyticsService
-from .context_intelligence.context_intelligence_service import ContextIntelligenceService
-from .resource_intelligence.resource_intelligence_service import ResourceIntelligenceService
-from .risk_management.risk_management_service import RiskManagementService
+from tools.services.user_service.services.prediction.user_behavior_analytics.user_behavior_analytics_service import UserBehaviorAnalyticsService
+from tools.services.user_service.services.prediction.context_intelligence.context_intelligence_service import ContextIntelligenceService
+from tools.services.user_service.services.prediction.resource_intelligence.resource_intelligence_service import ResourceIntelligenceService
+from tools.services.user_service.services.prediction.risk_management.risk_management_service import RiskManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +48,16 @@ class PredictionOrchestratorService:
     
     def __init__(self):
         """Initialize all prediction suite services with AI brain capabilities"""
-        # Initialize DataAnalyticsService for real ML
-        self.data_analytics = DataAnalyticsService()
+        # Initialize DataAnalyticsService for real ML capabilities
+        if DATA_ANALYTICS_AVAILABLE:
+            try:
+                self.data_analytics = DataAnalyticsService()
+                logger.info("DataAnalyticsService initialized successfully")
+            except Exception as e:
+                logger.warning(f"Failed to initialize DataAnalyticsService: {e}")
+                self.data_analytics = None
+        else:
+            self.data_analytics = None
         
         # Initialize prediction suites (enhanced with AI capabilities)
         self.suite1_service = UserBehaviorAnalyticsService()
@@ -73,12 +87,13 @@ class PredictionOrchestratorService:
             for suite in [self.suite1_service, self.suite2_service, 
                          self.suite3_service, self.suite4_service]:
                 if hasattr(suite, '_inject_ai_capabilities'):
-                    suite._inject_ai_capabilities(self.data_analytics, self.ml_processor)
+                    # 只传递data_analytics，ml_processor未定义
+                    suite._inject_ai_capabilities(self.data_analytics)
                     logger.info(f"AI capabilities injected into {suite.__class__.__name__}")
                 else:
                     # 直接设置AI属性
                     suite.data_analytics = self.data_analytics
-                    suite.ml_processor = self.ml_processor
+                    # suite.ml_processor = self.ml_processor  # 注释掉，未定义的属性
                     suite._use_ml_prediction = True  # 启用ML模式
                     logger.info(f"AI attributes added to {suite.__class__.__name__}")
                     
@@ -142,13 +157,14 @@ class PredictionOrchestratorService:
     async def analyze_context_patterns(
         self,
         user_id: str,
-        context_type: str = "general"
+        context_type: str = "general",
+        timeframe: str = "30d"
     ):
         """MCP Tool 4: Analyze contextual usage patterns"""
         try:
             logger.info(f"Orchestrator: Analyzing context patterns for user {user_id}")
             return await self.suite2_service.analyze_context_patterns(
-                user_id, context_type
+                user_id, context_type, timeframe
             )
         except Exception as e:
             logger.error(f"Error in analyze_context_patterns: {e}")
@@ -272,8 +288,8 @@ class PredictionOrchestratorService:
             if analysis_depth == "full":
                 # Suite 3: Resource Intelligence
                 prediction_tasks.extend([
-                    ("system_patterns", self.analyze_system_patterns(user_id, "user_specific", timeframe)),
-                    ("resource_needs", self.predict_resource_needs(user_id, "computational", timeframe))
+                    ("system_patterns", self.analyze_system_patterns(user_id, {"context_type": "user_specific"}, timeframe)),
+                    ("resource_needs", self.predict_resource_needs(user_id, {"workload_type": "computational", "timeframe": timeframe}))
                 ])
                 
                 # Suite 4: Risk Management (with basic compliance context)

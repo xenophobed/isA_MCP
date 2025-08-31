@@ -10,7 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from tools.base_tool import BaseTool
 from core.logging import get_logger
 
-from .prediction_orchestrator_service import PredictionOrchestratorService
+from tools.services.user_service.services.prediction.prediction_orchestrator_service import PredictionOrchestratorService
 
 logger = get_logger(__name__)
 

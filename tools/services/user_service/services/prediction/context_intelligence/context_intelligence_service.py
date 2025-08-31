@@ -37,7 +37,8 @@ class ContextIntelligenceService:
     async def analyze_context_patterns(
         self, 
         user_id: str, 
-        context_type: str = "general"
+        context_type: str = "general",
+        timeframe: str = "30d"
     ) -> ContextPattern:
         """
         Analyze environment-based usage patterns
@@ -53,7 +54,7 @@ class ContextIntelligenceService:
             logger.info(f"Analyzing context patterns for user {user_id}, context: {context_type}")
             
             # Delegate to context analyzer
-            pattern = await self.context_analyzer.analyze_patterns(user_id, context_type)
+            pattern = await self.context_analyzer.analyze_patterns(user_id, context_type, timeframe)
             
             logger.info(f"Context pattern analysis completed for user {user_id}")
             return pattern

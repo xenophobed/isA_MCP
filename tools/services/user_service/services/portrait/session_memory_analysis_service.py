@@ -13,13 +13,13 @@ import asyncio
 from collections import defaultdict, Counter
 import re
 
-from ..models import (
+from tools.services.user_service.models import (
     Session, SessionMessage, SessionMemory,
     SessionAnalysisResult, SessionMemoryPattern, SessionLearningMetrics,
     SessionCognitiveLoad, SessionAnalysisRequest
 )
-from ..repositories.session_repository import SessionRepository, SessionMessageRepository, SessionMemoryRepository
-from .base import BaseService, ServiceResult
+from tools.services.user_service.repositories.session_repository import SessionRepository, SessionMessageRepository, SessionMemoryRepository
+from tools.services.user_service.services.base import BaseService, ServiceResult
 
 # Memory Service integration
 import sys

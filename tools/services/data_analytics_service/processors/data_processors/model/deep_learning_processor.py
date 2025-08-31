@@ -34,14 +34,55 @@ PYTORCH_AVAILABLE = None     # Will be checked lazily
 
 # Placeholder for lazy imports - will be imported in functions when needed
 
-try:
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
+# Lazy sklearn import to prevent mutex locks during startup
+SKLEARN_AVAILABLE = None
+
+def _lazy_import_sklearn():
+    """Lazy import sklearn components only when needed"""
+    global SKLEARN_AVAILABLE
+    if SKLEARN_AVAILABLE is None:
+        try:
+            from sklearn.model_selection import train_test_split
+            from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+            SKLEARN_AVAILABLE = True
+            return {
+                'train_test_split': train_test_split,
+                'StandardScaler': StandardScaler,
+                'LabelEncoder': LabelEncoder,
+                'MinMaxScaler': MinMaxScaler,
+                'accuracy_score': accuracy_score,
+                'precision_score': precision_score,
+                'recall_score': recall_score,
+                'f1_score': f1_score,
+                'mean_squared_error': mean_squared_error,
+                'mean_absolute_error': mean_absolute_error,
+                'r2_score': r2_score
+            }
+        except ImportError:
+            SKLEARN_AVAILABLE = False
+            return None
+    elif SKLEARN_AVAILABLE:
+        from sklearn.model_selection import train_test_split
+        from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+        from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+        return {
+            'train_test_split': train_test_split,
+            'StandardScaler': StandardScaler,
+            'LabelEncoder': LabelEncoder,
+            'MinMaxScaler': MinMaxScaler,
+            'accuracy_score': accuracy_score,
+            'precision_score': precision_score,
+            'recall_score': recall_score,
+            'f1_score': f1_score,
+            'mean_squared_error': mean_squared_error,
+            'mean_absolute_error': mean_absolute_error,
+            'r2_score': r2_score
+        }
+    else:
+        return None
 
 try:
     from ..preprocessors.csv_processor import CSVProcessor

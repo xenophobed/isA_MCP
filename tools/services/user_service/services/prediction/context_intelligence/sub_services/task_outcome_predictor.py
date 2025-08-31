@@ -1045,7 +1045,7 @@ class TaskOutcomePredictor:
             }}
             """
             
-            reasoning_result = await self.reasoning_generator.generate_reasoning({
+            reasoning_result = self.reasoning_generator.generate_reasoning({
                 'prompt': analysis_prompt,
                 'reasoning_type': 'task_analysis',
                 'output_format': 'json'
@@ -1127,7 +1127,7 @@ class TaskOutcomePredictor:
             Focus on realistic, actionable risks.
             """
             
-            reasoning_result = await self.reasoning_generator.generate_reasoning({
+            reasoning_result = self.reasoning_generator.generate_reasoning({
                 'prompt': risk_analysis_prompt,
                 'reasoning_type': 'risk_assessment',
                 'output_format': 'json_array'
@@ -1194,7 +1194,7 @@ class TaskOutcomePredictor:
             Return as JSON array of strings.
             """
             
-            reasoning_result = await self.reasoning_generator.generate_reasoning({
+            reasoning_result = self.reasoning_generator.generate_reasoning({
                 'prompt': optimization_prompt,
                 'reasoning_type': 'optimization_suggestions',
                 'output_format': 'json_array'

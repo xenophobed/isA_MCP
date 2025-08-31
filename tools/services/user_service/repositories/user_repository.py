@@ -384,3 +384,62 @@ class UserRepository(BaseRepository[User]):
         except Exception as e:
             logger.error(f"Error ensuring user exists: {e}")
             raise RepositoryException(f"Failed to ensure user exists: {e}")
+    
+    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get comprehensive user profile data for predictions
+        
+        Args:
+            user_id: User identifier
+            
+        Returns:
+            User profile dictionary or None if not found
+        """
+        try:
+            # Get basic user data
+            user = await self.get_by_user_id(user_id)
+            if not user:
+                logger.debug(f"User {user_id} not found")
+                return None
+            
+            # Build comprehensive profile
+            profile = {
+                'basic_info': {
+                    'user_id': user.user_id,
+                    'email': user.email,
+                    'name': user.name,
+                    'created_at': user.created_at,
+                    'status': user.status
+                },
+                'activity_summary': {
+                    'total_sessions': 0,
+                    'last_active': user.updated_at,
+                    'account_age_days': (datetime.utcnow() - user.created_at).days if user.created_at else 0
+                },
+                'preferences': {
+                    'timezone': getattr(user, 'timezone', 'UTC'),
+                    'language': getattr(user, 'language', 'en'),
+                    'notification_settings': getattr(user, 'notification_settings', {}),
+                },
+                'capabilities': {
+                    'expertise_level': 'intermediate',  # Default
+                    'preferred_tools': [],
+                    'successful_task_types': [],
+                    'learning_style': 'balanced'
+                },
+                'usage_patterns': {
+                    'peak_hours': [9, 10, 14, 15, 16],
+                    'preferred_session_length': 60,  # minutes
+                    'task_complexity_preference': 'medium'
+                }
+            }
+            
+            # Try to enrich with additional data if available
+            # This would typically come from usage analytics, session data, etc.
+            # For now, provide sensible defaults
+            
+            return profile
+            
+        except Exception as e:
+            logger.error(f"Error getting user profile for {user_id}: {e}")
+            return None

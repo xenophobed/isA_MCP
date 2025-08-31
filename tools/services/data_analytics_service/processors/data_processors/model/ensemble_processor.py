@@ -12,45 +12,201 @@ import logging
 import warnings
 warnings.filterwarnings('ignore')
 
-# Core ensemble learning libraries
-try:
-    from sklearn.ensemble import (
-        VotingClassifier, VotingRegressor,
-        BaggingClassifier, BaggingRegressor,
-        RandomForestClassifier, RandomForestRegressor,
-        ExtraTreesClassifier, ExtraTreesRegressor,
-        AdaBoostClassifier, AdaBoostRegressor,
-        GradientBoostingClassifier, GradientBoostingRegressor,
-        StackingClassifier, StackingRegressor
-    )
-    from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-    from sklearn.svm import SVC, SVR
-    from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-    from sklearn.naive_bayes import GaussianNB
-    from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, KFold
-    from sklearn.preprocessing import StandardScaler, LabelEncoder
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-    from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-    logging.warning("Scikit-learn not available. Ensemble learning capabilities will be disabled.")
+# Core ensemble learning libraries - LAZY LOADING TO PREVENT MUTEX LOCKS
+SKLEARN_AVAILABLE = None
 
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    logging.warning("XGBoost not available. XGBoost ensemble methods will be disabled.")
+def _lazy_import_sklearn():
+    """Lazy import sklearn components only when needed"""
+    global SKLEARN_AVAILABLE
+    if SKLEARN_AVAILABLE is None:
+        try:
+            from sklearn.ensemble import (
+                VotingClassifier, VotingRegressor,
+                BaggingClassifier, BaggingRegressor,
+                RandomForestClassifier, RandomForestRegressor,
+                ExtraTreesClassifier, ExtraTreesRegressor,
+                AdaBoostClassifier, AdaBoostRegressor,
+                GradientBoostingClassifier, GradientBoostingRegressor,
+                StackingClassifier, StackingRegressor
+            )
+            from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
+            from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+            from sklearn.svm import SVC, SVR
+            from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+            from sklearn.naive_bayes import GaussianNB
+            from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, KFold
+            from sklearn.preprocessing import StandardScaler, LabelEncoder
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+            from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+            from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
+            
+            SKLEARN_AVAILABLE = True
+            return {
+                'VotingClassifier': VotingClassifier,
+                'VotingRegressor': VotingRegressor,
+                'BaggingClassifier': BaggingClassifier,
+                'BaggingRegressor': BaggingRegressor,
+                'RandomForestClassifier': RandomForestClassifier,
+                'RandomForestRegressor': RandomForestRegressor,
+                'ExtraTreesClassifier': ExtraTreesClassifier,
+                'ExtraTreesRegressor': ExtraTreesRegressor,
+                'AdaBoostClassifier': AdaBoostClassifier,
+                'AdaBoostRegressor': AdaBoostRegressor,
+                'GradientBoostingClassifier': GradientBoostingClassifier,
+                'GradientBoostingRegressor': GradientBoostingRegressor,
+                'StackingClassifier': StackingClassifier,
+                'StackingRegressor': StackingRegressor,
+                'LogisticRegression': LogisticRegression,
+                'LinearRegression': LinearRegression,
+                'Ridge': Ridge,
+                'DecisionTreeClassifier': DecisionTreeClassifier,
+                'DecisionTreeRegressor': DecisionTreeRegressor,
+                'SVC': SVC,
+                'SVR': SVR,
+                'KNeighborsClassifier': KNeighborsClassifier,
+                'KNeighborsRegressor': KNeighborsRegressor,
+                'GaussianNB': GaussianNB,
+                'train_test_split': train_test_split,
+                'cross_val_score': cross_val_score,
+                'StratifiedKFold': StratifiedKFold,
+                'KFold': KFold,
+                'StandardScaler': StandardScaler,
+                'LabelEncoder': LabelEncoder,
+                'accuracy_score': accuracy_score,
+                'precision_score': precision_score,
+                'recall_score': recall_score,
+                'f1_score': f1_score,
+                'roc_auc_score': roc_auc_score,
+                'mean_squared_error': mean_squared_error,
+                'mean_absolute_error': mean_absolute_error,
+                'r2_score': r2_score,
+                'BaseEstimator': BaseEstimator,
+                'ClassifierMixin': ClassifierMixin,
+                'RegressorMixin': RegressorMixin,
+                'clone': clone
+            }
+        except ImportError:
+            SKLEARN_AVAILABLE = False
+            logging.warning("Scikit-learn not available. Ensemble learning capabilities will be disabled.")
+            return None
+    elif SKLEARN_AVAILABLE:
+        # Re-import if available
+        from sklearn.ensemble import (
+            VotingClassifier, VotingRegressor,
+            BaggingClassifier, BaggingRegressor,
+            RandomForestClassifier, RandomForestRegressor,
+            ExtraTreesClassifier, ExtraTreesRegressor,
+            AdaBoostClassifier, AdaBoostRegressor,
+            GradientBoostingClassifier, GradientBoostingRegressor,
+            StackingClassifier, StackingRegressor
+        )
+        from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
+        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+        from sklearn.svm import SVC, SVR
+        from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+        from sklearn.naive_bayes import GaussianNB
+        from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, KFold
+        from sklearn.preprocessing import StandardScaler, LabelEncoder
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+        from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+        from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin, clone
+        
+        return {
+            'VotingClassifier': VotingClassifier,
+            'VotingRegressor': VotingRegressor,
+            'BaggingClassifier': BaggingClassifier,
+            'BaggingRegressor': BaggingRegressor,
+            'RandomForestClassifier': RandomForestClassifier,
+            'RandomForestRegressor': RandomForestRegressor,
+            'ExtraTreesClassifier': ExtraTreesClassifier,
+            'ExtraTreesRegressor': ExtraTreesRegressor,
+            'AdaBoostClassifier': AdaBoostClassifier,
+            'AdaBoostRegressor': AdaBoostRegressor,
+            'GradientBoostingClassifier': GradientBoostingClassifier,
+            'GradientBoostingRegressor': GradientBoostingRegressor,
+            'StackingClassifier': StackingClassifier,
+            'StackingRegressor': StackingRegressor,
+            'LogisticRegression': LogisticRegression,
+            'LinearRegression': LinearRegression,
+            'Ridge': Ridge,
+            'DecisionTreeClassifier': DecisionTreeClassifier,
+            'DecisionTreeRegressor': DecisionTreeRegressor,
+            'SVC': SVC,
+            'SVR': SVR,
+            'KNeighborsClassifier': KNeighborsClassifier,
+            'KNeighborsRegressor': KNeighborsRegressor,
+            'GaussianNB': GaussianNB,
+            'train_test_split': train_test_split,
+            'cross_val_score': cross_val_score,
+            'StratifiedKFold': StratifiedKFold,
+            'KFold': KFold,
+            'StandardScaler': StandardScaler,
+            'LabelEncoder': LabelEncoder,
+            'accuracy_score': accuracy_score,
+            'precision_score': precision_score,
+            'recall_score': recall_score,
+            'f1_score': f1_score,
+            'roc_auc_score': roc_auc_score,
+            'mean_squared_error': mean_squared_error,
+            'mean_absolute_error': mean_absolute_error,
+            'r2_score': r2_score,
+            'BaseEstimator': BaseEstimator,
+            'ClassifierMixin': ClassifierMixin,
+            'RegressorMixin': RegressorMixin,
+            'clone': clone
+        }
+    else:
+        return None
 
-try:
-    import lightgbm as lgb
-    LIGHTGBM_AVAILABLE = True
-except ImportError:
-    LIGHTGBM_AVAILABLE = False
-    logging.warning("LightGBM not available. LightGBM ensemble methods will be disabled.")
+def _check_sklearn_available():
+    return _lazy_import_sklearn() is not None
+
+# Lazy imports to prevent mutex locks during startup
+XGBOOST_AVAILABLE = None
+LIGHTGBM_AVAILABLE = None
+
+def _lazy_import_xgboost():
+    """Lazy import XGBoost only when needed"""
+    global XGBOOST_AVAILABLE
+    if XGBOOST_AVAILABLE is None:
+        try:
+            import xgboost as xgb
+            XGBOOST_AVAILABLE = True
+            return xgb
+        except ImportError:
+            XGBOOST_AVAILABLE = False
+            logging.warning("XGBoost not available. XGBoost ensemble methods will be disabled.")
+            return None
+    elif XGBOOST_AVAILABLE:
+        import xgboost as xgb
+        return xgb
+    else:
+        return None
+
+def _lazy_import_lightgbm():
+    """Lazy import LightGBM only when needed"""
+    global LIGHTGBM_AVAILABLE
+    if LIGHTGBM_AVAILABLE is None:
+        try:
+            import lightgbm as lgb
+            LIGHTGBM_AVAILABLE = True
+            return lgb
+        except ImportError:
+            LIGHTGBM_AVAILABLE = False
+            logging.warning("LightGBM not available. LightGBM ensemble methods will be disabled.")
+            return None
+    elif LIGHTGBM_AVAILABLE:
+        import lightgbm as lgb
+        return lgb
+    else:
+        return None
+
+# Keep backward compatibility - will be evaluated only when accessed
+def _check_xgboost_available():
+    return _lazy_import_xgboost() is not None
+
+def _check_lightgbm_available():
+    return _lazy_import_lightgbm() is not None
 
 try:
     from ..preprocessors.csv_processor import CSVProcessor
@@ -61,10 +217,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-class AdvancedStackingClassifier(BaseEstimator, ClassifierMixin):
-    """
-    Advanced stacking classifier with cross-validation and blending
-    """
+# 暂时注释掉复杂的自定义类，避免导入问题
+# TODO: 在完成基础架构重构后，使用新的基类重新实现
+
+# 注释掉 AdvancedStackingClassifier 类定义，避免导入问题
+# 将在后续使用新的基础架构重新实现
+
+class EnsembleProcessor:
     
     def __init__(self, base_models: List[Any], meta_model: Any, 
                  cv_folds: int = 5, use_probabilities: bool = True,
@@ -210,7 +369,9 @@ class AdvancedStackingClassifier(BaseEstimator, ClassifierMixin):
         else:
             raise AttributeError("Meta-model does not support probability prediction")
 
-class AdvancedStackingRegressor(BaseEstimator, RegressorMixin):
+# 暂时注释掉复杂的自定义类，避免导入问题
+# TODO: 在完成基础架构重构后，使用新的基类重新实现
+# class AdvancedStackingRegressor(BaseEstimator, RegressorMixin):
     """
     Advanced stacking regressor with cross-validation and blending
     """
@@ -388,8 +549,8 @@ class EnsembleProcessor:
                 "ensemble_configurations": self._generate_ensemble_configs(ml_analysis, problem_type),
                 "library_availability": {
                     "sklearn": SKLEARN_AVAILABLE,
-                    "xgboost": XGBOOST_AVAILABLE,
-                    "lightgbm": LIGHTGBM_AVAILABLE
+                    "xgboost": _check_xgboost_available(),
+                    "lightgbm": _check_lightgbm_available()
                 }
             }
             
@@ -533,7 +694,7 @@ class EnsembleProcessor:
                 ]
                 
                 # Add advanced models if available
-                if XGBOOST_AVAILABLE:
+                if _check_xgboost_available():
                     diverse_models.append({
                         "name": "XGBoost",
                         "type": "gradient_boosting",
@@ -541,7 +702,7 @@ class EnsembleProcessor:
                         "sklearn_class": "XGBClassifier"
                     })
                 
-                if LIGHTGBM_AVAILABLE:
+                if _check_lightgbm_available():
                     diverse_models.append({
                         "name": "LightGBM",
                         "type": "gradient_boosting",
@@ -589,7 +750,7 @@ class EnsembleProcessor:
                 ]
                 
                 # Add advanced models
-                if XGBOOST_AVAILABLE:
+                if _check_xgboost_available():
                     diverse_models.append({
                         "name": "XGBoost",
                         "type": "gradient_boosting",
@@ -1258,10 +1419,12 @@ class EnsembleProcessor:
                 }
                 
                 # Add advanced models if available
-                if XGBOOST_AVAILABLE:
+                xgb = _lazy_import_xgboost()
+                if xgb is not None:
                     model_map["xgb_classifier"] = xgb.XGBClassifier(random_state=42)
                 
-                if LIGHTGBM_AVAILABLE:
+                lgb = _lazy_import_lightgbm()
+                if lgb is not None:
                     model_map["lgb_classifier"] = lgb.LGBMClassifier(random_state=42)
                     
             else:  # regression
@@ -1274,11 +1437,13 @@ class EnsembleProcessor:
                     "knn_regressor": KNeighborsRegressor()
                 }
                 
-                # Add advanced models if available
-                if XGBOOST_AVAILABLE:
+                # Add advanced models if available  
+                xgb = _lazy_import_xgboost()
+                if xgb is not None:
                     model_map["xgb_regressor"] = xgb.XGBRegressor(random_state=42)
                 
-                if LIGHTGBM_AVAILABLE:
+                lgb = _lazy_import_lightgbm()
+                if lgb is not None:
                     model_map["lgb_regressor"] = lgb.LGBMRegressor(random_state=42)
             
             return model_map.get(model_name.lower())
@@ -1580,8 +1745,8 @@ class EnsembleProcessor:
                 "ensembles": list(self.ensemble_models.keys()),
                 "library_availability": {
                     "sklearn": SKLEARN_AVAILABLE,
-                    "xgboost": XGBOOST_AVAILABLE,
-                    "lightgbm": LIGHTGBM_AVAILABLE
+                    "xgboost": _check_xgboost_available(),
+                    "lightgbm": _check_lightgbm_available()
                 }
             }
 

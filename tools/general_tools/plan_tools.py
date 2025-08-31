@@ -91,9 +91,25 @@ class AutonomousPlanner(BaseTool):
             
             # Parse results
             if isinstance(result_data, str):
+                # Extract JSON from markdown code blocks if present
+                import re
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_data, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Try to find JSON object in the text
+                    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result_data, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(0)
+                    else:
+                        json_str = result_data
+                
                 try:
-                    plan_data = json.loads(result_data)
-                except json.JSONDecodeError:
+                    plan_data = json.loads(json_str)
+                    print(f"✅ Successfully parsed JSON plan")
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON parsing failed: {e}")
+                    print(f"Raw response: {result_data[:200]}...")
                     # If parsing fails, create simple plan
                     plan_data = self._create_fallback_plan(request, available_tools)
             else:
@@ -239,9 +255,25 @@ class AutonomousPlanner(BaseTool):
             
             # Parse results
             if isinstance(result_data, str):
+                # Extract JSON from markdown code blocks if present
+                import re
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_data, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Try to find JSON object in the text
+                    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result_data, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(0)
+                    else:
+                        json_str = result_data
+                
                 try:
-                    plan_data = json.loads(result_data)
-                except json.JSONDecodeError:
+                    plan_data = json.loads(json_str)
+                    print(f"✅ Successfully parsed JSON replan")
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON parsing failed for replan: {e}")
+                    print(f"Raw response: {result_data[:200]}...")
                     # If parsing fails, create simple replan
                     plan_data = self._create_fallback_replan(original_request, available_tools, feedback)
             else:

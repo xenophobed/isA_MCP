@@ -9,8 +9,18 @@ import asyncio
 from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from tools.base_tool import BaseTool
-from tools.services.data_analytics_service.services.data_analytics_service import DataAnalyticsService, get_analytics_service
 from core.logging import get_logger
+
+# Lazy import to prevent mutex locks during MCP server startup
+def _get_analytics_service(database_name: str = "default_analytics"):
+    from tools.services.data_analytics_service.services.data_analytics_service import get_analytics_service
+    return get_analytics_service(database_name)
+
+# 初始化模型导入服务
+def _init_model_import_service():
+    """初始化模型导入服务，但不立即导入任何库"""
+    from tools.services.data_analytics_service.services.model_import_service import get_model_import_service
+    return get_model_import_service()
 
 logger = get_logger(__name__)
 
@@ -21,10 +31,10 @@ class DataAnalyticsTool(BaseTool):
         super().__init__()
         self.services = {}  # Cache for service instances
     
-    def _get_service(self, database_name: str = "default_analytics") -> DataAnalyticsService:
+    def _get_service(self, database_name: str = "default_analytics"):
         """Get or create service instance"""
         if database_name not in self.services:
-            self.services[database_name] = get_analytics_service(database_name)
+            self.services[database_name] = _get_analytics_service(database_name)
         return self.services[database_name]
     
     async def ingest_data_source(

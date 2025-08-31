@@ -10,14 +10,14 @@ from datetime import datetime, timedelta
 import logging
 import json
 
-from ..models import (
+from ...models import (
     UserPortrait, UserPortraitCreate, UserPortraitUpdate,
     UserPortraitAnalysisRequest, UserPortraitResponse,
     UserBehaviorInsight, UserPortraitSummary, UserPortraitStatus
 )
-from ..repositories.user_repository import UserRepository
-from .base import BaseService, ServiceResult
-from .usage_service import UsageService
+from tools.services.user_service.repositories.user_repository import UserRepository
+from tools.services.user_service.services.base import BaseService, ServiceResult
+from tools.services.user_service.services.usage_service import UsageService
 
 # Memory Service import
 import sys

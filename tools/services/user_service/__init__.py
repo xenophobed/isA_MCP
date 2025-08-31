@@ -5,13 +5,14 @@ User Service Package
 包含 Auth0 集成、Stripe 支付和用户生命周期管理
 """
 
-from .services.auth_service import Auth0Service
-from .services.payment_service import PaymentService
+# 移除有问题的导入，避免连锁依赖
+# 如需使用具体服务，请直接导入对应模块
+# from .services.auth_service import Auth0Service  # 注释掉避免连锁依赖
 from .models import User, Subscription, ApiUsage, SubscriptionStatus
 
 __all__ = [
-    "Auth0Service",
-    "PaymentService",
+    "Auth0Service",  
+    "PaymentService",  
     "User",
     "Subscription", 
     "ApiUsage",

@@ -8,8 +8,92 @@ set -e
 PROJECT_NAME="isa_mcp"
 PROJECT_ROOT="$(pwd)"
 
+# Parse command line arguments
+SKIP_CLEANUP=false
+if [[ "$1" == "--skip-cleanup" ]]; then
+    SKIP_CLEANUP=true
+    echo "⚡ SKIP CLEANUP MODE: Will not stop existing services"
+fi
+
 echo "🚀 Starting local development environment..."
 echo "============================================"
+
+# Function to kill processes on specific ports
+kill_port_processes() {
+    local port=$1
+    local service_name=$2
+    echo "🔍 Checking port $port for $service_name..."
+    
+    # Find processes using the port
+    local pids=$(lsof -ti:$port 2>/dev/null || true)
+    
+    if [[ -n "$pids" ]]; then
+        echo "🛑 Stopping existing $service_name processes on port $port..."
+        echo "$pids" | xargs kill -TERM 2>/dev/null || true
+        sleep 2
+        
+        # Force kill if still running
+        local remaining_pids=$(lsof -ti:$port 2>/dev/null || true)
+        if [[ -n "$remaining_pids" ]]; then
+            echo "🔥 Force killing remaining $service_name processes..."
+            echo "$remaining_pids" | xargs kill -KILL 2>/dev/null || true
+        fi
+        
+        echo "✅ Port $port cleared"
+    else
+        echo "✅ Port $port is free"
+    fi
+}
+
+# Function to kill processes by name
+kill_named_processes() {
+    local process_name=$1
+    local service_name=$2
+    echo "🔍 Checking for $service_name processes..."
+    
+    local pids=$(pgrep -f "$process_name" 2>/dev/null || true)
+    
+    if [[ -n "$pids" ]]; then
+        echo "🛑 Stopping existing $service_name processes..."
+        echo "$pids" | xargs kill -TERM 2>/dev/null || true
+        sleep 2
+        
+        # Force kill if still running
+        local remaining_pids=$(pgrep -f "$process_name" 2>/dev/null || true)
+        if [[ -n "$remaining_pids" ]]; then
+            echo "🔥 Force killing remaining $service_name processes..."
+            echo "$remaining_pids" | xargs kill -KILL 2>/dev/null || true
+        fi
+        
+        echo "✅ $service_name processes cleared"
+    else
+        echo "✅ No $service_name processes running"
+    fi
+}
+
+# Always stop existing services (unless --skip-cleanup is used)
+if [[ "$SKIP_CLEANUP" == false ]]; then
+    echo "🧹 Cleaning up existing services..."
+    echo "=================================="
+    
+    # Kill services on specific ports
+    kill_port_processes 8100 "User Service"
+    kill_port_processes 8101 "Event Service" 
+    kill_port_processes 8081 "MCP Server"
+    
+    # Also kill by process name to catch any stragglers
+    kill_named_processes "start_server.py" "User Service"
+    kill_named_processes "event_server.py" "Event Service"
+    kill_named_processes "smart_mcp_server.py" "MCP Server"
+    
+    # Clean up PID files
+    rm -f logs/user_service.pid logs/event_service.pid logs/mcp_server.pid logs/stripe_cli.pid 2>/dev/null || true
+    
+    echo "✅ All existing services cleaned up"
+    echo "⏳ Waiting 3 seconds before starting services..."
+    sleep 3
+    echo ""
+fi
 
 # Check if dev .env exists
 if [[ ! -f "deployment/dev/.env" ]]; then
@@ -76,6 +160,29 @@ else
     echo "✅ Neo4j 已运行"
 fi
 
+# Function to check if service is responding
+check_service_health() {
+    local url=$1
+    local service_name=$2
+    local max_attempts=10
+    local attempt=1
+    
+    echo "🔍 Checking $service_name health at $url..."
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        if curl -s --connect-timeout 2 --max-time 5 "$url" > /dev/null 2>&1; then
+            echo "✅ $service_name is responding"
+            return 0
+        fi
+        echo "⏳ Attempt $attempt/$max_attempts - waiting for $service_name..."
+        sleep 2
+        ((attempt++))
+    done
+    
+    echo "❌ $service_name failed to start or is not responding"
+    return 1
+}
+
 # 2. 启动 User Service (端口 8100)
 echo "👤 启动 User Service (端口 8100)..."
 cd tools/services/user_service
@@ -84,17 +191,27 @@ USER_SERVICE_PID=$!
 echo "User Service PID: $USER_SERVICE_PID"
 cd ../../..
 
+# Wait and check User Service health
+sleep 3
+if ! check_service_health "http://localhost:8100/health" "User Service"; then
+    echo "❌ User Service startup failed. Check logs/user_service.log"
+    exit 1
+fi
+
 # 3. 启动 Event Sourcing Service (端口 8101)
 echo "📝 启动 Event Sourcing Service (端口 8101)..."
 cd tools/services/event_service
-python event_server.py --port 8101 &
+PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH" python event_server.py --port 8101 > ../../../logs/event_service.log 2>&1 &
 EVENT_SERVICE_PID=$!
 echo "Event Service PID: $EVENT_SERVICE_PID"
 cd ../../..
 
-# 等待服务启动
-echo "⏳ 等待服务启动..."
-sleep 5
+# Wait and check Event Service health
+sleep 3
+if ! check_service_health "http://localhost:8101/health" "Event Service"; then
+    echo "❌ Event Service startup failed. Check logs/event_service.log"
+    exit 1
+fi
 
 # 4. 启动 Stripe CLI Webhook 监听 (可选)
 STRIPE_CLI_PID=""
@@ -111,8 +228,16 @@ fi
 
 # 5. 启动 Smart MCP Server
 echo "🎯 Starting MCP server on port ${MCP_PORT:-8081}..."
-source .venv/bin/activate && python smart_mcp_server.py &
+PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH" python smart_mcp_server.py > logs/mcp_server.log 2>&1 &
 MCP_PID=$!
+echo "MCP Server PID: $MCP_PID"
+
+# Wait and check MCP Server health
+sleep 5
+if ! check_service_health "http://localhost:${MCP_PORT:-8081}/health" "MCP Server"; then
+    echo "❌ MCP Server startup failed. Check logs/mcp_server.log"
+    exit 1
+fi
 
 # 保存 PID 文件用于停止服务
 echo $USER_SERVICE_PID > logs/user_service.pid
@@ -127,16 +252,24 @@ echo "✅ Local development environment started!"
 echo "========================================="
 echo "📊 服务状态:"
 echo "• Neo4j Browser:    http://localhost:7474"
-echo "• User Service:     http://localhost:8100"
-echo "• Event Service:    http://localhost:8101"
-echo "• Smart MCP Server: http://localhost:${MCP_PORT:-8081}"
+echo "• User Service:     http://localhost:8100 (✅ Health check passed)"
+echo "• Event Service:    http://localhost:8101 (✅ Health check passed)"
+echo "• Smart MCP Server: http://localhost:${MCP_PORT:-8081} (✅ Health check passed)"
 if [[ -n "$STRIPE_CLI_PID" ]]; then
     echo "• Stripe CLI:       监听中 (转发到 localhost:8100)"
 fi
-echo "🔍 Health Check: http://localhost:${MCP_PORT:-8081}/health"
+echo ""
+echo "🔍 Health Checks:"
+echo "• User Service:     http://localhost:8100/health"
+echo "• Event Service:    http://localhost:8101/health"
+echo "• MCP Server:       http://localhost:${MCP_PORT:-8081}/health"
 echo ""
 echo "📝 日志文件位置: logs/"
 echo "🛑 停止所有服务: ./deployment/scripts/stop_dev.sh"
+echo ""
+echo "📖 启动选项:"
+echo "• 普通启动(自动重启): ./deployment/scripts/start_dev.sh"
+echo "• 跳过清理启动:      ./deployment/scripts/start_dev.sh --skip-cleanup"
 echo ""
 echo "Press Ctrl+C to stop all services..."
 

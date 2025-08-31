@@ -52,7 +52,7 @@ from tools.services.user_service.services.session_service import SessionService
 from tools.services.user_service.services.credit_service import CreditService
 from tools.services.user_service.services.invitation_service import InvitationService
 from tools.services.user_service.services.resource_authorization_service import ResourceAuthorizationService
-from tools.services.user_service.services.user_portrait_service import UserPortraitService
+from tools.services.user_service.services.portrait.user_portrait_service import UserPortraitService
 from tools.services.user_service.repositories import UserRepository, SubscriptionRepository, OrganizationRepository
 from tools.services.user_service.config import get_config
 

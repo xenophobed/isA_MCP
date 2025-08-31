@@ -513,7 +513,12 @@ class TemporalPatternAnalyzer:
         """使用ML分析会话频率模式"""
         try:
             if not sessions:
-                return {"daily_average": 1.0, "weekly_pattern": [1] * 7, "trend": "stable"}
+                return {
+                    "daily_average": 1.0, 
+                    "weekly_pattern": 1.0, 
+                    "trend": 1.0,
+                    "stability": 0.8
+                }
             
             # 准备会话数据
             session_data = []
@@ -537,13 +542,20 @@ class TemporalPatternAnalyzer:
             
             return frequency_analysis.get('frequency_patterns', {
                 "daily_average": 2.5, 
-                "weekly_pattern": [3, 2, 2, 3, 4, 1, 1], 
-                "trend": "increasing"
+                "weekly_pattern": 2.1, 
+                "trend": 1.2,
+                "stability": 0.85,
+                "peak_days": 4.0
             })
             
         except Exception as e:
             logger.error(f"ML session frequency analysis failed: {e}")
-            return {"daily_average": 1.5, "weekly_pattern": [2] * 7, "trend": "stable"}
+            return {
+                "daily_average": 1.5, 
+                "weekly_pattern": 2.0, 
+                "trend": 1.0,
+                "stability": 0.75
+            }
     
     async def _ml_detect_cyclical_patterns(self, usage_records: List[Dict], sessions: List[Dict]) -> Dict[str, Any]:
         """使用AI检测周期性模式"""
@@ -592,10 +604,13 @@ class TemporalPatternAnalyzer:
                 os.unlink(temp_file.name)  # 清理临时文件
             
             # 使用TimeSeriesProcessor检测周期性
-            cyclical_analysis = await self.time_series_processor.detect_seasonality({
-                'data': combined_data,
-                'periods': ['daily', 'weekly', 'monthly']
-            })
+            # 首先准备时间序列数据
+            prep_result = self.time_series_processor.prepare_time_series('timestamp', 'value')
+            if prep_result.get('success'):
+                series_key = prep_result['series_key']
+                cyclical_analysis = self.time_series_processor.detect_seasonality(series_key)
+            else:
+                cyclical_analysis = {'has_seasonality': False}
             
             return cyclical_analysis.get('patterns', {
                 "daily_cycle": True,

@@ -80,7 +80,7 @@ class ContextPatternAnalyzer:
         
         logger.info("Context Pattern Analyzer initialized")
     
-    async def analyze_patterns(self, user_id: str, context_type: str) -> ContextPattern:
+    async def analyze_patterns(self, user_id: str, context_type: str, timeframe: str = "30d") -> ContextPattern:
         """
         Analyze context-specific patterns for a user
         

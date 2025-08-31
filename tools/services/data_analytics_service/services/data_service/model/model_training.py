@@ -341,22 +341,115 @@ class ModelTrainingService:
                     'problem_type': 'time_series'
                 }
             
-            # For most ML algorithms, use MLProcessor
-            MLProcessor = _get_ml_processor()
-            processor = MLProcessor(csv_processor=None, file_path=None)
-            processor.df = data
+            # MLProcessor causes mutex locks due to complex dependency chains
+            # Use lightweight DataFrameMLProcessor instead
+            class DataFrameMLProcessor:
+                """Lightweight ML processor that works directly with DataFrames"""
+                def __init__(self, dataframe):
+                    self.df = dataframe
+                    
+                def train_model(self, target_column, algorithm, test_size=0.2, **hyperparameters):
+                    """Train model using sklearn directly"""
+                    try:
+                        from sklearn.model_selection import train_test_split
+                        from sklearn.metrics import accuracy_score, r2_score, mean_squared_error
+                        from sklearn.linear_model import LogisticRegression, LinearRegression
+                        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+                        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+                        import time
+                        
+                        start_time = time.time()
+                        
+                        # Prepare data
+                        X = self.df.drop(columns=[target_column])
+                        y = self.df[target_column]
+                        
+                        # Select numeric features only
+                        numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
+                        X = X[numeric_features]
+                        
+                        if len(X.columns) == 0:
+                            return {'error': 'No numeric features available for training'}
+                        
+                        # Split data
+                        X_train, X_test, y_train, y_test = train_test_split(
+                            X, y, test_size=test_size, random_state=42
+                        )
+                        
+                        # Detect problem type
+                        if y.dtype in ['int64', 'float64'] and y.nunique() > 10:
+                            problem_type = 'regression'
+                        else:
+                            problem_type = 'classification'
+                        
+                        # Select and train model
+                        if problem_type == 'classification':
+                            if algorithm.lower() in ['logistic_regression', 'logistic']:
+                                model = LogisticRegression(random_state=42, max_iter=1000, **hyperparameters)
+                            elif algorithm.lower() in ['random_forest', 'rf']:
+                                model = RandomForestClassifier(random_state=42, n_estimators=100, **hyperparameters)
+                            elif algorithm.lower() in ['decision_tree', 'tree']:
+                                model = DecisionTreeClassifier(random_state=42, **hyperparameters)
+                            else:
+                                model = LogisticRegression(random_state=42, max_iter=1000)
+                        else:  # regression
+                            if algorithm.lower() in ['linear_regression', 'linear']:
+                                model = LinearRegression(**hyperparameters)
+                            elif algorithm.lower() in ['random_forest', 'rf']:
+                                model = RandomForestRegressor(random_state=42, n_estimators=100, **hyperparameters)
+                            elif algorithm.lower() in ['decision_tree', 'tree']:
+                                model = DecisionTreeRegressor(random_state=42, **hyperparameters)
+                            else:
+                                model = LinearRegression()
+                        
+                        # Train
+                        model.fit(X_train, y_train)
+                        
+                        # Evaluate
+                        y_pred = model.predict(X_test)
+                        if problem_type == 'classification':
+                            score = accuracy_score(y_test, y_pred)
+                            metrics = {
+                                'accuracy': float(score),
+                                'test_samples': len(y_test)
+                            }
+                        else:
+                            r2 = r2_score(y_test, y_pred)
+                            mse = mean_squared_error(y_test, y_pred)
+                            metrics = {
+                                'r2_score': float(r2),
+                                'mse': float(mse),
+                                'test_samples': len(y_test)
+                            }
+                        
+                        training_time = time.time() - start_time
+                        
+                        # Generate model ID
+                        from datetime import datetime
+                        model_id = f'{algorithm}_{int(datetime.now().timestamp())}'
+                        
+                        return {
+                            'model_id': model_id,
+                            'model_instance': model,
+                            'problem_type': problem_type,
+                            'metrics': metrics,
+                            'features_used': list(X.columns),
+                            'n_samples': len(X),
+                            'train_size': len(X_train),
+                            'test_size': len(X_test),
+                            'training_time_seconds': training_time,
+                            'algorithm': algorithm
+                        }
+                        
+                    except Exception as e:
+                        return {'error': f'Model training failed: {str(e)}'}
             
-            # Detect problem type
-            target_series = data[target_column]
-            if config.problem_type:
-                problem_type = config.problem_type
-            else:
-                problem_type = processor._detect_problem_type(target_series)
+            processor = DataFrameMLProcessor(data)
             
             return {
                 'success': True,
                 'processor': processor,
-                'problem_type': problem_type
+                'problem_type': 'classification'  # Will be detected during training
             }
             
         except Exception as e:

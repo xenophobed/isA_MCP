@@ -11,7 +11,7 @@ from .subscription_service_v2 import SubscriptionServiceV2
 from .organization_service import OrganizationService
 from .email_service import EmailService
 from .invitation_service import InvitationService
-from .user_portrait_service import UserPortraitService
+# from .portrait.user_portrait_service import UserPortraitService  # 注释掉避免连锁依赖
 from .compatibility_adapter import (
     UserServiceCompatibilityAdapter,
     SubscriptionServiceCompatibilityAdapter
@@ -25,7 +25,7 @@ __all__ = [
     'OrganizationService',
     'EmailService',
     'InvitationService',
-    'UserPortraitService',
+    # 'UserPortraitService',  # 暂时移除
     'UserServiceCompatibilityAdapter',
     'SubscriptionServiceCompatibilityAdapter'
 ]
