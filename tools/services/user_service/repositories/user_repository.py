@@ -9,9 +9,13 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
 
-from ..models import User
-from .base import BaseRepository
-from .exceptions import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.user_models import User
+from repositories.base import BaseRepository
+from repositories.exceptions import (
     UserNotFoundException, 
     DuplicateEntryException,
     RepositoryException

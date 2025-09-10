@@ -9,7 +9,10 @@ from datetime import datetime, timedelta
 import logging
 import uuid
 
-from ..models import CreditTransaction
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from models.schemas.usage_models import CreditTransaction
 from .base import BaseRepository
 from .exceptions import RepositoryException
 

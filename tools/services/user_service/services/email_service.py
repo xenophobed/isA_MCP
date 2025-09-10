@@ -11,8 +11,12 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 
-from .base import BaseService, ServiceResult
-from ..config import get_config
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tools.services.user_service.services.base import BaseService, ServiceResult
+from config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +34,10 @@ class EmailService(BaseService):
         super().__init__("EmailService")
         self.config = get_config()
         
-        # 使用提供的API密钥或配置中的密钥
-        self.api_key = api_key or "re_PFqcCYGx_7QGBTd81pyJeYNMCbkGLZV8w"
+        # Use provided API key or get from configuration
+        self.api_key = api_key or self.config.resend_api_key or os.environ.get("RESEND_API_KEY")
+        if not self.api_key:
+            raise ValueError("Resend API key is required. Set RESEND_API_KEY environment variable.")
         self.base_url = "https://api.resend.com"
         
         # 默认发件人
@@ -222,7 +228,7 @@ class EmailService(BaseService):
             return self._handle_exception(e, "send billing notification")
     
     def _build_invitation_html(self, data: Dict[str, Any]) -> str:
-        """构建邀请邮件HTML内容"""
+        """Build invitation email HTML content"""
         return f"""
         <!DOCTYPE html>
         <html>
@@ -263,7 +269,7 @@ class EmailService(BaseService):
         """
     
     def _build_invitation_text(self, data: Dict[str, Any]) -> str:
-        """构建邀请邮件纯文本内容"""
+        """Build invitation email plain text content"""
         return f"""
 You're Invited to {data['organization_name']}!
 
@@ -285,7 +291,7 @@ The iaPro.ai Team
         """
     
     def _build_welcome_html(self, data: Dict[str, Any]) -> str:
-        """构建欢迎邮件HTML内容"""
+        """Build welcome email HTML content"""
         return f"""
         <!DOCTYPE html>
         <html>
@@ -325,7 +331,7 @@ The iaPro.ai Team
         """
     
     def _build_welcome_text(self, data: Dict[str, Any]) -> str:
-        """构建欢迎邮件纯文本内容"""
+        """Build welcome email plain text content"""
         org_text = f"\n\nYou've been added to the organization: {data['organization_name']}" if data.get('organization_name') else ""
         
         return f"""
@@ -348,7 +354,7 @@ The iaPro.ai Team
         """
     
     def _build_billing_html(self, data: Dict[str, Any]) -> str:
-        """构建账单通知邮件HTML内容"""
+        """Build billing notification email HTML content"""
         notification_type = data['type']
         
         content_map = {
@@ -392,7 +398,7 @@ The iaPro.ai Team
         """
     
     def _build_billing_text(self, data: Dict[str, Any]) -> str:
-        """构建账单通知邮件纯文本内容"""
+        """Build billing notification email plain text content"""
         notification_type = data['type']
         
         content_map = {
@@ -420,7 +426,7 @@ The iaPro.ai Team
         """
     
     async def close(self):
-        """关闭HTTP客户端"""
+        """Close HTTP client"""
         await self.client.aclose()
     
     async def __aenter__(self):

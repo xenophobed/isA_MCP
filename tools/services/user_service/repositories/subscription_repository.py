@@ -9,9 +9,14 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 
-from ..models import Subscription, SubscriptionStatus, StripeSubscriptionStatus
-from .base import BaseRepository
-from .exceptions import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.subscription_models import Subscription
+from models.schemas.enums import SubscriptionStatus, StripeSubscriptionStatus
+from repositories.base import BaseRepository
+from repositories.exceptions import (
     SubscriptionNotFoundException,
     DuplicateEntryException,
     RepositoryException

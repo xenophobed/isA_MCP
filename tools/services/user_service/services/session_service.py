@@ -9,10 +9,14 @@ from datetime import datetime
 import logging
 import uuid
 
-from ..models import Session, SessionCreate, SessionMemory, SessionMessage
-from ..repositories.session_repository import SessionRepository, SessionMemoryRepository, SessionMessageRepository
-from ..repositories.user_repository import UserRepository
-from .base import BaseService, ServiceResult
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.session_models import Session, SessionCreate, SessionMemory, SessionMessage
+from repositories.session_repository import SessionRepository, SessionMemoryRepository, SessionMessageRepository
+from repositories.user_repository import UserRepository
+from tools.services.user_service.services.base import BaseService, ServiceResult
 
 logger = logging.getLogger(__name__)
 

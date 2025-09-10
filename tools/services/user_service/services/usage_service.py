@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import logging
 import uuid
 
-from ..models import UsageRecord, UsageRecordCreate, UsageStatistics
+from models.schemas.usage_models import UsageRecord, UsageRecordCreate, UsageStatistics
 from ..repositories.usage_repository import UsageRepository
 from ..repositories.user_repository import UserRepository
 from .base import BaseService, ServiceResult

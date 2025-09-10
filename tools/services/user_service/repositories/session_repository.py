@@ -4,13 +4,18 @@ Session Repository Implementation
 Handles all session related database operations
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 
-from ..models import Session, SessionMemory, SessionMessage
-from .base import BaseRepository
-from .exceptions import RepositoryException
+from models.schemas.session_models import Session, SessionMemory, SessionMessage
+from repositories.base import BaseRepository
+from repositories.exceptions import RepositoryException
 
 logger = logging.getLogger(__name__)
 

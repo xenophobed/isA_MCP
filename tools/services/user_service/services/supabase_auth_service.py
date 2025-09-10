@@ -12,7 +12,11 @@ import httpx
 import logging
 from datetime import datetime
 
-from ..models import Auth0UserInfo
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.user_models import Auth0UserInfo
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +58,7 @@ class SupabaseAuthService:
                 token,
                 self.jwt_secret,
                 algorithms=["HS256"],
-                options={"verify_aud": False, "verify_iat": False}  # Supabase不总是使用audience，禁用iat验证避免时钟偏差
+                options={"verify_aud": False, "verify_iat": False, "verify_exp": False}  # Supabase不总是使用audience，使用自定义过期验证
             )
             
             # 检查token是否过期

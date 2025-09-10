@@ -65,7 +65,7 @@ class UserServiceConfig:
         self.supabase_url = os.getenv("SUPABASE_LOCAL_URL", "http://127.0.0.1:54321")
         self.supabase_anon_key = os.getenv("SUPABASE_LOCAL_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMAs_-IsVo")
         self.supabase_service_role_key = os.getenv("SUPABASE_LOCAL_SERVICE_ROLE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU")
-        self.supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET", "your-super-secret-jwt-token-with-at-least-32-characters-long")
+        self.supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET", "super-secret-jwt-token-with-at-least-32-characters-long")
         
         # 认证模式配置 (auth0 | supabase | both)
         self.auth_provider = os.getenv("AUTH_PROVIDER", "both")

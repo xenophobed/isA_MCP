@@ -9,9 +9,13 @@ from typing import Dict, Any, Optional
 import logging
 from enum import Enum
 
-from .auth_service import Auth0Service
-from .supabase_auth_service import SupabaseAuthService
-from ..models import Auth0UserInfo
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from services.auth_service import Auth0Service
+from services.supabase_auth_service import SupabaseAuthService
+from models.schemas.user_models import Auth0UserInfo
 
 logger = logging.getLogger(__name__)
 

@@ -9,10 +9,14 @@ from datetime import datetime
 import logging
 import uuid
 
-from ..models import CreditTransaction, CreditTransactionCreate
-from ..repositories.credit_repository import CreditRepository
-from ..repositories.user_repository import UserRepository
-from .base import BaseService, ServiceResult
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.usage_models import CreditTransaction, CreditTransactionCreate
+from repositories.credit_repository import CreditRepository
+from repositories.user_repository import UserRepository
+from tools.services.user_service.services.base import BaseService, ServiceResult
 
 logger = logging.getLogger(__name__)
 
@@ -64,13 +68,13 @@ class CreditService(BaseService):
             # Calculate new balance
             new_balance = current_balance - amount
             
-            # Create transaction record
+            # Create transaction record  
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'consume',
-                'credits_amount': amount,
-                'credits_before': current_balance,
-                'credits_after': new_balance,
+                'amount': amount,
+                'balance_before': current_balance,
+                'balance_after': new_balance,
                 'usage_record_id': usage_record_id,
                 'description': description or f"Credits consumed: {amount}",
                 'metadata': metadata or {}
@@ -128,9 +132,9 @@ class CreditService(BaseService):
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'recharge',
-                'credits_amount': amount,
-                'credits_before': current_balance,
-                'credits_after': new_balance,
+                'amount': amount,
+                'balance_before': current_balance,
+                'balance_after': new_balance,
                 'description': description or f"Credits recharged: {amount}",
                 'metadata': metadata or {}
             }
@@ -187,9 +191,9 @@ class CreditService(BaseService):
             transaction_data = {
                 'user_id': user_id,
                 'transaction_type': 'refund',
-                'credits_amount': amount,
-                'credits_before': current_balance,
-                'credits_after': new_balance,
+                'amount': amount,
+                'balance_before': current_balance,
+                'balance_after': new_balance,
                 'description': description or f"Credits refunded: {amount}",
                 'metadata': metadata or {}
             }

@@ -11,10 +11,10 @@ import logging
 from datetime import datetime
 import json
 
-from ..models import (
-    PaymentIntent, CheckoutSession, WebhookEvent, 
-    SubscriptionStatus, StripeSubscriptionStatus
+from models.schemas.subscription_models import (
+    PaymentIntent, CheckoutSession, WebhookEvent
 )
+from models.schemas.enums import SubscriptionStatus, StripeSubscriptionStatus
 
 
 logger = logging.getLogger(__name__)

@@ -5,6 +5,11 @@ Organization Invitation Repository
 处理组织邀请的CRUD操作
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncpg
 import json
 import secrets
@@ -12,8 +17,9 @@ import uuid
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
-from .base import BaseRepository
-from ..models import OrganizationInvitation, InvitationStatus
+from repositories.base import BaseRepository
+from models.schemas.organization_models import OrganizationInvitation
+from models.schemas.enums import InvitationStatus
 
 
 class InvitationRepository(BaseRepository[OrganizationInvitation]):

@@ -4,11 +4,16 @@
 处理用户和组织的资源权限数据库操作
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from core.database.supabase_client import get_supabase_client
-from ..models import (
+from models.schemas.user_models import (
     ResourceType, AccessLevel, SubscriptionStatus,
     ResourcePermission, UserResourceAccess, OrganizationResourcePermission, 
     OrganizationResourceAccess, ResourceAccessCheck, UserResourceSummary

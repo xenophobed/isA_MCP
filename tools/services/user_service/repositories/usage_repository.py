@@ -4,13 +4,18 @@ Usage Repository Implementation
 Handles all user usage record related database operations
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import logging
 
-from ..models import UsageRecord, UsageStatistics
-from .base import BaseRepository
-from .exceptions import RepositoryException
+from models.schemas.user_models import UsageRecord, UsageStatistics
+from repositories.base import BaseRepository
+from repositories.exceptions import RepositoryException
 
 logger = logging.getLogger(__name__)
 

@@ -11,8 +11,8 @@ import logging
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
-from ..models import (
-    ResourceType, AccessLevel, SubscriptionStatus,
+from models.schemas.enums import ResourceType, AccessLevel, SubscriptionStatus
+from models.schemas.resource_models import (
     ResourcePermission, UserResourceAccess, OrganizationResourcePermission,
     OrganizationResourceAccess, ResourceAccessCheck, ResourceAccessResponse,
     UserResourceSummary, GrantResourceAccessRequest, RevokeResourceAccessRequest

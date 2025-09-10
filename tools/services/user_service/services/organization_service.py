@@ -8,13 +8,17 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..repositories.organization_repository import OrganizationRepository
-from ..models import (
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from repositories.organization_repository import OrganizationRepository
+from models.schemas.organization_models import (
     Organization, OrganizationCreate, OrganizationUpdate,
-    OrganizationMember, OrganizationMemberCreate, OrganizationMemberUpdate,
-    OrganizationRole, OrganizationMemberStatus
+    OrganizationMember, OrganizationMemberCreate, OrganizationMemberUpdate
 )
-from .base import ServiceResult
+from models.schemas.enums import OrganizationRole, OrganizationMemberStatus
+from tools.services.user_service.services.base import ServiceResult
 
 logger = logging.getLogger(__name__)
 

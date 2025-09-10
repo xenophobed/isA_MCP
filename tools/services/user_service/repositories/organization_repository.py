@@ -4,21 +4,28 @@ Organization Repository
 Handles database operations for organizations and organization members
 """
 
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncio
 import logging
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 import uuid
 
-from .base import BaseRepository
-from ..models import (
+from repositories.base import BaseRepository
+from models.schemas.organization_models import (
     Organization, OrganizationCreate, OrganizationUpdate,
     OrganizationMember, OrganizationMemberCreate, OrganizationMemberUpdate,
     OrganizationUsage, OrganizationUsageCreate,
-    OrganizationCreditTransaction,
+    OrganizationCreditTransaction
+)
+from models.schemas.enums import (
     OrganizationStatus, OrganizationPlan, OrganizationRole, OrganizationMemberStatus
 )
-from ..services.base import ServiceResult
+from services.base import ServiceResult
 
 logger = logging.getLogger(__name__)
 

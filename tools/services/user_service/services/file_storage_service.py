@@ -18,8 +18,12 @@ from minio import Minio
 from minio.error import S3Error
 from fastapi import UploadFile
 
-from ..config import get_config
-from .base import ServiceResult, ServiceStatus
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import get_config
+from tools.services.user_service.services.base import ServiceResult, ServiceStatus
 
 logger = logging.getLogger(__name__)
 

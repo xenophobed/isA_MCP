@@ -79,9 +79,13 @@ class ISAClientFactory:
             # Override with any additional kwargs
             client_params.update(kwargs)
             
-            # Create client
-            client = ISAModelClient(**client_params)
-            logger.info(f"ISA client created with params: {list(client_params.keys())}")
+            # Create client - use direct URL initialization like isa_agent
+            if isa_service_url:
+                client = ISAModelClient(isa_service_url)
+                logger.info(f"ISA client created with direct URL: {isa_service_url}")
+            else:
+                client = ISAModelClient(**client_params)
+                logger.info(f"ISA client created with params: {list(client_params.keys())}")
             
             return client
             

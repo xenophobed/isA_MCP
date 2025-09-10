@@ -10,16 +10,19 @@ import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
-from .base import BaseService, ServiceResult
-from .email_service import EmailService
-from ..models import (
-    OrganizationInvitation, OrganizationInvitationCreate, InvitationStatus,
-    OrganizationRole, AcceptInvitationRequest
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tools.services.user_service.services.base import BaseService, ServiceResult
+from tools.services.user_service.services.email_service import EmailService
+from models.schemas.organization_models import (
+    OrganizationInvitation, OrganizationInvitationCreate, AcceptInvitationRequest
 )
-from ..repositories import (
-    InvitationRepository, OrganizationRepository, 
-    UserRepository
-)
+from models.schemas.enums import InvitationStatus, OrganizationRole
+from repositories.invitation_repository import InvitationRepository
+from repositories.organization_repository import OrganizationRepository
+from repositories.user_repository import UserRepository
 
 
 class InvitationService(BaseService):

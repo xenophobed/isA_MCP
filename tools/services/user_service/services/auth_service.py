@@ -12,7 +12,11 @@ import httpx
 import logging
 from datetime import datetime, timedelta
 
-from ..models import Auth0UserInfo
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models.schemas.user_models import Auth0UserInfo
 
 
 logger = logging.getLogger(__name__)
