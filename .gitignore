@@ -62,6 +62,10 @@ credentials.json
 # Demo and test data
 demo_data/
 
+# Temporary data files
+data_storage/temp_*.csv
+data_storage/data_*.csv
+
 # Database files
 *.db
 *.sqlite
@@ -83,9 +87,7 @@ event_feedback.log
 # ============================================
 # Debug files (generated during development)
 debug_*.py
-test_*.py
 *_debug.py
-*_test.py
 debug_screenshots/
 debug_output/
 
@@ -99,6 +101,10 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+
+# Test files (moved to tests/ directory)
+tests/test_*.py
+tests/*_test.py
 
 # ============================================
 # IDE和编辑器

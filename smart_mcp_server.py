@@ -24,6 +24,13 @@ from core.security import initialize_security
 from core.monitoring import monitor_manager
 from core.auto_discovery import AutoDiscoverySystem
 
+# Extended discovery with external services (fallback to basic if not available)
+try:
+    from core.external_discovery import ExtendedAutoDiscoverySystem
+    EXTENDED_DISCOVERY_AVAILABLE = True
+except ImportError:
+    EXTENDED_DISCOVERY_AVAILABLE = False
+
 # AI selectors
 from tools.core.tool_selector import ToolSelector
 from prompts.prompt_selector import PromptSelector
@@ -41,7 +48,7 @@ class SmartMCPServer:
         self.prompt_selector = None
         self.resource_selector = None
         self.search_service = None
-        self.auto_discovery = AutoDiscoverySystem()
+        self.auto_discovery = None  # Will be set in _register_all_capabilities
         self.config = config or {}
     
     async def initialize(self) -> FastMCP:
@@ -80,9 +87,18 @@ class SmartMCPServer:
         """Use auto-discovery system to register all capabilities"""
         print("📦 Auto-discovering and registering all capabilities...")
         
-        # Use the auto-discovery system
-        auto_discovery = AutoDiscoverySystem()
+        # Use extended auto-discovery if available, otherwise fallback to basic
+        if EXTENDED_DISCOVERY_AVAILABLE:
+            print("🌐 Using extended discovery with external services support...")
+            auto_discovery = ExtendedAutoDiscoverySystem()
+        else:
+            print("📁 Using basic discovery (external services not available)...")
+            auto_discovery = AutoDiscoverySystem()
+        
         await auto_discovery.auto_register_with_mcp(self.mcp)
+        
+        # Store discovery system for cleanup
+        self.auto_discovery = auto_discovery
         
         print("✅ Auto-discovery completed")
     
@@ -237,6 +253,12 @@ class SmartMCPServer:
                 stats["resources"] = {"error": str(e)}
         
         return stats
+    
+    async def cleanup(self):
+        """Cleanup server resources including external services"""
+        if self.auto_discovery and hasattr(self.auto_discovery, 'cleanup'):
+            await self.auto_discovery.cleanup()
+            print("🧹 Server cleanup completed")
 
 # Global server instance
 smart_server: Optional[SmartMCPServer] = None

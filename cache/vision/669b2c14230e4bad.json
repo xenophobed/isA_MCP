@@ -1,0 +1,23 @@
+{
+  "elements": {
+    "username": {
+      "type": "css_selector",
+      "selector": "input[name='username']",
+      "x": 300,
+      "y": 200
+    },
+    "password": {
+      "type": "css_selector",
+      "selector": "input[name='password']",
+      "x": 300,
+      "y": 250
+    }
+  },
+  "detection_type": "login",
+  "confidence": 0.85,
+  "timestamp": "2025-07-05T04:02:17.998823",
+  "url_pattern": "example.com",
+  "page_hash": "1db44de3f008",
+  "expires_at": "2025-07-06T04:02:17.998836",
+  "hit_count": 1
+}

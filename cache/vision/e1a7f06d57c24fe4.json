@@ -1,0 +1,30 @@
+{
+  "elements": {
+    "ui_elements": [
+      {
+        "id": "omni_0",
+        "type": "button",
+        "content": "unanswerable",
+        "center": [
+          75,
+          65
+        ],
+        "bbox": [
+          49,
+          49,
+          101,
+          81
+        ],
+        "confidence": 0.9377142786979675,
+        "interactable": true
+      }
+    ]
+  },
+  "detection_type": "ui_elements",
+  "confidence": 0.9,
+  "timestamp": "2025-07-12T19:59:19.017015",
+  "url_pattern": "convenience-test.com",
+  "page_hash": "3fc91070643a",
+  "expires_at": "2025-07-13T19:59:19.017046",
+  "hit_count": 1
+}
