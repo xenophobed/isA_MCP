@@ -423,11 +423,14 @@ class GraphKnowledgeResources:
                 sys.path.insert(0, str(project_root))
                 
                 from tools.services.data_analytics_service.services.knowledge_service.neo4j_client import Neo4jClient
+                from core.config import get_settings
+                
+                settings = get_settings()
                 neo4j_client = Neo4jClient({
-                    'uri': 'bolt://localhost:7687',
-                    'username': 'neo4j',
-                    'password': 'password',
-                    'database': 'neo4j'
+                    'uri': settings.graph_analytics.neo4j_uri or 'bolt://localhost:7687',
+                    'username': settings.graph_analytics.neo4j_username or 'neo4j',
+                    'password': settings.graph_analytics.neo4j_password or 'password',
+                    'database': settings.graph_analytics.neo4j_database or 'neo4j'
                 })
                 
                 # Get actual Neo4j data for user

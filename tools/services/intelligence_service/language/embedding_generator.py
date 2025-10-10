@@ -307,10 +307,13 @@ class EmbeddingGenerator:
         overlap: int = 50,
         model: Optional[str] = None,
         metadata: Optional[dict] = None,
+        strategy: Optional[str] = None,
         **kwargs
     ) -> List[dict]:
         """
-        Chunk text into smaller pieces with embeddings using ISA
+        Chunk text into smaller pieces with embeddings
+        
+        Now supports advanced chunking strategies via the new ChunkingService.
         
         Args:
             text: Text to chunk
@@ -318,12 +321,43 @@ class EmbeddingGenerator:
             overlap: Overlap between chunks
             model: Model to use for embeddings
             metadata: Additional metadata to include
+            strategy: Chunking strategy to use (e.g., 'recursive', 'semantic', 'markdown_aware')
             **kwargs: Additional parameters
             
         Returns:
             List of chunk dictionaries with text and embeddings
         """
         try:
+            # If strategy specified, use new ChunkingService
+            if strategy:
+                from tools.services.intelligence_service.vector_db.chunking_service import chunking_service, ChunkingStrategy
+                
+                logger.info(f"Using advanced chunking strategy: {strategy}")
+                
+                # Create chunks using the new service
+                chunks = await chunking_service.chunk_text(
+                    text=text,
+                    strategy=strategy,
+                    chunk_size=chunk_size,
+                    chunk_overlap=overlap,
+                    metadata=metadata,
+                    **kwargs
+                )
+                
+                # Generate embeddings for chunks
+                chunk_texts = [chunk.text for chunk in chunks]
+                embeddings = await self.embed_batch(chunk_texts, model=model)
+                
+                # Convert to expected format
+                result = []
+                for chunk, embedding in zip(chunks, embeddings):
+                    chunk_dict = chunk.to_dict()
+                    chunk_dict['embedding'] = embedding
+                    result.append(chunk_dict)
+                
+                return result
+            
+            # Otherwise, use original ISA-based or local chunking
             # Check if text exceeds token limits (8192 tokens ~ 20,000 characters)
             # If so, pre-chunk locally to respect ISA limits  
             max_chars_for_isa = 6000   # 更保守的估计，考虑ISA内部处理开销
@@ -537,6 +571,45 @@ async def search(query: str, candidates: List[str], **kwargs) -> List[Tuple[str,
 async def chunk(text: str, **kwargs) -> List[dict]:
     """Chunk text with embeddings"""
     return await embedding_generator.chunk_text(text, **kwargs)
+
+async def advanced_chunk(
+    text: str, 
+    strategy: str = "hybrid",
+    chunk_size: int = 1000,
+    chunk_overlap: int = 100,
+    **kwargs
+) -> List[dict]:
+    """
+    Advanced chunking with multiple strategies
+    
+    Available strategies:
+    - fixed_size: Simple fixed-size chunks
+    - sentence_based: Chunk by sentences
+    - recursive: Recursively split with multiple separators
+    - markdown_aware: Preserve Markdown structure
+    - code_aware: Preserve code structure
+    - semantic: Chunk based on semantic similarity
+    - token_based: Chunk by token count
+    - hierarchical: Create parent-child chunk relationships
+    - hybrid: Automatically detect and apply best strategy
+    
+    Args:
+        text: Text to chunk
+        strategy: Chunking strategy to use
+        chunk_size: Target size for chunks
+        chunk_overlap: Overlap between chunks
+        **kwargs: Additional strategy-specific parameters
+        
+    Returns:
+        List of chunk dictionaries with embeddings
+    """
+    return await embedding_generator.chunk_text(
+        text=text,
+        strategy=strategy,
+        chunk_size=chunk_size,
+        overlap=chunk_overlap,
+        **kwargs
+    )
 
 async def rerank(query: str, documents: List[str], **kwargs) -> List[dict]:
     """Rerank documents by relevance"""

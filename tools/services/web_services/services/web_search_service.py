@@ -4,10 +4,10 @@ Web Search Service - 基础网页搜索服务
 提供简单的搜索功能，返回链接和基本信息
 """
 
-import os
 from typing import Dict, Any, List, Optional
 
 from core.logging import get_logger
+from core.config import get_settings
 from ..engines.search_engine import SearchEngine, SearchProvider, BraveSearchStrategy
 
 logger = get_logger(__name__)
@@ -15,26 +15,29 @@ logger = get_logger(__name__)
 
 class WebSearchService:
     """基础网页搜索服务"""
-    
+
     def __init__(self):
         self.search_engine = SearchEngine()
         self._initialized = False
         logger.info("✅ WebSearchService initialized")
-    
+
     async def initialize(self):
         """初始化搜索引擎"""
         if self._initialized:
             return
-            
+
+        # Get settings from centralized config
+        settings = get_settings()
+
         # 注册Brave搜索
-        brave_api_key = os.getenv('BRAVE_TOKEN')
+        brave_api_key = settings.brave_api_key
         if brave_api_key:
             brave_strategy = BraveSearchStrategy(brave_api_key)
             self.search_engine.register_strategy(SearchProvider.BRAVE, brave_strategy)
             logger.info("✅ Brave search registered")
         else:
-            logger.warning("⚠️ No Brave API key found")
-        
+            logger.warning("⚠️ No Brave API key found in config")
+
         self._initialized = True
     
     async def search(self, query: str, count: int = 10) -> Dict[str, Any]:

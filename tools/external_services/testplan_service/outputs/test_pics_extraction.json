@@ -1,0 +1,2971 @@
+{
+  "total_items": 1237,
+  "true_items": 293,
+  "band_info": [
+    "Band_1",
+    "Band_12",
+    "Band_13",
+    "Band_17",
+    "Band_19",
+    "Band_19_FDD",
+    "Band_1_FDD",
+    "Band_2",
+    "Band_20",
+    "Band_2_FDD",
+    "Band_3",
+    "Band_4",
+    "Band_4_FDD",
+    "Band_5",
+    "Band_5_FDD",
+    "Band_6",
+    "Band_6_FDD",
+    "Band_7",
+    "Band_8",
+    "Band_8_FDD"
+  ],
+  "features": [
+    "CA",
+    "SA"
+  ],
+  "spec_id": "34123",
+  "metadata": {
+    "file_name": "Interlab_EVO_Feature_Spreadsheet_PDX-256_PDX-256_PICS_All_2025-09-20_18_58_46.xlsx",
+    "sheet_name": "3GPP TS 34.123-2",
+    "total_rows": 1237,
+    "true_items": 293,
+    "items_with_mnemonic": 220,
+    "items_without_mnemonic": 73
+  },
+  "pics_items": [
+    {
+      "item_id": "A.1/1",
+      "group": "Table A.1",
+      "description": "FDD (DS); this feature is mandatory for all UTRA FDD UE",
+      "mnemonic": "pc_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 0
+    },
+    {
+      "item_id": "A.1/4",
+      "group": "nan",
+      "description": "GSM",
+      "mnemonic": "pc_UMTS_GSM",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 3
+    },
+    {
+      "item_id": "A.1/7",
+      "group": "nan",
+      "description": "DTM",
+      "mnemonic": "pc_DTM",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 6
+    },
+    {
+      "item_id": "A.1/12",
+      "group": "nan",
+      "description": "Priority based reselection",
+      "mnemonic": "pc_SupportOf_Priority_Reselection",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 11
+    },
+    {
+      "item_id": "A.1/13",
+      "group": "nan",
+      "description": "E-UTRA",
+      "mnemonic": "pc_EUTRA",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 12
+    },
+    {
+      "item_id": "A.2/1",
+      "group": "Table A.2",
+      "description": "Narrow band speech (AMR)",
+      "mnemonic": "pc_Speech",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 13
+    },
+    {
+      "item_id": "A.2/2",
+      "group": "nan",
+      "description": "Emergency speech call",
+      "mnemonic": "pc_EmergSpeech",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 14
+    },
+    {
+      "item_id": "A.2/3",
+      "group": "nan",
+      "description": "Short Message Service (SMS) MT over CS",
+      "mnemonic": "pc_SMS_CS_MT",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 15
+    },
+    {
+      "item_id": "A.2/4",
+      "group": "nan",
+      "description": "Short Message Service (SMS) MO over CS",
+      "mnemonic": "pc_SMS_CS_MO",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 16
+    },
+    {
+      "item_id": "A.2/5",
+      "group": "nan",
+      "description": "Short Message Service (SMS) MT over PS",
+      "mnemonic": "pc_SMS_PS_MT",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 17
+    },
+    {
+      "item_id": "A.2/7",
+      "group": "nan",
+      "description": "Cell Broadcast Service (CBS)",
+      "mnemonic": "pc_SMS_CellBroadcast",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 19
+    },
+    {
+      "item_id": "A.2/8",
+      "group": "nan",
+      "description": "Wide band speech (UMTS_AMR-WB)",
+      "mnemonic": "pc_UMTS_AMR_WB_Speech",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 20
+    },
+    {
+      "item_id": "A.3/1",
+      "group": "Table A.3",
+      "description": "Circuit Switched",
+      "mnemonic": "pc_CS",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 22
+    },
+    {
+      "item_id": "A.3/2",
+      "group": "nan",
+      "description": "Packet Switched",
+      "mnemonic": "pc_PS",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 23
+    },
+    {
+      "item_id": "A.3/3",
+      "group": "nan",
+      "description": "UE supports UE operation mode A: PS and CS simultaneously",
+      "mnemonic": "pc_SupportOpModeA",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 24
+    },
+    {
+      "item_id": "A.6/1",
+      "group": "Table A.6",
+      "description": "Conversational",
+      "mnemonic": "pc_Conversational",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 75
+    },
+    {
+      "item_id": "A.6/2",
+      "group": "nan",
+      "description": "Streaming",
+      "mnemonic": "pc_Streaming",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 76
+    },
+    {
+      "item_id": "A.6/3",
+      "group": "nan",
+      "description": "Interactive",
+      "mnemonic": "pc_Interactive",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 77
+    },
+    {
+      "item_id": "A.6/4",
+      "group": "nan",
+      "description": "Background",
+      "mnemonic": "pc_Background",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 78
+    },
+    {
+      "item_id": "A.7/1",
+      "group": "Table A.7",
+      "description": "Call Deflection",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 79
+    },
+    {
+      "item_id": "A.7/2",
+      "group": "nan",
+      "description": "Calling Line Identification Presentation",
+      "mnemonic": "pc_SS_CLIP",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 80
+    },
+    {
+      "item_id": "A.7/3",
+      "group": "nan",
+      "description": "Calling Line Identification Restriction",
+      "mnemonic": "pc_SS_CLIR",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 81
+    },
+    {
+      "item_id": "A.7/6",
+      "group": "nan",
+      "description": "Call Forwarding Unconditional",
+      "mnemonic": "pc_SS_CallForwardingUnconditional",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 84
+    },
+    {
+      "item_id": "A.7/7",
+      "group": "nan",
+      "description": "Call Forwarding on Mobile Subscriber Busy",
+      "mnemonic": "pc_SS_CallForwardingSubscriberBusy",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 85
+    },
+    {
+      "item_id": "A.7/8",
+      "group": "nan",
+      "description": "Call Forwarding on No Reply",
+      "mnemonic": "pc_SS_CallForwardinoNoReply",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 86
+    },
+    {
+      "item_id": "A.7/9",
+      "group": "nan",
+      "description": "Call Forwarding on Mobile Subscriber Not Reachable",
+      "mnemonic": "pc_SS_CallForwardingSubscriberNotReachable",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 87
+    },
+    {
+      "item_id": "A.7/10",
+      "group": "nan",
+      "description": "Call Waiting",
+      "mnemonic": "pc_SS_CallWaitingSupp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 88
+    },
+    {
+      "item_id": "A.7/11",
+      "group": "nan",
+      "description": "Call Hold",
+      "mnemonic": "pc_SS_CallHold",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 89
+    },
+    {
+      "item_id": "A.7/12",
+      "group": "nan",
+      "description": "Multi Party Service",
+      "mnemonic": "pc_SS_MultiParty",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 90
+    },
+    {
+      "item_id": "A.7/15",
+      "group": "nan",
+      "description": "Advice of Charge (Information)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 93
+    },
+    {
+      "item_id": "A.7/16",
+      "group": "nan",
+      "description": "Advice of Charge (Charging)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 94
+    },
+    {
+      "item_id": "A.7/17",
+      "group": "nan",
+      "description": "Barring of All Outgoing Calls",
+      "mnemonic": "pc_SS_BAOC",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 95
+    },
+    {
+      "item_id": "A.7/18",
+      "group": "nan",
+      "description": "Barring of Outgoing International Calls",
+      "mnemonic": "pc_SS_BOIC",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 96
+    },
+    {
+      "item_id": "A.7/19",
+      "group": "nan",
+      "description": "Barring of Outgoing International Calls except those directed to the Home PLMN Country",
+      "mnemonic": "pc_SS_BOIC_ExHC",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 97
+    },
+    {
+      "item_id": "A.7/20",
+      "group": "nan",
+      "description": "Barring of All Incoming Calls",
+      "mnemonic": "pc_SS_BAIC",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 98
+    },
+    {
+      "item_id": "A.7/21",
+      "group": "nan",
+      "description": "Barring of Incoming Calls when Roaming Outside the Home PLMN Country",
+      "mnemonic": "pc_SS_BIC_Roam",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 99
+    },
+    {
+      "item_id": "A.7/22",
+      "group": "nan",
+      "description": "Explicit call transfer",
+      "mnemonic": "pc_SS_ExplictCallTransfer",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 100
+    },
+    {
+      "item_id": "A.7/23",
+      "group": "nan",
+      "description": "Call Completion to Busy Subscriber",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 101
+    },
+    {
+      "item_id": "A.7/24",
+      "group": "nan",
+      "description": "Call Completion to Busy Subscriber Request",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 102
+    },
+    {
+      "item_id": "A.7/27",
+      "group": "nan",
+      "description": "Multiple Subscriber Profile (MSP)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 105
+    },
+    {
+      "item_id": "A.7/30",
+      "group": "nan",
+      "description": "At least one non-call related Supplementary Service supported",
+      "mnemonic": "pc_NonCallRelSS",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 108
+    },
+    {
+      "item_id": "A.7/34",
+      "group": "nan",
+      "description": "Support of MT-LR LCS value added location request notification capability",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 112
+    },
+    {
+      "item_id": "A.7/35",
+      "group": "nan",
+      "description": "Unstructured SS Data",
+      "mnemonic": "pc_SS_USSD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 113
+    },
+    {
+      "item_id": "A.8/3",
+      "group": "nan",
+      "description": "USIM Application Toolkit (USAT)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 116
+    },
+    {
+      "item_id": "A.8a/4",
+      "group": "nan",
+      "description": "Standalone location method is supporting by UE",
+      "mnemonic": "pc_UE_PositioningStandaloneLocMethodsSup",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 120
+    },
+    {
+      "item_id": "A.10/8",
+      "group": "nan",
+      "description": "Last RPLMN",
+      "mnemonic": "pc_Last_RPLMN",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 133
+    },
+    {
+      "item_id": "A.10/12",
+      "group": "nan",
+      "description": "CSG Support",
+      "mnemonic": "pc_CSG",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 137
+    },
+    {
+      "item_id": "A.10/22",
+      "group": "nan",
+      "description": "Support of Cell Broadcast Service Discontinuous Reception (DRX)",
+      "mnemonic": "pc_SMS_CellBroadcast_DRX",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 147
+    },
+    {
+      "item_id": "A.10/28",
+      "group": "nan",
+      "description": "Support transmitting Signalling Connection Release Indication with IE \"Signalling Connection Release Indication Cause\" set to \"UE Requested PS Data session end\" in cell_DCH",
+      "mnemonic": "ps_UE_Req_PSDataSessionEnd_cell_DCH",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 153
+    },
+    {
+      "item_id": "A.10/29",
+      "group": "nan",
+      "description": "Support transmitting Signalling Connection Release Indication with IE \"Signalling Connection Release Indication Cause\" set to \"UE Requested PS Data session end\" in cell_FACH",
+      "mnemonic": "ps_UE_Req_PSDataSessionEnd_cell_FACH",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 154
+    },
+    {
+      "item_id": "A.10/30",
+      "group": "nan",
+      "description": "Support transmitting Signalling Connection Release Indication with IE \"Signalling Connection Release Indication Cause\" set to \"UE Requested PS Data session end\" in CELL_PCH when DRX cycle length in use is equal to or longer than the shorter CN domain specific DRX cycle length for the PS domain and CS domain",
+      "mnemonic": "ps_UE_Req_PSDataSessionEnd_cell_PCH",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 155
+    },
+    {
+      "item_id": "A.10/34",
+      "group": "nan",
+      "description": "Support of AttachWithIMSI",
+      "mnemonic": "pc_AttachWithIMSI",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 159
+    },
+    {
+      "item_id": "A.10/35",
+      "group": "nan",
+      "description": "Support of T3212 extended value IE",
+      "mnemonic": "pc_T3212Extended",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 160
+    },
+    {
+      "item_id": "A.10/36",
+      "group": "nan",
+      "description": "Support of T3312 extended value IE",
+      "mnemonic": "pc_T3312Extended",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 161
+    },
+    {
+      "item_id": "A.10/43",
+      "group": "nan",
+      "description": "Support of NAS Congestion control for CS services",
+      "mnemonic": "pc_CS_CongestionControl",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 168
+    },
+    {
+      "item_id": "A.12/1",
+      "group": "Table A.12",
+      "description": "Up-link reference measurement channel 12.2 kbps (FDD)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 179
+    },
+    {
+      "item_id": "A.12/2",
+      "group": "nan",
+      "description": "Down-link reference measurement channel 12.2 kbps (FDD)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 180
+    },
+    {
+      "item_id": "A.13/1",
+      "group": "Table A.13",
+      "description": "UE test loop",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 187
+    },
+    {
+      "item_id": "A.13/2",
+      "group": "nan",
+      "description": "Support of UE test loop mode 1 with UL RLC SDU size bigger than 12160 bits (1520 octets)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 188
+    },
+    {
+      "item_id": "A.14/1",
+      "group": "Table A.14",
+      "description": "Electrical Man Machine Interface (EMMI)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 192
+    },
+    {
+      "item_id": "A.14/2",
+      "group": "nan",
+      "description": "UICC/ME test interface",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 193
+    },
+    {
+      "item_id": "A.15/1",
+      "group": "Table A.15",
+      "description": "FDD: Chip rate 3,84 Mcps",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 194
+    },
+    {
+      "item_id": "A.15/2",
+      "group": "nan",
+      "description": "FDDI: Frequency band: 1 920-1 980, 2 110-2 170 MHz",
+      "mnemonic": "pc_Band1_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 195
+    },
+    {
+      "item_id": "A.15/3",
+      "group": "nan",
+      "description": "FDDII: Frequency band: 1 850-1 910, 1 930-1 990 MHz",
+      "mnemonic": "pc_Band2_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 196
+    },
+    {
+      "item_id": "A.15/5",
+      "group": "nan",
+      "description": "FDD: TX-RX Freq. Sep: 190 MHz",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 198
+    },
+    {
+      "item_id": "A.15/6",
+      "group": "nan",
+      "description": "FDD: TX-RX Freq. Sep: 80 MHz",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 199
+    },
+    {
+      "item_id": "A.15/8",
+      "group": "nan",
+      "description": "FDD: Carrier raster: 200 kHz",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 201
+    },
+    {
+      "item_id": "A.15/11",
+      "group": "nan",
+      "description": "FDD: UE Power Class 3 (+24 dBm)",
+      "mnemonic": "pc_UE_PowerClass3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 204
+    },
+    {
+      "item_id": "A.15/13",
+      "group": "nan",
+      "description": "FDD: Output RF spectrum emissions",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 206
+    },
+    {
+      "item_id": "A.15/15",
+      "group": "nan",
+      "description": "FDDIV: Frequency band: 1710-1755, 2110-2155 MHz",
+      "mnemonic": "pc_Band4_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 208
+    },
+    {
+      "item_id": "A.15/16",
+      "group": "nan",
+      "description": "FDDV: Frequency band: 824 - 849, 869-894 MHz",
+      "mnemonic": "pc_Band5_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 209
+    },
+    {
+      "item_id": "A.15/17",
+      "group": "nan",
+      "description": "FDDVI: Frequency band: 830-840, 875-885 MHz",
+      "mnemonic": "pc_Band6_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 210
+    },
+    {
+      "item_id": "A.15/19",
+      "group": "nan",
+      "description": "FDDVIII: Frequency band: 880-915, 925-960 MHz",
+      "mnemonic": "pc_Band8_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 212
+    },
+    {
+      "item_id": "A.15/21",
+      "group": "nan",
+      "description": "Multiple FDD bands simultaneously",
+      "mnemonic": "pc_MultiBand_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 214
+    },
+    {
+      "item_id": "A.15/27",
+      "group": "nan",
+      "description": "FDDXIX: Frequency band: 830 - 845 MHz, 875 - 890 MHz",
+      "mnemonic": "pc_Band19_Supp",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 220
+    },
+    {
+      "item_id": "A.18a/1",
+      "group": "Table A.18a",
+      "description": "Support of turbo decoding",
+      "mnemonic": "pc_DL_TC_FDD",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 241
+    },
+    {
+      "item_id": "A.18a/2",
+      "group": "nan",
+      "description": "Support of turbo encoding",
+      "mnemonic": "pc_UL_TC_FDD",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 242
+    },
+    {
+      "item_id": "A.18a/8",
+      "group": "nan",
+      "description": "Need of inter-frequency uplink compressed mode",
+      "mnemonic": "pc_InterFreq_UL_CompressedModeRequired",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 248
+    },
+    {
+      "item_id": "A.18a/8a",
+      "group": "nan",
+      "description": "Need of interRAT uplink compressed mode",
+      "mnemonic": "pc_InterRAT_UL_CompressedModeRequired",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 249
+    },
+    {
+      "item_id": "A.18a/9",
+      "group": "nan",
+      "description": "Need of inter-frequency downlink compressed mode",
+      "mnemonic": "pc_InterFreq_DL_CompressedModeRequired",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 250
+    },
+    {
+      "item_id": "A.18a/9a",
+      "group": "nan",
+      "description": "Need of interRAT downlink compressed mode",
+      "mnemonic": "pc_InterRAT_DL_CompressedModeRequired",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 251
+    },
+    {
+      "item_id": "A.18a/12",
+      "group": "nan",
+      "description": "Support of UE based Network Assisted GPS L1 C/A",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 254
+    },
+    {
+      "item_id": "A.18a/13",
+      "group": "nan",
+      "description": "Support of UE assisted Network Assisted GPS L1 C/A",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 255
+    },
+    {
+      "item_id": "A.18a/14",
+      "group": "nan",
+      "description": "Support of HS-PDSCH",
+      "mnemonic": "pc_HSDPA_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 256
+    },
+    {
+      "item_id": "A.18a/17",
+      "group": "nan",
+      "description": "Capability with simultaneous HS-DSCH configuration",
+      "mnemonic": "pc_CapabilityWithSimultaneousHS_DSCHConfig",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 259
+    },
+    {
+      "item_id": "A.18a/18",
+      "group": "nan",
+      "description": "Support of E-DPDCH",
+      "mnemonic": "pc_HSUPA_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 260
+    },
+    {
+      "item_id": "A.18a/22",
+      "group": "nan",
+      "description": "Support of F-DPCH",
+      "mnemonic": "pc_FDPCH",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 264
+    },
+    {
+      "item_id": "A.18a/24",
+      "group": "nan",
+      "description": "Support for MAC-ehs",
+      "mnemonic": "pc_MAC_ehs_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 266
+    },
+    {
+      "item_id": "A.18a/25",
+      "group": "nan",
+      "description": "Support of DPCCH Discontinuous Transmission",
+      "mnemonic": "pc_UL_DTX",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 267
+    },
+    {
+      "item_id": "A.18a/26",
+      "group": "nan",
+      "description": "Support of HS-DSCH Discontinuous Reception",
+      "mnemonic": "pc_DL_DRX",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 268
+    },
+    {
+      "item_id": "A.18a/29",
+      "group": "nan",
+      "description": "Support of HS-PDSCH in CELL_FACH",
+      "mnemonic": "pc_HS_FACH_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 271
+    },
+    {
+      "item_id": "A.18a/31",
+      "group": "nan",
+      "description": "Support enhanced F-DPCH",
+      "mnemonic": "pc_EnhancedF_DPCH",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 273
+    },
+    {
+      "item_id": "A.18a/33",
+      "group": "nan",
+      "description": "Support for MAC-i/is",
+      "mnemonic": "pc_MAC_iis_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 275
+    },
+    {
+      "item_id": "A.18a/36",
+      "group": "nan",
+      "description": "Support of HS-DSCH DRX operation",
+      "mnemonic": "pc_HS_FACH_DRX",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 278
+    },
+    {
+      "item_id": "A.18a/38",
+      "group": "nan",
+      "description": "Support of Slot Format #4",
+      "mnemonic": "pc_SlotFormat4",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 280
+    },
+    {
+      "item_id": "A.18a/40",
+      "group": "nan",
+      "description": "Support of multi cell",
+      "mnemonic": "pc_DualCell",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 282
+    },
+    {
+      "item_id": "A.18a.1/10",
+      "group": "nan",
+      "description": "Category 10",
+      "mnemonic": "pc_HSDSCH_UE_Category_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 331
+    },
+    {
+      "item_id": "A.18a.1a/14",
+      "group": "nan",
+      "description": "Category 14",
+      "mnemonic": "pc_HSDSCH_UE_Category_Extension_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 347
+    },
+    {
+      "item_id": "A.18a.1b/24",
+      "group": "nan",
+      "description": "Category 24",
+      "mnemonic": "pc_HSDSCH_UE_Category_Extension2_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 357
+    },
+    {
+      "item_id": "A.18a.2/6",
+      "group": "nan",
+      "description": "Category 6",
+      "mnemonic": "pc_EDCH_UE_Category_FDD",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 371
+    },
+    {
+      "item_id": "A.18c/2",
+      "group": "nan",
+      "description": "Stand-alone UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 444
+    },
+    {
+      "item_id": "A.18c/3",
+      "group": "nan",
+      "description": "Stand-alone UL:13.6 DL:13.6 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 445
+    },
+    {
+      "item_id": "A.18c/4",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_4",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 446
+    },
+    {
+      "item_id": "A.18c/4a",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_4a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 447
+    },
+    {
+      "item_id": "A.18c/4b",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.4 5.9 4.75) DL:(12.2 7.4 5.9 4.75) kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH + DL:0.15 kbps SRB#5 for DCCH",
+      "mnemonic": "pc_RAB_A_18c_4b",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 448
+    },
+    {
+      "item_id": "A.18c/5",
+      "group": "nan",
+      "description": "Conversational / speech / UL:10.2 DL:10.2 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_5",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 449
+    },
+    {
+      "item_id": "A.18c/5a",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(10.2, 6.7, 5.9, 4.75) DL:(10.2, 6.7, 5.9, 4.75) kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_5a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 450
+    },
+    {
+      "item_id": "A.18c/6",
+      "group": "nan",
+      "description": "Conversational / speech / UL:7.95 DL:7.95 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_6",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 451
+    },
+    {
+      "item_id": "A.18c/7",
+      "group": "nan",
+      "description": "Conversational / speech / UL:7.4 DL:7.4 kbps / CS RAB+ UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_7",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 452
+    },
+    {
+      "item_id": "A.18c/7a",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(7.4, 6.7, 5.9, 4.75) DL:(7.4, 6.7, 5.9, 4.75) kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_7a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 453
+    },
+    {
+      "item_id": "A.18c/8",
+      "group": "nan",
+      "description": "Conversational / speech / UL:6.7 DL:6.7 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_8",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 454
+    },
+    {
+      "item_id": "A.18c/9",
+      "group": "nan",
+      "description": "Conversational / speech / UL:5.9 DL:5.9 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_9",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 455
+    },
+    {
+      "item_id": "A.18c/10",
+      "group": "nan",
+      "description": "Conversational / speech / UL:5.15 DL:5.15 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_10",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 456
+    },
+    {
+      "item_id": "A.18c/11",
+      "group": "nan",
+      "description": "Conversational / speech / UL:4.75 DL:4.75 kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_11",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 457
+    },
+    {
+      "item_id": "A.18c/23.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_23_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 468
+    },
+    {
+      "item_id": "A.18c/23.2",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_23_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 469
+    },
+    {
+      "item_id": "A.18c/23.3",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_23_3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 470
+    },
+    {
+      "item_id": "A.18c/23.4",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_23_4",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 471
+    },
+    {
+      "item_id": "A.18c/23a.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC)",
+      "mnemonic": "pc_RAB_A_18c_23a_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 472
+    },
+    {
+      "item_id": "A.18c/23a.2",
+      "group": "nan",
+      "description": "Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC)",
+      "mnemonic": "pc_RAB_A_18c_23a_2",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 473
+    },
+    {
+      "item_id": "A.18c/23b",
+      "group": "nan",
+      "description": "Interactive or background / UL:16 DL:16 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_23b",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 474
+    },
+    {
+      "item_id": "A.18c/23c",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:32 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_23c",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 475
+    },
+    {
+      "item_id": "A.18c/23d",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL:32 kbps / PS RAB (20 ms TTI) + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_23d",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 476
+    },
+    {
+      "item_id": "A.18c/24.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / TC",
+      "mnemonic": "pc_RAB_A_18c_24_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 477
+    },
+    {
+      "item_id": "A.18c/24.2",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / CC",
+      "mnemonic": "pc_RAB_A_18c_24_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 478
+    },
+    {
+      "item_id": "A.18c/25.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL: 64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH/ (TC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_25_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 479
+    },
+    {
+      "item_id": "A.18c/25.2",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL: 64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_25_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 480
+    },
+    {
+      "item_id": "A.18c/25.3",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL: 64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_25_3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 481
+    },
+    {
+      "item_id": "A.18c/25.4",
+      "group": "nan",
+      "description": "Interactive or background / UL:32 DL: 64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_25_4",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 482
+    },
+    {
+      "item_id": "A.18c/26",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL: 64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_26",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 483
+    },
+    {
+      "item_id": "A.18c/27",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:128 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_27",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 484
+    },
+    {
+      "item_id": "A.18c/28",
+      "group": "nan",
+      "description": "Interactive or background / UL:128 DL:128 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_28",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 485
+    },
+    {
+      "item_id": "A.18c/29",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:144 kbps / PS RAB + UL:3.4 DL: 3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_29",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 486
+    },
+    {
+      "item_id": "A.18c/30",
+      "group": "nan",
+      "description": "Interactive or background / UL:144 DL:144 kbps / PS RAB + UL:3.4 DL: 3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_30",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 487
+    },
+    {
+      "item_id": "A.18c/31.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:256 kbps / PS RAB + UL:3.4 DL: 3.4 kbps SRBs for DCCH /10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_31_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 488
+    },
+    {
+      "item_id": "A.18c/31.2",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:256 kbps / PS RAB + UL:3.4 DL: 3.4 kbps SRBs for DCCH /20 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_31_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 489
+    },
+    {
+      "item_id": "A.18c/32.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:384 kbps / PS RAB + UL:3.4 DL: 3.4 kbps SRBs for DCCH / 10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_32_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 490
+    },
+    {
+      "item_id": "A.18c/33.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:128 DL:384 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / 10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_33_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 492
+    },
+    {
+      "item_id": "A.18c/34.1",
+      "group": "nan",
+      "description": "Interactive or background / UL:384 DL:384 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / 10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_34_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 494
+    },
+    {
+      "item_id": "A.18c/38.1",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_38_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 502
+    },
+    {
+      "item_id": "A.18c/38.2",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (TC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_38_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 503
+    },
+    {
+      "item_id": "A.18c/38.3",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_38_3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 504
+    },
+    {
+      "item_id": "A.18c/38.4",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / (CC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_38_4",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 505
+    },
+    {
+      "item_id": "A.18c/38a",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:0 DL:0 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_38a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 506
+    },
+    {
+      "item_id": "A.18c/38b",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_38b",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 507
+    },
+    {
+      "item_id": "A.18c/38c",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:32 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_38c",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 508
+    },
+    {
+      "item_id": "A.18c/38d",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:64 kbps / PS RAB + Interactive or background / UL:64 DL:64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38d",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 509
+    },
+    {
+      "item_id": "A.18c/38e",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:0 DL:0 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38e",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 510
+    },
+    {
+      "item_id": "A.18c/38f",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38f",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 511
+    },
+    {
+      "item_id": "A.18c/38g",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:16 DL:16 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38g",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 512
+    },
+    {
+      "item_id": "A.18c/38h",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:32 DL:32 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38h",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 513
+    },
+    {
+      "item_id": "A.18c/38i",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:64 DL:64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38i",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 514
+    },
+    {
+      "item_id": "A.18c/38j",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.2 7.95 5.9 4.75) DL:(12.2 7.95 5.9 4.75) kbps / CS RAB + Interactive or background / UL:64 DL:128 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_38j",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 515
+    },
+    {
+      "item_id": "A.18c/39.1",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:64 kbps / PS RAB+ UL:3.4 DL: 3.4 kbps SRBs for DCCH / (TC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_39_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 516
+    },
+    {
+      "item_id": "A.18c/39.2",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:64 kbps / PS RAB+ UL:3.4 DL: 3.4 kbps SRBs for DCCH / (TC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_39_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 517
+    },
+    {
+      "item_id": "A.18c/39.3",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:64 kbps / PS RAB+ UL:3.4 DL: 3.4 kbps SRBs for DCCH / (CC, 10 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_39_3",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 518
+    },
+    {
+      "item_id": "A.18c/39.4",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:32 DL:64 kbps / PS RAB+ UL:3.4 DL: 3.4 kbps SRBs for DCCH / (CC, 20 ms TTI)",
+      "mnemonic": "pc_RAB_A_18c_39_4",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 519
+    },
+    {
+      "item_id": "A.18c/40",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:64 kbps / PS RAB+ UL:3.4 DL: 3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_40",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 520
+    },
+    {
+      "item_id": "A.18c/41",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:128 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_41",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 521
+    },
+    {
+      "item_id": "A.18c/42.1",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:256 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / 10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_42_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 522
+    },
+    {
+      "item_id": "A.18c/42.2",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:256 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / 20 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_42_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 523
+    },
+    {
+      "item_id": "A.18c/43.1",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:384 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH / 10 ms TTI",
+      "mnemonic": "pc_RAB_A_18c_43_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 524
+    },
+    {
+      "item_id": "A.18c/56",
+      "group": "nan",
+      "description": "Interactive or background / UL:8 DL:8 kbps / PS RAB + Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_56",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 546
+    },
+    {
+      "item_id": "A.18c/57",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:64 kbps / PS RAB + interactive or background / UL:64 DL:64 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_57",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 547
+    },
+    {
+      "item_id": "A.18c/58",
+      "group": "nan",
+      "description": "Streaming / unknown / UL:16 DL:64 kbps / PS RAB + interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18c_58",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 548
+    },
+    {
+      "item_id": "A.18c/58a",
+      "group": "nan",
+      "description": "Streaming / unknown / UL:16 DL:128 kbps / PS RAB + Interactive or background / UL:8 DL:8 kbps / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH.",
+      "mnemonic": "pc_RAB_A_18c_58a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 549
+    },
+    {
+      "item_id": "A.18c/62",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.65 8.85 6.6) DL:(12.65 8.85 6.6) kbps / CS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH + DL:0.15 kbps SRB#5 for DCCH",
+      "mnemonic": "pc_RAB_A_18c_62",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 553
+    },
+    {
+      "item_id": "A.18e/1",
+      "group": "Table A.18e",
+      "description": "Stand-alone signalling RB for PCCH",
+      "mnemonic": "pc_RAB_A_18e_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 568
+    },
+    {
+      "item_id": "A.18e/2",
+      "group": "nan",
+      "description": "Interactive/Background 32 kbps PS RAB + SRBs for CCCH + SRB for DCCH + SRB for BCCH",
+      "mnemonic": "pc_RAB_A_18e_2",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 569
+    },
+    {
+      "item_id": "A.18e/3",
+      "group": "nan",
+      "description": "Interactive/Background 32 kbps RAB + SRBs for PCCH +  SRB for CCCH + SRB for DCCH + SRB for BCCH",
+      "mnemonic": "pc_RAB_A_18e_3",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 570
+    },
+    {
+      "item_id": "A.18e/4",
+      "group": "nan",
+      "description": "RB for CTCH + SRB for CCCH +SRB for BCCH",
+      "mnemonic": "pc_RAB_A_18e_4",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 571
+    },
+    {
+      "item_id": "A.18e/5",
+      "group": "nan",
+      "description": "Interactive/Background 32 kbps PS RAB + Interactive/Background 32 kbps PS RAB + SRBs for CCCH + SRB for DCCH + SRB for BCCH",
+      "mnemonic": "pc_RAB_A_18e_5",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 572
+    },
+    {
+      "item_id": "A.18f/1",
+      "group": "Table A.18f",
+      "description": "Interactive/Background 32 kbps PS RAB + SRB for CCCH + SRB for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 576
+    },
+    {
+      "item_id": "A.18f/2",
+      "group": "nan",
+      "description": "Interactive/Background 32 kbps PS RAB + Interactive/Background 32 kbps PS RAB + SRB for CCCH + SRB for DCCH",
+      "mnemonic": "pc_RAB_A_18f_2",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 577
+    },
+    {
+      "item_id": "A.18f/3",
+      "group": "nan",
+      "description": "Interactive/Background / UL:32 DL: [max bit rate depending on UE category] with fixed RLC and MAC-ehs / PS RAB + SRBs for DCCH on RACH and SRB with ..",
+      "mnemonic": "pc_RAB_A_18f_3",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 578
+    },
+    {
+      "item_id": "A.18f.1/1",
+      "group": "Table A.18f.1",
+      "description": "Interactive or Background / UL:64 DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 579
+    },
+    {
+      "item_id": "A.18f.1/1a",
+      "group": "nan",
+      "description": "Interactive or Background / UL:128 DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_1a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 580
+    },
+    {
+      "item_id": "A.18f.1/2",
+      "group": "nan",
+      "description": "Interactive or background / UL:384 DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_2",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 581
+    },
+    {
+      "item_id": "A.18f.1/3",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:384 DL:[Bit rate depending on the UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_3",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 582
+    },
+    {
+      "item_id": "A.18f.1/3a",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Interactive or background / UL:64 DL:[Bit rate depending on the UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_3a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 583
+    },
+    {
+      "item_id": "A.18f.1/4a",
+      "group": "nan",
+      "description": "Conversational / unknown / UL:64 DL:64 kbps / CS RAB + Interactive or background / UL:64 DL:[Bit rate depending on the UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_4a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 585
+    },
+    {
+      "item_id": "A.18f.1/5",
+      "group": "nan",
+      "description": "Interactive or background / UL:384 DL:[Bit rate depending on the UE category] / PS RAB + Interactive or background / UL:384 DL:[Bit rate depending on the UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_5",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 586
+    },
+    {
+      "item_id": "A.18f.1/5a",
+      "group": "nan",
+      "description": "Interactive or background / UL:64 DL:[Bit rate depending on the UE category] / PS RAB + Interactive or background / UL:64 DL:[Bit rate depending on the UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_5a",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 587
+    },
+    {
+      "item_id": "A.18f.1/6",
+      "group": "nan",
+      "description": "Streaming / unknown / UL:128 DL: [guaranteed 128, max bit rate depending on UE category] kbps / PS RAB + Interactive or background / UL:128 DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_6",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 588
+    },
+    {
+      "item_id": "A.18f.1/7",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Streaming / unknown / UL:128 DL: [guaranteed 128, max bit rate depending on UE category] kbps / PS RAB + Interactive or background / UL:128 DL: [max bit rate depending on UE category] / PS RAB",
+      "mnemonic": "pc_RAB_A_18f_1_7",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 589
+    },
+    {
+      "item_id": "A.18f.1/8",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.65 8.85 6.6) DL:(12.65 8.85 6.6) kbps / CS RAB + Interactive or Background / UL:384 DL:[Bit rate depending on the UE category] / PS RAB+ UL:3.4 DL:3.4 kbps SRBs for DCCH + DL:0.15 kbps SRB#5 for DCCH",
+      "mnemonic": "pc_RAB_A_18f_1_8",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 590
+    },
+    {
+      "item_id": "A.18f.2/1",
+      "group": "Table A.18f.2",
+      "description": "Streaming / unknown / UL:16 DL:64 kbps / PS RAB + Interactive or background / UL:16 DL:64 kbps / PS RAB + UL:13.6 DL:13.6 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f2_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 593
+    },
+    {
+      "item_id": "A.18f.3/1",
+      "group": "Table A.18f.3",
+      "description": "Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] / PS RAB + UL: 3.4 DL:3.4 kbps SRBs for DCCH on DCH",
+      "mnemonic": "pc_RAB_A_18f3_1",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 594
+    },
+    {
+      "item_id": "A.18f.3/2",
+      "group": "nan",
+      "description": "Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] / PS RAB + UL:[max bit rate depending on UE category and TTI] DL:3.4 kbps SRBs for DCCH on E-DCH and DL DCH",
+      "mnemonic": "pc_RAB_A_18f3_2",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 595
+    },
+    {
+      "item_id": "A.18f.3/3",
+      "group": "nan",
+      "description": "Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] / PS RAB + UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] SRBs f",
+      "mnemonic": "pc_RAB_A_18f3_3",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 596
+    },
+    {
+      "item_id": "A.18f.3/4",
+      "group": "nan",
+      "description": "Conversational / speech / UL:12.2 DL:12.2 kbps / CS RAB + Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps SRBs for DCCH",
+      "mnemonic": "pc_RAB_A_18f3_4",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 597
+    },
+    {
+      "item_id": "A.18f.3/5",
+      "group": "nan",
+      "description": "Streaming or interactive or background / UL:[max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] kbps / PS RAB + Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [",
+      "mnemonic": "pc_RAB_A_18f3_5",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 598
+    },
+    {
+      "item_id": "A.18f.3/6",
+      "group": "nan",
+      "description": "Conversational / unknown or speech / UL:[max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] kbps / PS RAB + Streaming or Interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max",
+      "mnemonic": "pc_RAB_A_18f3_6",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 599
+    },
+    {
+      "item_id": "A.18f.3/7",
+      "group": "nan",
+      "description": "Conversational / unknown or speech / UL:[max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] kbps / PS RAB + Streaming or Interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max",
+      "mnemonic": "pc_RAB_A_18f3_7",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 600
+    },
+    {
+      "item_id": "A.18f.3/8",
+      "group": "nan",
+      "description": "Conversational / speech / UL:(12.65 8.85 6.6) DL:(12.65 8.85 6.6) kbps / CS RAB + Streaming or interactive or background / UL: [max bit rate depending on UE category and TTI] DL: [max bit rate depending on UE category] / PS RAB + UL:3.4 DL:3.4 kbps S",
+      "mnemonic": "pc_RAB_A_18f3_8",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 601
+    },
+    {
+      "item_id": "A.19a/4",
+      "group": "nan",
+      "description": "Support of UM RB and AM RB",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1019
+    },
+    {
+      "item_id": "A.19a/6",
+      "group": "nan",
+      "description": "Maximum header compression context space",
+      "mnemonic": "pc_MaxHcContextSpace_r5_ext",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1021
+    },
+    {
+      "item_id": "A.19b/1",
+      "group": "Table A.19b",
+      "description": "Support of BMC",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1023
+    },
+    {
+      "item_id": "A.19b/2",
+      "group": "nan",
+      "description": "Support of BMC Scheduling",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1024
+    },
+    {
+      "item_id": "A.20/1",
+      "group": "Table A.20",
+      "description": "At least one bearer service",
+      "mnemonic": "pc_CS_BearerServ",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1028
+    },
+    {
+      "item_id": "A.20/2",
+      "group": "nan",
+      "description": "At least one supplementary service",
+      "mnemonic": "pc_CS_SupplServ",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1029
+    },
+    {
+      "item_id": "A.20/3",
+      "group": "nan",
+      "description": "Inter-system measurement for GSM",
+      "mnemonic": "pc_IntSysMsr",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1030
+    },
+    {
+      "item_id": "A.20/4",
+      "group": "nan",
+      "description": "At least one MO circuit switched basic service",
+      "mnemonic": "pc_MO_Serv",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1031
+    },
+    {
+      "item_id": "A.20/5",
+      "group": "nan",
+      "description": "At lease one MT circuit switched basic service",
+      "mnemonic": "pc_MT_Serv",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1032
+    },
+    {
+      "item_id": "A.20/7",
+      "group": "nan",
+      "description": "Activation of one or more PDP contexts simultaneously",
+      "mnemonic": "pc_ActivateSimultaneousPDP",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1034
+    },
+    {
+      "item_id": "A.20/8",
+      "group": "nan",
+      "description": "Sending of correct acknowledgement of memory full condition",
+      "mnemonic": "pc_SMS_MemFull",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1035
+    },
+    {
+      "item_id": "A.20/9",
+      "group": "nan",
+      "description": "Status report capability",
+      "mnemonic": "pc_SMS_StatReport",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1036
+    },
+    {
+      "item_id": "A.20/10",
+      "group": "nan",
+      "description": "Void",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1037
+    },
+    {
+      "item_id": "A.20/11",
+      "group": "nan",
+      "description": "Storing of received Class 1 short messages",
+      "mnemonic": "pc_SMS_Class1Store",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1038
+    },
+    {
+      "item_id": "A.20/12",
+      "group": "nan",
+      "description": "Storing of received Class 2 short messages in the SIM",
+      "mnemonic": "pc_SMS_Class2Store",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1039
+    },
+    {
+      "item_id": "A.20/14",
+      "group": "nan",
+      "description": "Reply procedures",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1041
+    },
+    {
+      "item_id": "A.20/15",
+      "group": "nan",
+      "description": "Sending of concatenated multiple short messages on the same RR connection when there is no call in progress",
+      "mnemonic": "pc_SMS_MultiNoCall",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1042
+    },
+    {
+      "item_id": "A.20/16",
+      "group": "nan",
+      "description": "Sending of concatenated multiple short messages on the same RR connection when there is a call in progress",
+      "mnemonic": "pc_SMS_MultiCallEx",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1043
+    },
+    {
+      "item_id": "A.20/19",
+      "group": "nan",
+      "description": "Poll_PU based polling mode of AM RLC",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1046
+    },
+    {
+      "item_id": "A.20/20",
+      "group": "nan",
+      "description": "Timer based polling mode of AM RLC",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1047
+    },
+    {
+      "item_id": "A.20/21",
+      "group": "nan",
+      "description": "Discard mode of AM RLC",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1048
+    },
+    {
+      "item_id": "A.20/22",
+      "group": "nan",
+      "description": "At least one MO circuit switched basic service",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1049
+    },
+    {
+      "item_id": "A.20/23",
+      "group": "nan",
+      "description": "At least one MO circuit switched basic service for which immediate connect is not used",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1050
+    },
+    {
+      "item_id": "A.20/24",
+      "group": "nan",
+      "description": "Network initiated MO call (CCBS)",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1051
+    },
+    {
+      "item_id": "A.20/25",
+      "group": "nan",
+      "description": "DTMF protocol control procedure",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1052
+    },
+    {
+      "item_id": "A.20/31",
+      "group": "nan",
+      "description": "UE capable of displaying short messages in PS mode",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1059
+    },
+    {
+      "item_id": "A.20/32",
+      "group": "nan",
+      "description": "Support of Follow On Proceed",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1060
+    },
+    {
+      "item_id": "A.20/33",
+      "group": "nan",
+      "description": "Void",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1061
+    },
+    {
+      "item_id": "A.20/34",
+      "group": "nan",
+      "description": "Support detach on USIM removal",
+      "mnemonic": "pc_DetachOnUSIM_Rmv",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1062
+    },
+    {
+      "item_id": "A.20/35",
+      "group": "nan",
+      "description": "Support switch on/off",
+      "mnemonic": "pc_SwitchOnOff",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1063
+    },
+    {
+      "item_id": "A.20/36",
+      "group": "nan",
+      "description": "Support USIM removal without power down",
+      "mnemonic": "pc_USIM_Rmv",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1064
+    },
+    {
+      "item_id": "A.20/37",
+      "group": "nan",
+      "description": "Void",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1065
+    },
+    {
+      "item_id": "A.20/38",
+      "group": "nan",
+      "description": "Support of automatic PS attach procedure at switch on.",
+      "mnemonic": "pc_AutomaticAttachSwitchON",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1066
+    },
+    {
+      "item_id": "A.20/39",
+      "group": "nan",
+      "description": "User requested combined PS and non-PS detached without powering off",
+      "mnemonic": "pc_UserRequestedDetach",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1067
+    },
+    {
+      "item_id": "A.20/42",
+      "group": "nan",
+      "description": "PS attach attempted automatically by outstanding request",
+      "mnemonic": "pc_PS_AttachByRequest",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1070
+    },
+    {
+      "item_id": "A.20/43",
+      "group": "nan",
+      "description": "Support for making an outgoing PS call by AT commands",
+      "mnemonic": "pc_AT_SupportToInit_PS_Call",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1071
+    },
+    {
+      "item_id": "A.20/45",
+      "group": "nan",
+      "description": "Controlled Early Classmark Sending option implementation",
+      "mnemonic": "px_MS_ClsmkESIND",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1073
+    },
+    {
+      "item_id": "A.20/62",
+      "group": "nan",
+      "description": "Access technology priority supported in HPLMNwACT field",
+      "mnemonic": "pc_AccessTechPriSuppInHPLMNwACT",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1090
+    },
+    {
+      "item_id": "A.20/63",
+      "group": "nan",
+      "description": "User requested PS detach without powering off",
+      "mnemonic": "pc_UserRequestedPS_Detach",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1091
+    },
+    {
+      "item_id": "A.20/65",
+      "group": "nan",
+      "description": "AT command +CHUP supported",
+      "mnemonic": "pc_CHUP_AT_CommandSupp",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1093
+    },
+    {
+      "item_id": "A.20/66",
+      "group": "nan",
+      "description": "UE which supports follow-on request procedure (PS)",
+      "mnemonic": "pc_SupportFollowOnRequest",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1094
+    },
+    {
+      "item_id": "A.20/67",
+      "group": "nan",
+      "description": "UE which supports Inter-RAT network assisted cell change from UTRAN",
+      "mnemonic": "pc_SupportOfUTRAN_ToGERAN_NACC",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1095
+    },
+    {
+      "item_id": "A.20/68",
+      "group": "nan",
+      "description": "RLP supported",
+      "mnemonic": "pc_RLPSupported",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1096
+    },
+    {
+      "item_id": "A.20/72",
+      "group": "nan",
+      "description": "Support of DSAC",
+      "mnemonic": "pc_DSAC_Rel",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1100
+    },
+    {
+      "item_id": "A.20/75",
+      "group": "nan",
+      "description": "Automatic attach procedure when UE identity cannot be derived by the network",
+      "mnemonic": "pc_AutomaticAttachUEIDnotDerived",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1103
+    },
+    {
+      "item_id": "A.20/76",
+      "group": "nan",
+      "description": "GMM Information Supported",
+      "mnemonic": "pc_GMM_InformationSupported",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1104
+    },
+    {
+      "item_id": "A.20/77",
+      "group": "nan",
+      "description": "Multiplexer protocol supported",
+      "mnemonic": "pc_MUX_Support",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1105
+    },
+    {
+      "item_id": "A.20/81",
+      "group": "nan",
+      "description": "Support of CS call establishment",
+      "mnemonic": "pc_CS_CallEst",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1109
+    },
+    {
+      "item_id": "A.20/90",
+      "group": "nan",
+      "description": "Support of test execution with No USIM",
+      "mnemonic": "pc_No_USIM_Test_Execution",
+      "value": true,
+      "is_test_plan_relevant": true,
+      "status": NaN,
+      "row_index": 1118
+    },
+    {
+      "item_id": "A.21/1",
+      "group": "Table A.21",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1119
+    },
+    {
+      "item_id": "A.21/2",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1120
+    },
+    {
+      "item_id": "A.21/3",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 1",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1121
+    },
+    {
+      "item_id": "A.21/4",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 1",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1122
+    },
+    {
+      "item_id": "A.21/5",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 2",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1123
+    },
+    {
+      "item_id": "A.21/6",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 2",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1124
+    },
+    {
+      "item_id": "A.21/9",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 4",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1127
+    },
+    {
+      "item_id": "A.21/10",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 4",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1128
+    },
+    {
+      "item_id": "A.21/11",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 5",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1129
+    },
+    {
+      "item_id": "A.21/12",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 5",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1130
+    },
+    {
+      "item_id": "A.21/13",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 6",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1131
+    },
+    {
+      "item_id": "A.21/14",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 6",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1132
+    },
+    {
+      "item_id": "A.21/17",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 8",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1135
+    },
+    {
+      "item_id": "A.21/18",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 8",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1136
+    },
+    {
+      "item_id": "A.21/31",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on UTRA FDD Band 19",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1149
+    },
+    {
+      "item_id": "A.21/32",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on UTRA FDD Band 19",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1150
+    },
+    {
+      "item_id": "A.21/37",
+      "group": "nan",
+      "description": "Support for System Information Block type 11bis",
+      "mnemonic": "pc_SupportSIB11bis",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1155
+    },
+    {
+      "item_id": "A.21/38",
+      "group": "nan",
+      "description": "Capable of benefitting from battery consumption optimisation",
+      "mnemonic": "pc_DeviceType",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1156
+    },
+    {
+      "item_id": "A.21/40",
+      "group": "nan",
+      "description": "Support for Two DRX schemes in URA_PCH and CELL_PCH",
+      "mnemonic": "pc_TwoDRX_InPCH_States",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1158
+    },
+    {
+      "item_id": "A.21/41",
+      "group": "nan",
+      "description": "Support for E-DPDCH power interpolation formula",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1159
+    },
+    {
+      "item_id": "A.21/44",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on adjacent carriers",
+      "mnemonic": "pc_DL_CompressedModeRequiredForAdjacentCarriers",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1162
+    },
+    {
+      "item_id": "A.21/45",
+      "group": "nan",
+      "description": "Support UTRA CELL_PCH/URA_PCH to EUTRA RRC_IDLE cell reselection",
+      "mnemonic": "pc_PCH_StatesToEUTRA_IdleReselection",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1163
+    },
+    {
+      "item_id": "A.21/46",
+      "group": "nan",
+      "description": "Support for absolute priority based cell re-selection in UTRAN",
+      "mnemonic": "pc_AbsolutePriorityReselection",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1164
+    },
+    {
+      "item_id": "A.21/47",
+      "group": "nan",
+      "description": "Support for cell-specific Tx diversity configuration for dual-cell operation",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1165
+    },
+    {
+      "item_id": "A.22/1",
+      "group": "Table A.22",
+      "description": "Support E-UTRA measurements and reporting in connected mode",
+      "mnemonic": "pc_EUTRAN_MeasurementInConnected",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1171
+    },
+    {
+      "item_id": "A.22/2",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 1",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1172
+    },
+    {
+      "item_id": "A.22/3",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 2",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1173
+    },
+    {
+      "item_id": "A.22/4",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 3",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1174
+    },
+    {
+      "item_id": "A.22/5",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 4",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1175
+    },
+    {
+      "item_id": "A.22/6",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 5",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1176
+    },
+    {
+      "item_id": "A.22/8",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 7",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1178
+    },
+    {
+      "item_id": "A.22/9",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 8",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1179
+    },
+    {
+      "item_id": "A.22/13",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 12",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1183
+    },
+    {
+      "item_id": "A.22/14",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 13",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1184
+    },
+    {
+      "item_id": "A.22/16",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 17",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1186
+    },
+    {
+      "item_id": "A.22/18",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 19",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1188
+    },
+    {
+      "item_id": "A.22/19",
+      "group": "nan",
+      "description": "Require DL and UL compressed mode in order to perform measurements on E-UTRA frequency band 20",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1189
+    },
+    {
+      "item_id": "A.23/1",
+      "group": "Table A.23",
+      "description": "Require DL compressed mode in order to perform measurements on GSM 900P",
+      "mnemonic": "pc_DL_CompressedModeRequiredForGSM_900P",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1193
+    },
+    {
+      "item_id": "A.23/2",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on GSM 900P",
+      "mnemonic": "pc_UL_CompressedModeRequiredForGSM_900P",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1194
+    },
+    {
+      "item_id": "A.23/3",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on GSM 900E",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1195
+    },
+    {
+      "item_id": "A.23/4",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on GSM 900E",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1196
+    },
+    {
+      "item_id": "A.23/5",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on DCS 1800",
+      "mnemonic": "pc_DL_CompressedModeRequiredForDCS_1800",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1197
+    },
+    {
+      "item_id": "A.23/6",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on DCS 1800",
+      "mnemonic": "pc_UL_CompressedModeRequiredForDCS_1800",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1198
+    },
+    {
+      "item_id": "A.23/7",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on GSM 1900",
+      "mnemonic": "pc_DL_CompressedModeRequiredForGSM_1900",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1199
+    },
+    {
+      "item_id": "A.23/8",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on GSM 1900",
+      "mnemonic": "pc_UL_CompressedModeRequiredForGSM_1900",
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1200
+    },
+    {
+      "item_id": "A.23/13",
+      "group": "nan",
+      "description": "Require DL compressed mode in order to perform measurements on GSM 850",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1205
+    },
+    {
+      "item_id": "A.23/14",
+      "group": "nan",
+      "description": "Require UL compressed mode in order to perform measurements on GSM 850",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1206
+    },
+    {
+      "item_id": "A.24/20",
+      "group": "nan",
+      "description": "Supports ROHC profile 0x0001",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1226
+    },
+    {
+      "item_id": "A.24/21",
+      "group": "nan",
+      "description": "Supports ROHC profile 0x0002",
+      "mnemonic": null,
+      "value": true,
+      "is_test_plan_relevant": false,
+      "status": NaN,
+      "row_index": 1227
+    }
+  ]
+}

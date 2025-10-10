@@ -68,7 +68,8 @@ class RAGService:
             Dict containing storage result and MCP address
         """
         try:
-            knowledge_id = str(uuid.uuid4())
+            # Use doc_id from metadata if provided by Storage Service, otherwise generate new UUID
+            knowledge_id = (metadata or {}).get('doc_id', str(uuid.uuid4()))
             now = datetime.now().isoformat()
             
             # Generate embedding

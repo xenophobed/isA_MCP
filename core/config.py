@@ -89,10 +89,13 @@ USAGE:
 """
 
 import os
+import logging
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables based on ENV
 env = os.getenv("ENV", "development")
@@ -136,11 +139,17 @@ class DatabaseSettings:
 class LoggingSettings:
     """Logging configuration"""
     log_level: str = "INFO"
-    log_file: Optional[str] = "mcp_server.log"
+    log_file: Optional[str] = "logs/mcp_server.log"
     enable_console: bool = True
     enable_structured: bool = False
     max_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 5
+
+    # Centralized Logging (Loki)
+    loki_url: str = "http://localhost:3100"
+    loki_enabled: bool = False
+    service_name: str = "mcp"
+    environment: str = "development"
 
 @dataclass
 class MonitoringSettings:
@@ -265,6 +274,16 @@ class MCPSettings:
     isa_api_key: Optional[str] = None
     require_isa_auth: bool = False
     
+    # Auth Service URLs
+    auth_service_url: Optional[str] = None
+    authz_service_url: Optional[str] = None
+    
+    # Storage Service Configuration
+    storage_consul_host: Optional[str] = None
+    storage_consul_port: int = 8500
+    storage_fallback_host: Optional[str] = None
+    storage_fallback_port: int = 8208
+    
     # Local and Cloud Supabase URLs
     supabase_local_url: Optional[str] = None
     supabase_local_anon_key: Optional[str] = None
@@ -301,100 +320,151 @@ class MCPSettings:
             return Path(self.logging.log_file)
         return None
     
-    def load_from_env(self) -> 'MCPSettings':
-        """Load settings from environment variables"""
-        # Server settings
-        self.host = os.getenv("MCP_HOST", self.host)
-        self.port = int(os.getenv("MCP_PORT", str(self.port)))
-        self.server_name = os.getenv("MCP_SERVER_NAME", self.server_name)
+    def load_from_consul(self) -> 'MCPSettings':
+        """Load all settings from Consul service discovery and KV store"""
+        # Only need Consul connection info from env
+        consul_host = os.getenv("CONSUL_HOST", "localhost")
+        consul_port = int(os.getenv("CONSUL_PORT", "8500"))
         
-        # Authentication
-        self.require_auth = os.getenv("MCP_REQUIRE_AUTH", "false").lower() == "true"
-        
-        # Security settings
-        self.security.require_authorization = os.getenv("MCP_SECURITY_REQUIRE_AUTHORIZATION", "true").lower() == "true"
-        self.security.auto_approve_low_security = os.getenv("MCP_SECURITY_AUTO_APPROVE_LOW", "true").lower() == "true"
-        
-        
-        # Logging settings
-        self.logging.log_level = os.getenv("MCP_LOG_LOG_LEVEL", self.logging.log_level)
-        self.logging.log_file = os.getenv("MCP_LOG_LOG_FILE", self.logging.log_file)
-        
-        # External service API keys
-        self.openweather_api_key = os.getenv("OPENWEATHER_API_KEY", self.openweather_api_key)
-        
-        # AI/ML Service APIs
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", self.openai_api_key)
-        self.openai_api_base = os.getenv("OPENAI_API_BASE", self.openai_api_base)
-        self.replicate_api_token = os.getenv("REPLICATE_API_TOKEN", self.replicate_api_token)
-        self.hf_token = os.getenv("HF_TOKEN", self.hf_token)
-        self.runpod_api_key = os.getenv("RUNPOD_API_KEY", self.runpod_api_key)
-        
-        # Search APIs (note: using BRAVE_TOKEN from .env)
-        self.brave_api_key = os.getenv("BRAVE_TOKEN", self.brave_api_key)
-        
-        # Development/Package APIs
-        self.pypi_api_token = os.getenv("PYPI_API_TOKEN", self.pypi_api_token)
-        
-        # E-commerce APIs
-        self.shopify_store_domain = os.getenv("SHOPIFY_STORE_DOMAIN", self.shopify_store_domain)
-        self.shopify_storefront_access_token = os.getenv("SHOPIFY_STOREFRONT_ACCESS_TOKEN", self.shopify_storefront_access_token)
-        self.shopify_admin_api_key = os.getenv("SHOPIFY_ADMIN_API_KEY", self.shopify_admin_api_key)
-        
-        # Database/Storage APIs - Load both local and cloud configurations
-        self.supabase_local_url = os.getenv("SUPABASE_LOCAL_URL", self.supabase_local_url)
-        self.supabase_local_anon_key = os.getenv("SUPABASE_LOCAL_ANON_KEY", self.supabase_local_anon_key)
-        self.supabase_local_service_role_key = os.getenv("SUPABASE_LOCAL_SERVICE_ROLE_KEY", self.supabase_local_service_role_key)
-        self.supabase_cloud_url = os.getenv("SUPABASE_CLOUD_URL", self.supabase_cloud_url)
-        self.supabase_cloud_anon_key = os.getenv("SUPABASE_CLOUD_ANON_KEY", self.supabase_cloud_anon_key)
-        self.supabase_cloud_service_role_key = os.getenv("SUPABASE_CLOUD_SERVICE_ROLE_KEY", self.supabase_cloud_service_role_key)
-        
-        # Determine which Supabase instance to use based on environment
-        current_env = os.getenv("ENV", "development")
-        if current_env in ["development", "test"]:
-            # Use local Supabase for dev and test
-            self.supabase_url = self.supabase_local_url
-            self.supabase_anon_key = self.supabase_local_anon_key
-            self.supabase_service_role_key = self.supabase_local_service_role_key
-        else:
-            # Use cloud Supabase for staging and production
-            self.supabase_url = self.supabase_cloud_url
-            self.supabase_anon_key = self.supabase_cloud_anon_key
-            self.supabase_service_role_key = self.supabase_cloud_service_role_key
-        
-        self.supabase_pwd = os.getenv("SUPABASE_PWD", self.supabase_pwd)
-        self.db_schema = os.getenv("DB_SCHEMA", self.db_schema)
-        
-        # Graph Analytics settings
-        self.graph_analytics.max_tokens = int(os.getenv("GRAPH_MAX_TOKENS", str(self.graph_analytics.max_tokens)))
-        self.graph_analytics.temperature = float(os.getenv("GRAPH_TEMPERATURE", str(self.graph_analytics.temperature)))
-        self.graph_analytics.default_confidence = float(os.getenv("GRAPH_DEFAULT_CONFIDENCE", str(self.graph_analytics.default_confidence)))
-        self.graph_analytics.long_text_threshold = int(os.getenv("GRAPH_LONG_TEXT_THRESHOLD", str(self.graph_analytics.long_text_threshold)))
-        self.graph_analytics.chunk_size = int(os.getenv("GRAPH_CHUNK_SIZE", str(self.graph_analytics.chunk_size)))
-        self.graph_analytics.chunk_overlap = int(os.getenv("GRAPH_CHUNK_OVERLAP", str(self.graph_analytics.chunk_overlap)))
-        self.graph_analytics.max_concurrent = int(os.getenv("GRAPH_MAX_CONCURRENT", str(self.graph_analytics.max_concurrent)))
-        self.graph_analytics.batch_size = int(os.getenv("GRAPH_BATCH_SIZE", str(self.graph_analytics.batch_size)))
-        self.graph_analytics.similarity_threshold = float(os.getenv("GRAPH_SIMILARITY_THRESHOLD", str(self.graph_analytics.similarity_threshold)))
-        self.graph_analytics.embedding_dimension = int(os.getenv("GRAPH_EMBEDDING_DIMENSION", str(self.graph_analytics.embedding_dimension)))
-        self.graph_analytics.debug = os.getenv("GRAPH_DEBUG", "false").lower() == "true"
-        self.graph_analytics.perf_log = os.getenv("GRAPH_PERF_LOG", "true").lower() == "true"
-        self.graph_analytics.slow_threshold = float(os.getenv("GRAPH_SLOW_THRESHOLD", str(self.graph_analytics.slow_threshold)))
-        self.graph_analytics.max_retries = int(os.getenv("GRAPH_MAX_RETRIES", str(self.graph_analytics.max_retries)))
-        self.graph_analytics.retry_delay = float(os.getenv("GRAPH_RETRY_DELAY", str(self.graph_analytics.retry_delay)))
-        self.graph_analytics.enable_fallback = os.getenv("GRAPH_ENABLE_FALLBACK", "true").lower() == "true"
-        
-        # Neo4j configuration
-        self.graph_analytics.neo4j_uri = os.getenv("NEO4J_URI", self.graph_analytics.neo4j_uri)
-        self.graph_analytics.neo4j_username = os.getenv("NEO4J_USERNAME", self.graph_analytics.neo4j_username)
-        self.graph_analytics.neo4j_password = os.getenv("NEO4J_PASSWORD", self.graph_analytics.neo4j_password)
-        self.graph_analytics.neo4j_database = os.getenv("NEO4J_DATABASE", self.graph_analytics.neo4j_database)
+        try:
+            from core.consul_discovery import get_consul_discovery
+            import consul
+            
+            # Initialize Consul clients
+            discovery = get_consul_discovery()
+            consul_client = consul.Consul(host=consul_host, port=consul_port)
+            
+            if not discovery.is_available():
+                logger.error("Consul is required but not available!")
+                # Use minimal defaults for critical settings
+                self._set_minimal_defaults()
+                return self
+            
+            logger.info(f"Loading all configuration from Consul at {consul_host}:{consul_port}")
+            
+            # 1. Load service URLs from Consul discovery
+            self._load_service_urls_from_consul(discovery)
+            
+            # 2. Load configuration from Consul KV store
+            self._load_config_from_consul_kv(consul_client)
+            
+            logger.info("Successfully loaded configuration from Consul")
+            
+        except ImportError as e:
+            logger.error(f"Consul modules not available: {e}")
+            self._set_minimal_defaults()
+        except Exception as e:
+            logger.error(f"Failed to load configuration from Consul: {e}")
+            self._set_minimal_defaults()
         
         return self
+    
+    def _load_service_urls_from_consul(self, discovery):
+        """Load all service URLs from Consul service discovery"""
+        # Service discovery mappings
+        service_mappings = {
+            'model': 'isa_service_url',
+            'agent': 'agent_service_url', 
+            'auth': 'auth_service_url',
+            'authz': 'authz_service_url',
+            'user': 'user_service_url',
+            'storage': None,  # Special handling
+        }
+        
+        for service_name, attr_name in service_mappings.items():
+            try:
+                url = discovery.get_service_url(service_name)
+                if url:
+                    if service_name == 'storage':
+                        # Special handling for storage service
+                        import re
+                        match = re.match(r'http://([^:]+):(\d+)', url)
+                        if match:
+                            self.storage_fallback_host = match.group(1)
+                            self.storage_fallback_port = int(match.group(2))
+                            logger.info(f"Discovered storage service: {url}")
+                    elif attr_name:
+                        setattr(self, attr_name, url)
+                        logger.info(f"Discovered {service_name} service: {url}")
+            except Exception as e:
+                logger.warning(f"Failed to discover {service_name}: {e}")
+    
+    def _load_config_from_consul_kv(self, consul_client):
+        """Load configuration from Consul KV store"""
+        try:
+            # Load MCP server config
+            _, data = consul_client.kv.get('config/mcp/server')
+            if data and data.get('Value'):
+                import json
+                server_config = json.loads(data['Value'].decode('utf-8'))
+                self.host = server_config.get('host', '0.0.0.0')
+                self.port = server_config.get('port', 8081)
+                self.server_name = server_config.get('name', 'MCP Server')
+                logger.info("Loaded server config from Consul KV")
+        except Exception as e:
+            logger.debug(f"No server config in Consul KV, using defaults: {e}")
+        
+        try:
+            # Load security config
+            _, data = consul_client.kv.get('config/mcp/security')
+            if data and data.get('Value'):
+                import json
+                sec_config = json.loads(data['Value'].decode('utf-8'))
+                self.require_auth = sec_config.get('require_auth', False)
+                self.security.require_authorization = sec_config.get('require_authorization', True)
+                self.security.auto_approve_low_security = sec_config.get('auto_approve_low', True)
+                logger.info("Loaded security config from Consul KV")
+        except Exception as e:
+            logger.debug(f"No security config in Consul KV, using defaults: {e}")
+        
+        try:
+            # Load API keys and credentials
+            _, data = consul_client.kv.get('config/mcp/credentials')
+            if data and data.get('Value'):
+                import json
+                creds = json.loads(data['Value'].decode('utf-8'))
+                self.openai_api_key = creds.get('openai_api_key')
+                self.brave_api_key = creds.get('brave_api_key')
+                self.supabase_url = creds.get('supabase_url')
+                self.supabase_anon_key = creds.get('supabase_anon_key')
+                self.supabase_service_role_key = creds.get('supabase_service_role_key')
+                logger.info("Loaded credentials from Consul KV")
+        except Exception as e:
+            logger.debug(f"No credentials in Consul KV: {e}")
+        
+        try:
+            # Load logging config
+            _, data = consul_client.kv.get('config/mcp/logging')
+            if data and data.get('Value'):
+                import json
+                log_config = json.loads(data['Value'].decode('utf-8'))
+                self.logging.log_level = log_config.get('level', 'INFO')
+                self.logging.log_file = log_config.get('file', 'logs/mcp_server.log')
+                self.logging.loki_enabled = log_config.get('loki_enabled', False)
+                self.logging.loki_url = log_config.get('loki_url', 'http://localhost:3100')
+                logger.info("Loaded logging config from Consul KV")
+        except Exception as e:
+            logger.debug(f"No logging config in Consul KV, using defaults: {e}")
+    
+    def _set_minimal_defaults(self):
+        """Set minimal default values when Consul is unavailable"""
+        logger.warning("Using minimal default configuration (Consul unavailable)")
+        self.host = "0.0.0.0"
+        self.port = 8081
+        self.server_name = "MCP Server (No Consul)"
+        self.require_auth = False
+        self.logging.log_level = "INFO"
+        self.logging.log_file = "logs/mcp_server.log"
+    
+    def load_from_env(self) -> 'MCPSettings':
+        """Deprecated - redirects to load_from_consul"""
+        logger.info("load_from_env called - redirecting to load_from_consul")
+        return self.load_from_consul()
 
 def create_settings() -> MCPSettings:
-    """Create and configure settings instance"""
+    """Create and configure settings instance from Consul"""
     settings = MCPSettings()
-    return settings.load_from_env()
+    return settings.load_from_consul()
 
 # Global settings instance
 settings = create_settings()

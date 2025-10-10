@@ -93,12 +93,19 @@ class AIMetadataEmbeddingService(BaseService):
             logger.info("Please run setup_metadata_embedding.sql to create the table")
             raise
     
-    async def store_semantic_metadata(self, semantic_metadata: SemanticMetadata) -> Dict[str, Any]:
+    async def store_semantic_metadata(
+        self, 
+        semantic_metadata: SemanticMetadata,
+        storage_path: str = None,
+        dataset_name: str = None
+    ) -> Dict[str, Any]:
         """
         Store semantic metadata with embeddings in pgvector
         
         Args:
             semantic_metadata: Enriched semantic metadata from step 2
+            storage_path: Optional MinIO Parquet path for query execution
+            dataset_name: Optional dataset name
             
         Returns:
             Storage results with statistics and billing information
@@ -110,9 +117,17 @@ class AIMetadataEmbeddingService(BaseService):
             'errors': []
         }
         
+        # Store storage path info for query execution
+        self._storage_path = storage_path
+        self._dataset_name = dataset_name
+        
         try:
-            # Store business entities
-            entity_results = await self._store_business_entities(semantic_metadata.business_entities)
+            # Store business entities with storage path
+            entity_results = await self._store_business_entities(
+                semantic_metadata.business_entities,
+                storage_path=storage_path,
+                dataset_name=dataset_name
+            )
             results['stored_embeddings'] += entity_results['stored']
             results['failed_embeddings'] += entity_results['failed']
             results['errors'].extend(entity_results['errors'])
@@ -258,8 +273,20 @@ class AIMetadataEmbeddingService(BaseService):
             logger.error(f"Enhanced search failed: {e}")
             return []
     
-    async def _store_business_entities(self, business_entities: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Store business entities as embeddings"""
+    async def _store_business_entities(
+        self, 
+        business_entities: List[Dict[str, Any]],
+        storage_path: str = None,
+        dataset_name: str = None
+    ) -> Dict[str, Any]:
+        """
+        Store business entities as embeddings with storage path
+        
+        Args:
+            business_entities: List of business entity dictionaries
+            storage_path: Optional MinIO Parquet path
+            dataset_name: Optional dataset name
+        """
         results = {'stored': 0, 'failed': 0, 'errors': []}
         
         for entity in business_entities:
@@ -280,7 +307,21 @@ class AIMetadataEmbeddingService(BaseService):
                     results['failed'] += 1
                     continue
                 
-                # Store in database
+                # Store in database with storage path info
+                # Build metadata with storage information
+                metadata_dict = {
+                    'business_importance': entity.get('business_importance', 'unknown'),
+                    'record_count': entity.get('record_count', 0),
+                    'key_attributes': entity.get('key_attributes', []),
+                    'relationships': entity.get('relationships', [])
+                }
+                
+                # Add storage path for query execution
+                if storage_path:
+                    metadata_dict['storage_path'] = storage_path
+                if dataset_name:
+                    metadata_dict['dataset_name'] = dataset_name
+                
                 record_data = {
                     'id': f"entity_{entity_name}_{self.database_source}",
                     'entity_type': 'table',
@@ -288,12 +329,7 @@ class AIMetadataEmbeddingService(BaseService):
                     'entity_full_name': f"table:{entity_name}",
                     'content': content,
                     'embedding': embedding,
-                    'metadata': {
-                        'business_importance': entity.get('business_importance', 'unknown'),
-                        'record_count': entity.get('record_count', 0),
-                        'key_attributes': entity.get('key_attributes', []),
-                        'relationships': entity.get('relationships', [])
-                    },
+                    'metadata': metadata_dict,
                     'semantic_tags': [],
                     'confidence_score': confidence,
                     'source_step': 3,
@@ -705,15 +741,15 @@ class AIMetadataEmbeddingService(BaseService):
             logger.error(f"Failed to cleanup embeddings: {e}")
             return {'success': False, 'error': str(e)}
 
-# Global instance
-_embedding_service = None
+# Global instance cache - store per database_source
+_embedding_services = {}
 
 def get_embedding_service(database_source: str = "customs_trade_db") -> AIMetadataEmbeddingService:
-    """Get AI metadata embedding service instance"""
-    global _embedding_service
-    if _embedding_service is None:
-        _embedding_service = AIMetadataEmbeddingService(database_source)
-    return _embedding_service
+    """Get AI metadata embedding service instance - cached per database_source"""
+    global _embedding_services
+    if database_source not in _embedding_services:
+        _embedding_services[database_source] = AIMetadataEmbeddingService(database_source)
+    return _embedding_services[database_source]
 
 # Backward compatibility
 def get_embedding_storage(database_source: str = "customs_trade_db") -> AIMetadataEmbeddingService:

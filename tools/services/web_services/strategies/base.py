@@ -58,3 +58,34 @@ class DetectionStrategy(ABC):
     def get_detection_name(self) -> str:
         """Get detection strategy name"""
         pass
+
+class ActionStrategy(ABC):
+    """Base class for browser action strategies"""
+    
+    @abstractmethod
+    async def execute(self, page: Page, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute browser action with given parameters
+        
+        Args:
+            page: Playwright page instance
+            params: Action-specific parameters
+            
+        Returns:
+            Dict with execution result including success status and any data
+        """
+        pass
+    
+    @abstractmethod
+    def get_action_name(self) -> str:
+        """Get action strategy name"""
+        pass
+    
+    @abstractmethod
+    def get_required_params(self) -> List[str]:
+        """Get list of required parameters for this action"""
+        pass
+    
+    @abstractmethod
+    def validate_params(self, params: Dict[str, Any]) -> bool:
+        """Validate if params are sufficient for this action"""
+        pass

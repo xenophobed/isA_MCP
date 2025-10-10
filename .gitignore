@@ -2,9 +2,12 @@
 # Python
 # ============================================
 __pycache__/
+*/__pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyc
 .Python
 build/
 develop-eggs/
@@ -34,7 +37,7 @@ ENV/
 # ============================================
 # ⚠️ 敏感信息 - 绝不提交
 # ============================================
-# Environment files
+# Environment files (actual environment files with secrets)
 .env
 .env.local
 .env.production
@@ -45,6 +48,20 @@ ENV/
 .env.user_service.*
 .env.aws
 *.env.backup
+
+# Deployment environment files (actual .env files in deployment subdirs)
+deployment/dev/.env
+deployment/production/.env
+deployment/production/.env.production
+deployment/staging/.env
+deployment/staging/.env.staging
+deployment/test/.env
+deployment/test/.env.test
+deployment/aws/.env.aws
+
+# Keep templates (these should be committed)
+!**/.env.template
+!**/.env.example
 
 # API密钥和认证信息
 *_api_key*
@@ -150,9 +167,12 @@ models/models/
 
 # Cache directories
 .cache/
+cache/
 .npm/
 .yarn/
 node_modules/
+**/.cache/
+**/cache/
 
 # ============================================
 # 生产环境和部署

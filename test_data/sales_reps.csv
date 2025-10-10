@@ -1,0 +1,8 @@
+rep_id,rep_name,email,region,territory,hire_date,target_annual,ytd_sales,performance_rating,commission_rate,manager_id
+REP_001,John Smith,j.smith@company.com,North America,Western USA,2023-01-15,500000.00,342000.00,Exceeds,0.05,MGR_001
+REP_002,Sarah Johnson,s.johnson@company.com,North America,Eastern USA,2022-06-10,600000.00,485000.00,Exceeds,0.055,MGR_001
+REP_003,Hans Mueller,h.mueller@company.com,Europe,DACH,2023-03-20,400000.00,295000.00,Meets,0.045,MGR_002
+REP_004,Yuki Tanaka,y.tanaka@company.com,Asia Pacific,Japan,2022-11-05,450000.00,378000.00,Exceeds,0.05,MGR_003
+REP_005,Emma Wilson,e.wilson@company.com,Europe,UK,2023-02-14,350000.00,189000.00,Below,0.04,MGR_002
+REP_006,Carlos Rodriguez,c.rodriguez@company.com,North America,Latin America,2023-07-01,380000.00,156000.00,Below,0.04,MGR_001
+REP_007,Li Wei,l.wei@company.com,Asia Pacific,China,2022-09-18,420000.00,267000.00,Meets,0.045,MGR_003

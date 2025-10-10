@@ -1,0 +1,92 @@
+# ============================================
+# .dockerignore - Optimize Docker build
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+.venv*
+venv/
+ENV/
+env/
+
+# IDE & Editors
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & Quality
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.benchmarks/
+quality_monitoring/
+
+# Caches & Logs
+cache/
+*.cache
+logs/
+*.log
+
+# Data directories (not needed in container)
+demo_data/
+data_storage/
+models/
+tools/external_services/testplan_service/
+
+# Documentation
+docs/
+HowTos/
+README.md
+*.md
+plan/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Environment files (use docker secrets/config instead)
+.env
+.env.*
+deployment/dev/.env
+deployment/test/.env*
+deployment/staging/.env*
+deployment/production/.env*
+!deployment/.env.template
+
+# Development & Testing
+tests/
+scripts/analysis/
+scripts/debug/
+sql/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+tmp/
+temp/

@@ -6,10 +6,127 @@ Provides backward-compatible client instances
 """
 
 import os
+import asyncio
 from typing import Optional
 from core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class _ResponseWrapper:
+    """Wrapper to provide .content attribute for JSON responses"""
+    def __init__(self, content):
+        self.content = content
+        
+    def __str__(self):
+        return str(self.content)
+        
+    def __repr__(self):
+        return f"ResponseWrapper({repr(self.content)})"
+
+
+class _JSONCompatibleClientWrapper:
+    """
+    Wrapper for ISAModelClient to ensure consistent response format
+    that matches llm.md documentation specifications
+    """
+    
+    def __init__(self, client):
+        self._client = client
+        
+    async def invoke(self, input_data, task, service_type, **kwargs):
+        """
+        Invoke the wrapped client and ensure response format consistency
+        
+        When response_format={"type": "json_object"} is used, the result
+        should have a .content attribute as per llm.md documentation.
+        """
+        try:
+            # Call the underlying client
+            response = await self._client.invoke(
+                input_data=input_data,
+                task=task, 
+                service_type=service_type,
+                **kwargs
+            )
+            
+            # Check if this is a JSON mode request
+            response_format = kwargs.get('response_format')
+            if response_format and response_format.get('type') == 'json_object':
+                # For JSON mode, wrap the result to provide .content attribute
+                if response.get('success') and 'result' in response:
+                    result = response['result']
+                    # If result is already a string, wrap it to provide .content
+                    if isinstance(result, str):
+                        response['result'] = _ResponseWrapper(result)
+                        logger.debug("Wrapped JSON response result with .content attribute")
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"JSON-compatible client wrapper error: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'result': None,
+                'metadata': {}
+            }
+    
+    def __getattr__(self, name):
+        """Delegate other methods to the wrapped client"""
+        return getattr(self._client, name)
+
+
+class _ConcurrentSafeClientWrapper:
+    """
+    Concurrent-safe wrapper for ISAModelClient to handle race conditions
+    Uses per-request isolation instead of global locking for better performance
+    """
+    
+    def __init__(self, client):
+        self._client = client
+        
+    async def invoke(self, input_data, task, service_type, **kwargs):
+        """
+        Concurrent-safe invoke method with per-request isolation
+        """
+        try:
+            # Create a deep copy of kwargs to prevent shared state mutation
+            import copy
+            safe_kwargs = copy.deepcopy(kwargs)
+            
+            # Ensure streaming is handled per-request
+            # Only set default stream value if not explicitly provided
+            stream = safe_kwargs.get('stream', None)
+            if stream is None and service_type == "text":
+                if task in ["chat", "generate"]:
+                    # Default to False for better compatibility and debugging
+                    safe_kwargs['stream'] = False
+                else:
+                    safe_kwargs['stream'] = False
+            
+            # Call the underlying client
+            response = await self._client.invoke(
+                input_data=input_data,
+                task=task, 
+                service_type=service_type,
+                **safe_kwargs
+            )
+            
+            return response
+                
+        except Exception as e:
+            logger.error(f"Concurrent-safe client wrapper error: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'result': None,
+                'metadata': {}
+            }
+    
+    def __getattr__(self, name):
+        """Delegate other methods to the wrapped client"""
+        return getattr(self._client, name)
 
 class ISAClientFactory:
     """
@@ -19,6 +136,7 @@ class ISAClientFactory:
     
     _instance = None
     _client = None
+    _lock = asyncio.Lock()
     
     def __new__(cls):
         if cls._instance is None:
@@ -26,9 +144,25 @@ class ISAClientFactory:
         return cls._instance
     
     @classmethod
-    def get_client(cls, **kwargs):
+    async def get_client(cls, **kwargs):
         """
-        Get ISA client instance with optional authentication
+        Get ISA client instance with optional authentication (async version)
+        
+        Args:
+            **kwargs: Additional parameters for ISAModelClient
+            
+        Returns:
+            ISAModelClient instance configured with optional auth
+        """
+        async with cls._lock:
+            if cls._client is None:
+                cls._client = cls._create_client(**kwargs)
+            return cls._client
+    
+    @classmethod
+    def get_client_sync(cls, **kwargs):
+        """
+        Get ISA client instance with optional authentication (sync version for backward compatibility)
         
         Args:
             **kwargs: Additional parameters for ISAModelClient
@@ -87,13 +221,18 @@ class ISAClientFactory:
                 client = ISAModelClient(**client_params)
                 logger.info(f"ISA client created with params: {list(client_params.keys())}")
             
-            return client
+            # Wrap client to ensure consistent response format for JSON mode
+            wrapped_client = _JSONCompatibleClientWrapper(client)
+            
+            # Create concurrent-safe client wrapper
+            return _ConcurrentSafeClientWrapper(wrapped_client)
             
         except Exception as e:
             logger.error(f"Failed to create ISA client: {e}")
             # Fallback to basic client
             from isa_model.client import ISAModelClient
-            return ISAModelClient()
+            wrapped_client = _JSONCompatibleClientWrapper(ISAModelClient())
+            return _ConcurrentSafeClientWrapper(wrapped_client)
     
     @classmethod
     def reset_client(cls):
@@ -116,7 +255,7 @@ def get_isa_client(**kwargs):
     Returns:
         ISAModelClient instance with optional authentication
     """
-    return ISAClientFactory.get_client(**kwargs)
+    return ISAClientFactory.get_client_sync(**kwargs)
 
 
 # Global factory instance

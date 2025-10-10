@@ -35,16 +35,16 @@ class MemoryToolsTestSuite:
         }
     
     async def test_dialog_storage_tools(self):
-        """Test all 'store_*_memory_from_dialog' tools"""
+        """Test all 'store_*_memory' tools (dialog-based)"""
         print("🧪 Test 1: Dialog-based Storage Tools")
         print("="*60)
-        
+
         storage_tools = [
-            ("store_factual_memory_from_dialog", "factual"),
-            ("store_episodic_memory_from_dialog", "episodic"), 
-            ("store_semantic_memory_from_dialog", "semantic"),
-            ("store_procedural_memory_from_dialog", "procedural"),
-            ("store_working_memory_from_dialog", "working")
+            ("store_factual_memory", "factual"),
+            ("store_episodic_memory", "episodic"),
+            ("store_semantic_memory", "semantic"),
+            ("store_procedural_memory", "procedural"),
+            ("store_working_memory", "working")
         ]
         
         success_count = 0
@@ -225,7 +225,7 @@ class MemoryToolsTestSuite:
             if parsed_response.get('status') == 'success':
                 data = parsed_response.get('data', {})
                 results = data.get('results', [])
-                count = data.get('count', len(results))
+                count = data.get('total_results', data.get('count', len(results)))
                 print(f"  ✅ SUCCESS: Found {count} memories")
                 
                 # Show memory types found
@@ -376,10 +376,11 @@ class MemoryToolsTestSuite:
             
             if parsed_response.get('status') == 'success':
                 data = parsed_response.get('data', {})
-                stats = data.get('statistics', {})
+                # Handle both direct data and nested statistics formats
+                stats = data if 'total_memories' in data else data.get('statistics', {})
                 total = stats.get('total_memories', 0)
                 print(f"  ✅ SUCCESS: Total memories: {total}")
-                
+
                 by_type = stats.get('by_type', {})
                 if by_type:
                     print(f"  📊 By type: {dict(by_type)}")
@@ -429,7 +430,7 @@ class MemoryToolsTestSuite:
                 "dialog_content": workflow_data,
                 "importance_score": 0.9
             }
-            raw_response = await default_client.call_tool("store_factual_memory_from_dialog", store_args)
+            raw_response = await default_client.call_tool("store_factual_memory", store_args)
             parsed_response = default_client.parse_tool_response(raw_response)
             
             if parsed_response.get('status') == 'success':
@@ -455,8 +456,11 @@ class MemoryToolsTestSuite:
             parsed_response = default_client.parse_tool_response(raw_response)
             
             if parsed_response.get('status') == 'success':
-                results = parsed_response.get('data', {}).get('results', [])
-                found_workflow = any('workflow' in r.get('content', '').lower() for r in results)
+                data = parsed_response.get('data', {})
+                results = data.get('results', [])
+                total_results = data.get('total_results', len(results))
+                print(f"  ✅ Found {total_results} results")
+                found_workflow = any('workflow' in r.get('content', '').lower() or 'machine learning' in r.get('content', '').lower() for r in results)
                 if found_workflow:
                     print(f"  ✅ Successfully found workflow data in search results")
                 else:
@@ -476,10 +480,12 @@ class MemoryToolsTestSuite:
             parsed_response = default_client.parse_tool_response(raw_response)
             
             if parsed_response.get('status') == 'success':
-                stats = parsed_response.get('data', {}).get('statistics', {})
+                data = parsed_response.get('data', {})
+                # Handle both direct data and nested statistics formats
+                stats = data if 'total_memories' in data else data.get('statistics', {})
                 total = stats.get('total_memories', 0)
                 print(f"  ✅ Current total memories: {total}")
-                
+
                 if total > 0:
                     print(f"  ✅ Memory system shows active data")
                 else:

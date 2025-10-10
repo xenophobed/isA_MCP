@@ -26,21 +26,39 @@ async def search(query: str, count: int = 10) -> Dict[str, Any]
 - `query` (str): Search query string
 - `count` (int, optional): Number of results to return (default: 10)
 
-### Output
+### Output (Real Data Example)
 ```json
 {
     "success": true,
-    "query": "python tutorial",
+    "query": "Python programming",
     "total": 10,
     "results": [
         {
-            "title": "Python Tutorial - Learn Python",
-            "url": "https://example.com/python-tutorial",
-            "snippet": "Complete Python tutorial for beginners...",
-            "score": 0.95
+            "title": "Welcome to Python.org",
+            "url": "https://www.python.org/",
+            "snippet": "The official home of the <strong>Python</strong> <strong>Programming</strong> Language",
+            "score": 1.0
+        },
+        {
+            "title": "Python For Beginners | Python.org",
+            "url": "https://www.python.org/about/gettingstarted/",
+            "snippet": "The official home of the <strong>Python</strong> <strong>Programming</strong> Language",
+            "score": 0.9
+        },
+        {
+            "title": "Introduction to Python",
+            "url": "https://www.w3schools.com/python/python_intro.asp",
+            "snippet": "<strong>Python</strong> is a popular <strong>programming</strong> language.",
+            "score": 0.8
         }
     ],
-    "urls": ["https://example.com/python-tutorial", ...]
+    "urls": [
+        "https://www.python.org/",
+        "https://www.python.org/about/gettingstarted/",
+        "https://www.w3schools.com/python/python_intro.asp",
+        "https://towardsdatascience.com/temporal-difference-learning-and-the-importance-of-exploration-an-illustrated-guide/",
+        "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    ]
 }
 ```
 

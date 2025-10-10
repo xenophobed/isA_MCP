@@ -79,13 +79,19 @@ class SessionMemoryEngine(BaseMemoryEngine):
     async def _store_or_update_session(self, session_memory: SessionMemory) -> MemoryOperationResult:
         """Store session memory with upsert logic to handle session updates"""
         try:
-            # Check if session already exists
+            # Validate user_id
+            validated_user_id = self._validate_user_id(session_memory.user_id)
+            
+            # Check if session already exists (must filter by BOTH user_id AND session_id)
             existing_result = self.db.table(self.table_name)\
                 .select('id')\
+                .eq('user_id', validated_user_id)\
                 .eq('session_id', session_memory.session_id)\
                 .execute()
             
             memory_data = self._prepare_for_storage_without_embedding(session_memory)
+            # Ensure validated_user_id is used in memory_data
+            memory_data['user_id'] = validated_user_id
             
             if existing_result.data:
                 # Update existing session - increment message count and update content
@@ -95,10 +101,9 @@ class SessionMemoryEngine(BaseMemoryEngine):
                 current_session = self.db.table(self.table_name)\
                     .select('total_messages')\
                     .eq('id', existing_id)\
-                    .single()\
                     .execute()
                 
-                current_count = current_session.data.get('total_messages', 0) if current_session.data else 0
+                current_count = current_session.data[0].get('total_messages', 0) if current_session.data and len(current_session.data) > 0 else 0
                 
                 # Update with incremented message count
                 memory_data['total_messages'] = current_count + 1
@@ -121,23 +126,41 @@ class SessionMemoryEngine(BaseMemoryEngine):
                     )
             else:
                 # Insert new session
-                result = self.db.table(self.table_name).insert(memory_data).execute()
+                logger.debug(f"🆕 Inserting new session: user_id={validated_user_id}, session_id={session_memory.session_id}")
+                logger.debug(f"   Memory data keys: {list(memory_data.keys())}")
                 
-                if result.data:
-                    logger.info(f"✅ Created new session: {session_memory.session_id}")
-                    return MemoryOperationResult(
-                        success=True,
-                        memory_id=session_memory.id,
-                        operation="store",
-                        message=f"Successfully stored session memory",
-                        data={"memory": result.data[0]}
-                    )
+                try:
+                    result = self.db.table(self.table_name).insert(memory_data).execute()
+                    
+                    if result.data:
+                        logger.info(f"✅ Created new session: {session_memory.session_id}")
+                        return MemoryOperationResult(
+                            success=True,
+                            memory_id=session_memory.id,
+                            operation="store",
+                            message=f"Successfully stored session memory",
+                            data={"memory": result.data[0]}
+                        )
+                    else:
+                        logger.error(f"❌ Insert returned no data for session {session_memory.session_id}")
+                        raise Exception("No data returned from insert operation")
+                        
+                except Exception as insert_error:
+                    logger.error(f"❌ Database insert failed: {insert_error}")
+                    logger.error(f"   Table: {self.table_name}")
+                    logger.error(f"   User ID: {validated_user_id}")
+                    logger.error(f"   Session ID: {session_memory.session_id}")
+                    logger.error(f"   Data fields: {list(memory_data.keys())}")
+                    raise
             
             # If we get here, something went wrong
             raise Exception("No data returned from database operation")
             
         except Exception as e:
             logger.error(f"❌ Failed to store/update session memory: {e}")
+            logger.error(f"   Exception type: {type(e).__name__}")
+            logger.error(f"   Session: user_id={session_memory.user_id}, session_id={session_memory.session_id}")
+            
             return MemoryOperationResult(
                 success=False,
                 memory_id=session_memory.id,
@@ -148,28 +171,51 @@ class SessionMemoryEngine(BaseMemoryEngine):
     async def get_session_by_id(self, user_id: str, session_id: str) -> SessionMemory:
         """Get session memory by session_id"""
         try:
+            # Validate user_id format
+            validated_user_id = self._validate_user_id(user_id)
+            
+            # First, let's try to find the session without .single() to see if it exists
             result = self.db.table(self.table_name)\
                 .select('*')\
-                .eq('user_id', user_id)\
+                .eq('user_id', validated_user_id)\
                 .eq('session_id', session_id)\
-                .single()\
                 .execute()
             
-            if result.data:
-                return await self._parse_from_storage(result.data)
+            logger.debug(f"🔍 Query result for session {session_id}: found {len(result.data or [])} records")
             
-            return None
+            if result.data and len(result.data) > 0:
+                # Take the first record if multiple exist
+                session_data = result.data[0]
+                return await self._parse_from_storage(session_data)
+            else:
+                logger.warning(f"⚠️ No session found for user_id={validated_user_id}, session_id={session_id}")
+                # Let's also try to see if there are any sessions for this user at all
+                user_sessions = self.db.table(self.table_name)\
+                    .select('session_id')\
+                    .eq('user_id', validated_user_id)\
+                    .limit(5)\
+                    .execute()
+                
+                if user_sessions.data:
+                    existing_sessions = [s['session_id'] for s in user_sessions.data]
+                    logger.info(f"📋 User {validated_user_id} has these sessions: {existing_sessions}")
+                else:
+                    logger.info(f"📋 User {validated_user_id} has no sessions in database")
+                
+                return None
             
         except Exception as e:
             logger.error(f"❌ Failed to get session {session_id}: {e}")
+            logger.error(f"   Query details: user_id={user_id}, session_id={session_id}, table={self.table_name}")
             return None
 
     async def search_recent_sessions(self, user_id: str, limit: int = 10) -> List[SessionMemory]:
         """Search recent session memories"""
         try:
+            validated_user_id = self._validate_user_id(user_id)
             result = self.db.table(self.table_name)\
                 .select('*')\
-                .eq('user_id', user_id)\
+                .eq('user_id', validated_user_id)\
                 .order('created_at', desc=True)\
                 .limit(limit)\
                 .execute()
@@ -188,6 +234,7 @@ class SessionMemoryEngine(BaseMemoryEngine):
     async def update_session_activity(self, session_id: str, user_id: str, additional_content: str = None) -> MemoryOperationResult:
         """Update session with new activity"""
         try:
+            validated_user_id = self._validate_user_id(user_id)
             updates = {
                 'last_activity': datetime.now().isoformat(),
                 'message_count': 'message_count + 1'  # This would need database function support
@@ -210,6 +257,28 @@ class SessionMemoryEngine(BaseMemoryEngine):
             )
     
     # Private helper methods
+    
+    def _validate_user_id(self, user_id: str) -> str:
+        """
+        Validate and potentially convert user_id for database compatibility
+        
+        The database expects UUID format, but we might receive string user_ids.
+        This method ensures compatibility.
+        """
+        try:
+            # Try to parse as UUID to validate format
+            import uuid
+            if len(user_id) == 36 and '-' in user_id:
+                # Looks like a UUID, validate it
+                uuid.UUID(user_id)
+                return user_id
+            else:
+                # Not a UUID format, but database might accept it as string
+                logger.warning(f"⚠️ user_id '{user_id}' is not in UUID format, but proceeding")
+                return user_id
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"⚠️ Invalid user_id format '{user_id}': {e}")
+            return user_id
     
     async def _extract_session_topics(self, content: str) -> Dict[str, Any]:
         """Extract topics from session content using TextExtractor"""
@@ -424,9 +493,10 @@ class SessionMemoryEngine(BaseMemoryEngine):
                     'messages_since_last_summary': 0
                 }
                 
+                validated_user_id = self._validate_user_id(user_id)
                 result = self.db.table(self.table_name)\
                     .update(update_data)\
-                    .eq('user_id', user_id)\
+                    .eq('user_id', validated_user_id)\
                     .eq('session_id', session_id)\
                     .execute()
                 
@@ -528,9 +598,10 @@ class SessionMemoryEngine(BaseMemoryEngine):
     async def get_session_memories(self, user_id: str, session_id: str) -> List[SessionMemory]:
         """Get all session memories for a specific session"""
         try:
+            validated_user_id = self._validate_user_id(user_id)
             result = self.db.table(self.table_name)\
                 .select('*')\
-                .eq('user_id', user_id)\
+                .eq('user_id', validated_user_id)\
                 .eq('session_id', session_id)\
                 .order('created_at', desc=True)\
                 .execute()

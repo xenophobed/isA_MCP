@@ -50,7 +50,7 @@ class StorageCatalogService:
         
         logger.info("Storage Catalog Service initialized")
     
-    def catalog_storage(self, 
+    async def catalog_storage(self, 
                        storage_details: Dict[str, Any],
                        catalog_config: Dict[str, Any]) -> CatalogResult:
         """
@@ -81,7 +81,7 @@ class StorageCatalogService:
             catalog_entry = self._create_catalog_entry(storage_details, catalog_config)
             
             # Update metadata store
-            metadata_updates = self._update_metadata_store(catalog_entry, catalog_config)
+            metadata_updates = await self._update_metadata_store(catalog_entry, catalog_config)
             
             # Create storage index if requested
             index_results = {}
@@ -212,7 +212,7 @@ class StorageCatalogService:
         }
         return versions.get(storage_type, 'unknown')
     
-    def _update_metadata_store(self, catalog_entry: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _update_metadata_store(self, catalog_entry: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
         """Update the metadata store with storage information"""
         try:
             # Prepare metadata for the metadata store service
@@ -236,11 +236,17 @@ class StorageCatalogService:
                 }
             }
             
-            # Store in metadata service
-            store_result = self.metadata_service.store_metadata(
-                metadata=metadata_entry,
-                source_type="storage_catalog",
-                confidence_score=0.95
+            # Store dataset mapping in metadata service
+            dataset_name = catalog_entry['storage_info']['table_name']
+            table_name = catalog_entry['storage_info']['table_name']
+            storage_path = catalog_entry['storage_info']['full_path']
+            user_id = catalog_entry.get('owner', 'default_user')
+            
+            store_result = await self.metadata_service.store_dataset_mapping(
+                table_name=table_name,
+                dataset_name=dataset_name,
+                storage_path=storage_path,
+                user_id=user_id
             )
             
             return {

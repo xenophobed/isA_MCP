@@ -27,6 +27,9 @@ from tools.services.intelligence_service.vision.image_analyzer import analyze as
 from tools.services.intelligence_service.vision.ui_detector import detect_ui_with_coordinates
 from tools.services.intelligence_service.language.text_generator import generate_playwright_actions
 
+# Import enhanced action executor
+from tools.services.web_services.core.action_executor import get_action_executor
+
 logger = get_logger(__name__)
 
 
@@ -36,25 +39,27 @@ class WebAutomationService:
     def __init__(self):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
-        logger.info("✅ WebAutomationService initialized with 5-step atomic workflow")
+        self.action_executor = get_action_executor()
+        logger.info("✅ WebAutomationService initialized with enhanced action executor")
     
-    async def execute_task(self, url: str, task: str) -> Dict[str, Any]:
+    async def execute_task(self, url: str, task: str, user_id: str = "default") -> Dict[str, Any]:
         """
         Execute automation task using 5-step atomic workflow
-        
+
         Args:
             url: Target URL
             task: Task description, e.g. "search airpods"
-            
+            user_id: User identifier for credential lookup
+
         Returns:
             Dict containing results
         """
         try:
             logger.info(f"🚀 Starting 5-step atomic workflow: {task} on {url}")
-            
+
             # Initialize browser
             await self._start_browser()
-            
+
             # Navigate to target page and wait for load
             await self.page.goto(url, wait_until="domcontentloaded", timeout=60000)
             print("⏳ Page loaded, waiting for full render...")
@@ -72,7 +77,13 @@ class WebAutomationService:
             print("📸 Step 1: Taking initial screenshot...")
             screenshot_path = await self._take_screenshot("step1_initial")
             print(f"✅ Step 1 Complete: {screenshot_path}")
-            
+
+            # HIL Detection: Check if human intervention is needed
+            hil_check = await self._check_hil_required(screenshot_path, url, user_id)
+            if hil_check.get("hil_required"):
+                logger.info(f"🤚 HIL required: {hil_check.get('reason')}")
+                return hil_check
+
             # STEP 2: Screen Understanding with image_analyzer
             print("🧠 Step 2: Screen understanding with image_analyzer...")
             page_analysis = await self._step2_screen_understanding(screenshot_path, task)
@@ -250,23 +261,29 @@ Available UI elements with coordinates:
 
 Input text to type: "{input_text}"
 
-Generate a JSON list of actions in this format:
+Available action types:
+- click: Click element (supports coordinates, selector, text, xpath)
+- type: Type text (supports clear_first, press_enter)
+- select: Select dropdown option (by value, label, or index)
+- checkbox: Check/uncheck/toggle checkbox
+- scroll: Scroll page or element (direction, amount)
+- hover: Hover over element
+- wait: Wait for conditions (selector, text, url, timeout)
+- navigate: Navigate browser (goto, back, forward, reload)
+- press: Press keyboard key (Enter, Tab, Escape, etc.)
+
+Generate a JSON list of actions. Examples:
 [
-    {{
-        "action": "click",
-        "element": "element_name",
-        "x": 400,
-        "y": 200
-    }},
-    {{
-        "action": "type",
-        "element": "element_name", 
-        "x": 400,
-        "y": 200,
-        "text": "text to type"
-    }}
+    {{"action": "click", "x": 400, "y": 200}},
+    {{"action": "type", "text": "search query", "x": 400, "y": 200, "clear_first": true}},
+    {{"action": "select", "selector": "#country", "value": "US"}},
+    {{"action": "checkbox", "label": "Agree to terms", "action": "check"}},
+    {{"action": "scroll", "direction": "down", "amount": 500}},
+    {{"action": "wait", "wait_for": "selector", "selector": ".results"}},
+    {{"action": "press", "key": "Enter"}}
 ]
 
+Generate appropriate actions for: {task}
 Return only the JSON array."""
             
             # Call text_generator atomic function
@@ -291,40 +308,33 @@ Return only the JSON array."""
             return self._create_fallback_actions(ui_result, self._extract_input_text(task))
     
     async def _step5_execution_and_analysis(self, actions: List[Dict[str, Any]], task: str) -> Dict[str, Any]:
-        """Step 5: Execute Playwright actions and analyze results"""
+        """Step 5: Execute actions using enhanced ActionExecutor and analyze results"""
         try:
-            print("⚡ Step 5: Executing actions and analyzing results...")
+            print("⚡ Step 5: Executing enhanced actions and analyzing results...")
             
-            # Execute each action
+            # Execute actions using ActionExecutor
+            execution_result = await self.action_executor.execute_action_sequence(
+                page=self.page,
+                actions=actions,
+                delay_between_actions=1000,  # 1 second between actions
+                stop_on_error=False  # Continue even if an action fails
+            )
+            
+            # Build execution log from results
             execution_log = []
-            for i, action in enumerate(actions):
-                try:
-                    print(f"  Action {i+1}: {action['action']} at ({action.get('x', 0)}, {action.get('y', 0)})")
-                    
-                    if action['action'] == 'click':
-                        await self.page.mouse.click(action['x'], action['y'])
-                        execution_log.append(f"Clicked at ({action['x']}, {action['y']})")
-                        
-                    elif action['action'] == 'type':
-                        # Click first, then type
-                        await self.page.mouse.click(action['x'], action['y'])
-                        await asyncio.sleep(0.5)
-                        await self.page.keyboard.type(action.get('text', ''))
-                        execution_log.append(f"Typed '{action.get('text', '')}' at ({action['x']}, {action['y']})")
-                        
-                    elif action['action'] == 'press':
-                        await self.page.keyboard.press(action.get('key', 'Enter'))
-                        execution_log.append(f"Pressed {action.get('key', 'Enter')}")
-                    
-                    # Wait between actions
-                    await asyncio.sleep(1)
-                    
-                except Exception as e:
-                    logger.error(f"Action {i+1} failed: {e}")
-                    execution_log.append(f"Action {i+1} failed: {e}")
+            for i, result in enumerate(execution_result['results']):
+                if result.get('success'):
+                    action_type = result.get('action_type', 'unknown')
+                    method = result.get('method', '')
+                    execution_log.append(f"Action {i+1} ({action_type}): Success via {method}")
+                else:
+                    execution_log.append(f"Action {i+1} failed: {result.get('error', 'Unknown error')}")
             
-            # Wait for page changes
-            await asyncio.sleep(3)
+            print(f"  Executed {execution_result['executed']}/{execution_result['total_actions']} actions")
+            print(f"  Success: {execution_result['successful']}, Failed: {execution_result['failed']}")
+            
+            # Wait for page changes after all actions
+            await asyncio.sleep(2)
             
             # Take final screenshot and analyze results
             final_screenshot = await self._take_screenshot("step5_final")
@@ -363,12 +373,15 @@ Return JSON:
                     analysis_data = json.loads(json_match.group())
             
             return {
-                "actions_executed": len(actions),
+                "actions_executed": execution_result['executed'],
+                "actions_successful": execution_result['successful'],
+                "actions_failed": execution_result['failed'],
                 "execution_log": execution_log,
+                "execution_details": execution_result,
                 "final_screenshot": final_screenshot,
                 "analysis": result_analysis.response if result_analysis.success else "Analysis failed",
                 "task_completed": analysis_data.get("task_completed", False),
-                "summary": f"Executed {len(actions)} actions - {'Success' if analysis_data.get('task_completed') else 'Unclear'}"
+                "summary": f"Executed {execution_result['executed']} actions ({execution_result['successful']} successful) - {'Task Complete' if analysis_data.get('task_completed') else 'Needs Review'}"
             }
             
         except Exception as e:
@@ -454,12 +467,12 @@ Return JSON:
     def _extract_input_text(self, task: str) -> str:
         """Extract text to input from task description"""
         import re
-        
+
         # Look for quoted text
         match = re.search(r'["\'](.*?)["\']', task)
         if match:
             return match.group(1)
-        
+
         # Look for text after action words
         patterns = [
             r'search\s+(?:for\s+)?(.+)',
@@ -467,16 +480,279 @@ Return JSON:
             r'look\s+for\s+(.+)',
             r'type\s+(.+)'
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, task, re.IGNORECASE)
             if match:
                 return match.group(1).strip()
-        
+
         # Fallback: last word
         words = task.strip().split()
         return words[-1] if words else "search"
-    
+
+    async def _check_hil_required(self, screenshot_path: str, url: str, user_id: str) -> Dict[str, Any]:
+        """
+        Check if Human-in-Loop intervention is required
+
+        Detects:
+        1. Login pages → request_authorization or ask_human
+        2. CAPTCHA → ask_human
+        3. Payment confirmation → request_authorization
+        4. Wallet connection → request_authorization or ask_human
+
+        Returns HIL response if needed, otherwise returns {"hil_required": False}
+        """
+        try:
+            # Use image_analyzer to detect page type
+            detection_prompt = """Analyze this screenshot to detect if human intervention is needed.
+
+Check for:
+1. Login page (username/password fields, social login buttons)
+2. CAPTCHA or verification challenge
+3. Payment confirmation page (credit card, PayPal, etc.)
+4. Wallet connection (MetaMask, Coinbase, etc.)
+5. Cookie consent or age verification
+
+Return JSON:
+{
+    "intervention_required": true/false,
+    "intervention_type": "login|captcha|payment|wallet|verification|none",
+    "provider": "google|facebook|metamask|stripe|etc",
+    "details": "description of what's needed",
+    "confidence": 0.9
+}"""
+
+            result = await image_analyze(
+                image=screenshot_path,
+                prompt=detection_prompt,
+                provider="openai"
+            )
+
+            if not result.success:
+                return {"hil_required": False}
+
+            # Parse detection result
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', result.response)
+            if not json_match:
+                return {"hil_required": False}
+
+            detection = json.loads(json_match.group())
+
+            if not detection.get("intervention_required"):
+                return {"hil_required": False}
+
+            intervention_type = detection.get("intervention_type", "unknown")
+            provider = detection.get("provider", "unknown")
+            details = detection.get("details", "Human intervention required")
+
+            # Handle each intervention type with appropriate HIL action
+            if intervention_type == "captcha":
+                # CAPTCHA always requires ask_human (can't automate)
+                return {
+                    "hil_required": True,
+                    "status": "human_required",
+                    "action": "ask_human",
+                    "message": f"CAPTCHA detected. Please solve the CAPTCHA manually.",
+                    "data": {
+                        "intervention_type": "captcha",
+                        "url": url,
+                        "screenshot": screenshot_path,
+                        "details": details,
+                        "instructions": "Please solve the CAPTCHA and notify when complete"
+                    }
+                }
+
+            elif intervention_type == "login":
+                # Login: check Vault for credentials
+                return await self._handle_login_hil(provider, url, user_id, screenshot_path, details)
+
+            elif intervention_type == "payment":
+                # Payment: check Vault for payment method
+                return await self._handle_payment_hil(provider, url, user_id, screenshot_path, details)
+
+            elif intervention_type == "wallet":
+                # Wallet: check Vault for wallet credentials
+                return await self._handle_wallet_hil(provider, url, user_id, screenshot_path, details)
+
+            elif intervention_type == "verification":
+                # Age verification, cookie consent → ask_human
+                return {
+                    "hil_required": True,
+                    "status": "human_required",
+                    "action": "ask_human",
+                    "message": f"Verification required: {details}",
+                    "data": {
+                        "intervention_type": "verification",
+                        "url": url,
+                        "screenshot": screenshot_path,
+                        "details": details
+                    }
+                }
+
+            return {"hil_required": False}
+
+        except Exception as e:
+            logger.error(f"HIL detection failed: {e}")
+            return {"hil_required": False}
+
+    async def _handle_login_hil(self, provider: str, url: str, user_id: str, screenshot: str, details: str) -> Dict[str, Any]:
+        """Handle login page HIL - check Vault and return appropriate action"""
+        # Check if credentials exist in Vault
+        vault_has_creds = await self._check_vault_credentials(user_id, "social", provider)
+
+        if vault_has_creds:
+            # Vault has credentials → request_authorization
+            return {
+                "hil_required": True,
+                "status": "authorization_required",
+                "action": "request_authorization",
+                "message": f"Found stored credentials for {provider}. Do you authorize using them for login?",
+                "data": {
+                    "auth_type": "social",
+                    "provider": provider,
+                    "url": url,
+                    "credential_preview": {
+                        "provider": provider,
+                        "vault_id": vault_has_creds.get("vault_id"),
+                        "stored_at": vault_has_creds.get("created_at")
+                    },
+                    "screenshot": screenshot,
+                    "details": details
+                }
+            }
+        else:
+            # No credentials → ask_human
+            oauth_url = self._get_oauth_url(provider, url)
+            return {
+                "hil_required": True,
+                "status": "credential_required",
+                "action": "ask_human",
+                "message": f"No stored credentials found for {provider}. Please provide login credentials.",
+                "data": {
+                    "auth_type": "social",
+                    "provider": provider,
+                    "url": url,
+                    "oauth_url": oauth_url,
+                    "screenshot": screenshot,
+                    "details": details,
+                    "instructions": "Please click the OAuth button or enter credentials manually"
+                }
+            }
+
+    async def _handle_payment_hil(self, provider: str, url: str, user_id: str, screenshot: str, details: str) -> Dict[str, Any]:
+        """Handle payment page HIL"""
+        vault_has_creds = await self._check_vault_credentials(user_id, "payment", provider)
+
+        if vault_has_creds:
+            return {
+                "hil_required": True,
+                "status": "authorization_required",
+                "action": "request_authorization",
+                "message": f"Payment authorization required for {provider}. Use stored payment method?",
+                "data": {
+                    "auth_type": "payment",
+                    "provider": provider,
+                    "url": url,
+                    "credential_preview": {
+                        "provider": provider,
+                        "vault_id": vault_has_creds.get("vault_id"),
+                        "last_used": vault_has_creds.get("created_at")
+                    },
+                    "screenshot": screenshot,
+                    "details": details
+                }
+            }
+        else:
+            return {
+                "hil_required": True,
+                "status": "credential_required",
+                "action": "ask_human",
+                "message": f"No payment method found for {provider}. Please add payment details.",
+                "data": {
+                    "auth_type": "payment",
+                    "provider": provider,
+                    "url": url,
+                    "screenshot": screenshot,
+                    "details": details,
+                    "instructions": "Please enter payment information or connect payment service"
+                }
+            }
+
+    async def _handle_wallet_hil(self, provider: str, url: str, user_id: str, screenshot: str, details: str) -> Dict[str, Any]:
+        """Handle wallet connection HIL"""
+        vault_has_creds = await self._check_vault_credentials(user_id, "wallet", provider)
+
+        if vault_has_creds:
+            return {
+                "hil_required": True,
+                "status": "authorization_required",
+                "action": "request_authorization",
+                "message": f"Wallet connection required for {provider}. Use stored wallet?",
+                "data": {
+                    "auth_type": "wallet",
+                    "provider": provider,
+                    "url": url,
+                    "credential_preview": {
+                        "provider": provider,
+                        "vault_id": vault_has_creds.get("vault_id"),
+                        "wallet_type": provider
+                    },
+                    "screenshot": screenshot,
+                    "details": details
+                }
+            }
+        else:
+            return {
+                "hil_required": True,
+                "status": "credential_required",
+                "action": "ask_human",
+                "message": f"No wallet found for {provider}. Please connect your wallet.",
+                "data": {
+                    "auth_type": "wallet",
+                    "provider": provider,
+                    "url": url,
+                    "screenshot": screenshot,
+                    "details": details,
+                    "instructions": "Please connect your wallet via browser extension"
+                }
+            }
+
+    async def _check_vault_credentials(self, user_id: str, auth_type: str, provider: str) -> Optional[Dict[str, Any]]:
+        """Check if credentials exist in Vault Service"""
+        try:
+            import httpx
+            vault_service_url = "http://localhost:8214"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{vault_service_url}/api/v1/vault/secrets",
+                    headers={"X-User-Id": user_id},
+                    params={"tags": f"{auth_type},{provider}"}
+                )
+
+                if response.status_code == 200:
+                    vault_data = response.json()
+                    secrets = vault_data.get("items", [])
+                    if secrets:
+                        return secrets[0]  # Return first matching credential
+
+        except Exception as e:
+            logger.warning(f"Vault check failed: {e}")
+
+        return None
+
+    def _get_oauth_url(self, provider: str, current_url: str) -> Optional[str]:
+        """Generate OAuth URL for provider (simplified - would need real implementation)"""
+        # This is a placeholder - real implementation would construct proper OAuth URLs
+        oauth_patterns = {
+            "google": "https://accounts.google.com/o/oauth2/v2/auth",
+            "facebook": "https://www.facebook.com/v12.0/dialog/oauth",
+            "github": "https://github.com/login/oauth/authorize",
+            "twitter": "https://twitter.com/i/oauth2/authorize"
+        }
+        return oauth_patterns.get(provider.lower())
+
     async def _cleanup(self):
         """Cleanup browser resources"""
         try:

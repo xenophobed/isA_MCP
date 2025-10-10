@@ -69,7 +69,7 @@ class DataStorageService:
         
         logger.info("Data Storage Service initialized")
     
-    def store_data(self, 
+    async def store_data(self, 
                   data: pd.DataFrame,
                   storage_spec: Dict[str, Any],
                   config: Optional[StorageConfig] = None) -> StorageResult:
@@ -159,7 +159,8 @@ class DataStorageService:
                 logger.info("Executing Step 3: Storage Cataloging")
                 catalog_config = self._prepare_catalog_config(storage_spec, persistence_result)
                 
-                catalog_result = self.catalog_service.catalog_storage(
+                # Now that store_data is async, we can properly await catalog_storage
+                catalog_result = await self.catalog_service.catalog_storage(
                     persistence_result.storage_details,
                     catalog_config
                 )
@@ -286,7 +287,7 @@ class DataStorageService:
                    f"size={storage_size_mb:.1f}MB")
         return result
     
-    def store_multiple_targets(self, 
+    async def store_multiple_targets(self, 
                               data: pd.DataFrame,
                               target_configs: List[Dict[str, Any]]) -> Dict[str, StorageResult]:
         """Store data in multiple storage targets simultaneously"""
@@ -295,7 +296,7 @@ class DataStorageService:
         for i, target_config in enumerate(target_configs):
             target_name = target_config.get('name', f'target_{i}')
             try:
-                result = self.store_data(data, target_config)
+                result = await self.store_data(data, target_config)
                 results[target_name] = result
             except Exception as e:
                 logger.error(f"Multi-target storage failed for {target_name}: {e}")

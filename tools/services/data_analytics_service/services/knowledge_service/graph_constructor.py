@@ -14,9 +14,27 @@ from collections import defaultdict
 
 import logging
 from tools.base_service import BaseService
-from .entity_extractor import Entity, EntityType
-from .relation_extractor import Relation, RelationType
-from .attribute_extractor import Attribute, AttributeType
+from .core.types import GenericEntity as Entity, GenericRelation as Relation, GenericAttribute as Attribute
+# Legacy enum compatibility - map to strings
+class EntityType:
+    PERSON = "PERSON"
+    ORGANIZATION = "ORGANIZATION"
+    LOCATION = "LOCATION"
+    CONCEPT = "CONCEPT"
+    EVENT = "EVENT"
+    PRODUCT = "PRODUCT"
+
+class RelationType:
+    SEMANTIC = "SEMANTIC"
+    CAUSAL = "CAUSAL"
+    TEMPORAL = "TEMPORAL"
+    HIERARCHICAL = "HIERARCHICAL"
+
+class AttributeType:
+    TEXT = "TEXT"
+    NUMBER = "NUMBER"
+    DATE = "DATE"
+    BOOLEAN = "BOOLEAN"
 from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
 
 logger = logging.getLogger(__name__)
@@ -159,7 +177,7 @@ class GraphConstructor(BaseService):
                 attributes=attributes,
                 embedding=entity_embeddings[i],  # NEW
                 metadata={
-                    "entity_type": entity.entity_type.value,
+                    "entity_type": entity.entity_type if isinstance(entity.entity_type, str) else str(entity.entity_type),
                     "confidence": entity.confidence,
                     "canonical_form": entity.canonical_form,
                     "aliases": entity.aliases
@@ -192,7 +210,7 @@ class GraphConstructor(BaseService):
                     embedding=relation_embeddings[i],  # NEW
                     weight=relation.confidence,
                     metadata={
-                        "relation_type": relation.relation_type.value,
+                        "relation_type": relation.relation_type if isinstance(relation.relation_type, str) else str(relation.relation_type),
                         "predicate": relation.predicate,
                         "confidence": relation.confidence,
                         "context": relation.context,
@@ -250,7 +268,8 @@ class GraphConstructor(BaseService):
             if entity_id:
                 for attr_name, attribute in attributes.items():
                     # Prepare attribute text for embedding
-                    attr_text = f"{attr_name}: {attribute.normalized_value} (type: {attribute.attribute_type.value})"
+                    attr_type_str = attribute.attribute_type if isinstance(attribute.attribute_type, str) else str(attribute.attribute_type)
+                    attr_text = f"{attr_name}: {attribute.normalized_value} (type: {attr_type_str})"
                     attr_texts.append(attr_text)
                     
                     # Store metadata for later node creation
@@ -267,6 +286,26 @@ class GraphConstructor(BaseService):
             logger.info(f"Generating embeddings for {len(attr_texts)} attributes concurrently...")
             attr_embeddings = await self.embedding_generator.embed_batch(attr_texts, model="text-embedding-3-small")
             
+            # Ensure embeddings count matches metadata count
+            if len(attr_embeddings) != len(attr_metadata):
+                logger.warning(f"Embedding count mismatch: {len(attr_embeddings)} embeddings for {len(attr_metadata)} attributes. Using fallback.")
+                # Store original embeddings
+                original_embeddings = attr_embeddings[:]
+                attr_embeddings = []
+                
+                for i in range(len(attr_metadata)):
+                    if i < len(original_embeddings):
+                        # Use original embedding if available
+                        attr_embeddings.append(original_embeddings[i])
+                    else:
+                        # Generate fallback embedding or use default
+                        try:
+                            fallback_embedding = await self.embedding_generator.embed_single(attr_texts[i] if i < len(attr_texts) else "default")
+                            attr_embeddings.append(fallback_embedding)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate fallback embedding: {e}")
+                            attr_embeddings.append([0.0] * 1536)  # Default zero embedding
+            
             # Create attribute nodes with embeddings
             for i, metadata in enumerate(attr_metadata):
                 attribute_node = AttributeNode(
@@ -274,7 +313,7 @@ class GraphConstructor(BaseService):
                     entity_id=metadata['entity_id'],
                     name=metadata['attr_name'],
                     value=metadata['attribute'].normalized_value,
-                    attribute_type=metadata['attribute'].attribute_type.value,
+                    attribute_type=metadata['attribute'].attribute_type if isinstance(metadata['attribute'].attribute_type, str) else str(metadata['attribute'].attribute_type),
                     confidence=metadata['attribute'].confidence,
                     embedding=attr_embeddings[i],
                     metadata={
@@ -294,8 +333,8 @@ class GraphConstructor(BaseService):
             "attributes_count": sum(len(attrs) for attrs in entity_attributes.values()),
             "document_chunks_count": len(document_chunks),  # NEW
             "attribute_nodes_count": len(attribute_nodes),  # NEW
-            "entity_types": list(set(e.entity_type.value for e in entities)),
-            "relation_types": list(set(r.relation_type.value for r in relations)),
+            "entity_types": list(set(e.entity_type if isinstance(e.entity_type, str) else str(e.entity_type) for e in entities)),
+            "relation_types": list(set(r.relation_type if isinstance(r.relation_type, str) else str(r.relation_type) for r in relations)),
             "source_id": source_id,  # NEW
             "construction_config": self.config
         }
@@ -513,16 +552,19 @@ class GraphConstructor(BaseService):
         self.node_id_counter += 1
         # Use entity type and canonical form for meaningful IDs
         safe_text = entity.canonical_form.replace(" ", "_").replace("/", "_")
-        return f"{entity.entity_type.value.lower()}_{safe_text}_{self.node_id_counter}"
+        entity_type_str = entity.entity_type if isinstance(entity.entity_type, str) else str(entity.entity_type)
+        return f"{entity_type_str.lower()}_{safe_text}_{self.node_id_counter}"
     
     def _generate_edge_id(self, relation: Relation) -> str:
         """Generate unique edge ID for relation"""
         self.edge_id_counter += 1
-        return f"{relation.relation_type.value.lower()}_{self.edge_id_counter}"
+        rel_type_str = relation.relation_type if isinstance(relation.relation_type, str) else str(relation.relation_type)
+        return f"{rel_type_str.lower()}_{self.edge_id_counter}"
     
     def _create_entity_text(self, entity: Entity, attributes: Dict[str, Attribute]) -> str:
         """Create text representation for entity embedding"""
-        text_parts = [entity.canonical_form, entity.entity_type.value]
+        entity_type_str = entity.entity_type if isinstance(entity.entity_type, str) else str(entity.entity_type)
+        text_parts = [entity.canonical_form, entity_type_str]
 
         # Add key attributes
         for attr_name, attr in attributes.items():
@@ -648,7 +690,7 @@ class GraphConstructor(BaseService):
                 best_edge_id, best_edge = max(edge_list, key=lambda x: x[1].weight)
                 
                 # Update metadata to show merged edges
-                merged_relations = [edge.relation.relation_type.value for _, edge in edge_list]
+                merged_relations = [edge.relation.relation_type if isinstance(edge.relation.relation_type, str) else str(edge.relation.relation_type) for _, edge in edge_list]
                 best_edge.metadata.update({
                     "merged_relations": merged_relations,
                     "original_edge_count": len(edge_list)
@@ -722,14 +764,16 @@ class GraphConstructor(BaseService):
         """Get distribution of entity types"""
         distribution = defaultdict(int)
         for node in graph.nodes.values():
-            distribution[node.entity.entity_type.value] += 1
+            entity_type_str = node.entity.entity_type if isinstance(node.entity.entity_type, str) else str(node.entity.entity_type)
+            distribution[entity_type_str] += 1
         return dict(distribution)
     
     def _get_relation_type_distribution(self, graph: KnowledgeGraph) -> Dict[str, int]:
         """Get distribution of relation types"""
         distribution = defaultdict(int)
         for edge in graph.edges.values():
-            distribution[edge.relation.relation_type.value] += 1
+            rel_type_str = edge.relation.relation_type if isinstance(edge.relation.relation_type, str) else str(edge.relation.relation_type)
+            distribution[rel_type_str] += 1
         return dict(distribution)
     
     def export_for_neo4j_storage(self, graph: KnowledgeGraph) -> Dict[str, Any]:
@@ -739,14 +783,14 @@ class GraphConstructor(BaseService):
                 {
                     "id": node.id,
                     "name": node.entity.text,
-                    "type": node.entity.entity_type.value,
+                    "type": node.entity.entity_type if isinstance(node.entity.entity_type, str) else str(node.entity.entity_type),
                     "canonical_form": node.entity.canonical_form,
                     "confidence": node.entity.confidence,
                     "embedding": node.embedding,  # For vector index
                     "source_document": graph.metadata.get("source_id", ""),
                     # Flatten attributes to avoid nested objects
-                    "start_pos": node.entity.start,
-                    "end_pos": node.entity.end,
+                    "start_pos": getattr(node.entity, 'start_position', getattr(node.entity, 'start', 0)),
+                    "end_pos": getattr(node.entity, 'end_position', getattr(node.entity, 'end', 0)),
                     "aliases": node.entity.aliases,
                     # Don't include complex attributes object - handle separately
                 } for node in graph.nodes.values()
@@ -756,7 +800,7 @@ class GraphConstructor(BaseService):
                     "id": edge.id,
                     "source_id": edge.source_id,
                     "target_id": edge.target_id,
-                    "type": edge.relation.relation_type.value,
+                    "type": edge.relation.relation_type if isinstance(edge.relation.relation_type, str) else str(edge.relation.relation_type),
                     "predicate": edge.relation.predicate,
                     "confidence": edge.relation.confidence,
                     "embedding": edge.embedding,  # For vector index
@@ -793,7 +837,7 @@ class GraphConstructor(BaseService):
                     "id": node.id,
                     "entity": {
                         "text": node.entity.text,
-                        "type": node.entity.entity_type.value,
+                        "type": node.entity.entity_type if isinstance(node.entity.entity_type, str) else str(node.entity.entity_type),
                         "canonical_form": node.entity.canonical_form,
                         "aliases": node.entity.aliases,
                         "confidence": node.entity.confidence
@@ -801,7 +845,7 @@ class GraphConstructor(BaseService):
                     "attributes": {
                         name: {
                             "value": attr.value,
-                            "type": attr.attribute_type.value,
+                            "type": attr.attribute_type if isinstance(attr.attribute_type, str) else str(attr.attribute_type),
                             "confidence": attr.confidence
                         }
                         for name, attr in node.attributes.items()
@@ -841,7 +885,7 @@ class GraphConstructor(BaseService):
                     "source": edge.source_id,
                     "target": edge.target_id,
                     "relation": {
-                        "type": edge.relation.relation_type.value,
+                        "type": edge.relation.relation_type if isinstance(edge.relation.relation_type, str) else str(edge.relation.relation_type),
                         "predicate": edge.relation.predicate,
                         "confidence": edge.relation.confidence,
                         "context": edge.relation.context

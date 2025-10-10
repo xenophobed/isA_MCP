@@ -100,6 +100,7 @@ import logging
 import logging.handlers
 import sys
 import json
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
@@ -216,22 +217,30 @@ def setup_logging(
     enable_console: bool = True,
     enable_structured: bool = False,
     max_file_size: int = 10 * 1024 * 1024,  # 10MB
-    backup_count: int = 5
+    backup_count: int = 5,
+    loki_url: Optional[str] = None,
+    loki_enabled: bool = False,
+    service_name: str = "mcp",
+    environment: str = "development"
 ) -> None:
     """
-    Setup centralized logging configuration
-    
+    Setup centralized logging configuration with Loki support
+
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        log_file: Path to log file (optional)
+        log_file: Path to log file (optional, for local dev only)
         enable_console: Whether to enable console logging
         enable_structured: Whether to use structured JSON logging
         max_file_size: Maximum size of log file before rotation
         backup_count: Number of backup files to keep
+        loki_url: Loki server URL for centralized logging
+        loki_enabled: Whether to enable Loki centralized logging
+        service_name: Service name for Loki labels
+        environment: Environment name (development, staging, production)
     """
     # Convert string level to logging level
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
-    
+
     # Create formatters
     if enable_structured:
         console_formatter = StructuredFormatter()
@@ -243,27 +252,70 @@ def setup_logging(
         file_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
         )
-    
+
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(numeric_level)
-    
+
     # Remove existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
-    
-    # Console handler
+
+    # Console handler (always enabled for local dev and debugging)
     if enable_console:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(numeric_level)
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
-    
-    # File handler with rotation
-    if log_file:
+
+    # Loki handler (centralized logging - recommended for production)
+    if loki_enabled and loki_url:
+        try:
+            from logging_loki import LokiHandler
+
+            # Extract logger component from logger name
+            # e.g., "mcp.security" -> logger="security", "mcp" -> logger="main"
+            def get_logger_component(logger_name: str) -> str:
+                if not logger_name or logger_name == service_name:
+                    return "main"
+                return logger_name.replace(f"{service_name}.", "").replace(service_name, "main")
+
+            # Create Loki labels (used for filtering in Grafana)
+            loki_labels = {
+                "service": service_name,
+                "environment": environment,
+                "job": f"{service_name}_service"
+            }
+
+            # Create Loki handler
+            loki_handler = LokiHandler(
+                url=f"{loki_url}/loki/api/v1/push",
+                tags=loki_labels,
+                version="1",
+            )
+
+            # Only send INFO and above to Loki (reduce network traffic)
+            loki_handler.setLevel(logging.INFO)
+
+            root_logger.addHandler(loki_handler)
+
+            # Log successful Loki integration
+            root_logger.info(f"✅ Centralized logging enabled | loki_url={loki_url} | service={service_name}")
+
+        except ImportError:
+            root_logger.warning("⚠️  python-logging-loki not installed. Install with: pip install python-logging-loki")
+            root_logger.info("📝 Logging to console/file only")
+        except Exception as e:
+            # Loki unavailable - don't fail the app, just log locally
+            root_logger.warning(f"⚠️  Could not connect to Loki: {e}")
+            root_logger.info("📝 Logging to console/file only")
+
+    # File handler with rotation (optional, mainly for local dev backup)
+    # In production with Loki, file logging is optional
+    if log_file and not loki_enabled:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=max_file_size,
@@ -287,14 +339,40 @@ def get_logger(name: str) -> MCPLogger:
     return MCPLogger(name, logger)
 
 # Default setup for MCP server
-def setup_mcp_logging():
-    """Setup default logging configuration for MCP server"""
-    setup_logging(
-        log_level="INFO",
-        log_file="mcp_server.log",
-        enable_console=True,
-        enable_structured=False
-    )
+def setup_mcp_logging(config=None):
+    """
+    Setup default logging configuration for MCP server with Loki support
+
+    Args:
+        config: Optional MCPSettings config object. If not provided, uses environment variables.
+    """
+    if config and hasattr(config, 'logging'):
+        # Use config from MCPSettings
+        log_config = config.logging
+        setup_logging(
+            log_level=log_config.log_level,
+            log_file=log_config.log_file if not log_config.loki_enabled else None,
+            enable_console=log_config.enable_console,
+            enable_structured=log_config.enable_structured,
+            max_file_size=log_config.max_file_size,
+            backup_count=log_config.backup_count,
+            loki_url=log_config.loki_url,
+            loki_enabled=log_config.loki_enabled,
+            service_name=log_config.service_name,
+            environment=log_config.environment
+        )
+    else:
+        # Fallback to environment variables
+        setup_logging(
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            log_file=os.getenv("LOG_FILE", "logs/mcp_server.log") if not os.getenv("LOKI_ENABLED", "false").lower() == "true" else None,
+            enable_console=True,
+            enable_structured=os.getenv("LOG_STRUCTURED", "false").lower() == "true",
+            loki_url=os.getenv("LOKI_URL", "http://localhost:3100"),
+            loki_enabled=os.getenv("LOKI_ENABLED", "false").lower() == "true",
+            service_name=os.getenv("SERVICE_NAME", "mcp"),
+            environment=os.getenv("ENVIRONMENT", "development")
+        )
 
 # Global logger instances
 logger = get_logger(__name__)

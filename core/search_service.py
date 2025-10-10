@@ -332,8 +332,19 @@ class UnifiedSearchService:
                     item_name = row['item_name']
                     embedding = row['embedding']
                     
-                    if embedding and isinstance(embedding, list):
-                        self.embeddings_cache[item_name] = embedding
+                    # Handle both list and string formats
+                    if embedding:
+                        if isinstance(embedding, str):
+                            # Parse JSON string to list
+                            import json
+                            try:
+                                embedding = json.loads(embedding)
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse embedding for {item_name}")
+                                continue
+                        
+                        if isinstance(embedding, list) and len(embedding) > 0:
+                            self.embeddings_cache[item_name] = embedding
                         
                 logger.info(f"Loaded cached embeddings for {len(result.data)} items")
                 return True

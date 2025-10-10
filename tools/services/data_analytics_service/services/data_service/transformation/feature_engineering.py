@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import re
 
+from .lang_extractor import LangExtractor
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -44,6 +46,9 @@ class FeatureEngineeringService:
             'average_duration': 0.0
         }
         
+        # Initialize language extraction service for AI-powered text enrichment
+        self.lang_extractor = LangExtractor()
+        
         # Built-in feature functions
         self.feature_functions = {
             'log': lambda x: np.log(x + 1e-8),  # Add small value to avoid log(0)
@@ -56,7 +61,7 @@ class FeatureEngineeringService:
             'standardize': lambda x: (x - x.min()) / (x.max() - x.min() + 1e-8)
         }
         
-        logger.info("Feature Engineering Service initialized")
+        logger.info("Feature Engineering Service initialized with AI language processing")
     
     def engineer_features(self, 
                          data: pd.DataFrame,
@@ -158,6 +163,8 @@ class FeatureEngineeringService:
                 return self._apply_binning(df, operation)
             elif op_type == 'interaction_features':
                 return self._create_interaction_features(df, operation)
+            elif op_type == 'ai_language_extraction':
+                return self._extract_ai_language_features(df, operation)
             else:
                 return {
                     'success': False,

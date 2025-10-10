@@ -1,0 +1,16 @@
+transaction_id,customer_id,product_id,transaction_date,transaction_type,quantity,unit_price,total_amount,discount_percent,payment_method,sales_rep,region,status,notes
+TXN_001,CUST_001,PROD_001,2024-03-15,Sale,2,12500.00,25000.00,5.0,Credit Card,REP_001,North America,Completed,Enterprise bulk order
+TXN_002,CUST_002,PROD_003,2024-03-16,Sale,50,1899.99,94999.50,8.0,Bank Transfer,REP_002,North America,Completed,Volume discount applied
+TXN_003,CUST_003,PROD_005,2024-03-18,Sale,5,459.99,2299.95,0.0,Credit Card,REP_001,North America,Completed,Standard order
+TXN_004,CUST_004,PROD_002,2024-03-20,Sale,10,299.99,2999.90,10.0,Bank Transfer,REP_003,Europe,Completed,Annual subscription
+TXN_005,CUST_005,PROD_007,2024-03-22,Sale,3,3200.00,9600.00,12.0,Wire Transfer,REP_004,Asia Pacific,Completed,Regional office setup
+TXN_006,CUST_006,PROD_009,2024-03-25,Sale,8,899.99,7199.92,3.0,Credit Card,REP_001,North America,Completed,Small business order
+TXN_007,CUST_007,PROD_008,2024-03-28,Sale,1,699.99,699.99,0.0,PayPal,REP_005,Europe,Completed,Startup package
+TXN_008,CUST_008,PROD_006,2024-04-01,Sale,5,1599.99,7999.95,15.0,Bank Transfer,REP_002,North America,Completed,Enterprise license
+TXN_009,CUST_009,PROD_012,2024-04-03,Sale,20,499.99,9999.80,5.0,Credit Card,REP_003,Europe,Completed,Team license
+TXN_010,CUST_010,PROD_004,2024-04-05,Sale,3,899.99,2699.97,7.0,Wire Transfer,REP_004,Asia Pacific,Completed,Security upgrade
+TXN_011,CUST_001,PROD_011,2024-04-08,Sale,4,799.99,3199.96,8.0,Credit Card,REP_001,North America,Completed,Video conferencing setup
+TXN_012,CUST_002,PROD_010,2024-04-10,Sale,2,1299.99,2599.98,10.0,Bank Transfer,REP_002,North America,Completed,Backup solution
+TXN_013,CUST_003,PROD_003,2024-04-12,Return,-2,1899.99,-3799.98,0.0,Credit Card,REP_001,North America,Processed,Defective units
+TXN_014,CUST_004,PROD_005,2024-04-15,Sale,8,459.99,3679.92,5.0,Bank Transfer,REP_003,Europe,Pending,Network expansion
+TXN_015,CUST_005,PROD_001,2024-04-18,Sale,1,12500.00,12500.00,0.0,Wire Transfer,REP_004,Asia Pacific,Completed,Additional server

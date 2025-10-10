@@ -14,7 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from .auto_discovery import AutoDiscoverySystem
 from tools.external_services import ExternalServiceRegistry
 from tools.external_services.mindsdb_service import MindsDBService
-from tools.external_services.composio_service import ComposioService
+# Composio service moved to internal services - no longer external
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,8 @@ class ExtendedAutoDiscoverySystem(AutoDiscoverySystem):
     def _register_service_types(self):
         """Register known external service types"""
         self.external_registry.register_service_type("mindsdb", MindsDBService)
-        self.external_registry.register_service_type("composio", ComposioService)
-        logger.info("Registered external service types: mindsdb, composio")
+        # Note: Composio service moved to internal services (tools/services/composio_service)
+        logger.info("Registered external service types: mindsdb")
     
     def _check_external_services_enabled(self) -> bool:
         """Check if external services are globally enabled"""
@@ -67,20 +67,47 @@ class ExtendedAutoDiscoverySystem(AutoDiscoverySystem):
         Maintains full backward compatibility with existing functionality.
         """
         logger.info("🚀 Starting extended auto-discovery with external services support...")
-        
+
         # 1. Register all local capabilities (existing functionality)
         logger.info("📦 Registering local capabilities...")
         await super().auto_register_with_mcp(mcp)
         logger.info("✅ Local capabilities registered")
-        
+
         # 2. Register external services if enabled
+        # Option: Load external services in background (LAZY_LOAD_EXTERNAL_SERVICES=true)
+        lazy_load_external = os.getenv('LAZY_LOAD_EXTERNAL_SERVICES', 'false').lower() == 'true'
+
         if self.external_services_enabled:
-            logger.info("🌐 Registering external services...")
-            await self._register_external_services(mcp)
+            if lazy_load_external:
+                logger.info("🌐 External services will load in background (LAZY_LOAD_EXTERNAL_SERVICES=true)...")
+                # Start background task - doesn't block startup
+                import asyncio
+                asyncio.create_task(self._register_external_services_background(mcp))
+            else:
+                # Synchronous load (default, slower)
+                logger.info("🌐 Registering external services...")
+                await self._register_external_services(mcp)
         else:
             logger.info("⏭️  External services disabled, skipping external registration")
-        
+
         logger.info("🎉 Extended auto-discovery completed!")
+
+    async def _register_external_services_background(self, mcp: FastMCP):
+        """Register external services in background without blocking startup"""
+        try:
+            import asyncio
+            await asyncio.sleep(8)  # Wait for server to be fully ready
+            logger.info("🌐 Starting background external services registration...")
+            print("🌐 Starting background external services registration...")
+            await self._register_external_services(mcp)
+            logger.info("✅ External services ready (background registration complete)")
+            print("✅ External services ready (background registration complete)")
+        except Exception as e:
+            error_msg = f"❌ Background external services registration failed: {e}"
+            logger.error(error_msg)
+            print(error_msg)
+            import traceback
+            logger.error(traceback.format_exc())
     
     async def _register_external_services(self, mcp: FastMCP):
         """Register external services with MCP server"""

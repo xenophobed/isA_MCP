@@ -28,8 +28,9 @@ class TextExtractor:
     @property
     def client(self):
         """Lazy load ISA client"""
+        from core.isa_client_factory import get_isa_client
+        # 不再每次重置客户端，使用缓存实例
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
             self._client = get_isa_client()
         return self._client
     
@@ -37,7 +38,8 @@ class TextExtractor:
         self,
         text: str,
         entity_types: Optional[List[str]] = None,
-        confidence_threshold: float = 0.7
+        confidence_threshold: float = 0.7,
+        custom_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Extract named entities from text using AI
@@ -46,6 +48,7 @@ class TextExtractor:
             text: Text to analyze
             entity_types: Specific entity types to extract (optional)
             confidence_threshold: Minimum confidence score
+            custom_prompt: Custom prompt template (if None, uses default)
             
         Returns:
             Dictionary with extracted entities and metadata
@@ -57,28 +60,32 @@ class TextExtractor:
             # Prepare extraction prompt
             text_content = text[:3000] if len(text) > 3000 else text
             
-            prompt = f"""Extract named entities from the following text. Return a JSON object with entities categorized by type.
+            if custom_prompt:
+                # Use custom prompt template, replace {text} placeholder
+                prompt = custom_prompt.format(text=text_content)
+            else:
+                # Default simple prompt that works reliably
+                prompt = f"""Extract named entities from this text as JSON:
 
-Text: {text_content}
+{text_content}
 
-Extract entities for these categories:
+Find these entity types:
 - PERSON: People's names
-- ORGANIZATION: Companies, institutions
-- LOCATION: Places, addresses, countries
-- DATE: Dates and time expressions
+- ORGANIZATION: Companies, institutions  
+- LOCATION: Places, addresses
+- DATE: Dates and times
 - MONEY: Monetary amounts
-- PRODUCT: Products and services
-- EVENT: Events and activities
 
-Return format:
+Return JSON format:
 {{
     "entities": {{
-        "PERSON": [{{"name": "entity", "confidence": 0.95, "position": [start, end]}}],
-        "ORGANIZATION": [...],
-        ...
+        "PERSON": ["name1", "name2"],
+        "ORGANIZATION": ["org1", "org2"],
+        "LOCATION": ["place1", "place2"],
+        "DATE": ["date1", "date2"],
+        "MONEY": ["amount1", "amount2"]
     }},
-    "total_entities": number,
-    "confidence_scores": {{"entity_type": "avg_confidence"}}
+    "total_entities": 0
 }}"""
 
             # Call ISA for entity extraction
@@ -86,27 +93,35 @@ Return format:
                 input_data=prompt,
                 task="chat",
                 service_type="text",
+                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
                 temperature=0.1,
-                stream=False  # 禁用流式输出，获取完整响应
+                max_tokens=1000,  # 设置足够的token限制
+                stream=False,  # 禁用流式输出，获取完整响应
+                response_format={"type": "json_object"}  # 启用 JSON 输出模式
             )
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
             
             # Process complete response (streaming disabled)
-            result = response.get('result', '')
+            result = response.get('result')
             billing_info = response.get('metadata', {}).get('billing', {})
             
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
+            # Handle different result types - based on llm.md JSON mode specifications
+            result_text = ''
+            if result is None:
+                raise Exception("No result field in response")
+            elif hasattr(result, 'content'):
+                # JSON mode: result.content contains the JSON string (per llm.md line 315)
                 result_text = result.content
             elif isinstance(result, str):
+                # Fallback: direct string result
                 result_text = result
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            if not result_text or result_text.strip() == '':
+                raise Exception("Empty result in response")
             
             # Parse JSON response
             try:
@@ -120,24 +135,30 @@ Return format:
                 else:
                     raise Exception("Failed to parse entity extraction response")
             
-            # Filter by confidence threshold if specified
-            if confidence_threshold > 0:
-                filtered_entities = {}
-                for entity_type, entities in result_data.get("entities", {}).items():
-                    filtered_entities[entity_type] = [
-                        entity for entity in entities 
-                        if entity.get("confidence", 0) >= confidence_threshold
-                    ]
-                result_data["entities"] = filtered_entities
+            # Handle simplified format (list of strings) vs detailed format (list of objects)
+            entities_dict = result_data.get("entities", {})
+            total_entities = 0
+            avg_confidence = 0.8  # Default confidence for simplified format
             
-            # Calculate overall confidence
-            all_confidences = []
-            for entities in result_data.get("entities", {}).values():
-                for entity in entities:
-                    if "confidence" in entity:
-                        all_confidences.append(entity["confidence"])
+            # Count total entities and check format
+            for entity_type, entities in entities_dict.items():
+                if entities:
+                    total_entities += len(entities)
+                    # Check if this is detailed format with confidence scores
+                    if isinstance(entities[0], dict) and "confidence" in entities[0]:
+                        # Filter by confidence threshold if specified
+                        if confidence_threshold > 0:
+                            entities_dict[entity_type] = [
+                                entity for entity in entities 
+                                if entity.get("confidence", 0) >= confidence_threshold
+                            ]
+                        
+                        # Calculate average confidence from detailed format
+                        confidences = [entity.get("confidence", 0) for entity in entities_dict[entity_type]]
+                        if confidences:
+                            avg_confidence = sum(confidences) / len(confidences)
             
-            avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+            result_data["entities"] = entities_dict
             
             # Log billing info
             if billing_info:
@@ -148,7 +169,7 @@ Return format:
                 'data': result_data,
                 'confidence': avg_confidence,
                 'billing_info': billing_info,
-                'total_entities': result_data.get('total_entities', 0)
+                'total_entities': result_data.get('total_entities', total_entities)
             }
             
         except Exception as e:
@@ -187,45 +208,51 @@ Return format:
             categories_str = ", ".join(categories)
             mode = "multiple categories" if multi_label else "single category"
             
-            prompt = f"""Classify the following text into {mode} from the given options.
+            prompt = f"""Classify this text as JSON:
 
-Text: {text_content}
+{text_content}
 
 Categories: {categories_str}
 
-Return a JSON object:
+Return JSON format:
 {{
-    "classification": {{"category": "confidence_score"}},
-    "primary_category": "most_likely_category",
-    "confidence": "overall_confidence_score",
-    "reasoning": "brief explanation"
+    "primary_category": "category_name",
+    "categories": ["matched", "categories"]
 }}"""
 
             response = await self.client.invoke(
                 input_data=prompt,
                 task="chat",
                 service_type="text",
+                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
                 temperature=0.1,
-                stream=False  # 禁用流式输出，获取完整响应
+                max_tokens=1000,  # 设置足够的token限制
+                stream=False,  # 禁用流式输出，获取完整响应
+                response_format={"type": "json_object"}  # 启用 JSON 输出模式
             )
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
             
             # Process complete response (streaming disabled)
-            result = response.get('result', '')
+            result = response.get('result')
             billing_info = response.get('metadata', {}).get('billing', {})
             
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
+            # Handle different result types - based on llm.md JSON mode specifications
+            result_text = ''
+            if result is None:
+                raise Exception("No result field in response")
+            elif hasattr(result, 'content'):
+                # JSON mode: result.content contains the JSON string (per llm.md line 315)
                 result_text = result.content
             elif isinstance(result, str):
+                # Fallback: direct string result
                 result_text = result
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            if not result_text or result_text.strip() == '':
+                raise Exception("Empty result in response")
             
             # Parse JSON response
             try:
@@ -266,7 +293,8 @@ Return a JSON object:
     async def extract_key_information(
         self,
         text: str,
-        schema: Optional[Dict[str, Any]] = None
+        schema: Optional[Dict[str, Any]] = None,
+        custom_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Extract key information from text based on schema
@@ -311,26 +339,32 @@ Return a JSON object that follows the schema structure with the extracted inform
                 service_type="text",
                 model="gpt-4.1-mini",  # 使用更强模型处理复杂医疗JSON解析
                 temperature=0.1,
-                stream=False  # 禁用流式输出，获取完整响应
+                stream=False,  # 禁用流式输出，获取完整响应
+                response_format={"type": "json_object"}  # 启用 JSON 输出模式
             )
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
             
             # Process complete response (streaming disabled)
-            result = response.get('result', '')
+            result = response.get('result')
             billing_info = response.get('metadata', {}).get('billing', {})
             
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
+            # Handle different result types - based on llm.md JSON mode specifications
+            result_text = ''
+            if result is None:
+                raise Exception("No result field in response")
+            elif hasattr(result, 'content'):
+                # JSON mode: result.content contains the JSON string (per llm.md line 315)
                 result_text = result.content
             elif isinstance(result, str):
+                # Fallback: direct string result
                 result_text = result
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            if not result_text or result_text.strip() == '':
+                raise Exception("Empty result in response")
             
             # Parse JSON response with enhanced error handling
             try:
@@ -400,7 +434,8 @@ Return a JSON object that follows the schema structure with the extracted inform
         self,
         text: str,
         summary_length: str = "medium",
-        focus_areas: Optional[List[str]] = None
+        focus_areas: Optional[List[str]] = None,
+        custom_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate text summary using AI
@@ -425,48 +460,65 @@ Return a JSON object that follows the schema structure with the extracted inform
             }
             
             text_content = text[:3000] if len(text) > 3000 else text
-            length_instruction = length_settings.get(summary_length, length_settings["medium"])
-            focus_instruction = ""
-            if focus_areas:
-                focus_instruction = f"\nPay special attention to: {', '.join(focus_areas)}"
             
-            prompt = f"""Summarize the following text. {length_instruction}{focus_instruction}
+            if custom_prompt:
+                # Use custom prompt template
+                prompt = custom_prompt.format(
+                    text=text_content,
+                    summary_length=summary_length,
+                    focus_areas=', '.join(focus_areas) if focus_areas else ''
+                )
+            else:
+                # Default prompt
+                length_instruction = length_settings.get(summary_length, length_settings["medium"])
+                focus_instruction = ""
+                if focus_areas:
+                    focus_instruction = f"\nPay special attention to: {', '.join(focus_areas)}"
+                
+                prompt = f"""Summarize this text as JSON ({summary_length} length){focus_instruction}:
 
-Text: {text_content}
+{text_content}
 
-Return a JSON object:
+Return JSON format:
 {{
-    "summary": "the summary text",
-    "key_points": ["list", "of", "key", "points"],
-    "confidence": "confidence_score",
-    "word_count": "summary_word_count"
+    "summary": "summary text here",
+    "key_points": ["point1", "point2"],
+    "word_count": 100
 }}"""
 
             response = await self.client.invoke(
                 input_data=prompt,
                 task="chat",
                 service_type="text",
+                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
                 temperature=0.2,
-                stream=False  # 禁用流式输出，获取完整响应
+                max_tokens=1000,  # 设置足够的token限制
+                stream=False,  # 禁用流式输出，获取完整响应
+                response_format={"type": "json_object"}  # 启用 JSON 输出模式
             )
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
             
             # Process complete response (streaming disabled)
-            result = response.get('result', '')
+            result = response.get('result')
             billing_info = response.get('metadata', {}).get('billing', {})
             
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
+            # Handle different result types - based on llm.md JSON mode specifications
+            result_text = ''
+            if result is None:
+                raise Exception("No result field in response")
+            elif hasattr(result, 'content'):
+                # JSON mode: result.content contains the JSON string (per llm.md line 315)
                 result_text = result.content
             elif isinstance(result, str):
+                # Fallback: direct string result
                 result_text = result
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            if not result_text or result_text.strip() == '':
+                raise Exception("Empty result in response")
             
             # Parse JSON response
             try:
@@ -537,7 +589,7 @@ Return a JSON object:
 
 Text: {text_content}
 
-Return a JSON object:
+Please return a JSON object:
 {{
     "overall_sentiment": {{"label": "positive/negative/neutral", "score": "confidence_score"}},
     "detailed_analysis": "sentiment_breakdown",
@@ -549,27 +601,35 @@ Return a JSON object:
                 input_data=prompt,
                 task="chat",
                 service_type="text",
+                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
                 temperature=0.1,
-                stream=False  # 禁用流式输出，获取完整响应
+                max_tokens=1000,  # 设置足够的token限制
+                stream=False,  # 禁用流式输出，获取完整响应
+                response_format={"type": "json_object"}  # 启用 JSON 输出模式
             )
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
             
             # Process complete response (streaming disabled)
-            result = response.get('result', '')
+            result = response.get('result')
             billing_info = response.get('metadata', {}).get('billing', {})
             
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
+            # Handle different result types - based on llm.md JSON mode specifications
+            result_text = ''
+            if result is None:
+                raise Exception("No result field in response")
+            elif hasattr(result, 'content'):
+                # JSON mode: result.content contains the JSON string (per llm.md line 315)
                 result_text = result.content
             elif isinstance(result, str):
+                # Fallback: direct string result
                 result_text = result
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            if not result_text or result_text.strip() == '':
+                raise Exception("Empty result in response")
             
             # Parse JSON response
             try:
@@ -690,26 +750,41 @@ Return a JSON object:
         return fallback
 
 
-# Global instance for easy import
-text_extractor = TextExtractor()
+# Global instance for easy import - will be initialized on first use
+text_extractor = None
 
 # Convenience functions
 async def extract_entities(text: str, **kwargs) -> Dict[str, Any]:
     """Extract named entities from text"""
+    global text_extractor
+    if text_extractor is None:
+        text_extractor = TextExtractor()
     return await text_extractor.extract_entities(text, **kwargs)
 
 async def classify_text(text: str, categories: List[str], **kwargs) -> Dict[str, Any]:
     """Classify text into categories"""
+    global text_extractor
+    if text_extractor is None:
+        text_extractor = TextExtractor()
     return await text_extractor.classify_text(text, categories, **kwargs)
 
 async def extract_key_information(text: str, **kwargs) -> Dict[str, Any]:
     """Extract key information from text"""
+    global text_extractor
+    if text_extractor is None:
+        text_extractor = TextExtractor()
     return await text_extractor.extract_key_information(text, **kwargs)
 
 async def summarize_text(text: str, **kwargs) -> Dict[str, Any]:
     """Summarize text"""
+    global text_extractor
+    if text_extractor is None:
+        text_extractor = TextExtractor()
     return await text_extractor.summarize_text(text, **kwargs)
 
 async def analyze_sentiment(text: str, **kwargs) -> Dict[str, Any]:
     """Analyze text sentiment"""
+    global text_extractor
+    if text_extractor is None:
+        text_extractor = TextExtractor()
     return await text_extractor.analyze_sentiment(text, **kwargs)

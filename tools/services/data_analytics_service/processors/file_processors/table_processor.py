@@ -9,8 +9,22 @@ Supports both OCR-based and native table extraction methods.
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-import cv2
-import numpy as np
+
+# Make cv2 and numpy optional
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    cv2 = None
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
+
 from dataclasses import dataclass
 import pandas as pd
 from pathlib import Path

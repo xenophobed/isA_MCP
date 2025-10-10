@@ -1,0 +1,291 @@
+# Business Domain Configuration
+# Generic Knowledge Analytics for Business Intelligence
+
+domain_name: "business"
+domain_description: "Business intelligence and corporate knowledge extraction"
+version: "1.0.0"
+language: "en"
+locale: "en_US"
+
+# Entity Types for Business Domain
+entity_types:
+  ORGANIZATION:
+    description: "Companies, corporations, institutions"
+    schema:
+      name: "Organization name"
+      industry: "Business sector or industry"
+      founded: "Year founded or established"
+      size: "Number of employees or company scale"
+      revenue: "Annual revenue information"
+      location: "Headquarters or main location"
+      website: "Official website URL"
+      ceo: "Chief Executive Officer or leader"
+      products: "Main products or services offered"
+    patterns:
+      - '\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\s+(?:Inc|Corp|LLC|Ltd|Company|Corporation)\b'
+      - '\b([A-Z][a-zA-Z\s]+)\s+is\s+a\s+(?:company|corporation|firm|business)\b'
+    ai_prompts:
+      extraction: "Identify organizations, companies, and institutions mentioned in the text."
+      
+  PERSON:
+    description: "Business professionals, executives, employees"
+    schema:
+      name: "Full name"
+      title: "Job title or position"
+      company: "Current employer"
+      department: "Department or division"
+      experience: "Years of experience"
+      education: "Educational background"
+      skills: "Professional skills and expertise"
+      location: "Work location"
+    patterns:
+      - '\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b'
+      - '\b(?:Mr|Ms|Dr|Prof)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b'
+    ai_prompts:
+      extraction: "Extract names of business professionals, executives, and employees."
+      
+  PRODUCT:
+    description: "Products, services, and offerings"
+    schema:
+      name: "Product or service name"
+      category: "Product category or type"
+      price: "Pricing information"
+      manufacturer: "Company that produces it"
+      features: "Key features and capabilities"
+      target_market: "Target customer segment"
+      launch_date: "Product launch or release date"
+    patterns:
+      - '\b([A-Z][a-zA-Z\s]+)\s+(?:product|service|software|platform|tool)\b'
+    ai_prompts:
+      extraction: "Identify products, services, and business offerings."
+      
+  FINANCIAL_METRIC:
+    description: "Financial data, metrics, and KPIs"
+    schema:
+      metric_name: "Name of the financial metric"
+      value: "Numerical value"
+      currency: "Currency type"
+      period: "Time period (quarterly, annual, etc.)"
+      growth_rate: "Growth or change percentage"
+    patterns:
+      - '\$([0-9,]+(?:\.[0-9]+)?)\s*(?:billion|million|thousand|B|M|K)?'
+      - '([0-9]+(?:\.[0-9]+)?%)\s*(?:growth|increase|decrease|change)'
+    ai_prompts:
+      extraction: "Extract financial metrics, revenue figures, and performance data."
+
+# Relation Types for Business Domain
+relation_types:
+  WORKS_FOR:
+    description: "Employment relationship"
+    predicate: "works for"
+    schema:
+      role: "Job role or position"
+      department: "Department or division"
+      start_date: "Employment start date"
+      employment_type: "Full-time, part-time, contract, etc."
+    patterns:
+      - '\b(\w+(?:\s+\w+)*)\s+works?\s+(?:for|at)\s+(\w+(?:\s+\w+)*)'
+      - '\b(\w+(?:\s+\w+)*)\s+is\s+(?:employed\s+by|an?\s+employee\s+of)\s+(\w+(?:\s+\w+)*)'
+    valid_entity_pairs:
+      - ["PERSON", "ORGANIZATION"]
+    ai_prompts:
+      extraction: "Find employment relationships between people and organizations."
+      
+  PRODUCES:
+    description: "Product/service creation relationship"
+    predicate: "produces"
+    schema:
+      product_line: "Product category or line"
+      launch_date: "Product launch date"
+      market_segment: "Target market"
+    patterns:
+      - '\b(\w+(?:\s+\w+)*)\s+(?:makes|produces|manufactures|develops|creates)\s+(\w+(?:\s+\w+)*)'
+      - '\b(\w+(?:\s+\w+)*)\s+is\s+(?:the\s+)?(?:maker|producer|manufacturer)\s+of\s+(\w+(?:\s+\w+)*)'
+    valid_entity_pairs:
+      - ["ORGANIZATION", "PRODUCT"]
+    ai_prompts:
+      extraction: "Identify which organizations produce or manufacture which products."
+      
+  COMPETES_WITH:
+    description: "Competitive relationship"
+    predicate: "competes with"
+    schema:
+      market_segment: "Market or industry segment"
+      competition_type: "Direct, indirect, potential"
+    patterns:
+      - '\b(\w+(?:\s+\w+)*)\s+competes?\s+with\s+(\w+(?:\s+\w+)*)'
+      - '\b(\w+(?:\s+\w+)*)\s+(?:and|vs\.?)\s+(\w+(?:\s+\w+)*)\s+are\s+competitors'
+    valid_entity_pairs:
+      - ["ORGANIZATION", "ORGANIZATION"]
+      - ["PRODUCT", "PRODUCT"]
+    ai_prompts:
+      extraction: "Find competitive relationships between companies or products."
+      
+  ACQUIRED:
+    description: "Acquisition or merger relationship"
+    predicate: "acquired"
+    schema:
+      acquisition_date: "Date of acquisition"
+      acquisition_price: "Purchase price or valuation"
+      acquisition_type: "Merger, acquisition, buyout"
+    patterns:
+      - '\b(\w+(?:\s+\w+)*)\s+(?:acquired|bought|purchased)\s+(\w+(?:\s+\w+)*)'
+      - '\b(\w+(?:\s+\w+)*)\s+was\s+(?:acquired\s+by|bought\s+by)\s+(\w+(?:\s+\w+)*)'
+    valid_entity_pairs:
+      - ["ORGANIZATION", "ORGANIZATION"]
+    ai_prompts:
+      extraction: "Identify acquisition and merger relationships."
+
+# Attribute Types for Business Domain  
+attribute_types:
+  MONETARY_VALUE:
+    description: "Financial amounts and currency values"
+    schema:
+      data_type: "number"
+      format: "currency"
+      required: true
+    validation_rules:
+      min_value: 0
+      currency_codes: ["USD", "EUR", "GBP", "JPY", "CNY"]
+    normalization_rules:
+      remove_formatting: true
+      convert_to_base_currency: "USD"
+      
+  PERCENTAGE:
+    description: "Percentage values and rates"
+    schema:
+      data_type: "number"
+      format: "percentage"
+      range: [0, 100]
+    validation_rules:
+      min_value: 0
+      max_value: 1000  # Allow for growth rates > 100%
+    normalization_rules:
+      ensure_decimal_format: true
+      
+  DATE_VALUE:
+    description: "Date and temporal information"
+    schema:
+      data_type: "date"
+      format: "ISO8601"
+    validation_rules:
+      earliest_date: "1800-01-01"
+      latest_date: "2030-12-31"
+    normalization_rules:
+      output_format: "YYYY-MM-DD"
+      
+  TEXT_VALUE:
+    description: "General text attributes"
+    schema:
+      data_type: "string"
+      max_length: 1000
+    validation_rules:
+      min_length: 1
+      allowed_chars: "alphanumeric_spaces_punctuation"
+
+# AI Strategy Configurations
+ai_strategies:
+  default:
+    model_type: "llm"
+    model_name: "claude-3-sonnet"
+    temperature: 0.1
+    max_tokens: 4000
+    confidence_threshold: 0.75
+    system_prompt: |
+      You are an expert business analyst specialized in extracting structured information 
+      from business documents, reports, and communications. Focus on identifying:
+      - Organizations, companies, and business entities
+      - Key personnel and their roles
+      - Products, services, and offerings  
+      - Financial metrics and performance data
+      - Business relationships and partnerships
+      
+      Extract information with high precision and provide confidence scores.
+    domain_context: |
+      This is business intelligence analysis focusing on corporate entities,
+      financial performance, competitive relationships, and market dynamics.
+      
+  financial_focused:
+    model_type: "llm"
+    model_name: "claude-3-sonnet"
+    temperature: 0.05  # Lower temperature for financial precision
+    max_tokens: 3000
+    confidence_threshold: 0.8
+    system_prompt: |
+      You are a financial analyst expert at extracting precise financial information
+      from business documents. Focus on numerical accuracy and financial relationships.
+    domain_context: "Financial analysis and metrics extraction from business data."
+
+# Extraction Configuration
+extraction_config:
+  primary_methods: ["llm", "pattern"]
+  enable_fallback: true
+  fallback_methods: ["pattern"]
+  confidence_routing:
+    llm: 0.8
+    pattern: 0.6
+    hybrid: 0.9
+  max_text_length: 50000
+  chunk_size: 4000
+  enable_parallel: true
+  max_workers: 4
+
+# Domain-specific Prompts
+prompts:
+  entity_extraction: |
+    Extract business entities from the following text. Identify:
+    1. Organizations (companies, corporations, institutions)
+    2. People (executives, employees, professionals)
+    3. Products (goods, services, software, platforms)
+    4. Financial metrics (revenue, profit, growth rates)
+    
+    Text: {text}
+    
+  relation_extraction: |
+    Find business relationships in the text. Look for:
+    1. Employment relationships (who works for which company)
+    2. Product relationships (which company makes what product)
+    3. Competitive relationships (competitors, market rivals)
+    4. Corporate relationships (acquisitions, partnerships)
+    
+    Entities: {entities}
+    Text: {text}
+    
+  attribute_extraction: |
+    Extract detailed attributes for the business entity: {entity_name}
+    Focus on business-relevant properties like financial metrics,
+    organizational details, and market position.
+    
+    Entity Type: {entity_type}
+    Context: {context}
+
+# Templates for structured output
+templates:
+  entity_output: |
+    {{
+      "entity_type": "{entity_type}",
+      "name": "{name}",
+      "confidence": {confidence},
+      "attributes": {attributes}
+    }}
+    
+  relation_output: |
+    {{
+      "relation_type": "{relation_type}",
+      "subject": "{subject}",
+      "object": "{object}",
+      "predicate": "{predicate}",
+      "confidence": {confidence}
+    }}
+
+# Custom Business Rules
+custom_rules:
+  organization_validation:
+    - "Must have legal entity suffix (Inc, Corp, LLC, Ltd)"
+    - "Revenue figures must be realistic"
+    - "Founded date cannot be in the future"
+    
+  financial_metrics:
+    - "Currency amounts must include currency indicator"
+    - "Percentages should be validated against reasonable ranges"
+    - "Growth rates above 1000% should be flagged for review"

@@ -172,8 +172,11 @@ class WebCrawlService:
         try:
             logger.info("🔧 Starting BS4 extraction...")
             
+            # Use enhanced mode when analysis is requested for richer data
+            use_enhanced = bool(analysis_request)
+            
             # Extract text using BS4 service
-            bs4_result = await bs4_extract(url)
+            bs4_result = await bs4_extract(url, enhanced=use_enhanced)
             
             if not bs4_result.success:
                 logger.warning(f"BS4 extraction failed: {bs4_result.error}")
@@ -185,8 +188,8 @@ class WebCrawlService:
             if analysis_request and bs4_result.content:
                 final_analysis = await self._synthesize_bs4_results(bs4_result, analysis_request)
             
-            return {
-                "method": "bs4_extraction",
+            result = {
+                "method": "bs4_extraction" + ("_enhanced" if use_enhanced else ""),
                 "success": True,
                 "content": bs4_result.content,
                 "title": bs4_result.title,
@@ -204,6 +207,30 @@ class WebCrawlService:
                     "links_count": len(bs4_result.links)
                 }
             }
+            
+            # Add enhanced data if available
+            if use_enhanced:
+                result["tables"] = bs4_result.tables
+                result["images"] = bs4_result.images
+                result["videos"] = bs4_result.videos
+                result["code_blocks"] = bs4_result.code_blocks
+                result["lists"] = bs4_result.lists
+                result["forms"] = bs4_result.forms
+                result["metadata"] = bs4_result.metadata
+                result["seo_analysis"] = bs4_result.seo_analysis
+                result["readability_score"] = bs4_result.readability_score
+                result["extraction_stats"] = bs4_result.extraction_stats
+                
+                # Update raw_data with enhanced stats
+                result["raw_data"].update({
+                    "tables_count": len(bs4_result.tables),
+                    "images_count": len(bs4_result.images),
+                    "videos_count": len(bs4_result.videos),
+                    "code_blocks_count": len(bs4_result.code_blocks),
+                    "forms_count": len(bs4_result.forms)
+                })
+            
+            return result
             
         except Exception as e:
             logger.error(f"❌ BS4 extraction path failed: {e}")
@@ -325,6 +352,38 @@ Content Preview:
 Sample Headings:
 {json.dumps([h['text'] for h in bs4_result.headings[:5]], indent=2)}
 """
+            
+            # Add enhanced data if available
+            if hasattr(bs4_result, 'tables') and bs4_result.tables:
+                content_summary += f"\nTables: {len(bs4_result.tables)} tables found"
+                if bs4_result.tables:
+                    content_summary += f"\nFirst table headers: {bs4_result.tables[0].get('headers', [])[:5]}"
+            
+            if hasattr(bs4_result, 'images') and bs4_result.images:
+                content_summary += f"\nImages: {len(bs4_result.images)} images"
+                img_with_alt = sum(1 for img in bs4_result.images if img.get('alt'))
+                content_summary += f" ({img_with_alt} with alt text)"
+            
+            if hasattr(bs4_result, 'code_blocks') and bs4_result.code_blocks:
+                content_summary += f"\nCode Blocks: {len(bs4_result.code_blocks)}"
+                languages = set(cb.get('language', 'unknown') for cb in bs4_result.code_blocks[:10])
+                content_summary += f" (languages: {', '.join(languages)})"
+            
+            if hasattr(bs4_result, 'seo_analysis') and bs4_result.seo_analysis:
+                content_summary += f"\n\nSEO Analysis:"
+                seo = bs4_result.seo_analysis
+                content_summary += f"\n- Title length: {seo.get('title_length', 0)} chars"
+                content_summary += f"\n- Meta description: {'Present' if seo.get('meta_description') else 'Missing'}"
+                content_summary += f"\n- H1 count: {seo.get('h1_count', 0)}"
+                content_summary += f"\n- Internal links: {seo.get('internal_links_count', 0)}"
+                content_summary += f"\n- External links: {seo.get('external_links_count', 0)}"
+            
+            if hasattr(bs4_result, 'metadata') and bs4_result.metadata:
+                content_summary += f"\n\nMetadata:"
+                for key in ['og:title', 'og:description', 'author', 'keywords'][:4]:
+                    if key in bs4_result.metadata:
+                        value = str(bs4_result.metadata[key])[:100]
+                        content_summary += f"\n- {key}: {value}"
             
             prompt = f"""Based on this extracted webpage content, create a comprehensive analysis for: "{analysis_request}"
 

@@ -100,31 +100,12 @@ class MetadataStoreService:
         logger.info(f"Starting pipeline {pipeline_id} for source: {source_path}")
         
         try:
-            # Step 1: Data Processing + Metadata Extraction
+            # Step 1: Metadata Extraction
             step1_start = datetime.now()
-            logger.info(f"Pipeline {pipeline_id}: Step 1 - Processing data source and extracting metadata")
+            logger.info(f"Pipeline {pipeline_id}: Step 1 - Extracting metadata from data source")
             
-            csv_database_path = None
-            # First, process CSV file and create SQLite database if needed
-            if source_path.lower().endswith('.csv'):
-                from .....processors.data_processors.preprocessors.csv_processor import CSVProcessor
-                logger.info(f"Pipeline {pipeline_id}: Processing CSV file and creating SQLite database")
-                
-                csv_processor = CSVProcessor(source_path)
-                csv_analysis = csv_processor.get_full_analysis_with_sqlite(save_to_sqlite=True)
-                
-                if not csv_analysis.get('sqlite_database', {}).get('success', False):
-                    raise Exception(f"CSV processing failed: {csv_analysis.get('error', 'Unknown error')}")
-                
-                csv_database_path = csv_analysis['sqlite_database']['database_path']
-                logger.info(f"Pipeline {pipeline_id}: SQLite database created at {csv_database_path}")
-            
-            # Then extract metadata
+            # Extract metadata directly
             raw_metadata = extract_metadata(source_path, source_type)
-            
-            # Store database path in metadata for SQL executor
-            if csv_database_path:
-                raw_metadata['csv_database_path'] = csv_database_path
             
             if 'error' in raw_metadata:
                 raise Exception(f"Metadata extraction failed: {raw_metadata['error']}")
@@ -372,6 +353,111 @@ class MetadataStoreService:
     def get_pipeline_result(self, pipeline_id: str) -> Optional[PipelineResult]:
         """Get detailed result for a specific pipeline"""
         return self.processed_sources.get(pipeline_id)
+    
+    async def store_dataset_mapping(self, table_name: str, dataset_name: str, storage_path: str, user_id: str = "default_user") -> Dict[str, Any]:
+        """
+        Store dataset name mapping for storage path resolution
+        
+        Args:
+            table_name: Table name from metadata
+            dataset_name: Dataset name used in storage
+            storage_path: Full storage path
+            user_id: User identifier
+            
+        Returns:
+            Storage result
+        """
+        try:
+            # Create mapping metadata for storage
+            mapping_metadata = {
+                'mapping_type': 'dataset_storage',
+                'table_name': table_name,
+                'dataset_name': dataset_name,
+                'storage_path': storage_path,
+                'user_id': user_id,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Store using embedding service
+            content = f"Dataset mapping: table '{table_name}' stored as dataset '{dataset_name}' at path '{storage_path}' for user '{user_id}'"
+            
+            # Create embedding for searchability
+            embedding = await self.embedding_service.embedding_generator.embed(content)
+            
+            # Store in database using the same pattern as embedding service
+            import uuid
+            record_data = {
+                'id': str(uuid.uuid4()),
+                'entity_type': 'dataset_mapping',
+                'entity_name': f"{table_name}→{dataset_name}",
+                'entity_full_name': f"mapping:{table_name}→{dataset_name}",
+                'content': content,
+                'embedding': embedding,
+                'metadata': mapping_metadata,
+                'semantic_tags': ['storage_mapping', f'user:{user_id}', f'table:{table_name}', f'dataset:{dataset_name}'],
+                'confidence_score': 1.0,
+                'database_source': self.database_name,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            result = self.embedding_service.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
+            
+            logger.info(f"Stored dataset mapping: {table_name} → {dataset_name} for user {user_id}")
+            return {
+                'success': True,
+                'mapping_stored': True,
+                'table_name': table_name,
+                'dataset_name': dataset_name,
+                'storage_path': storage_path,
+                'result': result
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to store dataset mapping: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'mapping_stored': False
+            }
+    
+    async def get_dataset_mapping(self, table_name: str, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
+        """
+        Get dataset name for a table name
+        
+        Args:
+            table_name: Table name to look up
+            user_id: User identifier
+            
+        Returns:
+            Dataset mapping information or None
+        """
+        try:
+            # Search for mapping
+            query = f"Dataset mapping table '{table_name}' user '{user_id}'"
+            
+            results = await self.embedding_service.search_similar_entities(
+                query, entity_type='dataset_mapping', limit=5
+            )
+            
+            for result in results:
+                metadata = result.metadata or {}
+                if (metadata.get('table_name') == table_name and 
+                    metadata.get('user_id') == user_id):
+                    return {
+                        'table_name': metadata.get('table_name'),
+                        'dataset_name': metadata.get('dataset_name'),
+                        'storage_path': metadata.get('storage_path'),
+                        'user_id': metadata.get('user_id'),
+                        'found': True
+                    }
+            
+            logger.warning(f"No dataset mapping found for table '{table_name}', user '{user_id}'")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get dataset mapping: {e}")
+            return None
     
     async def get_database_summary(self) -> Dict[str, Any]:
         """Get summary of stored metadata in the database"""

@@ -21,6 +21,27 @@ def json_serializer(obj):
         return obj.dict()
     elif hasattr(obj, '__dict__'):
         return obj.__dict__
+    # Handle numpy types - be more aggressive
+    try:
+        import numpy as np
+        # Handle any numpy type first
+        if isinstance(obj, np.generic):
+            return obj.item()
+        # Handle numpy arrays
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        # Backup: check for any numpy module types
+        elif hasattr(obj, 'dtype') and hasattr(obj, 'item'):
+            return obj.item()
+    except ImportError:
+        pass
+    except Exception:
+        # If numpy conversion fails, try basic conversions
+        try:
+            if hasattr(obj, 'item'):
+                return obj.item()
+        except:
+            pass
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 class BaseTool:

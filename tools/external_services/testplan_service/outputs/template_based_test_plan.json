@@ -1,0 +1,4566 @@
+{
+  "test_plan": [
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2",
+      "test_name": "6.2.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.5",
+      "test_name": "6.2.5"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TL",
+      "volt": "VH",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "6.3.2",
+      "test_name": "6.3.2"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD1",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD2",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD3",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD7",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eFDD8",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD38",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD40",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Low range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "5 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "10 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "eTDD41",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "High range",
+      "bw": "20 MHz",
+      "test_id": "7.3",
+      "test_name": "7.3"
+    },
+    {
+      "band": "CA_1C",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1C",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1C",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_3C",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_3C",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_3C",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "40 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "40 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_38C",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "40 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TN",
+      "volt": "VN",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TH",
+      "volt": "VH",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "10 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    },
+    {
+      "band": "CA_1A-3A",
+      "temp": "TL",
+      "volt": "VL",
+      "tf": "Mid range",
+      "bw": "20 MHz",
+      "test_id": "6.2.2A.1",
+      "test_name": "6.2.2A.1"
+    }
+  ],
+  "statistics": {
+    "total_tests": 5,
+    "total_combinations": 506,
+    "by_test_type": {
+      "Power": 434,
+      "Sensitivity": 72
+    }
+  }
+}

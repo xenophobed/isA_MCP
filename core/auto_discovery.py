@@ -387,6 +387,33 @@ class AutoDiscoverySystem:
             except Exception as e:
                 logger.error(f"  ❌ Failed to register resources from {python_file.name}: {e}")
         
+        # Register Composio Bridge if available
+        composio_tools_metadata = {}
+        try:
+            logger.info("🌉 Attempting to register Composio Bridge...")
+            from tools.services.composio_service.composio_mcp_bridge import register_composio_bridge
+            composio_tools_metadata = register_composio_bridge(mcp)
+            
+            # 将 Composio 工具元数据加入索引
+            if composio_tools_metadata:
+                logger.info(f"  📊 Indexing {len(composio_tools_metadata)} Composio tools for search...")
+                for tool_name, tool_meta in composio_tools_metadata.items():
+                    self.discovered_tools[tool_name] = {
+                        "name": tool_name,
+                        "description": tool_meta.get("description", ""),
+                        "category": tool_meta.get("category", "integration"),
+                        "keywords": tool_meta.get("keywords", []),
+                        "source": "composio_dynamic",
+                        "docstring": tool_meta.get("description", "")
+                    }
+                logger.info(f"  ✅ Indexed {len(composio_tools_metadata)} Composio tools for search")
+            
+            logger.info("  ✅ Composio Bridge integration registered")
+        except ImportError as e:
+            logger.info("  ⚠️ Composio Bridge not available (this is normal if not configured)")
+        except Exception as e:
+            logger.error(f"  ❌ Failed to register Composio Bridge: {e}")
+        
         # Also discover for metadata purposes
         self.discover_tools()
         self.discover_prompts() 

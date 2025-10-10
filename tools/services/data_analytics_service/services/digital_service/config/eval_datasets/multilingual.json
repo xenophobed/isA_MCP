@@ -1,0 +1,17 @@
+{
+  "name": "multilingual",
+  "created_at": "2025-10-01T09:04:11.922787",
+  "test_cases": [
+    {
+      "id": "multilingual_001",
+      "query": "What are the main applications of natural language processing?",
+      "document": "Natural Language Processing (NLP) has numerous applications including:\n                - Machine translation (e.g., Google Translate)\n                - Sentiment analysis for social media monitoring\n                - Chatbots and virtual assistants\n                - Text summarization for news and documents\n                - Named entity recognition in information extraction\n                - Question answering systems",
+      "expected_answer": "Main NLP applications include machine translation, sentiment analysis, chatbots, text summarization, and question answering systems.",
+      "ground_truth_contexts": null,
+      "metadata": null,
+      "category": "application",
+      "difficulty": "easy",
+      "language": "en"
+    }
+  ]
+}

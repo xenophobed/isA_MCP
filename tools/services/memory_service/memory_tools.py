@@ -316,15 +316,17 @@ def register_memory_tools(mcp: FastMCP):
         user_id: str,
         query: str,
         memory_types: Optional[List[str]] = None,
-        top_k: int = 10
+        top_k: int = 10,
+        similarity_threshold: float = 0.4
     ) -> str:
         """Search across memory types using semantic similarity
-        
+
         Args:
             user_id: User identifier
             query: Search query
             memory_types: Optional list of memory types to search
             top_k: Maximum number of results
+            similarity_threshold: Minimum similarity score (0.0-1.0), default 0.4
         """
         try:
             tools.reset_billing()
@@ -342,7 +344,8 @@ def register_memory_tools(mcp: FastMCP):
                 user_id=user_id,
                 query=query,
                 memory_types=parsed_types,
-                top_k=top_k
+                top_k=top_k,
+                similarity_threshold=similarity_threshold
             )
             
             results = await memory_service.search_memories(search_query)

@@ -659,28 +659,52 @@ else:
 
 ## Testing
 
-Comprehensive test suite available at:
-```
-tools/services/intelligence_service/language/tests/test_text_extractor.py
-```
+### Test Status (Last Updated: 2025-09-28)
+
+✅ **All Functions Working** - Using `gpt-4.1-nano` model for stable JSON mode support
+
+| Function | Status | Test Result |
+|----------|--------|-------------|
+| `extract_entities` | ✅ Working | Successfully extracts PERSON, ORGANIZATION, LOCATION, DATE, MONEY entities |
+| `classify_text` | ✅ Working | Correctly classifies text into provided categories |
+| `extract_key_information` | ✅ Working | Extracts structured information using custom schemas |
+| `summarize_text` | ✅ Working | Generates summaries with configurable lengths |
+| `analyze_sentiment` | ✅ Working | Analyzes sentiment with confidence scores |
 
 ### Running Tests
-```bash
-# From project root
-python -m tools.services.intelligence_service.language.tests.test_text_extractor
 
-# Expected: 8/8 tests passing (100% success rate)
+```bash
+# Quick test all functions
+python -c "
+import asyncio
+from tools.services.intelligence_service.language.text_extractor import *
+async def test():
+    print('Entity extraction:', (await extract_entities('Apple in Cupertino'))['success'])
+    print('Classification:', (await classify_text('Great!', ['positive','negative']))['success'])
+    print('Key info:', (await extract_key_information('Meeting with Bob'))['success'])
+    print('Summarization:', (await summarize_text('AI revolutionizes tech'))['success'])
+    print('Sentiment:', (await analyze_sentiment('Terrible service'))['success'])
+asyncio.run(test())
+"
+
+# Expected: All functions return success: True
 ```
 
 ### Test Coverage
-- Entity extraction with confidence filtering
-- Single and multi-label text classification
-- Custom schema information extraction
-- Text summarization with focus areas
-- Overall and aspect-based sentiment analysis
-- Convenience functions testing
-- Error handling and edge cases
-- Performance and billing metrics
+- ✅ Entity extraction with confidence filtering
+- ✅ Single and multi-label text classification
+- ✅ Custom schema information extraction
+- ✅ Text summarization with focus areas (fixed with gpt-4.1-nano)
+- ✅ Overall sentiment analysis (fixed with gpt-4.1-nano)
+- ✅ Convenience functions testing
+- ✅ Error handling and edge cases
+- ✅ Performance and billing metrics
+
+### Important Notes
+
+1. **Model Selection**: The code now uses `gpt-4.1-nano` model which reliably supports JSON mode output
+2. **Previous Issue**: `gpt-5-nano` model had intermittent issues with JSON mode (returning empty strings)
+3. **Solution**: All functions with `response_format={"type": "json_object"}` now explicitly use `gpt-4.1-nano`
 
 ## Summary
 

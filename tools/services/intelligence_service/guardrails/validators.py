@@ -143,8 +143,7 @@ class RelevanceValidator(BaseValidator):
             result = await self.isa_client.invoke(
                 input_data=relevance_prompt,
                 task="chat",
-                service_type="llm",
-                model="gpt-4o-mini"
+                service_type="text"
             )
             
             if result.get('success'):
@@ -362,8 +361,7 @@ class HallucinationValidator(BaseValidator):
             result = await self.isa_client.invoke(
                 input_data=hallucination_prompt,
                 task="chat",
-                service_type="llm",
-                model="gpt-4o-mini"
+                service_type="text"
             )
             
             if result.get('success'):
@@ -473,8 +471,7 @@ class SafetyValidator(BaseValidator):
             result = await self.isa_client.invoke(
                 input_data=safety_prompt,
                 task="chat",
-                service_type="llm",
-                model="gpt-4o-mini"
+                service_type="text"
             )
             
             if result.get('success'):

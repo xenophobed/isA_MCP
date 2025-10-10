@@ -9,7 +9,8 @@ from datetime import datetime
 from typing import Dict, Any
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-from core.auth import security_manager, AuthenticationError, AuthorizationError
+# from core.auth import security_manager, AuthenticationError, AuthorizationError
+# TODO: Fix these imports - they don't exist in core.auth
 import logging
 
 logger = logging.getLogger(__name__)

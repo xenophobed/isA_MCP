@@ -5,6 +5,7 @@ Provides monitoring, metrics, and health checks for the unified search service
 """
 
 import asyncio
+import os
 import time
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, asdict
@@ -39,9 +40,11 @@ class SearchMonitor:
         self.max_recent_searches = 100
         self.health_check_interval = 60  # seconds
         self.last_health_check = time.time()
-        
-        # Performance thresholds
-        self.slow_search_threshold_ms = 1000
+
+        # Performance thresholds - read from environment
+        # Convert GRAPH_SLOW_THRESHOLD from seconds to milliseconds
+        slow_threshold_seconds = float(os.getenv("GRAPH_SLOW_THRESHOLD", "5.0"))
+        self.slow_search_threshold_ms = slow_threshold_seconds * 1000  # Convert to ms
         self.error_rate_threshold = 0.1  # 10%
         
     def record_search(self, response_time_ms: float, results_count: int, 

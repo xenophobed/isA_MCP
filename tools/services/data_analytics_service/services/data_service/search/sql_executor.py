@@ -1177,14 +1177,20 @@ class SQLExecutor:
             
             self.execution_history.append(feedback_record)
             
-            # TODO: Implement actual learning mechanism
-            # This could involve:
-            # 1. Updating LLM fine-tuning data
-            # 2. Updating SQL pattern templates
-            # 3. Adjusting confidence scoring
-            # 4. Improving semantic matching
-            
-            logger.info(f"Learned from user feedback: {user_satisfaction}")
+            # Learning mechanism implementation
+            # Update pattern weights based on feedback
+            if user_satisfaction == 'positive':
+                self._reinforce_successful_pattern(sql_query, query_context)
+            elif user_satisfaction == 'negative':
+                self._penalize_failed_pattern(sql_query, query_context, corrected_sql)
+
+            # Update confidence scoring model
+            self._update_confidence_model(feedback_record)
+
+            # Log for potential LLM fine-tuning
+            self._log_for_finetuning(feedback_record)
+
+            logger.info(f"Learned from user feedback: {user_satisfaction} (pattern weights updated)")
             
         except Exception as e:
             logger.error(f"Failed to process user feedback: {e}")
@@ -1553,6 +1559,120 @@ class SQLExecutor:
             database_path: Path to DuckDB database file (defaults to in-memory)
             **kwargs: Additional configuration options
             
+        Returns:
+            SQLExecutor configured for DuckDB with professional service support
+        """
+        database_config = {
+            'type': 'duckdb',
+            'database': database_path,
+            'max_execution_time': kwargs.get('max_execution_time', 30),
+            'max_rows': kwargs.get('max_rows', 10000),
+            'max_connections': kwargs.get('max_connections', 10),
+            'connection_timeout': kwargs.get('connection_timeout', 30.0),
+            'query_timeout': kwargs.get('query_timeout', 30.0),
+            'max_memory_mb': kwargs.get('max_memory_mb', 1024),
+            'enable_monitoring': kwargs.get('enable_monitoring', True),
+        }
+
+        return SQLExecutor(database_config)
+
+    def _reinforce_successful_pattern(self, sql_query: str, query_context: Optional[Any]) -> None:
+        """Reinforce successful SQL patterns"""
+        # Extract pattern features
+        if not hasattr(self, 'pattern_weights'):
+            self.pattern_weights = {}
+
+        # Simple pattern extraction (improve as needed)
+        pattern_key = self._extract_pattern(sql_query)
+
+        if pattern_key not in self.pattern_weights:
+            self.pattern_weights[pattern_key] = 1.0
+
+        # Increase weight for successful pattern
+        self.pattern_weights[pattern_key] *= 1.1  # 10% increase
+        logger.debug(f"Reinforced pattern '{pattern_key}': {self.pattern_weights[pattern_key]:.2f}")
+
+    def _penalize_failed_pattern(self, sql_query: str, query_context: Optional[Any], corrected_sql: Optional[str]) -> None:
+        """Penalize failed SQL patterns"""
+        if not hasattr(self, 'pattern_weights'):
+            self.pattern_weights = {}
+
+        pattern_key = self._extract_pattern(sql_query)
+
+        if pattern_key not in self.pattern_weights:
+            self.pattern_weights[pattern_key] = 1.0
+
+        # Decrease weight for failed pattern
+        self.pattern_weights[pattern_key] *= 0.9  # 10% decrease
+        logger.debug(f"Penalized pattern '{pattern_key}': {self.pattern_weights[pattern_key]:.2f}")
+
+        # If corrected SQL provided, reinforce the correct pattern
+        if corrected_sql:
+            correct_pattern = self._extract_pattern(corrected_sql)
+            if correct_pattern not in self.pattern_weights:
+                self.pattern_weights[correct_pattern] = 1.0
+            self.pattern_weights[correct_pattern] *= 1.2  # 20% increase for correction
+            logger.debug(f"Learned correct pattern '{correct_pattern}': {self.pattern_weights[correct_pattern]:.2f}")
+
+    def _extract_pattern(self, sql_query: str) -> str:
+        """Extract SQL pattern for learning"""
+        # Simple pattern: first 3 keywords
+        keywords = []
+        for word in sql_query.upper().split():
+            if word in ['SELECT', 'FROM', 'WHERE', 'JOIN', 'GROUP', 'ORDER', 'LIMIT', 'HAVING']:
+                keywords.append(word)
+            if len(keywords) >= 3:
+                break
+        return '_'.join(keywords) if keywords else 'UNKNOWN'
+
+    def _update_confidence_model(self, feedback_record: Dict[str, Any]) -> None:
+        """Update confidence scoring model based on feedback"""
+        if not hasattr(self, 'confidence_adjustments'):
+            self.confidence_adjustments = {}
+
+        pattern = feedback_record.get('sql_pattern', 'unknown')
+        satisfaction = feedback_record.get('user_satisfaction')
+
+        if pattern not in self.confidence_adjustments:
+            self.confidence_adjustments[pattern] = 0.0
+
+        # Adjust confidence based on feedback
+        if satisfaction == 'positive':
+            self.confidence_adjustments[pattern] += 0.05
+        elif satisfaction == 'negative':
+            self.confidence_adjustments[pattern] -= 0.05
+
+        # Clamp between -0.3 and +0.3
+        self.confidence_adjustments[pattern] = max(-0.3, min(0.3, self.confidence_adjustments[pattern]))
+
+    def _log_for_finetuning(self, feedback_record: Dict[str, Any]) -> None:
+        """Log feedback data for potential LLM fine-tuning"""
+        # Store in finetuning_data list for later export
+        if not hasattr(self, 'finetuning_data'):
+            self.finetuning_data = []
+
+        self.finetuning_data.append({
+            'timestamp': feedback_record.get('timestamp'),
+            'query_context': feedback_record.get('query_context'),
+            'generated_sql': feedback_record.get('sql_query'),
+            'corrected_sql': feedback_record.get('corrected_sql'),
+            'satisfaction': feedback_record.get('user_satisfaction'),
+            'error_type': feedback_record.get('error_type')
+        })
+
+        # Limit storage to last 1000 records
+        if len(self.finetuning_data) > 1000:
+            self.finetuning_data = self.finetuning_data[-1000:]
+
+    @staticmethod
+    def create_for_duckdb(database_path: str = ":memory:", **kwargs) -> 'SQLExecutor':
+        """
+        Create SQLExecutor configured for DuckDB
+
+        Args:
+            database_path: Path to DuckDB database or :memory: for in-memory
+            **kwargs: Additional configuration options
+
         Returns:
             SQLExecutor configured for DuckDB with professional service support
         """

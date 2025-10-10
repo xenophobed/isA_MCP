@@ -400,7 +400,22 @@ class OfficeProcessor:
             )
     
     async def _process_powerpoint_presentation(self, file_path: str, options: Dict[str, Any]) -> OfficeAnalysisResult:
-        """Process PowerPoint presentation comprehensively."""
+        """
+        Process PowerPoint presentation comprehensively with image and table extraction.
+        
+        Extracts:
+        - Text content from text boxes and shapes
+        - Images embedded in slides (as bytes with metadata)
+        - Tables with structure and data
+        - Slide notes and metadata
+        
+        Args:
+            file_path: Path to PowerPoint file
+            options: Processing options (extract_images, extract_tables, etc.)
+            
+        Returns:
+            OfficeAnalysisResult with complete presentation analysis
+        """
         import time
         start_time = time.time()
         
@@ -408,10 +423,18 @@ class OfficeProcessor:
             # Extract content using python-pptx if available, otherwise use ZIP parsing
             try:
                 from pptx import Presentation
+                from pptx.enum.shapes import MSO_SHAPE_TYPE
                 prs = Presentation(file_path)
                 
                 slides = []
                 all_text = ""
+                all_embedded_media = []
+                total_images = 0
+                total_tables = 0
+                
+                # Processing options
+                extract_images = options.get('extract_images', self.extract_images)
+                extract_tables = options.get('extract_tables', self.extract_tables)
                 
                 for i, slide in enumerate(prs.slides):
                     slide_content = {
@@ -419,11 +442,14 @@ class OfficeProcessor:
                         'title': '',
                         'content': [],
                         'notes': '',
-                        'layout': slide.slide_layout.name if hasattr(slide.slide_layout, 'name') else 'unknown'
+                        'layout': slide.slide_layout.name if hasattr(slide.slide_layout, 'name') else 'unknown',
+                        'images': [],
+                        'tables': []
                     }
                     
-                    # Extract text from shapes
-                    for shape in slide.shapes:
+                    # Extract content from shapes
+                    for shape_idx, shape in enumerate(slide.shapes):
+                        # Extract text content
                         if hasattr(shape, 'text') and shape.text.strip():
                             text = shape.text.strip()
                             slide_content['content'].append(text)
@@ -432,9 +458,86 @@ class OfficeProcessor:
                             # Identify title (usually the first text shape)
                             if not slide_content['title'] and len(text) < 100:
                                 slide_content['title'] = text
+                        
+                        # Extract images
+                        if extract_images and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                            try:
+                                image = shape.image
+                                image_bytes = image.blob
+                                image_ext = image.ext  # jpg, png, etc.
+                                image_content_type = image.content_type
+                                
+                                image_data = {
+                                    'image_bytes': image_bytes,
+                                    'image_format': image_ext,
+                                    'content_type': image_content_type,
+                                    'image_name': f"slide_{i+1}_img_{len(slide_content['images'])+1}.{image_ext}",
+                                    'slide_number': i + 1,
+                                    'shape_index': shape_idx,
+                                    'shape_name': shape.name if hasattr(shape, 'name') else f'Picture {shape_idx}',
+                                    'size_bytes': len(image_bytes),
+                                    'position': {
+                                        'left': shape.left,
+                                        'top': shape.top,
+                                        'width': shape.width,
+                                        'height': shape.height
+                                    } if hasattr(shape, 'left') else {}
+                                }
+                                
+                                slide_content['images'].append(image_data)
+                                all_embedded_media.append({
+                                    **image_data,
+                                    'media_type': 'image',
+                                    'source_slide': i + 1
+                                })
+                                total_images += 1
+                                
+                                logger.info(f"Extracted image: {image_data['image_name']} ({image_data['size_bytes']} bytes)")
+                                
+                            except Exception as img_error:
+                                logger.warning(f"Failed to extract image from slide {i+1}, shape {shape_idx}: {img_error}")
+                        
+                        # Extract tables
+                        if extract_tables and shape.shape_type == MSO_SHAPE_TYPE.TABLE:
+                            try:
+                                table = shape.table
+                                table_data = []
+                                
+                                # Extract table data
+                                for row_idx, row in enumerate(table.rows):
+                                    row_data = []
+                                    for cell in row.cells:
+                                        cell_text = cell.text.strip() if hasattr(cell, 'text') else ''
+                                        row_data.append(cell_text)
+                                        if cell_text:
+                                            all_text += cell_text + ' '
+                                    table_data.append(row_data)
+                                
+                                table_info = {
+                                    'table_data': table_data,
+                                    'rows': len(table_data),
+                                    'columns': len(table_data[0]) if table_data else 0,
+                                    'slide_number': i + 1,
+                                    'shape_index': shape_idx,
+                                    'shape_name': shape.name if hasattr(shape, 'name') else f'Table {shape_idx}',
+                                    'position': {
+                                        'left': shape.left,
+                                        'top': shape.top,
+                                        'width': shape.width,
+                                        'height': shape.height
+                                    } if hasattr(shape, 'left') else {}
+                                }
+                                
+                                slide_content['tables'].append(table_info)
+                                total_tables += 1
+                                
+                                logger.info(f"Extracted table from slide {i+1}: {table_info['rows']}x{table_info['columns']}")
+                                
+                            except Exception as table_error:
+                                logger.warning(f"Failed to extract table from slide {i+1}, shape {shape_idx}: {table_error}")
                     
                     # Extract slide notes
-                    if hasattr(slide, 'notes_slide') and slide.notes_slide.notes_text_frame:
+                    if self.extract_slide_notes and hasattr(slide, 'notes_slide') and slide.notes_slide.notes_text_frame:
                         notes_text = slide.notes_slide.notes_text_frame.text.strip()
                         slide_content['notes'] = notes_text
                         all_text += notes_text + ' '
@@ -447,20 +550,28 @@ class OfficeProcessor:
                     'title': prs.core_properties.title or '',
                     'subject': prs.core_properties.subject or '',
                     'created': str(prs.core_properties.created) if prs.core_properties.created else '',
-                    'modified': str(prs.core_properties.modified) if prs.core_properties.modified else ''
+                    'modified': str(prs.core_properties.modified) if prs.core_properties.modified else '',
+                    'total_images_extracted': total_images,
+                    'total_tables_extracted': total_tables
                 }
                 
+                logger.info(f"PowerPoint processing complete: {len(slides)} slides, {total_images} images, {total_tables} tables")
+                
             except ImportError:
+                logger.warning("python-pptx not available, falling back to ZIP parsing (images/tables not extracted)")
                 # Fallback to ZIP parsing for PPTX files
                 slides, metadata = await self._parse_pptx_zip(file_path)
                 all_text = ' '.join(' '.join(slide.get('content', [])) for slide in slides)
+                all_embedded_media = []
+                total_images = 0
+                total_tables = 0
             
             # Create PowerPoint presentation structure
             ppt_prs = PowerPointPresentation(
                 slides=slides,
                 total_slides=len(slides),
                 slide_layouts=list(set(slide.get('layout', 'unknown') for slide in slides)),
-                embedded_media=[],  # Would extract media metadata
+                embedded_media=all_embedded_media,
                 metadata=metadata
             )
             
@@ -470,8 +581,14 @@ class OfficeProcessor:
                 structure={
                     'slide_count': len(slides),
                     'total_content_items': sum(len(slide.get('content', [])) for slide in slides),
+                    'total_images': total_images,
+                    'total_tables': total_tables,
                     'has_notes': any(slide.get('notes') for slide in slides),
-                    'unique_layouts': len(set(slide.get('layout', 'unknown') for slide in slides))
+                    'has_images': total_images > 0,
+                    'has_tables': total_tables > 0,
+                    'unique_layouts': len(set(slide.get('layout', 'unknown') for slide in slides)),
+                    'images_per_slide': [len(slide.get('images', [])) for slide in slides],
+                    'tables_per_slide': [len(slide.get('tables', [])) for slide in slides]
                 },
                 metadata=metadata,
                 text_content=all_text.strip(),

@@ -49,14 +49,19 @@ class TextGenerator:
                 params["max_tokens"] = max_tokens
             params.update(kwargs)
             
-            # Call ISA client
+            # Call ISA client with default OpenAI model
+            logger.info(f"Calling ISA with prompt length: {len(prompt)}, params: {params}")
             response = await self.client.invoke(
                 input_data=prompt,
                 task="chat",
                 service_type="text",
                 stream=False,  # 禁用流式输出，获取完整响应
+                provider="openai",  # 使用OpenAI提供商
+                model="gpt-4.1-nano",  # 使用默认快速模型
                 **params
             )
+            
+            logger.info(f"ISA response success: {response.get('success')}, has result: {'result' in response}")
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
@@ -73,8 +78,41 @@ class TextGenerator:
             else:
                 result_text = str(result)
             
-            if not result_text:
-                raise Exception("No result found in response")
+            # 更详细的空结果检查
+            if not result_text or (isinstance(result_text, str) and not result_text.strip()):
+                logger.warning(f"Empty result on first attempt - Original result: {result}, Type: {type(result)}")
+                
+                # 重试一次 - 可能是ISA客户端初始化问题
+                logger.info("Retrying ISA call once...")
+                retry_response = await self.client.invoke(
+                    input_data=prompt,
+                    task="chat",
+                    service_type="text",
+                    stream=False,
+                    provider="openai",  # 使用OpenAI提供商
+                    model="gpt-4.1-nano",  # 使用默认快速模型
+                    **params
+                )
+                
+                if retry_response.get('success'):
+                    retry_result = retry_response.get('result', '')
+                    if hasattr(retry_result, 'content'):
+                        retry_result_text = retry_result.content
+                    elif isinstance(retry_result, str):
+                        retry_result_text = retry_result
+                    else:
+                        retry_result_text = str(retry_result)
+                    
+                    if retry_result_text and retry_result_text.strip():
+                        logger.info("✅ Retry successful")
+                        result_text = retry_result_text
+                        billing_info = retry_response.get('metadata', {}).get('billing', {})
+                    else:
+                        logger.error(f"Retry also failed - Retry result: {retry_result}")
+                        raise Exception("No result found in response after retry")
+                else:
+                    logger.error(f"Retry failed with error: {retry_response.get('error')}")
+                    raise Exception("No result found in response")
             
             # Log billing info
             if billing_info:

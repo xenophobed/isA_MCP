@@ -8,7 +8,15 @@ import asyncio
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 from contextlib import asynccontextmanager
-import asyncpg
+
+# Make asyncpg optional - only needed for direct PostgreSQL connections
+try:
+    import asyncpg
+    ASYNCPG_AVAILABLE = True
+except ImportError:
+    ASYNCPG_AVAILABLE = False
+    asyncpg = None
+
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -64,24 +72,28 @@ class DatabaseManager:
     
     async def _init_pg_pool(self, settings):
         """Initialize PostgreSQL connection pool for vector operations"""
-        try:
-            # Extract connection details from Supabase URL
-            db_url = self._build_postgres_url(settings)
-            
-            self._pg_pool = await asyncpg.create_pool(
-                db_url,
-                min_size=2,
-                max_size=10,
-                command_timeout=60,
-                server_settings={
-                    'application_name': 'mcp_server',
-                    'search_path': 'dev,test,public'
-                }
-            )
-            logger.info("PostgreSQL connection pool initialized")
-        except Exception as e:
-            logger.warning(f"PostgreSQL pool initialization failed: {e}")
-            # Continue without pool - fallback to Supabase client only
+        # Only try to create PostgreSQL pool if asyncpg is available
+        if ASYNCPG_AVAILABLE:
+            try:
+                # Extract connection details from Supabase URL
+                db_url = self._build_postgres_url(settings)
+
+                self._pg_pool = await asyncpg.create_pool(
+                    db_url,
+                    min_size=2,
+                    max_size=10,
+                    command_timeout=60,
+                    server_settings={
+                        'application_name': 'mcp_server',
+                        'search_path': 'dev,test,public'
+                    }
+                )
+                logger.info("PostgreSQL connection pool initialized")
+            except Exception as e:
+                logger.warning(f"PostgreSQL pool initialization failed: {e}")
+                # Continue without pool - fallback to Supabase client only
+        else:
+            logger.info("asyncpg not available - using Supabase client only (no direct PostgreSQL pool)")
     
     def _build_postgres_url(self, settings) -> str:
         """Build PostgreSQL connection URL from Supabase settings"""

@@ -1,0 +1,11 @@
+customer_id,customer_name,email,phone,registration_date,customer_type,credit_limit,country,region
+CUST_001,Acme Corporation,contact@acme.com,+1-555-0101,2024-01-15,Enterprise,50000.00,USA,North America
+CUST_002,Global Tech Solutions,info@globaltech.com,+1-555-0102,2024-01-20,Enterprise,75000.00,USA,North America
+CUST_003,SmallBiz Inc,hello@smallbiz.com,+1-555-0103,2024-02-01,SMB,10000.00,USA,North America
+CUST_004,EuroTech GmbH,kontakt@eurotech.de,+49-30-12345,2024-02-10,Enterprise,60000.00,Germany,Europe
+CUST_005,Asia Pacific Ltd,contact@asiapac.com,+65-6789-0123,2024-02-15,Enterprise,80000.00,Singapore,Asia Pacific
+CUST_006,Local Services,admin@localservices.com,+1-555-0106,2024-03-01,SMB,5000.00,USA,North America
+CUST_007,TechStart Innovations,team@techstart.com,+44-20-7890-1234,2024-03-10,Startup,15000.00,UK,Europe
+CUST_008,Manufacturing Co,orders@mfgco.com,+1-555-0108,2024-03-15,Enterprise,100000.00,USA,North America
+CUST_009,Digital Solutions,hello@digitalsol.com,+33-1-23-45-67-89,2024-04-01,SMB,20000.00,France,Europe
+CUST_010,Innovation Labs,contact@innovlabs.com,+81-3-1234-5678,2024-04-10,Enterprise,90000.00,Japan,Asia Pacific

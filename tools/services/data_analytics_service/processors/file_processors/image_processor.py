@@ -11,8 +11,21 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass
-import cv2
-import numpy as np
+
+# Optional dependencies - make cv2 and numpy optional
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    cv2 = None
+    
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +82,12 @@ class ImageProcessor:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
         
+        # Check if required dependencies are available
+        if not CV2_AVAILABLE:
+            logger.warning("OpenCV (cv2) not available - ImageProcessor functionality will be limited")
+        if not NUMPY_AVAILABLE:
+            logger.warning("NumPy not available - ImageProcessor functionality will be limited")
+        
         # OCR settings
         self.ocr_engine = self.config.get('ocr_engine', 'tesseract')
         self.ocr_languages = self.config.get('ocr_languages', ['eng'])
@@ -95,6 +114,18 @@ class ImageProcessor:
         Returns:
             Complete image analysis results
         """
+        # Check if required dependencies are available
+        if not CV2_AVAILABLE or not NUMPY_AVAILABLE:
+            return {
+                'error': 'OpenCV and NumPy are required for image processing',
+                'success': False,
+                'available_dependencies': {
+                    'cv2': CV2_AVAILABLE,
+                    'numpy': NUMPY_AVAILABLE
+                },
+                'suggestion': 'Install with: pip install opencv-python numpy'
+            }
+        
         try:
             options = options or {}
             

@@ -140,6 +140,39 @@ class GuardrailSystem:
             logger.error(f"Failed to initialize validators: {e}")
             self._validators = {}
     
+    async def validate_content(self, content: str) -> Dict[str, Any]:
+        """
+        Validate content quality and safety
+        
+        Args:
+            content: Text content to validate
+            
+        Returns:
+            Dict with validation results
+        """
+        if self.config.level == GuardrailLevel.DISABLED:
+            return {'passed': True, 'confidence': 1.0, 'warnings': [], 'compliance_score': 1.0}
+        
+        try:
+            # Use validate_result method internally
+            result = {'text': content}
+            passed = await self.validate_result("", result)
+            
+            return {
+                'passed': passed,
+                'confidence': 0.8 if passed else 0.3,
+                'warnings': [] if passed else ['Content validation failed'],
+                'compliance_score': 0.9 if passed else 0.4
+            }
+        except Exception as e:
+            logger.error(f"Content validation error: {e}")
+            return {
+                'passed': False,
+                'confidence': 0.1,
+                'warnings': [str(e)],
+                'compliance_score': 0.1
+            }
+    
     async def validate_result(
         self,
         query: str,
@@ -447,8 +480,7 @@ class GuardrailSystem:
             result = await self.isa_client.invoke(
                 input_data=attribution_prompt,
                 task="chat",
-                service_type="llm",
-                model="gpt-4o-mini"
+                service_type="text"
             )
             
             if result.get('success'):
@@ -495,8 +527,7 @@ class GuardrailSystem:
             result = await self.isa_client.invoke(
                 input_data=consistency_prompt,
                 task="chat",
-                service_type="llm",
-                model="gpt-4o-mini"
+                service_type="text"
             )
             
             if result.get('success'):

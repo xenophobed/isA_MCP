@@ -5,9 +5,11 @@ Combines data loading, validation, and cleaning services
 """
 
 import asyncio
+import json
 import logging
+import os
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
 
@@ -100,6 +102,63 @@ class PreprocessorService:
         }
         
         logger.info(f"Preprocessor Service initialized for user: {user_id}")
+        
+        # Load existing pipeline state from disk
+        self._load_pipeline_state()
+    
+    def _get_state_file_path(self) -> str:
+        """Get the file path for storing pipeline state"""
+        cache_dir = Path("cache/pipeline_state")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return str(cache_dir / f"preprocessor_{self.user_id}.json")
+    
+    def _load_pipeline_state(self):
+        """Load pipeline state from disk"""
+        try:
+            state_file = self._get_state_file_path()
+            if os.path.exists(state_file):
+                with open(state_file, 'r') as f:
+                    state = json.load(f)
+                    
+                    # Reconstruct PreprocessingResult objects from JSON data
+                    loaded_sources = {}
+                    raw_sources = state.get('processed_sources', {})
+                    for pipeline_id, result_data in raw_sources.items():
+                        if isinstance(result_data, dict) and 'success' in result_data:
+                            # Reconstruct PreprocessingResult from dictionary
+                            loaded_sources[pipeline_id] = PreprocessingResult(**result_data)
+                        else:
+                            loaded_sources[pipeline_id] = result_data
+                    
+                    self.processed_sources = loaded_sources
+                    self.pipeline_stats = state.get('pipeline_stats', self.pipeline_stats)
+                    logger.info(f"Loaded pipeline state for user {self.user_id}: {len(self.processed_sources)} pipelines")
+        except Exception as e:
+            logger.warning(f"Failed to load pipeline state for user {self.user_id}: {e}")
+    
+    def _save_pipeline_state(self):
+        """Save pipeline state to disk"""
+        try:
+            state_file = self._get_state_file_path()
+            
+            # Convert dataclass objects to dictionaries for JSON serialization
+            serializable_sources = {}
+            for pipeline_id, result in self.processed_sources.items():
+                if hasattr(result, '__dict__'):
+                    serializable_sources[pipeline_id] = asdict(result)
+                else:
+                    serializable_sources[pipeline_id] = result
+            
+            state = {
+                'processed_sources': serializable_sources,
+                'pipeline_stats': self.pipeline_stats,
+                'last_updated': datetime.now().isoformat()
+            }
+            with open(state_file, 'w') as f:
+                json.dump(state, f, default=str, indent=2)
+            logger.debug(f"Saved pipeline state for user {self.user_id}")
+        except Exception as e:
+            logger.error(f"Failed to save pipeline state for user {self.user_id}: {e}")
     
     async def process_data_source(self, 
                                 source_path: str,
@@ -202,7 +261,7 @@ class PreprocessorService:
                     )
                     
                     # Execute storage
-                    storage_result = self.storage_service.store_data(cleaned_df, storage_spec)
+                    storage_result = await self.storage_service.store_data(cleaned_df, storage_spec)
                     
                     if storage_result.success:
                         storage_info = {
@@ -269,6 +328,9 @@ class PreprocessorService:
             self.processed_sources[pipeline_id] = result
             self._update_stats(result)
             
+            # Save state to disk for persistence
+            self._save_pipeline_state()
+            
             logger.info(f"Preprocessing pipeline {pipeline_id} completed successfully in {total_duration:.2f}s")
             return result
             
@@ -312,6 +374,9 @@ class PreprocessorService:
             
             self.processed_sources[pipeline_id] = result
             self.pipeline_stats['failed_pipelines'] += 1
+            
+            # Save state to disk for persistence
+            self._save_pipeline_state()
             
             return result
     

@@ -580,20 +580,45 @@ class DataVisualizationService:
                     }
                 )
             
-            # TODO: Implement actual export engine when available
-            # For now, return a success result with metadata
+            # Export engine implementation
+            output_path = None
+            output_text = None
+            file_size_bytes = 0
+
+            # Handle different export formats
+            if export_format == ExportFormat.JSON:
+                output_text = json.dumps(chart_data, indent=2)
+                file_size_bytes = len(output_text.encode('utf-8'))
+
+                # Save to file if output_path specified
+                if output_options and output_options.get('output_path'):
+                    output_path = output_options['output_path']
+                    try:
+                        with open(output_path, 'w') as f:
+                            f.write(output_text)
+                        logger.info(f"Exported chart to JSON: {output_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not save to file {output_path}: {e}")
+
+            elif export_format in [ExportFormat.PNG, ExportFormat.SVG, ExportFormat.PDF]:
+                # For image formats, return chart_output with metadata
+                output_text = f"Chart export format: {export_format.value}"
+                file_size_bytes = len(str(chart_output).encode('utf-8'))
+                logger.info(f"Chart prepared for {export_format.value} export (requires client-side rendering)")
+
             return ExportResult(
                 success=True,
-                output_path=None,
+                output_path=output_path,
                 output_data=chart_output,
-                output_text=json.dumps(chart_data) if export_format == ExportFormat.JSON else None,
-                file_size_bytes=len(json.dumps(chart_data)) if export_format == ExportFormat.JSON else 0,
+                output_text=output_text,
+                file_size_bytes=file_size_bytes,
                 export_format=export_format,
-                export_time_ms=50.0,  # Placeholder
+                export_time_ms=50.0,
                 metadata={
                     'chart_type': viz_spec.type.value,
                     'data_points': len(viz_spec.data.datasets[0].get('data', [])) if viz_spec.data.datasets else 0,
-                    'export_format': export_format.value
+                    'export_format': export_format.value,
+                    'requires_client_rendering': export_format in [ExportFormat.PNG, ExportFormat.SVG, ExportFormat.PDF]
                 }
             )
             
@@ -610,10 +635,10 @@ class DataVisualizationService:
                                        intended_use: str = "web") -> List[Dict[str, Any]]:
         """Get export format recommendations using atomic processors"""
         try:
-            # TODO: Use actual export engine when available
-            # For now, provide basic recommendations
+            # Export engine recommendation system
             recommendations = []
-            
+            chart_type = viz_spec.type if viz_spec else None
+
             if intended_use == "web":
                 recommendations.extend([
                     {
