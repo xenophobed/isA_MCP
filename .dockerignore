@@ -39,12 +39,17 @@ htmlcov/
 .tox/
 .benchmarks/
 quality_monitoring/
+conftest.py
+pytest.ini
+.coveragerc
+tox.ini
 
 # Caches & Logs
 cache/
 *.cache
 logs/
 *.log
+static/test_output/
 
 # Data directories (not needed in container)
 demo_data/
@@ -55,9 +60,13 @@ tools/external_services/testplan_service/
 # Documentation
 docs/
 HowTos/
-README.md
 *.md
+**/*.md
+README.md
+LICENSE.md
+CHANGELOG.md
 plan/
+issues/
 
 # Git
 .git/
@@ -80,9 +89,17 @@ deployment/production/.env*
 
 # Development & Testing
 tests/
+test_*.py
+*_test.py
+**/test*.py
+**/tests/
+**/*_test/
+**/*_tests/
+**/test_*/
 scripts/analysis/
 scripts/debug/
 sql/
+test_data/
 
 # Temporary files
 *.tmp

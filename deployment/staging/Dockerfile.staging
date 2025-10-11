@@ -1,0 +1,128 @@
+# ============================================
+# Staging MCP Service - Lightweight with Consul
+# ============================================
+
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
+    gcc \
+    g++ \
+    libffi-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /build
+
+# Copy and install staging requirements
+COPY deployment/staging/requirements.staging.txt .
+RUN pip install --no-cache-dir -r requirements.staging.txt && \
+    pip install --no-cache-dir python-consul==1.1.0 && \
+    # Clean up to reduce image size
+    find /opt/venv -name "*.pyc" -delete && \
+    find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -path "*/tests/*" -delete 2>/dev/null || true && \
+    find /opt/venv -path "*/test/*" -delete 2>/dev/null || true && \
+    find /opt/venv -name "*.dist-info" -type d -exec rm -rf {}/RECORD {}/WHEEL {}/METADATA {} + 2>/dev/null || true && \
+    rm -rf /opt/venv/lib/python3.11/site-packages/pip* /opt/venv/lib/python3.11/site-packages/setuptools* 2>/dev/null || true
+
+# ============================================
+# Stage 2: Runtime - Ultra lightweight
+# ============================================
+FROM python:3.11-slim
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
+    libpq5 \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/opt/venv/bin:$PATH" \
+    ENVIRONMENT=staging
+
+# Create non-root user
+RUN groupadd -r mcp && useradd -r -g mcp mcp
+
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder --chown=mcp:mcp /opt/venv /opt/venv
+
+# Copy only necessary application code
+COPY --chown=mcp:mcp main.py .
+COPY --chown=mcp:mcp core/ ./core/
+COPY --chown=mcp:mcp tools/ ./tools/
+COPY --chown=mcp:mcp prompts/ ./prompts/
+COPY --chown=mcp:mcp resources/ ./resources/
+COPY --chown=mcp:mcp config/ ./config/
+COPY --chown=mcp:mcp deployment/scripts/register_consul.py ./scripts/
+
+# Create required directories
+RUN mkdir -p /app/logs /app/cache && \
+    chown -R mcp:mcp /app
+
+USER mcp
+
+# Startup script using existing Consul integration
+COPY --chown=mcp:mcp <<'EOF' /app/start.sh
+#!/bin/sh
+set -e
+
+echo "🚀 Starting Staging MCP Service..."
+
+# Start Consul registration in background if enabled
+if [ "$CONSUL_ENABLED" = "true" ]; then
+    echo "📡 Starting Consul registration..."
+    python /app/scripts/register_consul.py &
+    CONSUL_PID=$!
+    echo "✅ Consul registration started (PID: $CONSUL_PID)"
+fi
+
+# Start MCP service
+echo "✅ Starting MCP service on port ${SERVICE_PORT:-8081}"
+exec python main.py --port ${SERVICE_PORT:-8081}
+EOF
+
+RUN chmod +x /app/start.sh
+
+# Expose MCP port
+EXPOSE 8081
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+# Use startup script
+ENTRYPOINT ["/app/start.sh"]
+
+# ============================================
+# Build & Run Instructions
+# ============================================
+# Build:
+#   cd /Users/xenodennis/Documents/Fun/isA_MCP
+#   docker build -f deployment/staging/Dockerfile.staging -t staging-isa-mcp:latest .
+#
+# Run with Consul:
+#   docker run -d \
+#     --name staging-isa-mcp \
+#     -p 8081:8081 \
+#     -e CONSUL_ENABLED=true \
+#     -e CONSUL_HOST=consul.service.consul \
+#     -e CONSUL_PORT=8500 \
+#     -e SERVICE_NAME=staging-isa-mcp \
+#     -e SERVICE_PORT=8081 \
+#     --env-file deployment/staging/.env.staging \
+#     staging-isa-mcp:latest
+#
+# Image size: ~664MB (Python slim + optimized deps, -290MB from cleanup)
+# ============================================

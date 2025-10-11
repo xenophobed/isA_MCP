@@ -5,7 +5,7 @@ Handles CSV file preprocessing and analysis for metadata extraction
 """
 
 import pandas as pd
-import sqlite3
+# import sqlite3  # Deprecated - using DuckDB instead
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -21,18 +21,7 @@ class CSVProcessor:
         self.file_path = Path(file_path)
         self.df = None
         self.user_id = user_id
-        self.sqlite_db_path = None
-        
-        # Get path to resources/dbs/sqlite directory
-        current_dir = Path(__file__).resolve()
-        project_root = current_dir
-        while project_root.name != "isA_MCP":
-            project_root = project_root.parent
-            if project_root == project_root.parent:  # Reached filesystem root
-                break
-        
-        self.sqlite_base_dir = project_root / "resources" / "dbs" / "sqlite"
-        self.sqlite_base_dir.mkdir(parents=True, exist_ok=True)
+        self.duckdb_path = None  # Using DuckDB instead of SQLite
         
     def load_csv(self, **kwargs) -> bool:
         """Load CSV file with error handling"""
@@ -254,7 +243,7 @@ class CSVProcessor:
     
     def save_to_sqlite(self, table_name: Optional[str] = None, if_exists: str = 'replace') -> Dict[str, Any]:
         """
-        Save CSV data to SQLite database in resources/dbs/sqlite
+        DEPRECATED: Save CSV data to database (now using DuckDB instead of SQLite)
         
         Args:
             table_name: Name for the table (defaults to CSV filename without extension)
@@ -263,117 +252,68 @@ class CSVProcessor:
         Returns:
             Dictionary with database information
         """
+        logger.warning("save_to_sqlite is deprecated. DuckDB can read CSV files directly without conversion.")
+        
+        # Return info about the CSV file itself since DuckDB can query it directly
         if self.df is None:
             if not self.load_csv():
                 return {"error": "Failed to load CSV data"}
         
-        try:
-            # Generate database filename
-            csv_name = self.file_path.stem  # filename without extension
-            if self.user_id:
-                db_filename = f"user_{self.user_id}_{csv_name}.db"
-            else:
-                db_filename = f"{csv_name}.db"
-            
-            self.sqlite_db_path = self.sqlite_base_dir / db_filename
-            
-            # Default table name to CSV filename
-            if table_name is None:
-                table_name = csv_name.lower().replace('-', '_').replace(' ', '_')
-            
-            # Connect and save data
-            with sqlite3.connect(self.sqlite_db_path) as conn:
-                # Save DataFrame to SQLite
-                self.df.to_sql(table_name, conn, if_exists=if_exists, index=False)
-                
-                # Get table info for verification
-                cursor = conn.cursor()
-                cursor.execute(f"PRAGMA table_info({table_name})")
-                columns_info = cursor.fetchall()
-                
-                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                row_count = cursor.fetchone()[0]
-            
-            logger.info(f"Successfully saved CSV to SQLite: {self.sqlite_db_path}")
-            
-            return {
-                "success": True,
-                "database_path": str(self.sqlite_db_path),
-                "table_name": table_name,
-                "row_count": row_count,
-                "columns": [{"name": col[1], "type": col[2]} for col in columns_info],
-                "database_size_mb": round(self.sqlite_db_path.stat().st_size / (1024 * 1024), 2)
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to save CSV to SQLite: {e}")
-            return {"error": str(e)}
+        csv_name = self.file_path.stem
+        if table_name is None:
+            table_name = csv_name.lower().replace('-', '_').replace(' ', '_')
+        
+        return {
+            "success": True,
+            "csv_path": str(self.file_path),
+            "table_name": table_name,
+            "row_count": len(self.df),
+            "columns": [{"name": col, "type": str(self.df[col].dtype)} for col in self.df.columns],
+            "note": "Use DuckDB to query this CSV directly: SELECT * FROM 'path/to/file.csv'"
+        }
     
-    def get_sqlite_connection(self) -> Optional[sqlite3.Connection]:
-        """Get connection to the SQLite database"""
-        if self.sqlite_db_path and self.sqlite_db_path.exists():
-            return sqlite3.connect(self.sqlite_db_path)
+    def get_sqlite_connection(self):
+        """DEPRECATED: Use DuckDB instead"""
+        logger.warning("get_sqlite_connection is deprecated. Use DuckDB for better performance.")
         return None
     
     def get_database_metadata(self) -> Dict[str, Any]:
-        """Get metadata about the SQLite database for SQL executor"""
-        if not self.sqlite_db_path or not self.sqlite_db_path.exists():
-            return {"error": "No SQLite database available"}
+        """Get metadata about the CSV for database operations"""
+        if self.df is None:
+            if not self.load_csv():
+                return {"error": "Failed to load CSV data"}
         
-        try:
-            with sqlite3.connect(self.sqlite_db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Get all tables
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                table_names = [row[0] for row in cursor.fetchall()]
-                
-                tables_metadata = []
-                for table_name in table_names:
-                    # Get table info
-                    cursor.execute(f"PRAGMA table_info({table_name})")
-                    columns_info = cursor.fetchall()
-                    
-                    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                    row_count = cursor.fetchone()[0]
-                    
-                    table_metadata = {
-                        "table_name": table_name,
-                        "record_count": row_count,
-                        "columns": [
-                            {
-                                "column_name": col[1],
-                                "data_type": col[2],
-                                "ordinal_position": col[0],
-                                "is_nullable": col[3] == 0,  # NOT NULL = 0
-                                "column_default": col[4],
-                                "is_primary_key": col[5] == 1
-                            }
-                            for col in columns_info
-                        ]
+        csv_name = self.file_path.stem
+        table_name = csv_name.lower().replace('-', '_').replace(' ', '_')
+        
+        return {
+            "csv_path": str(self.file_path),
+            "database_type": "duckdb",
+            "tables": [{
+                "table_name": table_name,
+                "record_count": len(self.df),
+                "columns": [
+                    {
+                        "column_name": col,
+                        "data_type": str(self.df[col].dtype),
+                        "ordinal_position": idx,
+                        "is_nullable": bool(self.df[col].isnull().any()),
+                        "column_default": None,
+                        "is_primary_key": False
                     }
-                    tables_metadata.append(table_metadata)
-                
-                return {
-                    "database_path": str(self.sqlite_db_path),
-                    "database_type": "sqlite",
-                    "tables": tables_metadata,
-                    "total_tables": len(tables_metadata)
-                }
-                
-        except Exception as e:
-            logger.error(f"Failed to get database metadata: {e}")
-            return {"error": str(e)}
+                    for idx, col in enumerate(self.df.columns, 1)
+                ]
+            }],
+            "total_tables": 1,
+            "query_example": f"SELECT * FROM '{self.file_path}' LIMIT 10"
+        }
     
     def get_full_analysis_with_sqlite(self, save_to_sqlite: bool = True) -> Dict[str, Any]:
-        """Get complete analysis including SQLite database creation"""
+        """Get complete analysis (SQLite deprecated, using DuckDB metadata)"""
         analysis = self.get_full_analysis()
         
-        if save_to_sqlite and analysis.get("file_info") and "error" not in analysis:
-            sqlite_result = self.save_to_sqlite()
-            analysis["sqlite_database"] = sqlite_result
-            
-            if sqlite_result.get("success"):
-                analysis["database_metadata"] = self.get_database_metadata()
+        if analysis.get("file_info") and "error" not in analysis:
+            analysis["database_metadata"] = self.get_database_metadata()
+            analysis["duckdb_note"] = "Use DuckDB to query CSV directly without conversion"
         
         return analysis

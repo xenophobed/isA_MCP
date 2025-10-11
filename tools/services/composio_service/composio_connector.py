@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 COMPOSIO_AVAILABLE = False
 try:
     from composio import Composio
+    from composio.client import Client
     try:
-        from composio.exceptions import ComposioSDKError
+        from composio.exceptions import ComposioAPIError as ComposioSDKError
     except ImportError:
         # Fallback for different exception locations
         ComposioSDKError = Exception
@@ -29,6 +30,7 @@ try:
 except ImportError as e:
     logger.warning(f"Composio SDK not available: {e}. Install with: pip install composio")
     Composio = None
+    Client = None
     ComposioSDKError = Exception
 
 class ComposioService(BaseService):
@@ -70,8 +72,8 @@ class ComposioService(BaseService):
             self.composio_client = Composio(api_key=api_key)
             
             # Test connection by listing available toolkits
-            toolkits_response = self.composio_client.client.toolkits.list()
-            toolkits = toolkits_response.items
+            toolkits_response = self.composio_client.toolkits.list()
+            toolkits = toolkits_response.items if hasattr(toolkits_response, 'items') else []
             logger.info(f"Connected to Composio with {len(toolkits)} toolkits available")
             
             # Store available integrations
@@ -112,8 +114,8 @@ class ComposioService(BaseService):
         
         try:
             # Simple health check - list toolkits
-            toolkits_response = self.composio_client.client.toolkits.list()
-            return toolkits_response is not None and hasattr(toolkits_response, 'items')
+            toolkits_response = self.composio_client.toolkits.list()
+            return toolkits_response is not None
         except Exception as e:
             logger.error(f"Composio health check failed: {e}")
             return False
@@ -354,19 +356,9 @@ class ComposioService(BaseService):
     async def _create_or_get_auth_config(self, app_name: str) -> str:
         """Create or get auth config for an app"""
         try:
-            # First try to list existing auth configs
-            auth_configs = self.composio_client.client.auth_configs.list()
-            
-            # Look for existing auth config for this app
-            if hasattr(auth_configs, 'items') and auth_configs.items:
-                for config in auth_configs.items:
-                    if hasattr(config, 'toolkit') and getattr(config.toolkit, 'slug', '') == app_name:
-                        return config.id
-            
-            # If no auth config exists, create one
-            auth_config = self.composio_client.client.auth_configs.create(
-                toolkit={"slug": app_name}
-            )
+            # Use entity_id approach for new API
+            # Create connected account directly
+            return f"entity_default_{app_name}"
             
             return getattr(auth_config, 'id', f"auth_config_{app_name}")
             
@@ -400,9 +392,9 @@ class ComposioService(BaseService):
     async def _handle_list_integrations(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle listing available integrations"""
         try:
-            toolkits_response = self.composio_client.client.toolkits.list()
-            toolkits = toolkits_response.items
-            app_list = [{"name": toolkit.name, "description": getattr(toolkit, 'description', '')} for toolkit in toolkits]
+            toolkits_response = self.composio_client.toolkits.list()
+            toolkits = toolkits_response.items if hasattr(toolkits_response, 'items') else []
+            app_list = [{"name": getattr(toolkit, 'name', str(toolkit)), "description": getattr(toolkit, 'description', '')} for toolkit in toolkits]
             
             return {
                 "success": True,
@@ -430,11 +422,11 @@ class ComposioService(BaseService):
             # Step 1: Get auth config for the app
             auth_config_id = await self._create_or_get_auth_config(app_name)
             
-            # Step 2: Initiate real OAuth connection  
+            # Step 2: Initiate connection using new API
             connection_request = self.composio_client.connected_accounts.initiate(
-                user_id="default",
-                auth_config_id=auth_config_id,
-                callback_url="http://localhost:8081/oauth/callback"
+                integrationId=app_name,
+                entityId="default",
+                data={"redirectUri": "http://localhost:8081/oauth/callback"}
             )
             
             # Step 3: Return OAuth URL for user authorization
@@ -464,14 +456,14 @@ class ComposioService(BaseService):
         app_name = params.get('app_name')
         
         try:
-            connections_response = self.composio_client.client.connected_accounts.list()
-            connections = connections_response.items
+            connections_response = self.composio_client.connected_accounts.list()
+            connections = connections_response.items if hasattr(connections_response, 'items') else []
             
             if app_name:
-                connections = [conn for conn in connections if getattr(conn, 'app_name', None) == app_name]
+                connections = [conn for conn in connections if getattr(conn, 'appUniqueId', getattr(conn, 'app_name', None)) == app_name]
             
             account_list = [{
-                "app_name": getattr(conn, 'app_name', 'unknown'),
+                "app_name": getattr(conn, 'appUniqueId', getattr(conn, 'app_name', 'unknown')),
                 "connection_id": getattr(conn, 'id', ''),
                 "status": getattr(conn, 'status', 'active')
             } for conn in connections]
@@ -499,18 +491,9 @@ class ComposioService(BaseService):
             raise ValueError("app_name and action_name are required")
         
         try:
-            # Execute action using the tools API
-            tools_response = self.composio_client.client.tools.list(apps=[app_name])
-            tools = tools_response.items
-            
-            # Find the specific action
-            matching_tools = [tool for tool in tools if action_name.lower() in tool.name.lower()]
-            if not matching_tools:
-                raise ValueError(f"Action '{action_name}' not found for app '{app_name}'")
-            
-            # Execute the first matching tool
-            action_result = self.composio_client.tools.execute(
-                action_name=matching_tools[0].name,
+            # Execute action using the new API
+            action_result = self.composio_client.actions.execute(
+                action_name=f"{app_name}_{action_name}",
                 params=action_params,
                 entity_id="default"
             )
@@ -539,14 +522,14 @@ class ComposioService(BaseService):
             raise ValueError("app_name parameter is required")
         
         try:
-            # Get tools for the app - use apps parameter instead of app_names
-            tools_response = self.composio_client.client.tools.list(apps=[app_name])
-            tools = tools_response.items
+            # Get actions for the app using new API
+            actions_response = self.composio_client.actions.list(appNames=[app_name])
+            actions = actions_response.items if hasattr(actions_response, 'items') else []
             action_list = [{
-                "name": tool.name,
-                "description": getattr(tool, 'description', ''),
-                "parameters": getattr(tool, 'parameters', {})
-            } for tool in tools]
+                "name": getattr(action, 'name', str(action)),
+                "description": getattr(action, 'description', ''),
+                "parameters": getattr(action, 'parameters', {})
+            } for action in actions]
             
             return {
                 "success": True,
@@ -643,18 +626,18 @@ class ComposioService(BaseService):
     async def _fetch_resource(self, resource: Dict[str, Any], params: Dict[str, Any]) -> Any:
         """Fetch resource data from Composio"""
         if resource.get("name") == "connected_accounts":
-            connections_response = self.composio_client.client.connected_accounts.list()
-            connections = connections_response.items
+            connections_response = self.composio_client.connected_accounts.list()
+            connections = connections_response.items if hasattr(connections_response, 'items') else []
             return [{
-                "app_name": getattr(conn, 'app_name', 'unknown'),
+                "app_name": getattr(conn, 'appUniqueId', getattr(conn, 'app_name', 'unknown')),
                 "connection_id": getattr(conn, 'id', ''),
                 "status": getattr(conn, 'status', 'active')
             } for conn in connections]
         
         elif resource.get("name") == "available_apps":
-            toolkits_response = self.composio_client.client.toolkits.list()
-            toolkits = toolkits_response.items
-            return [{"name": toolkit.name, "description": getattr(toolkit, 'description', '')} for toolkit in toolkits]
+            toolkits_response = self.composio_client.toolkits.list()
+            toolkits = toolkits_response.items if hasattr(toolkits_response, 'items') else []
+            return [{"name": getattr(toolkit, 'name', str(toolkit)), "description": getattr(toolkit, 'description', '')} for toolkit in toolkits]
         
         elif resource.get("name") == "app_schemas":
             # Return schema information for connected apps
@@ -677,3 +660,25 @@ class ComposioService(BaseService):
             env_var = value[2:-1]  # Remove ${ and }
             return os.environ.get(env_var, value)
         return value
+
+
+class ComposioConnector:
+    """Backwards compatibility connector for Composio"""
+    
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize ComposioConnector with optional API key"""
+        self.service = ComposioService({'auth_config': {'api_key': api_key}})
+        
+    async def connect(self) -> bool:
+        """Connect to Composio"""
+        return await self.service.connect()
+        
+    def get_available_tools(self) -> List[str]:
+        """Get list of available tools"""
+        if not self.service.is_connected:
+            return []
+        return list(self.service.available_tools.keys())
+        
+    async def invoke_tool(self, tool_name: str, params: Dict[str, Any]) -> Any:
+        """Invoke a tool"""
+        return await self.service.invoke_tool(tool_name, params)

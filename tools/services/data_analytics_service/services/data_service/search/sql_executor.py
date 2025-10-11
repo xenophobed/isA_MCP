@@ -1087,7 +1087,9 @@ class SQLExecutor:
     @classmethod
     def create_sqlite_executor(cls, database_filename: str, user_id: Optional[str] = None) -> 'SQLExecutor':
         """
-        Create SQL executor for SQLite database in resources/dbs/sqlite
+        DEPRECATED: Use create_duckdb_executor() instead for better performance
+        
+        Create SQL executor for SQLite database
         
         Args:
             database_filename: Name of the SQLite database file
@@ -1096,37 +1098,15 @@ class SQLExecutor:
         Returns:
             SQLExecutor configured for the SQLite database
         """
-        # Get path to resources/dbs/sqlite directory
-        import os
-        from pathlib import Path
+        # Redirect to DuckDB for better performance
+        logger.warning("create_sqlite_executor is deprecated. Using DuckDB instead for better performance.")
         
-        current_dir = Path(__file__).resolve()
-        project_root = current_dir
-        while project_root.name != "isA_MCP":
-            project_root = project_root.parent
-            if project_root == project_root.parent:  # Reached filesystem root
-                break
-        
-        sqlite_dir = project_root / "resources" / "dbs" / "sqlite"
-        
-        # If user_id provided, look for user-specific database
+        # Use DuckDB with file-based storage
+        db_path = f"{database_filename}.duckdb" if not database_filename.endswith('.duckdb') else database_filename
         if user_id:
-            user_db_path = sqlite_dir / f"user_{user_id}_{database_filename}"
-            if user_db_path.exists():
-                db_path = str(user_db_path)
-            else:
-                db_path = str(sqlite_dir / database_filename)
-        else:
-            db_path = str(sqlite_dir / database_filename)
+            db_path = f"user_{user_id}_{db_path}"
         
-        database_config = {
-            'type': 'sqlite',
-            'database': db_path,
-            'max_execution_time': 30,
-            'max_rows': 10000
-        }
-        
-        return cls(database_config)
+        return cls.create_duckdb_executor(database_path=db_path)
     
     # ===== LLM Integration and Feedback Methods =====
     
