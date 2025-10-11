@@ -24,22 +24,18 @@ docker build --platform linux/amd64 \
 ## Deployment Commands
 
 ### Local Testing (Recommended)
-Uses `.env.staging` file with dynamic overrides for local development:
+**Simplified command** - All configuration is in `.env.staging` file:
 
 ```bash
 docker run -d \
     --name mcp-staging-test \
+    --add-host=host.docker.internal:host-gateway \
     --env-file /Users/xenodennis/Documents/Fun/isA_MCP/deployment/staging/.env.staging \
-    -e CONSUL_HOST=host.docker.internal \
-    -e CONSUL_PORT=8500 \
-    -e CONSUL_ENABLED=false \
-    -e DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:54322/postgres?options=-c%20search_path=dev" \
-    -e SUPABASE_LOCAL_URL="http://host.docker.internal:54321" \
-    -e SUPABASE_LOCAL_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
-    -e SUPABASE_LOCAL_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU" \
     -p 8081:8081 \
     staging-isa-mcp:amd64
 ```
+
+**Note**: Make sure you've added the required variables to `.env.staging` (see Environment Variables Configuration section below)
 
 ### Legacy Local Testing (All environment variables)
 ```bash
@@ -58,22 +54,20 @@ docker run -d \
 ```
 
 ### Production Deployment
-Uses `.env.staging` file with production overrides:
+**Simplified command** - Override only production-specific values:
 
 ```bash
 docker run -d \
     --name mcp-staging-prod \
     --env-file /path/to/deployment/staging/.env.staging \
     -e CONSUL_HOST=consul.service.consul \
-    -e CONSUL_PORT=8500 \
-    -e CONSUL_ENABLED=true \
     -e DATABASE_URL="YOUR_PRODUCTION_DATABASE_URL" \
     -e SUPABASE_LOCAL_URL="YOUR_PRODUCTION_SUPABASE_URL" \
-    -e SUPABASE_LOCAL_ANON_KEY="YOUR_PRODUCTION_ANON_KEY" \
-    -e SUPABASE_LOCAL_SERVICE_ROLE_KEY="YOUR_PRODUCTION_SERVICE_ROLE_KEY" \
     -p 8081:8081 \
     staging-isa-mcp:amd64
 ```
+
+**Note**: For production, only override the variables that differ from the `.env.staging` defaults
 
 ## Testing & Verification
 
@@ -127,12 +121,35 @@ docker ps | grep mcp-staging
 - Cleaned pip cache and bytecode files
 - Removed test directories and metadata
 
-## Environment Variables
+## Environment Variables Configuration
+
+### 🔧 Setup Instructions
+
+**Before running the container, update your `.env.staging` file with these required variables:**
+
+```bash
+# Add to deployment/staging/.env.staging
+
+# ====================
+# CONSUL SERVICE DISCOVERY
+# ====================
+CONSUL_HOST="host.docker.internal"
+CONSUL_PORT="8500"
+CONSUL_ENABLED="true"
+
+# ====================
+# DATABASE CONFIGURATION (Local Testing)
+# ====================
+SUPABASE_LOCAL_URL="http://host.docker.internal:54321"
+SUPABASE_LOCAL_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+SUPABASE_LOCAL_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+DATABASE_URL="postgresql://postgres:postgres@host.docker.internal:54322/postgres?options=-c%20search_path=dev"
+```
 
 ### Configuration Approach
-The deployment uses a **hybrid approach**:
-- **Static configuration**: Stored in `.env.staging` file
-- **Dynamic overrides**: Passed as `-e` parameters for environment-specific values
+The deployment uses a **simplified approach**:
+- **All configuration**: Stored in `.env.staging` file
+- **Minimal overrides**: Only override when necessary for specific environments
 
 ### Static Variables (in .env.staging)
 | Variable | Description | Value |
@@ -150,7 +167,7 @@ The deployment uses a **hybrid approach**:
 |----------|----------|-------------|---------|
 | `CONSUL_HOST` | No | Consul server host | `host.docker.internal` |
 | `CONSUL_PORT` | No | Consul server port | `8500` |
-| `CONSUL_ENABLED` | No | Enable Consul discovery | `false` |
+| `CONSUL_ENABLED` | No | Enable Consul discovery (default: true) | `true` |
 | `DATABASE_URL` | Yes | PostgreSQL database URL | `postgresql://...` |
 | `SUPABASE_LOCAL_URL` | Yes | Supabase URL | `http://host.docker.internal:54321` |
 | `SUPABASE_LOCAL_ANON_KEY` | Yes | Supabase anonymous key | `eyJhbGciOi...` |
@@ -170,8 +187,9 @@ The deployment uses a **hybrid approach**:
    - Verify database is accessible
 
 3. **Consul connection issues**
-   - Set CONSUL_ENABLED=false to disable Consul
-   - Verify CONSUL_HOST connectivity
+   - Consul is **enabled by default** for service discovery
+   - Set CONSUL_ENABLED=false to disable Consul if not needed
+   - Verify CONSUL_HOST connectivity (default: host.docker.internal:8500)
 
 4. **Port conflicts**
    ```bash

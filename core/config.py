@@ -361,21 +361,21 @@ class MCPSettings:
     
     def _load_service_urls_from_consul(self, discovery):
         """Load all service URLs from Consul service discovery"""
-        # Service discovery mappings
+        # Service discovery mappings - Updated to match actual Consul service names
         service_mappings = {
-            'model': 'isa_service_url',
-            'agent': 'agent_service_url', 
-            'auth': 'auth_service_url',
-            'authz': 'authz_service_url',
-            'user': 'user_service_url',
-            'storage': None,  # Special handling
+            'models': 'isa_service_url',          # Changed from 'model' to 'models'
+            'agents': 'agent_service_url',        # Changed from 'agent' to 'agents'
+            'auth_service': 'auth_service_url',   # Changed from 'auth' to 'auth_service'
+            'authorization_service': 'authz_service_url',  # Changed from 'authz' to 'authorization_service'
+            'account_service': 'user_service_url',         # Changed from 'user' to 'account_service'
+            'storage_service': None,              # Changed from 'storage' to 'storage_service', Special handling
         }
         
         for service_name, attr_name in service_mappings.items():
             try:
                 url = discovery.get_service_url(service_name)
                 if url:
-                    if service_name == 'storage':
+                    if service_name == 'storage_service':
                         # Special handling for storage service
                         import re
                         match = re.match(r'http://([^:]+):(\d+)', url)

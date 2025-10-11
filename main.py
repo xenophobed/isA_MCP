@@ -807,12 +807,10 @@ async def run_server(port: int = 8081):
     consul_registration = None
     if os.getenv("CONSUL_ENABLED", "true").lower() == "true":
         try:
-            from deployment.scripts.register_consul import MCPConsulRegistration
-            consul_registration = MCPConsulRegistration()
-            if consul_registration.register():
+            from core.consul_registry import initialize_consul_registry
+            consul_registration = initialize_consul_registry("mcp_service", int(os.getenv("SERVICE_PORT", "8081")))
+            if consul_registration:
                 logger.info("✅ Registered with Consul service discovery")
-                # Start health check maintenance in background
-                asyncio.create_task(asyncio.to_thread(consul_registration.maintain_health))
             else:
                 logger.warning("⚠️ Failed to register with Consul, continuing without service discovery")
         except Exception as e:
@@ -889,7 +887,8 @@ async def run_server(port: int = 8081):
         # Deregister from Consul on shutdown
         if consul_registration:
             try:
-                consul_registration.deregister()
+                from core.consul_registry import cleanup_consul_registry
+                cleanup_consul_registry()
                 logger.info("✅ Deregistered from Consul")
             except Exception as e:
                 logger.error(f"Consul deregistration error: {e}")

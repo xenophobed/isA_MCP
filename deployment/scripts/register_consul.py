@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class MCPConsulRegistration:
     def __init__(self,
-                 service_name="mcp",
+                 service_name="mcp_service",
                  service_port=8081,
                  consul_host=None,
                  consul_port=8500,
@@ -43,14 +43,7 @@ class MCPConsulRegistration:
                 service_id=self.service_id,
                 address=self.service_host,
                 port=self.service_port,
-                tags=[
-                    "sse",          # Server-Sent Events support
-                    "mcp",          # Model Context Protocol
-                    "ai",           # AI service
-                    "streaming",    # Streaming responses
-                    "long-polling", # Long polling support
-                    "websocket",    # WebSocket support (if applicable)
-                ],
+                tags=["platform", "ai", "api"],  # Standardized platform service tags
                 check=consul.Check.ttl("30s")  # TTL check every 30 seconds
             )
             
@@ -60,7 +53,7 @@ class MCPConsulRegistration:
             logger.info(f"✅ MCP service registered with Consul: {self.service_id}")
             logger.info(f"   Service: {self.service_name}")
             logger.info(f"   Port: {self.service_port}")
-            logger.info(f"   Tags: sse, mcp, ai, streaming")
+            logger.info(f"   Tags: platform, ai, api")
             
             return True
             
@@ -69,22 +62,50 @@ class MCPConsulRegistration:
             return False
     
     def maintain_health(self):
-        """Maintain health check with Consul"""
+        """Maintain health check with enhanced error handling"""
+        retry_count = 0
+        max_retries = 3
+        
         while self.running:
             try:
+                # Check if service is still registered
+                services = self.consul.agent.services()
+                if self.service_id not in services:
+                    logger.warning(f"Service {self.service_id} not found in Consul, re-registering...")
+                    if self.register():
+                        retry_count = 0
+                        logger.info(f"✅ Successfully re-registered {self.service_id}")
+                    else:
+                        retry_count += 1
+                        logger.error(f"❌ Failed to re-register {self.service_id}, retry {retry_count}/{max_retries}")
+                
                 # Update TTL health check
                 self.consul.agent.check.ttl_pass(
                     f"service:{self.service_id}",
-                    "MCP service is healthy"
+                    f"MCP service is healthy - {self.service_name}@{self.service_host}:{self.service_port}"
                 )
-                logger.debug("Health check passed")
-                time.sleep(15)  # Update every 15 seconds
+                logger.debug(f"✅ TTL health check passed for {self.service_id}")
+                retry_count = 0  # Reset on success
+                
+                # Dynamic sleep based on error state
+                sleep_time = 5 if retry_count > 0 else 15
+                time.sleep(sleep_time)
                 
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                logger.error(f"Health check failed: {e}")
-                time.sleep(5)
+                retry_count += 1
+                logger.error(f"❌ Health check failed: {e}, retry {retry_count}/{max_retries}")
+                
+                # Re-register if TTL fails multiple times
+                if retry_count >= max_retries:
+                    logger.error(f"TTL failed {max_retries} times, attempting re-registration")
+                    self.register()
+                    retry_count = 0
+                
+                # Exponential backoff
+                sleep_time = min(5 * (2 ** (retry_count - 1)), 30)
+                time.sleep(sleep_time)
     
     def deregister(self):
         """Deregister service from Consul"""
@@ -106,7 +127,7 @@ def main():
     # Create registration - will read from env vars
     service_port = int(os.getenv('SERVICE_PORT', '8081'))
     registration = MCPConsulRegistration(
-        service_name="mcp",
+        service_name="mcp_service",
         service_port=service_port
     )
     
