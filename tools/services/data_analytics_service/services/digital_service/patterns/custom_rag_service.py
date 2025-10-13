@@ -32,6 +32,11 @@ from ..integrations.embedding_integration import EmbeddingIntegration
 from ..integrations.vector_db_integration import VectorDBIntegration
 from ..config.analytics_config import VectorDBPolicy
 
+# 导入 ChunkingService for hybrid approach
+from tools.services.intelligence_service.vector_db.chunking_service import (
+    ChunkingService, ChunkingStrategy, ChunkConfig
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,7 +71,18 @@ class CustomRAGService:
         self.chunk_size = self.config.get('chunk_size', 1000)
         self.chunk_overlap = self.config.get('chunk_overlap', 100)
         self.top_k = self.config.get('top_k_results', 5)
-        
+
+        # Chunking strategy: "page" (default) or "recursive", "semantic", etc.
+        self.chunking_strategy = self.config.get('chunking_strategy', 'page')
+
+        # Initialize ChunkingService for hybrid approach
+        if self.chunking_strategy != 'page':
+            self.chunking_service = ChunkingService()
+            logger.info(f"Hybrid chunking enabled: strategy={self.chunking_strategy}")
+        else:
+            self.chunking_service = None
+            logger.info("Page-level chunking enabled (default)")
+
         logger.info(f"CustomRAGService initialized with vector DB: {vector_db_policy.value}")
     
     async def ingest_pdf(
@@ -101,15 +117,21 @@ class CustomRAGService:
             
             logger.info(f"📥 开始 PDF 摄取: {pdf_name} (user: {user_id})")
             
-            # ========== 阶段 1: 页面级多模态处理 ==========
-            logger.info("🔧 阶段 1: 页面级多模态分析...")
-            
-            # 处理每一页（图+文一起）
-            page_records = await self._process_pages_multimodal(
-                pdf_path, user_id, pdf_name, metadata
-            )
-            
-            logger.info(f"✅ 处理完成: {len(page_records)} 个页面")
+            # ========== 阶段 1: 多模态处理 ==========
+            if self.chunking_strategy == 'page':
+                logger.info("🔧 阶段 1: 页面级多模态分析 (Page-level)...")
+                # 页面级：每页一个 chunk
+                page_records = await self._process_pages_multimodal(
+                    pdf_path, user_id, pdf_name, metadata
+                )
+            else:
+                logger.info(f"🔧 阶段 1: 混合多模态分析 (Hybrid: {self.chunking_strategy})...")
+                # 混合模式：VLM 分析页面 + 文本分块
+                page_records = await self._process_pages_hybrid(
+                    pdf_path, user_id, pdf_name, metadata
+                )
+
+            logger.info(f"✅ 处理完成: {len(page_records)} 个 chunks")
             
             # ========== 阶段 2: 存储到 Supabase ==========
             logger.info("💾 阶段 2: 存储到 Supabase pgvector...")
@@ -249,7 +271,234 @@ class CustomRAGService:
         logger.info(f"✅ 页面处理完成: {len(page_records)}/{len(pages_text_list)} 成功")
         
         return page_records
-    
+
+    async def _process_pages_hybrid(
+        self,
+        pdf_path: str,
+        user_id: str,
+        pdf_name: str,
+        metadata: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        混合模式处理：VLM 分析页面 + 文本细粒度分块
+
+        流程：
+        1. 按页提取文本
+        2. VLM 分析整页 (multimodal) + 上传图片到 MinIO
+        3. 对每页文本进行细粒度分块 (ChunkingService)
+        4. 每个文本 chunk 关联 page_id + photo_urls
+
+        Returns:
+            chunk 记录列表（比页面数量多，因为每页被分成多个 chunks）
+        """
+        from tools.services.data_analytics_service.processors.file_processors.pdf_processor import PDFProcessor
+
+        pdf_processor = PDFProcessor(self.config)
+        all_chunk_records = []
+
+        # 1. 提取 PDF 完整信息
+        logger.info("📄 提取 PDF 内容...")
+        result = await pdf_processor.process_pdf_unified(pdf_path, {
+            'extract_text': True,
+            'extract_images': True,
+            'extract_tables': False
+        })
+
+        if not result.get('success'):
+            logger.error(f"PDF 提取失败: {result.get('error')}")
+            return []
+
+        # 提取文字（按页）
+        text_extraction = result.get('text_extraction', {})
+        pages_text_list = text_extraction.get('pages', [])
+        logger.info(f"提取到 {len(pages_text_list)} 个页面的文字")
+
+        # 提取图片（按页分组）
+        image_analysis = result.get('image_analysis', {})
+        all_images = image_analysis.get('extracted_images', [])
+        logger.info(f"提取到 {len(all_images)} 张图片")
+
+        if not pages_text_list:
+            logger.warning("❌ 没有提取到任何页面！")
+            return []
+
+        # 限制处理的页面数量
+        max_pages = self.config.get('max_pages')
+        if max_pages and len(pages_text_list) > max_pages:
+            logger.info(f"⚠️ 限制页面处理数量: {len(pages_text_list)} -> {max_pages}")
+            pages_text_list = pages_text_list[:max_pages]
+
+        # 2. 并发处理每一页（VLM + 分块）
+        logger.info(f"🔄 开始混合处理 {len(pages_text_list)} 个页面...")
+
+        max_concurrent = self.config.get('max_concurrent_pages', 3)
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        tasks = []
+        for page_idx, page_text in enumerate(pages_text_list, start=1):
+            page_num = page_idx
+
+            # 获取该页的图片
+            page_images = [
+                img for img in all_images
+                if img.get('page_number') == page_num
+            ]
+
+            task = self._process_single_page_hybrid(
+                pdf_path=pdf_path,
+                page_number=page_num,
+                page_text=page_text,
+                page_images=page_images,
+                user_id=user_id,
+                pdf_name=pdf_name,
+                metadata=metadata,
+                semaphore=semaphore
+            )
+            tasks.append(task)
+
+        # 并发执行
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 收集所有 chunks (每页可能产生多个 chunks)
+        for idx, r in enumerate(results):
+            if isinstance(r, Exception):
+                logger.error(f"页面 {idx+1} 处理失败: {r}")
+            elif r and isinstance(r, list):
+                # r 是该页的 chunk 列表
+                all_chunk_records.extend(r)
+
+        logger.info(f"✅ 混合处理完成: {len(all_chunk_records)} 个 chunks from {len(pages_text_list)} pages")
+
+        return all_chunk_records
+
+    async def _process_single_page_hybrid(
+        self,
+        pdf_path: str,
+        page_number: int,
+        page_text: str,
+        page_images: List[Dict[str, Any]],
+        user_id: str,
+        pdf_name: str,
+        metadata: Dict[str, Any],
+        semaphore: asyncio.Semaphore
+    ) -> List[Dict[str, Any]]:
+        """
+        混合处理单个页面：VLM 分析 + 文本细粒度分块
+
+        Returns:
+            该页的 chunk 记录列表 (可能有多个 chunks)
+        """
+        async with semaphore:
+            try:
+                logger.info(f"📄 处理页面 {page_number} (hybrid)...")
+
+                # 1. VLM 分析整页 (multimodal context)
+                enable_vlm = self.config.get('enable_vlm_analysis', True)
+                if enable_vlm:
+                    page_summary, photo_descriptions = await self._analyze_page_with_vlm(
+                        pdf_path, page_number, page_text, len(page_images)
+                    )
+                else:
+                    page_summary = f"第{page_number}页"
+                    photo_descriptions = [f"图片{i+1}" for i in range(len(page_images))]
+
+                # 2. 上传页面图片到 MinIO
+                enable_minio = self.config.get('enable_minio_upload', True)
+                photo_urls = []
+                if enable_minio:
+                    for idx, img_data in enumerate(page_images):
+                        try:
+                            photo_url = await self._upload_image_to_minio(
+                                img_data, user_id, pdf_name, page_number, idx
+                            )
+                            if photo_url:
+                                photo_urls.append(photo_url)
+                        except Exception as e:
+                            logger.warning(f"图片上传失败 (page={page_number}, img={idx}): {e}")
+                            continue
+                else:
+                    photo_urls = [f"placeholder_url_{i}" for i in range(len(page_images))]
+
+                # 3. 使用 ChunkingService 分块文本
+                if not page_text or not page_text.strip():
+                    logger.warning(f"页面 {page_number} 无文本，跳过分块")
+                    return []
+
+                # 配置分块策略
+                chunk_config = ChunkConfig(
+                    strategy=ChunkingStrategy(self.chunking_strategy),
+                    chunk_size=self.chunk_size,
+                    chunk_overlap=self.chunk_overlap,
+                    min_chunk_size=100,
+                    max_chunk_size=self.chunk_size * 2
+                )
+
+                # 分块
+                chunks = await self.chunking_service.get_chunker(chunk_config).chunk(
+                    text=page_text,
+                    metadata={'page_number': page_number}
+                )
+
+                logger.info(f"📝 页面 {page_number} 分成 {len(chunks)} 个 chunks")
+
+                # 4. 为每个 chunk 生成 embedding 和记录
+                chunk_records = []
+                for chunk_idx, chunk in enumerate(chunks):
+                    # 合并文本：page_summary + chunk_text + photo_descriptions
+                    combined_parts = []
+
+                    # 添加页面摘要 (for context)
+                    if page_summary and chunk_idx == 0:  # 只在第一个 chunk 加摘要
+                        combined_parts.append(f"【页面概要】{page_summary}")
+
+                    # 添加 chunk 文本
+                    combined_parts.append(chunk.text)
+
+                    # 添加图片描述 (for context)
+                    if photo_descriptions and chunk_idx == 0:  # 只在第一个 chunk 加图片
+                        combined_parts.append("\n【页面图片】")
+                        for idx, desc in enumerate(photo_descriptions, 1):
+                            combined_parts.append(f"图片{idx}: {desc}")
+
+                    combined_text = "\n".join(combined_parts)
+
+                    # 生成 embedding
+                    embedding = await self.embedding_integration.embed_text(combined_text)
+
+                    # 创建 chunk 记录
+                    chunk_record = {
+                        'page_number': page_number,
+                        'chunk_index': chunk_idx,
+                        'text': combined_text,
+                        'embedding': embedding,
+                        'photo_urls': photo_urls,  # 该页的所有图片
+                        'metadata': {
+                            'pdf_name': pdf_name,
+                            'page_number': page_number,
+                            'chunk_index': chunk_idx,
+                            'total_page_chunks': len(chunks),
+                            'page_summary': page_summary,
+                            'num_photos': len(photo_urls),
+                            'photo_descriptions': photo_descriptions,
+                            'chunking_strategy': self.chunking_strategy,
+                            'content_type': 'text_chunk',
+                            'chunk_id': chunk.chunk_id,
+                            **chunk.metadata,
+                            **metadata
+                        }
+                    }
+
+                    chunk_records.append(chunk_record)
+
+                logger.info(f"✅ 页面 {page_number} 处理完成: {len(chunk_records)} chunks, {len(photo_urls)} 张图片")
+                return chunk_records
+
+            except Exception as e:
+                logger.error(f"❌ 页面 {page_number} 混合处理失败: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return []
+
     async def _process_single_page_multimodal(
         self,
         pdf_path: str,

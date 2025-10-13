@@ -51,22 +51,26 @@ def register_digital_tools(mcp: FastMCP):
         
         Args:
             user_id: User identifier for knowledge isolation
-            content: Content to store (text/document content, or image file path)
-            content_type: Type of content - "text", "document", "image"
+            content: Content to store (text/document content, file path for image/pdf)
+            content_type: Type of content - "text", "document", "image", "pdf"
             metadata: Additional metadata as dict (e.g. {"source": "manual", "topic": "AI"})
             options: Storage options as dict (e.g. {"chunk_size": 400, "overlap": 50, "model": "gpt-4o-mini"})
-        
+
         Examples:
             # Store text
             store_knowledge(user_id="user1", content="Python is a programming language", content_type="text")
-            
+
             # Store document with chunking
-            store_knowledge(user_id="user1", content="Long document...", content_type="document", 
+            store_knowledge(user_id="user1", content="Long document...", content_type="document",
                           options={"chunk_size": 400, "overlap": 50})
-            
+
             # Store image
             store_knowledge(user_id="user1", content="/path/to/image.jpg", content_type="image",
                           options={"model": "gpt-4o-mini", "description_prompt": "Describe this image"})
+
+            # Store PDF with multimodal processing
+            store_knowledge(user_id="user1", content="/path/to/document.pdf", content_type="pdf",
+                          options={"enable_vlm_analysis": True, "enable_minio_upload": True, "max_pages": 14})
         """
         try:
             metadata = metadata or {}
@@ -87,16 +91,43 @@ def register_digital_tools(mcp: FastMCP):
                 
             elif content_type == "image":
                 model = options.get("model", "gpt-4o-mini")
-                description_prompt = options.get("description_prompt", 
+                description_prompt = options.get("description_prompt",
                     "Describe this image in detail, including objects, scene, colors, composition, and any text visible.")
                 result = await digital_tool.analytics_service.store_image(
                     user_id, content, metadata, description_prompt, model
                 )
-                
+
+            elif content_type == "pdf":
+                # Route to CustomRAGService for multimodal PDF processing
+                from ..services.digital_service.patterns.custom_rag_service import get_custom_rag_service
+
+                # Extract PDF config from options
+                pdf_config = {
+                    'enable_vlm_analysis': options.get('enable_vlm_analysis', True),
+                    'enable_minio_upload': options.get('enable_minio_upload', True),
+                    'max_pages': options.get('max_pages'),
+                    'max_concurrent_pages': options.get('max_concurrent_pages', 2),
+                    'chunking_strategy': options.get('chunking_strategy', 'page'),
+                    'chunk_size': options.get('chunk_size', 800),
+                    'chunk_overlap': options.get('chunk_overlap', 100),
+                    'top_k_results': options.get('top_k_results', 5)
+                }
+
+                custom_rag = get_custom_rag_service(pdf_config)
+                result = await custom_rag.ingest_pdf(
+                    pdf_path=content,  # content is the PDF file path
+                    user_id=user_id,
+                    metadata=metadata
+                )
+
+                # Add ingestion method to result
+                if result.get('success'):
+                    result['ingestion_method'] = 'custom_rag_multimodal'
+
             else:
                 return digital_tool.create_response(
                     "error", "store_knowledge", {},
-                    f"Unsupported content_type: {content_type}. Use 'text', 'document', or 'image'"
+                    f"Unsupported content_type: {content_type}. Use 'text', 'document', 'image', or 'pdf'"
                 )
             
             return digital_tool.create_response(
@@ -133,7 +164,8 @@ def register_digital_tools(mcp: FastMCP):
                 - top_k: Number of results (default: 5)
                 - enable_rerank: Enable reranking for quality (default: False)
                 - search_mode: "semantic", "hybrid", "lexical" (default: "hybrid")
-                - content_types: ["text", "image"] - filter by content type
+                - content_types: ["text", "image", "pdf"] - filter by content type
+                - content_type: "text", "image", "pdf" - filter for specific type
                 - return_format: "results", "context", "list" - output format
                 - knowledge_id: Specific item ID to retrieve
         
@@ -148,9 +180,13 @@ def register_digital_tools(mcp: FastMCP):
             # Image-only search
             search_knowledge(user_id="user1", query="red car",
                            search_options={"content_types": ["image"]})
-            
+
+            # PDF-only search with multimodal results
+            search_knowledge(user_id="user1", query="how to create customer",
+                           search_options={"content_type": "pdf", "top_k": 5})
+
             # Get specific item
-            search_knowledge(user_id="user1", query="", 
+            search_knowledge(user_id="user1", query="",
                            search_options={"knowledge_id": "uuid-123"})
         """
         try:
@@ -161,9 +197,10 @@ def register_digital_tools(mcp: FastMCP):
             enable_rerank = search_options.get("enable_rerank", False)
             search_mode = search_options.get("search_mode", "hybrid")
             content_types = search_options.get("content_types", ["text", "image"])
+            content_type = search_options.get("content_type")  # Single content type filter
             return_format = search_options.get("return_format", "results")
             knowledge_id = search_options.get("knowledge_id")
-            
+
             # Handle specific item retrieval
             if knowledge_id:
                 result = await digital_tool.analytics_service.get_knowledge_item(user_id, knowledge_id)
@@ -172,23 +209,85 @@ def register_digital_tools(mcp: FastMCP):
                     "search_knowledge", result,
                     result.get('error') if not result.get('success') else None
                 )
-            
+
+            # Handle PDF-specific search
+            if content_type == "pdf" or content_types == ["pdf"]:
+                # Use CustomRAGService for PDF-specific search
+                from ..services.digital_service.patterns.custom_rag_service import get_custom_rag_service
+
+                custom_rag = get_custom_rag_service()
+                result = await custom_rag.retrieve(
+                    user_id=user_id,
+                    query=query,
+                    top_k=top_k,
+                    filters={"content_type": "pdf"}
+                )
+
+                # Format response to match standard search format
+                if result.get('success'):
+                    search_results = []
+                    for page in result.get('page_results', []):
+                        search_results.append({
+                            'text': page.get('text'),
+                            'page_number': page.get('page_number'),
+                            'page_summary': page.get('page_summary'),
+                            'photo_urls': page.get('photo_urls', []),
+                            'num_photos': len(page.get('photo_urls', [])),
+                            'relevance_score': page.get('similarity_score'),
+                            'metadata': page.get('metadata', {}),
+                            'content_type': 'pdf',
+                            'is_pdf_content': True
+                        })
+
+                    result = {
+                        'success': True,
+                        'search_results': search_results,
+                        'total_results': len(search_results),
+                        'total_photos': result.get('total_photos', 0),
+                        'search_method': 'custom_rag_multimodal',
+                        'query': query
+                    }
+
             # Handle content type filtering
-            if content_types == ["image"]:
+            elif content_types == ["image"]:
                 # Image-only search
                 result = await digital_tool.analytics_service.search_images(
                     user_id, query, top_k, enable_rerank, search_mode
                 )
             elif content_types == ["text"]:
-                # Text-only search  
+                # Text-only search
                 result = await digital_tool.analytics_service.search_knowledge(
                     user_id, query, top_k, enable_rerank, search_mode
                 )
             else:
-                # Mixed search (default)
+                # Mixed search (default) - may include PDF content
                 result = await digital_tool.analytics_service.search_knowledge(
                     user_id, query, top_k, enable_rerank, search_mode
                 )
+
+                # Enrich results if they contain PDF content
+                if result.get('success') and result.get('search_results'):
+                    enriched_results = []
+                    for item in result['search_results']:
+                        metadata = item.get('metadata', {})
+                        record_type = metadata.get('record_type', metadata.get('content_type'))
+
+                        # Check if this is PDF content (page or text_chunk)
+                        if record_type in ['page', 'text_chunk']:
+                            # Preserve PDF multimodal metadata
+                            enriched_results.append({
+                                **item,
+                                'page_number': metadata.get('page_number'),
+                                'page_summary': metadata.get('page_summary'),
+                                'photo_urls': metadata.get('photo_urls', []),
+                                'num_photos': metadata.get('num_photos', 0),
+                                'pdf_name': metadata.get('pdf_name'),
+                                'is_pdf_content': True
+                            })
+                        else:
+                            enriched_results.append(item)
+
+                    result['search_results'] = enriched_results
             
             # Handle return format
             if return_format == "context":
@@ -263,6 +362,8 @@ def register_digital_tools(mcp: FastMCP):
                 - enable_citations: Include inline citations (default: True)
                 - modes: ["simple", "crag"] - for hybrid multi-mode query
                 - recommend_mode: Auto-recommend best mode (default: False)
+                - use_pdf_context: Use PDF-aware RAG pipeline (default: False)
+                - auto_detect_pdf: Auto-detect PDF content and route to CustomRAG (default: True)
         
         Examples:
             # Basic RAG response
@@ -283,6 +384,10 @@ def register_digital_tools(mcp: FastMCP):
             # Auto-recommend best mode
             knowledge_response(user_id="user1", query="Complex reasoning task",
                              response_options={"recommend_mode": True})
+
+            # PDF-aware RAG with image references
+            knowledge_response(user_id="user1", query="How to create new customer in CRM?",
+                             response_options={"use_pdf_context": True, "context_limit": 5})
         """
         try:
             response_options = response_options or {}
@@ -294,25 +399,109 @@ def register_digital_tools(mcp: FastMCP):
             enable_citations = response_options.get("enable_citations", True)
             modes = response_options.get("modes")
             recommend_mode = response_options.get("recommend_mode", False)
-            
+            use_pdf_context = response_options.get("use_pdf_context", False)
+            auto_detect_pdf = response_options.get("auto_detect_pdf", True)
+
             # Handle mode recommendation
             if recommend_mode:
                 recommendation = await digital_tool.analytics_service.recommend_mode(query, user_id)
                 if recommendation.get('success'):
                     rag_mode = recommendation.get('recommended_mode', 'simple')
                     logger.info(f"Auto-recommended mode: {rag_mode}")
-            
+
             # Handle multi-mode query
             if modes and len(modes) > 1:
                 result = await digital_tool.analytics_service.hybrid_query(user_id, query, modes)
                 return digital_tool.create_response(
                     "success" if result.get('success') else "error",
-                    "knowledge_response", 
+                    "knowledge_response",
                     {**result, "response_type": "hybrid_multi_mode", "response_options_used": response_options},
                     result.get('error') if not result.get('success') else None
                 )
-            
-            # Handle multimodal response
+
+            # Auto-detect PDF content if enabled
+            if not use_pdf_context and auto_detect_pdf:
+                # Quick search to check if results contain PDF content
+                search_result = await digital_tool.analytics_service.search_knowledge(
+                    user_id=user_id,
+                    query=query,
+                    top_k=1
+                )
+
+                if search_result.get('success') and search_result.get('search_results'):
+                    first_result = search_result['search_results'][0]
+                    metadata = first_result.get('metadata', {})
+                    record_type = metadata.get('record_type', metadata.get('content_type'))
+
+                    # Auto-enable PDF RAG if content is from PDF
+                    if record_type in ['page', 'text_chunk']:
+                        use_pdf_context = True
+                        logger.info(f"Auto-detected PDF content, using CustomRAG pipeline")
+
+            # Handle PDF-aware RAG
+            if use_pdf_context:
+                from ..services.digital_service.patterns.custom_rag_service import get_custom_rag_service
+
+                custom_rag = get_custom_rag_service()
+
+                # 1. Retrieve with CustomRAG (preserves photo_urls)
+                retrieval_result = await custom_rag.retrieve(
+                    user_id=user_id,
+                    query=query,
+                    top_k=context_limit * 2  # Get more for better coverage
+                )
+
+                if not retrieval_result.get('success'):
+                    return digital_tool.create_response(
+                        "error",
+                        "knowledge_response",
+                        retrieval_result,
+                        retrieval_result.get('error')
+                    )
+
+                # 2. Generate with CustomRAG (includes image references)
+                generation_result = await custom_rag.generate(
+                    user_id=user_id,
+                    query=query,
+                    retrieval_result=retrieval_result,
+                    generation_config={
+                        'model': response_options.get('model', 'gpt-4o-mini'),
+                        'temperature': response_options.get('temperature', 0.3),
+                        'provider': response_options.get('provider', 'yyds')
+                    }
+                )
+
+                # Format response
+                if generation_result.get('success'):
+                    result = {
+                        'success': True,
+                        'response': generation_result.get('answer'),
+                        'answer': generation_result.get('answer'),  # Alias for compatibility
+                        'sources': generation_result.get('sources', {}),
+                        'page_count': generation_result.get('sources', {}).get('page_count', 0),
+                        'photo_count': generation_result.get('sources', {}).get('photo_count', 0),
+                        'page_sources': generation_result.get('sources', {}).get('page_sources', []),
+                        'context_used': generation_result.get('context_used'),
+                        'response_type': 'pdf_multimodal_rag',
+                        'rag_mode_used': 'custom_rag',
+                        'inline_citations_enabled': True,  # Images are cited in answer
+                        'response_options_used': response_options
+                    }
+
+                    return digital_tool.create_response(
+                        "success",
+                        "knowledge_response",
+                        result
+                    )
+                else:
+                    return digital_tool.create_response(
+                        "error",
+                        "knowledge_response",
+                        generation_result,
+                        generation_result.get('error')
+                    )
+
+            # Handle standard multimodal response (non-PDF)
             if include_images:
                 result = await digital_tool.analytics_service.generate_image_rag_response(
                     user_id, query, context_limit, include_images, rag_mode
@@ -324,14 +513,14 @@ def register_digital_tools(mcp: FastMCP):
                     user_id, query, rag_mode, context_limit=context_limit
                 )
                 response_type = "text_rag"
-            
+
             # Ensure citations are enabled if requested
             if result.get('success') and enable_citations:
                 if 'result' in result and isinstance(result['result'], dict):
                     result['result']['inline_citations_enabled'] = True
                 elif 'inline_citations_enabled' not in result:
                     result['inline_citations_enabled'] = enable_citations
-            
+
             return digital_tool.create_response(
                 "success" if result.get('success') else "error",
                 "knowledge_response",
@@ -368,9 +557,16 @@ def register_digital_tools(mcp: FastMCP):
                 "rag_capabilities": capabilities.get('capabilities', {}) if capabilities.get('success') else {},
                 "simplified_interface": {
                     "core_functions": ["store_knowledge", "search_knowledge", "knowledge_response"],
-                    "supported_content_types": ["text", "document", "image"],
-                    "supported_rag_modes": ["simple", "raptor", "self_rag", "crag", "plan_rag", "hm_rag", "graph"],
-                    "version": "simplified_v1.0"
+                    "supported_content_types": ["text", "document", "image", "pdf"],
+                    "supported_rag_modes": ["simple", "raptor", "self_rag", "crag", "plan_rag", "hm_rag", "graph", "custom_rag"],
+                    "pdf_multimodal_features": {
+                        "vlm_analysis": True,
+                        "minio_storage": True,
+                        "page_level_processing": True,
+                        "hybrid_chunking": True,
+                        "image_url_preservation": True
+                    },
+                    "version": "simplified_v1.1_pdf"
                 }
             }
             
@@ -381,4 +577,5 @@ def register_digital_tools(mcp: FastMCP):
 
     print("✅ Digital Tools registered: 3 core functions + 1 utility")
     print("📍 Core functions: store_knowledge, search_knowledge, knowledge_response")
+    print("📄 Content types: text, document, image, pdf (with multimodal support)")
     print("🔧 Utility: get_service_status")

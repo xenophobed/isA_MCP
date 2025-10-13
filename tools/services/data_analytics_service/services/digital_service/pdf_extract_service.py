@@ -21,9 +21,16 @@ import logging
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 from datetime import datetime
-import dask
-from dask.distributed import Client, as_completed
-from dask import delayed
+
+# Optional: Dask for parallel processing (fallback to asyncio if not available)
+try:
+    import dask
+    from dask.distributed import Client, as_completed
+    from dask import delayed
+    HAS_DASK = True
+except ImportError:
+    HAS_DASK = False
+    logging.warning("Dask not available, will use asyncio for parallel processing")
 
 # Use existing production services
 from ...processors.file_processors.pdf_processor import PDFProcessor
@@ -62,9 +69,13 @@ class PDFExtractService:
     
     async def initialize_dask(self, workers: int = 4, threads_per_worker: int = 2):
         """Initialize Dask client for parallel processing"""
+        if not HAS_DASK:
+            logger.warning("Dask not available, cannot initialize")
+            return False
+
         try:
             self.dask_client = Client(
-                processes=True, 
+                processes=True,
                 n_workers=workers,
                 threads_per_worker=threads_per_worker,
                 silence_logs=False
@@ -417,6 +428,10 @@ class PDFExtractService:
     
     async def _process_images_with_dask(self, images: List[Dict[str, Any]]) -> List[str]:
         """Process images in parallel using Dask + ImageAnalyzer"""
+        if not HAS_DASK:
+            logger.warning("Dask not available, falling back to asyncio")
+            return await self._process_images_with_asyncio(images)
+
         try:
             @delayed
             def analyze_image_dask(image_data: str) -> str:
@@ -426,7 +441,7 @@ class PDFExtractService:
                     try:
                         # Use existing ImageAnalyzer
                         result = await analyze(
-                            image=image_data, 
+                            image=image_data,
                             prompt="Extract all text visible in this image. Return only the text content, maintaining original formatting."
                         )
                         if result.success:
@@ -437,7 +452,7 @@ class PDFExtractService:
                     except Exception as e:
                         logger.warning(f"Image analysis exception: {e}")
                         return ""
-                
+
                 # Run async function in new event loop for Dask
                 try:
                     loop = asyncio.new_event_loop()
@@ -445,7 +460,7 @@ class PDFExtractService:
                     return loop.run_until_complete(_analyze())
                 finally:
                     loop.close()
-            
+
             # Create delayed tasks for each image
             tasks = []
             for img in images:
@@ -454,13 +469,13 @@ class PDFExtractService:
                     tasks.append(task)
                 else:
                     tasks.append(delayed(lambda: "")())
-            
+
             # Execute in parallel with Dask
             logger.info(f"Executing {len(tasks)} image analysis tasks with Dask + ImageAnalyzer...")
             results = dask.compute(*tasks)
-            
+
             return list(results)
-            
+
         except Exception as e:
             logger.error(f"Dask image processing failed: {e}")
             # Fallback to asyncio

@@ -7,10 +7,144 @@ Provides backward-compatible client instances
 
 import os
 import asyncio
-from typing import Optional
+import aiohttp
+import json
+from typing import Optional, Dict, Any, Union
 from core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class ISAServiceClient:
+    """
+    HTTP client for ISA Model Service API
+    Based on /Users/xenodennis/Documents/Fun/isA_Model/examples/isa_service_client.py
+    """
+
+    def __init__(self, base_url: str, api_key: Optional[str] = None, timeout: int = 60, max_retries: int = 3):
+        self.base_url = base_url.rstrip('/')
+        self.api_key = api_key
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create HTTP session with proper headers."""
+        if self._session is None or self._session.closed:
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "ISA-Service-Client/1.0"
+            }
+
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+                headers["X-API-Key"] = self.api_key
+
+            timeout_obj = aiohttp.ClientTimeout(total=self.timeout)
+            self._session = aiohttp.ClientSession(headers=headers, timeout=timeout_obj)
+
+        return self._session
+
+    async def close(self):
+        """Close the HTTP session and cleanup resources."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def invoke(
+        self,
+        input_data: Union[str, Dict[str, Any]],
+        task: str,
+        service_type: str,
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
+        stream: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Universal invoke method - makes HTTP POST to /api/v1/invoke
+
+        Args:
+            input_data: Input data (text, image path, etc.)
+            task: Task to perform (chat, analyze, transcribe, etc.)
+            service_type: Service type (text, vision, audio, image, embedding)
+            model: Optional model name
+            provider: Optional provider name
+            stream: Enable streaming (for text services)
+            **kwargs: Additional parameters
+
+        Returns:
+            Response dictionary with success, result and metadata
+        """
+        payload = {
+            "input_data": input_data,
+            "task": task,
+            "service_type": service_type,
+            "stream": stream,
+            **kwargs
+        }
+
+        if model:
+            payload["model"] = model
+        if provider:
+            payload["provider"] = provider
+
+        session = await self._get_session()
+        url = f"{self.base_url}/api/v1/invoke"
+
+        try:
+            async with session.post(url, json=payload) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    return {
+                        "success": False,
+                        "result": None,
+                        "error": f"HTTP {response.status}: {error_text}",
+                        "metadata": {}
+                    }
+
+                # Handle non-streaming response
+                if not stream:
+                    result = await response.json()
+                    return result
+
+                # Handle streaming response (SSE format)
+                full_text = ""
+                metadata = {}
+
+                async for line in response.content:
+                    line_str = line.decode('utf-8').strip()
+                    if not line_str or not line_str.startswith('data: '):
+                        continue
+
+                    data_str = line_str[6:]  # Remove "data: " prefix
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        event_data = json.loads(data_str)
+                        if 'token' in event_data:
+                            full_text += event_data['token']
+                        elif 'metadata' in event_data:
+                            metadata = event_data['metadata']
+                        elif event_data.get('done'):
+                            break
+                    except json.JSONDecodeError:
+                        continue
+
+                return {
+                    "success": True,
+                    "result": full_text,
+                    "metadata": metadata
+                }
+
+        except Exception as e:
+            logger.error(f"ISAServiceClient invoke failed: {e}")
+            return {
+                "success": False,
+                "result": None,
+                "error": str(e),
+                "metadata": {}
+            }
 
 
 class _ResponseWrapper:
@@ -176,63 +310,78 @@ class ISAClientFactory:
     
     @classmethod
     def _create_client(cls, **kwargs):
-        """Create ISA client with authentication if configured"""
+        """Create ISA client with API mode (preferred) or local mode fallback"""
         try:
-            from isa_model.client import ISAModelClient
-            
-            # Get configuration from environment or config
-            isa_service_url = os.getenv('ISA_SERVICE_URL')
+            # Get configuration from environment
+            isa_api_url = os.getenv('ISA_API_URL') or os.getenv('ISA_SERVICE_URL')
             isa_api_key = os.getenv('ISA_API_KEY')
-            require_auth = os.getenv('REQUIRE_ISA_AUTH', 'false').lower() == 'true'
-            
+            use_api_mode = os.getenv('ISA_USE_API_MODE', 'true').lower() == 'true'
+
             # Try to get from config if environment variables not set
             try:
                 from core.config import get_settings
                 settings = get_settings()
-                isa_service_url = isa_service_url or settings.isa_service_url
-                isa_api_key = isa_api_key or settings.isa_api_key
-                require_auth = require_auth or settings.require_isa_auth
+                isa_api_url = isa_api_url or getattr(settings, 'isa_api_url', None) or getattr(settings, 'isa_service_url', None)
+                isa_api_key = isa_api_key or getattr(settings, 'isa_api_key', None)
             except Exception as e:
                 logger.debug(f"Could not load config settings: {e}")
-            
-            # Build client parameters
-            client_params = {}
-            
-            # Add service endpoint if configured
-            if isa_service_url:
-                client_params['service_endpoint'] = isa_service_url
-                logger.info(f"Using ISA service endpoint: {isa_service_url}")
-            
-            # Add API key if configured and required
-            if isa_api_key and require_auth:
-                client_params['api_key'] = isa_api_key
-                logger.info("Using ISA API key authentication")
-            elif require_auth and not isa_api_key:
-                logger.warning("ISA authentication required but no API key configured")
-            
-            # Override with any additional kwargs
-            client_params.update(kwargs)
-            
-            # Create client - use direct URL initialization like isa_agent
-            if isa_service_url:
-                client = ISAModelClient(isa_service_url)
-                logger.info(f"ISA client created with direct URL: {isa_service_url}")
+
+            # Try Consul service discovery for ISA Model service
+            try:
+                from core.consul_discovery import discover_service
+                # Use 'model_service' as the service name in Consul
+                consul_discovered_url = discover_service('model_service', default_url=isa_api_url)
+                if consul_discovered_url and consul_discovered_url != isa_api_url:
+                    logger.info(f"🔍 Consul discovered ISA Model service: {consul_discovered_url}")
+                    isa_api_url = consul_discovered_url
+                elif consul_discovered_url:
+                    logger.info(f"📍 Using ISA Model service from Consul: {isa_api_url}")
+                else:
+                    logger.debug("Consul service discovery not available, using environment/config URL")
+            except Exception as consul_error:
+                logger.debug(f"Consul discovery failed, using fallback URL: {consul_error}")
+
+            # Use ISAServiceClient for HTTP-based API mode
+            if use_api_mode and isa_api_url:
+                # API mode: Use HTTP client for remote service
+                client = ISAServiceClient(
+                    base_url=isa_api_url,
+                    api_key=isa_api_key,
+                    timeout=kwargs.get('timeout', 60),
+                    max_retries=kwargs.get('max_retries', 3)
+                )
+                logger.info(f"✅ ISA client created in API mode (HTTP): {isa_api_url}")
+                logger.info(f"   Authentication: {'Enabled' if isa_api_key else 'Disabled'}")
+            elif isa_api_url:
+                # Use HTTP client even if API mode not explicitly enabled
+                client = ISAServiceClient(
+                    base_url=isa_api_url,
+                    api_key=isa_api_key,
+                    timeout=kwargs.get('timeout', 60),
+                    max_retries=kwargs.get('max_retries', 3)
+                )
+                logger.info(f"ISA client with service URL (HTTP): {isa_api_url}")
             else:
-                client = ISAModelClient(**client_params)
-                logger.info(f"ISA client created with params: {list(client_params.keys())}")
-            
-            # Wrap client to ensure consistent response format for JSON mode
+                # Local mode: Use ISAModelClient for local inference
+                from isa_model.client import ISAModelClient
+                client = ISAModelClient(**kwargs)
+                logger.info("ISA client in LOCAL mode with default configuration")
+
+            # Wrap client
             wrapped_client = _JSONCompatibleClientWrapper(client)
-            
-            # Create concurrent-safe client wrapper
             return _ConcurrentSafeClientWrapper(wrapped_client)
-            
+
         except Exception as e:
             logger.error(f"Failed to create ISA client: {e}")
-            # Fallback to basic client
-            from isa_model.client import ISAModelClient
-            wrapped_client = _JSONCompatibleClientWrapper(ISAModelClient())
-            return _ConcurrentSafeClientWrapper(wrapped_client)
+            # Last resort fallback
+            try:
+                from isa_model.client import ISAModelClient
+                wrapped_client = _JSONCompatibleClientWrapper(ISAModelClient())
+                logger.warning("Using fallback ISA client with default configuration")
+                return _ConcurrentSafeClientWrapper(wrapped_client)
+            except Exception as fallback_error:
+                logger.error(f"Fatal: Could not create any ISA client: {fallback_error}")
+                raise
     
     @classmethod
     def reset_client(cls):

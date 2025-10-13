@@ -361,14 +361,14 @@ class MCPSettings:
     
     def _load_service_urls_from_consul(self, discovery):
         """Load all service URLs from Consul service discovery"""
-        # Service discovery mappings - Updated to match actual Consul service names
+        # Service discovery mappings
         service_mappings = {
-            'models': 'isa_service_url',          # Changed from 'model' to 'models'
-            'agents': 'agent_service_url',        # Changed from 'agent' to 'agents'
-            'auth_service': 'auth_service_url',   # Changed from 'auth' to 'auth_service'
-            'authorization_service': 'authz_service_url',  # Changed from 'authz' to 'authorization_service'
-            'account_service': 'user_service_url',         # Changed from 'user' to 'account_service'
-            'storage_service': None,              # Changed from 'storage' to 'storage_service', Special handling
+            'model_service': 'isa_service_url',
+            'agent_service': 'agent_service_url',
+            'auth_service': 'auth_service_url',
+            'authorization_service': 'authz_service_url',
+            'account_service': 'user_service_url',
+            'storage_service': None,  # Special handling
         }
         
         for service_name, attr_name in service_mappings.items():
