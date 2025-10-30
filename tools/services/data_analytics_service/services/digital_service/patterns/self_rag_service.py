@@ -275,5 +275,110 @@ class SelfRAGService(BaseRAGService):
         if improvements:
             refined_parts.append(f"\n\nReflection: {', '.join(improvements)}")
             refined_parts.append(f"\nRefined response: Let me provide a more comprehensive answer to '{query}' based on the available sources.")
-        
+
         return "\n".join(refined_parts)
+
+    # ==================== New Interface Methods ====================
+
+    async def store(self,
+                   content: str,
+                   user_id: str,
+                   content_type: str = "text",
+                   metadata: Optional[Dict[str, Any]] = None,
+                   options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Store content using Self-RAG strategy"""
+        return await self.process_document(content, user_id, metadata)
+
+    async def retrieve(self,
+                      query: str,
+                      user_id: str,
+                      top_k: int = 5,
+                      filters: Optional[Dict[str, Any]] = None,
+                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Retrieve with self-assessment"""
+        start_time = time.time()
+        try:
+            search_result = await self.search_knowledge(
+                user_id=user_id,
+                query=query,
+                top_k=top_k or self.config.top_k,
+                enable_rerank=self.config.enable_rerank,
+                search_mode="hybrid"
+            )
+
+            if not search_result['success']:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=[],
+                    metadata={},
+                    mode_used=self.mode,
+                    processing_time=time.time() - start_time,
+                    error=search_result.get('error')
+                )
+
+            return RAGResult(
+                success=True,
+                content="",
+                sources=search_result['search_results'],
+                metadata={'total_results': len(search_result['search_results'])},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time
+            )
+        except Exception as e:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
+
+    async def generate(self,
+                      query: str,
+                      user_id: str,
+                      context: Optional[str] = None,
+                      retrieval_result: Optional[RAGResult] = None,
+                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Generate with self-reflection"""
+        start_time = time.time()
+        try:
+            if retrieval_result and retrieval_result.sources:
+                sources = retrieval_result.sources
+            else:
+                retrieval = await self.retrieve(query, user_id, options=options)
+                if not retrieval.success:
+                    return retrieval
+                sources = retrieval.sources
+
+            # Build context and generate initial response
+            context_text = self._build_context_with_citations(sources)
+            initial_response = await self._generate_response_with_llm(query, context_text, context)
+
+            # Self-assess and refine
+            refined_response = await self._self_assess_and_refine(query, initial_response)
+
+            return RAGResult(
+                success=True,
+                content=refined_response,
+                sources=sources,
+                metadata={
+                    'self_assessed': True,
+                    'initial_response_length': len(initial_response),
+                    'refined_response_length': len(refined_response)
+                },
+                mode_used=self.mode,
+                processing_time=time.time() - start_time
+            )
+        except Exception as e:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )

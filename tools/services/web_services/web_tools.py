@@ -2,15 +2,29 @@
 """
 Web Tools - Clean web-related tools implementation
 Based on three core services: WebSearchService, WebCrawlService, WebAutomationService
+
+Now using MCP-compliant Pydantic models from tools.models.tool_models
 """
 
 import json
-from typing import List
+from typing import List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 from tools.base_tool import BaseTool
 from tools.services.web_services.services.web_search_service import WebSearchService
 from tools.services.web_services.services.web_crawl_service import WebCrawlService
 from tools.services.web_services.services.web_automation_service import WebAutomationService
+from core.security import SecurityLevel, get_security_manager
+
+# Import MCP-compliant models
+from tools.core import (
+    SearchResultsResponse,
+    SuccessResponse,
+    ErrorResponse,
+    ManualInterventionResponse,
+    RequestCredentialUsageResponse,
+    InterventionType,
+    ToolStatus
+)
 
 
 class WebToolsService(BaseTool):
@@ -41,123 +55,64 @@ class WebToolsService(BaseTool):
         return self.automation_service
     
     async def web_search(
-        self, 
-        query: str, 
+        self,
+        query: str,
         count: int = 10,
         freshness: str = None,
         result_filter: str = None,
         goggle_type: str = None,
         extra_snippets: bool = True,
         deep_search: bool = False
-    ) -> str:
-        """Enhanced web search implementation with advanced features"""
+    ) -> Dict[str, Any]:
+        """Enhanced web search implementation with advanced features (MCP-compliant)"""
         try:
             service = self._get_search_service()
-            
-            # Import enums for parameter conversion
-            from tools.services.web_services.engines.search_engine import (
-                SearchFreshness, ResultFilter
+
+            # Call service's search method with all parameters
+            result = await service.search(
+                query=query,
+                count=count,
+                freshness=freshness,
+                result_filter=result_filter,
+                goggle_type=goggle_type,
+                extra_snippets=extra_snippets,
+                deep_search=deep_search
             )
-            
-            # Build kwargs for enhanced search
-            search_kwargs = {
-                "count": count,
-                "extra_snippets": extra_snippets
-            }
-            
-            # Add optional parameters
-            if freshness:
-                if freshness.upper() in ['DAY', 'WEEK', 'MONTH', 'YEAR']:
-                    search_kwargs["freshness"] = SearchFreshness[freshness.upper()]
-                else:
-                    search_kwargs["freshness"] = freshness  # Pass as string
-            
-            if result_filter:
-                if result_filter.upper() in ['DISCUSSIONS', 'FAQ', 'NEWS', 'VIDEOS', 'INFOBOX', 'LOCATIONS']:
-                    search_kwargs["result_filter"] = ResultFilter[result_filter.upper()]
-                else:
-                    search_kwargs["result_filter"] = result_filter
-            
-            if goggle_type:
-                search_kwargs["goggle_type"] = goggle_type
-            
-            # Use deep search if requested
-            if deep_search:
-                # Direct access to search engine for deep search
-                await service.initialize()
-                strategy = service.search_engine.strategies.get("brave")
-                if strategy:
-                    results = await strategy.deep_search(query, depth=2, max_results_per_level=count)
-                    # Convert to service format
-                    result = {
-                        "success": True,
+
+            # Return plain response dict (FastMCP will wrap it)
+            if result.get("success"):
+                return self.create_response(
+                    "success",
+                    "web_search",
+                    {
                         "query": query,
-                        "total": len(results),
-                        "results": [
-                            {
-                                "title": r.title,
-                                "url": r.url,
-                                "snippet": r.snippet,
-                                "score": r.score,
-                                "type": r.type,
-                                "all_content": r.get_all_content()[:500]  # Limit content size
-                            }
-                            for r in results
-                        ],
-                        "urls": [r.url for r in results],
-                        "search_type": "deep"
+                        "total": result.get("total", 0),
+                        "results": result.get("results", []),
+                        "urls": result.get("urls"),
+                        "search_params": result.get("search_params")
                     }
-                else:
-                    result = {"success": False, "error": "Deep search not available"}
+                )
             else:
-                # Regular enhanced search
-                await service.initialize()
-                results = await service.search_engine.search(query, **search_kwargs)
-                result = {
-                    "success": True,
-                    "query": query,
-                    "total": len(results),
-                    "results": [
-                        {
-                            "title": r.title,
-                            "url": r.url,
-                            "snippet": r.snippet,
-                            "score": r.score,
-                            "type": r.type,
-                            "all_content": r.get_all_content()[:500]  # Limit content size
-                        }
-                        for r in results
-                    ],
-                    "urls": [r.url for r in results],
-                    "search_params": {
-                        "freshness": str(search_kwargs.get("freshness")) if "freshness" in search_kwargs else None,
-                        "filter": str(search_kwargs.get("result_filter")) if "result_filter" in search_kwargs else None,
-                        "goggle": search_kwargs.get("goggle_type"),
-                        "extra_snippets": extra_snippets,
-                        "count": count
-                    }
-                }
-            
-            return self.create_response(
-                status="success" if result.get("success") else "error",
-                action="web_search",
-                data=result,
-                error_message=result.get("error") if not result.get("success") else None
-            )
-            
+                return self.create_response(
+                    "error",
+                    "web_search",
+                    result,
+                    result.get("error", "Unknown error")
+                )
+
         except Exception as e:
             return self.create_response(
-                status="error",
-                action="web_search", 
-                data={},
-                error_message=str(e)
+                "error",
+                "web_search",
+                {},
+                str(e)
             )
         finally:
             if self.search_service:
                 await self.search_service.close()
                 self.search_service = None
     
-    async def web_crawl(self, url: str, analysis_request: str = "") -> str:
+    async def web_crawl(self, url: str, analysis_request: str = "") -> Dict[str, Any]:
         """Web crawl implementation"""
         try:
             service = self._get_crawl_service()
@@ -182,7 +137,7 @@ class WebToolsService(BaseTool):
                 await self.crawl_service.close()
                 self.crawl_service = None
     
-    async def web_crawl_compare(self, urls: List[str], analysis_request: str) -> str:
+    async def web_crawl_compare(self, urls: List[str], analysis_request: str) -> Dict[str, Any]:
         """Web crawl compare implementation"""
         try:
             service = self._get_crawl_service()
@@ -207,7 +162,7 @@ class WebToolsService(BaseTool):
                 await self.crawl_service.close()
                 self.crawl_service = None
     
-    async def web_automation(self, url: str, task: str, user_id: str = "default") -> str:
+    async def web_automation(self, url: str, task: str, user_id: str = "default") -> Dict[str, Any]:
         """Web automation implementation"""
         try:
             service = self._get_automation_service()
@@ -243,50 +198,25 @@ class WebToolsService(BaseTool):
 
 
 def register_web_tools(mcp: FastMCP):
-    """Register web tools using FastMCP decorators"""
+    """
+    Register web tools using FastMCP decorators
+
+    NOTE: web_search has been moved to tools/web_search_tools.py
+    This file now only contains web_crawl and web_automation
+    """
     web_service = WebToolsService()
-    
+
+    # Get security manager for applying decorators
+    security_manager = get_security_manager()
+
+    # web_search has been moved to tools/web_search_tools.py for better separation
+
     @mcp.tool()
-    async def web_search(
-        query: str,
-        count: int = 10,
-        freshness: str = None,
-        result_filter: str = None,
-        goggle_type: str = None,
-        extra_snippets: bool = True,
-        deep_search: bool = False
-    ) -> str:
-        """
-        Enhanced web search with advanced filtering and content extraction
-        
-        Keywords: search, web, internet, query, results, filter, news, video, fresh, deep
-        Category: web
-        
-        Args:
-            query: Search query text
-            count: Number of results to return (default: 10, max: 20)
-            freshness: Time filter - 'day', 'week', 'month', 'year' (optional)
-            result_filter: Result type - 'news', 'videos', 'discussions', 'faq' (optional)
-            goggle_type: Predefined ranking - 'academic', 'technical', 'news' (optional)
-            extra_snippets: Get extra content snippets (default: True)
-            deep_search: Perform deep search with query expansion (default: False)
-        
-        Examples:
-            - Basic: {"query": "python programming"}
-            - Fresh news: {"query": "AI", "freshness": "day", "result_filter": "news"}
-            - Technical: {"query": "React hooks", "goggle_type": "technical"}
-            - Deep search: {"query": "machine learning", "deep_search": true}
-        """
-        return await web_service.web_search(
-            query, count, freshness, result_filter, 
-            goggle_type, extra_snippets, deep_search
-        )
-    
-    @mcp.tool()
+    @security_manager.require_authorization(SecurityLevel.LOW)
     async def web_crawl(
         url: str,
         analysis_request: str = ""
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
         Intelligently crawl and analyze web pages with enhanced extraction capabilities
         
@@ -376,11 +306,12 @@ def register_web_tools(mcp: FastMCP):
             return await web_service.web_crawl(url, analysis_request)
     
     @mcp.tool()
+    @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def web_automation(
         url: str,
         task: str,
         user_id: str = "default"
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
         Automate web browser interactions with HIL support
 

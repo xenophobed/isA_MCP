@@ -3,6 +3,11 @@
 RAG Factory - RAG服务工厂
 
 替代enhanced_rag_service.py，使用Factory模式管理所有RAG服务实例。
+
+New Architecture (Migrated):
+- ✅ SimpleRAGService (basic vector retrieval)
+- ✅ CRAGRAGService (quality-aware retrieval)
+- TODO: RAPTORRAGService, SelfRAGService, etc.
 """
 
 import asyncio
@@ -11,29 +16,104 @@ import time
 from typing import Dict, Any, List, Optional, Type
 from datetime import datetime
 
-from .base.base_rag_service import BaseRAGService, RAGConfig, RAGResult, RAGMode
+from .base.base_rag_service import BaseRAGService
+from .base.rag_models import RAGConfig, RAGResult, RAGMode
 from .patterns.simple_rag_service import SimpleRAGService
-from .patterns.raptor_rag_service import RAPTORRAGService
-from .patterns.self_rag_service import SelfRAGService
-from .patterns.crag_rag_service import CRAGRAGService
-from .patterns.plan_rag_service import PlanRAGRAGService
-from .patterns.hm_rag_service import HMRAGRAGService
-from .patterns.graph_rag_service import GraphRAGService
+
+# TODO: Migrate these services to new architecture
+# from .patterns.raptor_rag_service import RAPTORRAGService
+# from .patterns.self_rag_service import SelfRAGService
+from .patterns.crag_rag_service import CRAGRAGService  # ✅ Migrated
+# from .patterns.plan_rag_service import PlanRAGRAGService
+# from .patterns.hm_rag_service import HMRAGRAGService
+# from .patterns.graph_rag_service import GraphRAGService
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# Simple Factory Function (Used by digital_tools.py)
+# ============================================================================
+
+def get_rag_service(
+    mode: str = "simple",
+    config: Optional[Dict[str, Any]] = None
+) -> BaseRAGService:
+    """
+    Get RAG service instance - Simple factory function for digital_tools.py
+
+    Args:
+        mode: RAG mode - currently only "simple" is migrated
+        config: Configuration dictionary
+
+    Returns:
+        BaseRAGService instance
+
+    Example:
+        service = get_rag_service(mode='simple', config={'chunk_size': 400})
+        result = await service.store(request)
+    """
+    config = config or {}
+
+    if mode == "simple":
+        rag_config = RAGConfig(
+            mode=RAGMode.SIMPLE,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000)
+        )
+        return SimpleRAGService(rag_config)
+    elif mode == "crag":
+        rag_config = RAGConfig(
+            mode=RAGMode.CRAG,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000)
+        )
+        return CRAGRAGService(rag_config)
+    else:
+        raise ValueError(
+            f"Unknown RAG mode: {mode}. "
+            f"Currently only 'simple' and 'crag' modes are migrated. "
+            f"Other modes need migration to new architecture."
+        )
+
+
+def get_simple_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for simple RAG"""
+    return get_rag_service(mode="simple", config=config)
+
+
+def get_crag_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for CRAG (quality-aware RAG)"""
+    return get_rag_service(mode="crag", config=config)
+
+
+# ============================================================================
+# Legacy RAGFactory Class (For backward compatibility)
+# ============================================================================
+
 class RAGFactory:
-    """RAG服务工厂"""
+    """RAG服务工厂 (Legacy - use get_rag_service() instead)"""
 
     def __init__(self):
         self._services: Dict[RAGMode, Type[BaseRAGService]] = {
             RAGMode.SIMPLE: SimpleRAGService,
-            RAGMode.RAPTOR: RAPTORRAGService,
-            RAGMode.SELF_RAG: SelfRAGService,
-            RAGMode.CRAG: CRAGRAGService,
-            RAGMode.PLAN_RAG: PlanRAGRAGService,
-            RAGMode.HM_RAG: HMRAGRAGService,
-            RAGMode.GRAPH: GraphRAGService,
+            RAGMode.CRAG: CRAGRAGService,  # ✅ Migrated
+            # TODO: Migrate other services
+            # RAGMode.RAPTOR: RAPTORRAGService,
+            # RAGMode.SELF_RAG: SelfRAGService,
+            # RAGMode.PLAN_RAG: PlanRAGRAGService,
+            # RAGMode.HM_RAG: HMRAGRAGService,
+            # RAGMode.GRAPH: GraphRAGService,
         }
         self._instances: Dict[str, BaseRAGService] = {}
 

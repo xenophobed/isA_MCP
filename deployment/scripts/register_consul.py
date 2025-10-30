@@ -25,7 +25,9 @@ class MCPConsulRegistration:
         # Read from env vars if not provided
         consul_host = consul_host or os.getenv('CONSUL_HOST', 'localhost')
         consul_port = consul_port or int(os.getenv('CONSUL_PORT', '8500'))
-        service_host = service_host or os.getenv('SERVICE_HOST', socket.gethostname())
+        # Use HOSTNAME env var (container name in Docker) instead of socket.gethostname()
+        # socket.gethostname() returns short container ID which is NOT DNS resolvable
+        service_host = service_host or os.getenv('SERVICE_HOST', os.getenv('HOSTNAME', socket.gethostname()))
 
         self.consul = consul.Consul(host=consul_host, port=consul_port)
         self.service_name = service_name

@@ -90,13 +90,12 @@ class GuardrailSystem:
         
         logger.info(f"GuardrailSystem initialized with level: {self.config.level.value}")
     
-    @property
-    def isa_client(self):
+    async def _get_client(self):
         """Lazy load ISA client for LLM-as-Judge validation"""
         if self._isa_client is None:
             try:
-                from core.isa_client_factory import get_isa_client
-                self._isa_client = get_isa_client()
+                from core.clients.model_client import get_isa_client
+                self._isa_client = await get_isa_client()
             except ImportError:
                 logger.warning("ISA client not available, some validations may be limited")
         return self._isa_client
@@ -459,25 +458,26 @@ class GuardrailSystem:
     ) -> float:
         """Check how well the response is attributed to source documents"""
         try:
-            if not source_documents or not self.isa_client:
+            client = await self._get_client()
+            if not source_documents or not client:
                 return 0.5  # Neutral score when unable to check
-            
+
             # Use ISA for attribution scoring
             source_texts = [doc.get('text', '') for doc in source_documents]
             combined_sources = ' '.join(source_texts[:3])  # Use top 3 sources
-            
+
             attribution_prompt = f"""
             Please evaluate how well the following response is supported by the given source texts.
             Rate from 0.0 (no support) to 1.0 (fully supported).
-            
+
             Response: {response}
-            
+
             Source texts: {combined_sources}
-            
+
             Provide only a numeric score between 0.0 and 1.0.
             """
-            
-            result = await self.isa_client.invoke(
+
+            result = await client._underlying_client.invoke(
                 input_data=attribution_prompt,
                 task="chat",
                 service_type="text"
@@ -506,25 +506,26 @@ class GuardrailSystem:
     ) -> float:
         """Check factual consistency between response and sources"""
         try:
-            if not source_documents or not self.isa_client:
+            client = await self._get_client()
+            if not source_documents or not client:
                 return 0.5
-            
+
             # Use ISA for consistency checking
             source_texts = [doc.get('text', '') for doc in source_documents]
             combined_sources = ' '.join(source_texts[:3])
-            
+
             consistency_prompt = f"""
             Check if the following response contains any factual claims that contradict the source texts.
             Rate consistency from 0.0 (major contradictions) to 1.0 (fully consistent).
-            
+
             Response: {response}
-            
+
             Source texts: {combined_sources}
-            
+
             Provide only a numeric score between 0.0 and 1.0.
             """
-            
-            result = await self.isa_client.invoke(
+
+            result = await client._underlying_client.invoke(
                 input_data=consistency_prompt,
                 task="chat",
                 service_type="text"

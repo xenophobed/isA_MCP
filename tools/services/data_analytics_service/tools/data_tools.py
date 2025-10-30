@@ -39,8 +39,9 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from tools.base_tool import BaseTool
+from tools.services.data_analytics_service.tools.context import DataProgressReporter
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -82,10 +83,12 @@ class DataTool(BaseTool):
     Data processing tool for structured data ingestion and storage
     
     Inherits from BaseTool to provide consistent response formatting
+    Includes DataProgressReporter for comprehensive progress tracking
     """
     
     def __init__(self):
         super().__init__()
+        self.progress_reporter = DataProgressReporter(self)
 
 
 def register_data_tools(mcp: FastMCP):
@@ -98,13 +101,16 @@ def register_data_tools(mcp: FastMCP):
     - data_search: Semantic similarity search
     - data_query: Natural language query execution
     """
+    # Initialize DataTool with progress reporter
+    data_tool = DataTool()
     
     @mcp.tool()
     async def data_ingest(
         user_id: str,
         source_path: str,
         dataset_name: str = None,
-        storage_options: dict = None
+        storage_options: dict = None,
+        ctx: Optional[Context] = None
     ) -> str:
         """
         Complete data ingestion pipeline: CSV → DataFrame → MinIO Parquet + Metadata
@@ -140,16 +146,26 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns: {"status": "success", "data": {...}}
         """
-        data_tool = DataTool()
-        
         try:
             from pathlib import Path
             from tools.services.data_analytics_service.services.data_service.preprocessor.preprocessor_service import get_preprocessor_service
             from tools.services.data_analytics_service.services.data_service.storage.data_storage_service import DataStorageService
+            from tools.services.data_analytics_service.tools.context import DataSourceDetector
             
             # Generate dataset name if not provided
             if not dataset_name:
                 dataset_name = Path(source_path).stem
+            
+            # Detect data source type
+            data_source_type = DataSourceDetector.detect_from_path(source_path)
+            
+            # Log start and report Stage 1: Processing
+            await data_tool.log_info(ctx, f"Starting data ingestion for user {user_id}: {source_path}")
+            await data_tool.progress_reporter.report_stage(
+                ctx, "processing", data_source_type, 
+                f"loading {dataset_name}",
+                pipeline_type="ingestion"
+            )
             
             logger.info(f"Starting data ingestion for user {user_id}: {source_path}")
             
@@ -161,15 +177,26 @@ def register_data_tools(mcp: FastMCP):
             pipeline_result = await preprocessor.process_data_source(source_path)
             
             if not pipeline_result.success:
+                await data_tool.log_error(ctx, f"Preprocessing failed: {pipeline_result.error_message}")
                 return data_tool.create_response(
                     "error", "data_ingest", 
                     {"user_id": user_id},
                     f"Preprocessing failed: {str(pipeline_result.error_message)}"
                 )
             
+            # Report data statistics
+            await data_tool.progress_reporter.report_data_stats(
+                ctx, "processing", data_source_type,
+                rows=pipeline_result.rows_detected,
+                columns=pipeline_result.columns_detected,
+                quality_score=pipeline_result.data_quality_score,
+                pipeline_type="ingestion"
+            )
+            
             # Step 2: Get cleaned dataframe
             cleaned_df = preprocessor.get_cleaned_data(pipeline_result.pipeline_id)
             if cleaned_df is None:
+                await data_tool.log_error(ctx, "No cleaned dataframe available")
                 return data_tool.create_response(
                     "error", "data_ingest",
                     {"user_id": user_id},
@@ -177,6 +204,11 @@ def register_data_tools(mcp: FastMCP):
                 )
             
             # Step 3: Store to MinIO Parquet using professional storage service
+            await data_tool.log_info(ctx, f"Storing data to MinIO Parquet: {dataset_name}")
+            await data_tool.progress_reporter.report_storage_progress(
+                ctx, data_source_type, "minio", "uploading"
+            )
+            
             storage_success = False
             parquet_path = None
             
@@ -253,7 +285,15 @@ def register_data_tools(mcp: FastMCP):
             
             logger.info(f"Data stored to MinIO: {parquet_path}")
             
-            # Step 4: Store metadata to metadata store for querying  
+            # Step 4: Store metadata to metadata store for querying
+            # Stage 2: Extraction - Metadata extraction and semantic enrichment
+            await data_tool.log_info(ctx, "Starting metadata extraction and semantic enrichment")
+            await data_tool.progress_reporter.report_stage(
+                ctx, "extraction", data_source_type,
+                "extracting metadata",
+                pipeline_type="ingestion"
+            )
+            
             logger.info("STEP4: Storing metadata for future querying...")
             metadata_success = False
             metadata_embeddings_count = 0
@@ -284,6 +324,12 @@ def register_data_tools(mcp: FastMCP):
                         
                     # Step 2: Semantic enrichment
                     logger.info("STEP4: Performing semantic enrichment...")
+                    await data_tool.progress_reporter.report_stage(
+                        ctx, "extraction", data_source_type,
+                        "AI semantic enrichment",
+                        pipeline_type="ingestion"
+                    )
+                    
                     enricher = AISemanticEnricher()
                     semantic_metadata = await enricher.enrich_metadata(raw_metadata)
                     logger.info(f"STEP4: Semantic enrichment completed - {len(semantic_metadata.business_entities)} entities, {len(semantic_metadata.semantic_tags)} tags")
@@ -291,6 +337,14 @@ def register_data_tools(mcp: FastMCP):
                     # Preserve storage_info in semantic metadata for embeddings
                     if not hasattr(semantic_metadata, 'storage_info'):
                         semantic_metadata.storage_info = raw_metadata.get('storage_info', {})
+                    
+                    # Stage 3: Embedding - Generate vector embeddings
+                    await data_tool.log_info(ctx, "Generating vector embeddings")
+                    await data_tool.progress_reporter.report_stage(
+                        ctx, "embedding", data_source_type,
+                        "generating embeddings",
+                        pipeline_type="ingestion"
+                    )
                     
                     # Step 3: Store embeddings with storage path information
                     logger.info("STEP4: Storing embeddings to database...")
@@ -309,13 +363,42 @@ def register_data_tools(mcp: FastMCP):
                     if metadata_embeddings_count > 0:
                         metadata_success = True
                         logger.info(f"STEP4: Metadata stored successfully: {metadata_embeddings_count} embeddings (failed: {failed_count})")
+                        
+                        # Report embedding progress with granular details
+                        await data_tool.progress_reporter.report_stage(
+                            ctx, "embedding", data_source_type,
+                            f"{metadata_embeddings_count} embeddings created",
+                            pipeline_type="ingestion"
+                        )
                     else:
                         logger.warning(f"STEP4: No embeddings were stored (failed: {failed_count})")
                         
             except Exception as e:
                 logger.error(f"STEP4: Metadata storage failed: {str(e)}")
+                await data_tool.log_error(ctx, f"Metadata storage failed: {str(e)}")
                 import traceback
                 logger.error(f"STEP4: Traceback: {traceback.format_exc()}")
+            
+            # Stage 4: Storing - Final storage completion
+            await data_tool.progress_reporter.report_storage_progress(
+                ctx, data_source_type, "vector_db", "indexing"
+            )
+            await data_tool.progress_reporter.report_storage_progress(
+                ctx, data_source_type, "metadata_store", "completed"
+            )
+            
+            # Report completion with summary
+            await data_tool.progress_reporter.report_complete(
+                ctx, data_source_type,
+                {
+                    "rows": pipeline_result.rows_detected,
+                    "columns": pipeline_result.columns_detected,
+                    "embeddings": metadata_embeddings_count,
+                    "quality_score": pipeline_result.data_quality_score
+                },
+                pipeline_type="ingestion"
+            )
+            await data_tool.log_info(ctx, f"Data ingestion completed successfully: {dataset_name}")
             
             # Success - return clean result like digital_tools (avoid any numpy objects)
             success_result = {
@@ -345,6 +428,7 @@ def register_data_tools(mcp: FastMCP):
                 
         except Exception as e:
             logger.error(f"Data ingestion failed: {str(e)}")
+            await data_tool.log_error(ctx, f"Data ingestion failed: {str(e)}")
             # Use weather_tools pattern for error too
             error_response = {
                 "status": "error",
@@ -356,7 +440,11 @@ def register_data_tools(mcp: FastMCP):
             return json.dumps(error_response, ensure_ascii=False)
     
     @mcp.tool()
-    async def get_pipeline_status(user_id: str, pipeline_id: str = None) -> str:
+    async def get_pipeline_status(
+        user_id: str, 
+        pipeline_id: str = None,
+        ctx: Optional[Context] = None
+    ) -> str:
         """
         Get status and statistics of data processing pipelines
         
@@ -386,9 +474,8 @@ def register_data_tools(mcp: FastMCP):
             >>> # Get all pipeline statistics
             >>> result = await get_pipeline_status(user_id="user123")
         """
-        data_tool = DataTool()
-        
         try:
+            await data_tool.log_info(ctx, f"Getting pipeline status for user {user_id}")
             from tools.services.data_analytics_service.services.data_service.preprocessor.preprocessor_service import get_preprocessor_service
             
             preprocessor_service = get_preprocessor_service(user_id)
@@ -448,7 +535,11 @@ def register_data_tools(mcp: FastMCP):
             )
 
     @mcp.tool()
-    async def data_search(user_id: str, search_query: str = None) -> str:
+    async def data_search(
+        user_id: str, 
+        search_query: str = None,
+        ctx: Optional[Context] = None
+    ) -> str:
         """
         Search and discover available datasets using semantic similarity
         
@@ -474,11 +565,17 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns top N most similar entities
         """
-        data_tool = DataTool()
-        
         try:
             from tools.services.data_analytics_service.services.data_service.management.metadata.metadata_embedding import get_embedding_service
             from core.database.supabase_client import get_supabase_client
+            
+            # Stage 1: Query Processing
+            await data_tool.log_info(ctx, f"Starting dataset search for user {user_id}")
+            await data_tool.progress_reporter.report_stage(
+                ctx, "processing", "query",
+                "analyzing search query" if search_query else "listing all datasets",
+                pipeline_type="search"
+            )
             
             logger.info(f"Searching datasets for user {user_id}")
             
@@ -497,7 +594,21 @@ def register_data_tools(mcp: FastMCP):
             # Search for specific metadata if query provided
             search_results = []
             if search_query:
+                # Stage 2: Query Embedding
+                await data_tool.progress_reporter.report_stage(
+                    ctx, "embedding", "query",
+                    "generating query embedding",
+                    pipeline_type="search"
+                )
+                
                 try:
+                    # Stage 3: Similarity Matching
+                    await data_tool.progress_reporter.report_stage(
+                        ctx, "matching", "query",
+                        "searching vector database",
+                        pipeline_type="search"
+                    )
+                    
                     # Use embedding service to search - correct method and parameters
                     search_results_raw = await embedding_service.search_similar_entities(
                         query=search_query,
@@ -516,7 +627,27 @@ def register_data_tools(mcp: FastMCP):
                         })
                 except Exception as e:
                     logger.warning(f"Search failed: {str(e)}")
+                    await data_tool.log_error(ctx, f"Search failed: {str(e)}")
                     search_results = []
+            
+            # Stage 4: Result Ranking
+            await data_tool.progress_reporter.report_stage(
+                ctx, "ranking", "query",
+                f"{len(search_results)} results found",
+                pipeline_type="search"
+            )
+            
+            # Report completion
+            await data_tool.progress_reporter.report_complete(
+                ctx, "query",
+                {
+                    "total_embeddings": total_embeddings,
+                    "results_found": len(search_results),
+                    "query": search_query or "all datasets"
+                },
+                pipeline_type="search"
+            )
+            await data_tool.log_info(ctx, f"Search completed: {len(search_results)} results found")
             
             result = {
                 "success": True,
@@ -562,6 +693,7 @@ def register_data_tools(mcp: FastMCP):
                 
         except Exception as e:
             logger.error(f"Data search failed: {str(e)}")
+            await data_tool.log_error(ctx, f"Data search failed: {str(e)}")
             error_response = {
                 "status": "error",
                 "action": "data_search", 
@@ -576,7 +708,8 @@ def register_data_tools(mcp: FastMCP):
         user_id: str,
         natural_language_query: str,
         include_visualization: bool = True,
-        include_analytics: bool = False
+        include_analytics: bool = False,
+        ctx: Optional[Context] = None
     ) -> str:
         """
         Execute natural language queries against ingested data - REAL DATA from MinIO Parquet
@@ -621,9 +754,15 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns: {"status": "success", "data": {actual_sales_data...}}
         """
-        data_tool = DataTool()
-        
         try:
+            # Stage 1: Query Analysis
+            await data_tool.log_info(ctx, f"Starting data query for user {user_id}: {natural_language_query}")
+            await data_tool.progress_reporter.report_stage(
+                ctx, "processing", "query",
+                "analyzing natural language query",
+                pipeline_type="query"
+            )
+            
             logger.info(f"Processing data query for user {user_id}: {natural_language_query}")
             
             # Import available services
@@ -664,6 +803,13 @@ def register_data_tools(mcp: FastMCP):
             
             result["services_used"].append("embedding_service")
             result["execution_times"]["metadata_check"] = (datetime.now() - service_start).total_seconds()
+            
+            # Stage 2: Data Retrieval
+            await data_tool.progress_reporter.report_stage(
+                ctx, "retrieval", "query",
+                "searching for relevant data",
+                pipeline_type="query"
+            )
             
             # Step 2: Search and retrieve data using embedding service
             service_start = datetime.now()
@@ -820,6 +966,13 @@ def register_data_tools(mcp: FastMCP):
             
             logger.info(f"STEP3: Loading data from MinIO: {storage_path}")
             
+            # Stage 3: Query Execution
+            await data_tool.progress_reporter.report_stage(
+                ctx, "execution", "query",
+                "loading and executing query on Parquet data",
+                pipeline_type="query"
+            )
+            
             # Step 3: Load Parquet from MinIO and query with Professional DuckDB Service
             from tools.services.data_analytics_service.services.data_service.search.sql_executor import ExecutionResult
             
@@ -959,6 +1112,7 @@ def register_data_tools(mcp: FastMCP):
                 )
                 
                 logger.info(f"STEP3: Query executed successfully - {len(data_rows)} REAL rows returned from Parquet")
+                await data_tool.log_info(ctx, f"Query executed successfully: {len(data_rows)} rows returned")
                 
             except Exception as query_error:
                 logger.error(f"STEP3: Failed to query Parquet: {str(query_error)}")
@@ -1018,9 +1172,15 @@ def register_data_tools(mcp: FastMCP):
             result["execution_times"]["data_query"] = (datetime.now() - service_start).total_seconds()
             result["data_source"] = storage_path
             
-            # Step 3: Generate visualization if requested
+            # Stage 4: Visualization
             visualization_spec = None
             if include_visualization and execution_result.data:
+                await data_tool.progress_reporter.report_stage(
+                    ctx, "visualization", "query",
+                    "generating chart specifications",
+                    pipeline_type="query"
+                )
+                
                 try:
                     service_start = datetime.now()
                     
@@ -1167,6 +1327,19 @@ def register_data_tools(mcp: FastMCP):
                 "message": f"Query processed using {len(result['services_used'])} services"
             })
             
+            # Report completion
+            await data_tool.progress_reporter.report_complete(
+                ctx, "query",
+                {
+                    "rows_returned": execution_result.row_count,
+                    "services_used": len(result['services_used']),
+                    "execution_time": result["total_execution_time"],
+                    "visualization_ready": result.get("visualization_ready", False)
+                },
+                pipeline_type="query"
+            )
+            await data_tool.log_info(ctx, f"Query completed successfully: {execution_result.row_count} rows returned")
+            
             response = {
                 "status": "success",
                 "action": "data_query", 
@@ -1178,6 +1351,7 @@ def register_data_tools(mcp: FastMCP):
                 
         except Exception as e:
             logger.error(f"Data query failed: {str(e)}")
+            await data_tool.log_error(ctx, f"Data query failed: {str(e)}")
             error_response = {
                 "status": "error",
                 "action": "data_query",

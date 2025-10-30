@@ -120,7 +120,7 @@ You analyze requests and decide the best approach, including whether to search t
 - **📁 User Files**: {file_count} uploaded files ({file_types if file_types else "various types"})
 - **🔍 Document Search**: search_knowledge, generate_rag_response, list_user_files
 
-{f"## Relevant File Context:\\n{file_context}\\n" if file_context else ""}
+{"## Relevant File Context:" if file_context else ""}{file_context if file_context else ""}
 
 ## User Request:
 {user_message}

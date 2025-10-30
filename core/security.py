@@ -221,7 +221,23 @@ class SecurityManager:
                     #         "security_level": security_level.name
                     #     }
                     # )
-            
+
+            # CRITICAL: Clean Context from annotations (same as base_tool.py)
+            # This prevents FastMCP from trying to serialize Context objects
+            if hasattr(wrapper, '__annotations__'):
+                clean_annotations = {}
+                for param_name, param_type in wrapper.__annotations__.items():
+                    # Skip Context types entirely
+                    if 'Context' not in str(param_type):
+                        clean_annotations[param_name] = param_type
+                    # For ctx parameter, use Any instead of Context
+                    elif param_name == 'ctx':
+                        from typing import Any
+                        clean_annotations[param_name] = Any
+
+                wrapper.__annotations__ = clean_annotations
+                logger.debug(f"Cleaned Context from security wrapper annotations for '{func.__name__}'")
+
             return wrapper
         return decorator
 

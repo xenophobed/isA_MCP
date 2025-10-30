@@ -153,7 +153,7 @@ class VisionAnalyzer:
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                from core.isa_client_factory import get_isa_client
+                from core.clients.model_client import get_isa_client
                 self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
@@ -455,7 +455,7 @@ Only include elements you are confident about (confidence > 0.7). Start your res
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                from core.isa_client_factory import get_isa_client
+                from core.clients.model_client import get_isa_client
                 self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
@@ -1294,7 +1294,7 @@ Only include elements you are confident about (confidence > 0.7). Start your res
                 
                 # Use ISA Model client for vision analysis
                 if self.client is None:
-                    from core.isa_client_factory import get_isa_client
+                    from core.clients.model_client import get_isa_client
                     self.client = get_isa_client()
                     logger.info(f"✅ ISA Model client initialized")
                 
@@ -1345,7 +1345,7 @@ Only include elements you are confident about (confidence > 0.7). Start your res
             
             # Use ISA Model client for vision analysis
             if self.client is None:
-                from core.isa_client_factory import get_isa_client
+                from core.clients.model_client import get_isa_client
                 self.client = get_isa_client()
                 logger.info(f"✅ ISA Model client initialized")
             
@@ -1787,7 +1787,7 @@ Only include elements you are confident about (confidence > 0.7). Start your res
         try:
             # Initialize client if needed
             if self.client is None:
-                from core.isa_client_factory import get_isa_client
+                from core.clients.model_client import get_isa_client
                 self.client = get_isa_client()
             
             # Create analysis prompt

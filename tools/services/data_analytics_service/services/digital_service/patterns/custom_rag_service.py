@@ -20,9 +20,12 @@ import logging
 import time
 import base64
 import uuid
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
 from pathlib import Path
 from datetime import datetime
+
+# 导入 BaseRAGService
+from ..base.base_rag_service import BaseRAGService, RAGResult, RAGMode, RAGConfig
 
 # 导入现有组件
 from ..pdf_extract_service import PDFExtractService
@@ -40,7 +43,7 @@ from tools.services.intelligence_service.vector_db.chunking_service import (
 logger = logging.getLogger(__name__)
 
 
-class CustomRAGService:
+class CustomRAGService(BaseRAGService):
     """
     Custom Multimodal RAG Service for PDF Processing
     
@@ -51,29 +54,44 @@ class CustomRAGService:
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
+        # Initialize base class with RAGConfig
+        self.raw_config = config or {}
+
+        # Create RAGConfig for base class
+        rag_config = RAGConfig(
+            mode=RAGMode.HYBRID,  # Custom uses hybrid mode
+            chunk_size=self.raw_config.get('chunk_size', 1000),
+            overlap=self.raw_config.get('chunk_overlap', 100),
+            top_k=self.raw_config.get('top_k_results', 5),
+            embedding_model=self.raw_config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=self.raw_config.get('enable_rerank', False)
+        )
+
+        super().__init__(rag_config)
+
+        # Custom RAG specific attributes
         self.service_name = "custom_rag_service"
-        self.version = "1.0.0"
-        
+        self.version = "2.0.0"
+
         # 初始化组件
-        self.pdf_extract_service = PDFExtractService(self.config)
-        self.minio_integration = get_minio_integration(self.config)
+        self.pdf_extract_service = PDFExtractService(self.raw_config)
+        self.minio_integration = get_minio_integration(self.raw_config)
         self.embedding_integration = EmbeddingIntegration()
-        
+
         # 向量数据库配置
         vector_db_policy = VectorDBPolicy.STORAGE  # 使用 Supabase
         self.vector_db_integration = VectorDBIntegration(
             policy=vector_db_policy,
-            config=self.config
+            config=self.raw_config
         )
-        
+
         # 配置参数
-        self.chunk_size = self.config.get('chunk_size', 1000)
-        self.chunk_overlap = self.config.get('chunk_overlap', 100)
-        self.top_k = self.config.get('top_k_results', 5)
+        self.chunk_size = self.raw_config.get('chunk_size', 1000)
+        self.chunk_overlap = self.raw_config.get('chunk_overlap', 100)
+        self.top_k = self.raw_config.get('top_k_results', 5)
 
         # Chunking strategy: "page" (default) or "recursive", "semantic", etc.
-        self.chunking_strategy = self.config.get('chunking_strategy', 'page')
+        self.chunking_strategy = self.raw_config.get('chunking_strategy', 'page')
 
         # Initialize ChunkingService for hybrid approach
         if self.chunking_strategy != 'page':
@@ -84,31 +102,85 @@ class CustomRAGService:
             logger.info("Page-level chunking enabled (default)")
 
         logger.info(f"CustomRAGService initialized with vector DB: {vector_db_policy.value}")
-    
-    async def ingest_pdf(
+
+    def get_capabilities(self) -> Dict[str, Any]:
+        """Get Custom RAG service capabilities"""
+        return {
+            'name': 'Custom Multimodal RAG',
+            'description': 'PDF multimodal processing with VLM analysis and image storage',
+            'features': [
+                'PDF page-level extraction',
+                'VLM image analysis',
+                'MinIO image storage',
+                'Hybrid chunking strategies (page, recursive, semantic)',
+                'Multimodal vector search',
+                'Page-level and chunk-level processing'
+            ],
+            'supported_content_types': ['pdf', 'text', 'document', 'image'],
+            'chunking_strategies': ['page', 'recursive', 'semantic', 'sentence'],
+            'vector_db': 'Supabase pgvector',
+            'image_storage': 'MinIO',
+            'version': self.version,
+            'mode': RAGMode.HYBRID.value
+        }
+
+    async def store(
+        self,
+        content: Union[str, Any],
+        user_id: str,
+        content_type: str = "pdf",
+        metadata: Optional[Dict[str, Any]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> RAGResult:
+        """
+        Universal storage - implements BaseRAGService.store()
+
+        Supports PDF multimodal processing with VLM analysis and image storage.
+
+        Flow for PDF:
+        1. Extract PDF pages (text + images) using PDFExtractService
+        2. VLM analysis of each page
+        3. Upload images to MinIO
+        4. Generate embeddings for text + image descriptions
+        5. Store to Supabase pgvector
+
+        Args:
+            content: File path (for PDF/image) or text string
+            user_id: User identifier
+            content_type: "pdf", "image", "text", or "document"
+            metadata: Additional metadata
+            options: Storage options (VLM, chunking, etc.)
+
+        Returns:
+            RAGResult with storage statistics
+        """
+        # For PDF content_type, call specialized PDF processing
+        if content_type == "pdf":
+            return await self._store_pdf(
+                pdf_path=content,
+                user_id=user_id,
+                metadata=metadata,
+                options=options
+            )
+        else:
+            # For other types, use base class methods
+            return await super().store_knowledge(user_id, content, metadata)
+
+    async def _store_pdf(
         self,
         pdf_path: str,
         user_id: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        metadata: Optional[Dict[str, Any]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> RAGResult:
         """
-        完整的 PDF 摄取流程
-        
-        流程：
-        1. 使用 PDFExtractService 提取 PDF（文本 + 图片）
-        2. 对每个图片使用 VLM 生成描述
-        3. 上传图片到 MinIO，获取 URL
-        4. 文本分块 + Embedding
-        5. 存储到 Supabase pgvector（文本 chunk + 图片描述 + 图片 URL）
-        
-        Args:
-            pdf_path: PDF 文件路径
-            user_id: 用户 ID
-            metadata: 额外元数据
-            
+        Specialized PDF storage implementation
+
         Returns:
-            存储结果统计
+            RAGResult with storage statistics
         """
+        options = options or {}
+        metadata = metadata or {}
         start_time = time.time()
         
         try:
@@ -140,33 +212,39 @@ class CustomRAGService:
             )
             
             processing_time = time.time() - start_time
-            
+
             # 统计信息
             total_images = sum(len(p.get('photo_urls', [])) for p in page_records)
-            
-            return {
-                'success': True,
-                'pdf_name': pdf_name,
-                'user_id': user_id,
-                'statistics': {
+
+            return RAGResult(
+                success=True,
+                content=f"Stored {len(page_records)} pages with {total_images} images",
+                sources=page_records,
+                metadata={
+                    'pdf_name': pdf_name,
                     'pages_stored': len(page_records),
                     'images_stored': total_images,
                     'total_records': len(page_records),
-                    'processing_time': processing_time
+                    'storage_result': storage_result,
+                    'content_type': 'pdf'
                 },
-                'storage_result': storage_result,
-                'processing_time': processing_time
-            }
-            
+                mode_used=RAGMode.HYBRID,
+                processing_time=processing_time
+            )
+
         except Exception as e:
             logger.error(f"❌ PDF 摄取失败: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return {
-                'success': False,
-                'error': str(e),
-                'processing_time': time.time() - start_time
-            }
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'pdf_name': pdf_name if 'pdf_name' in locals() else 'unknown'},
+                mode_used=RAGMode.HYBRID,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
     
     async def _process_pages_multimodal(
         self,
@@ -188,8 +266,8 @@ class CustomRAGService:
             页面记录列表，每个页面一条记录
         """
         from tools.services.data_analytics_service.processors.file_processors.pdf_processor import PDFProcessor
-        
-        pdf_processor = PDFProcessor(self.config)
+
+        pdf_processor = PDFProcessor(self.raw_config)
         page_records = []
         
         # 1. 提取 PDF 完整信息（文字 + 图片）
@@ -219,17 +297,11 @@ class CustomRAGService:
             logger.warning("❌ 没有提取到任何页面！")
             return []
         
-        # 限制处理的页面数量
-        max_pages = self.config.get('max_pages')
-        if max_pages and len(pages_text_list) > max_pages:
-            logger.info(f"⚠️ 限制页面处理数量: {len(pages_text_list)} -> {max_pages}")
-            pages_text_list = pages_text_list[:max_pages]
-        
         # 2. 并发处理每一页
         logger.info(f"🔄 开始处理 {len(pages_text_list)} 个页面（页面级多模态分析）...")
         
         # 创建 semaphore 限制并发数
-        max_concurrent = self.config.get('max_concurrent_pages', 3)
+        max_concurrent = self.raw_config.get('max_concurrent_pages', 3)
         semaphore = asyncio.Semaphore(max_concurrent)
         
         tasks = []
@@ -293,7 +365,7 @@ class CustomRAGService:
         """
         from tools.services.data_analytics_service.processors.file_processors.pdf_processor import PDFProcessor
 
-        pdf_processor = PDFProcessor(self.config)
+        pdf_processor = PDFProcessor(self.raw_config)
         all_chunk_records = []
 
         # 1. 提取 PDF 完整信息
@@ -323,15 +395,10 @@ class CustomRAGService:
             return []
 
         # 限制处理的页面数量
-        max_pages = self.config.get('max_pages')
-        if max_pages and len(pages_text_list) > max_pages:
-            logger.info(f"⚠️ 限制页面处理数量: {len(pages_text_list)} -> {max_pages}")
-            pages_text_list = pages_text_list[:max_pages]
-
         # 2. 并发处理每一页（VLM + 分块）
         logger.info(f"🔄 开始混合处理 {len(pages_text_list)} 个页面...")
 
-        max_concurrent = self.config.get('max_concurrent_pages', 3)
+        max_concurrent = self.raw_config.get('max_concurrent_pages', 3)
         semaphore = asyncio.Semaphore(max_concurrent)
 
         tasks = []
@@ -393,7 +460,7 @@ class CustomRAGService:
                 logger.info(f"📄 处理页面 {page_number} (hybrid)...")
 
                 # 1. VLM 分析整页 (multimodal context)
-                enable_vlm = self.config.get('enable_vlm_analysis', True)
+                enable_vlm = self.raw_config.get('enable_vlm_analysis', True)
                 if enable_vlm:
                     page_summary, photo_descriptions = await self._analyze_page_with_vlm(
                         pdf_path, page_number, page_text, len(page_images)
@@ -403,7 +470,7 @@ class CustomRAGService:
                     photo_descriptions = [f"图片{i+1}" for i in range(len(page_images))]
 
                 # 2. 上传页面图片到 MinIO
-                enable_minio = self.config.get('enable_minio_upload', True)
+                enable_minio = self.raw_config.get('enable_minio_upload', True)
                 photo_urls = []
                 if enable_minio:
                     for idx, img_data in enumerate(page_images):
@@ -527,7 +594,7 @@ class CustomRAGService:
                 logger.info(f"📄 处理页面 {page_number}...")
                 
                 # 1. VLM 分析整页（可配置是否启用）
-                enable_vlm = self.config.get('enable_vlm_analysis', True)
+                enable_vlm = self.raw_config.get('enable_vlm_analysis', True)
                 if enable_vlm:
                     page_summary, photo_descriptions = await self._analyze_page_with_vlm(
                         pdf_path, page_number, page_text, len(page_images)
@@ -539,7 +606,7 @@ class CustomRAGService:
                     logger.info(f"⚠️ VLM 分析已禁用（简化模式）")
                 
                 # 2. 上传页面图片到 MinIO（可配置是否启用）
-                enable_minio = self.config.get('enable_minio_upload', True)
+                enable_minio = self.raw_config.get('enable_minio_upload', True)
                 photo_urls = []
                 if enable_minio:
                     for idx, img_data in enumerate(page_images):
@@ -772,8 +839,8 @@ photo_2: xxx
         """提取 PDF 中的所有图片（使用 PDFProcessor）"""
         try:
             from tools.services.data_analytics_service.processors.file_processors.pdf_processor import PDFProcessor
-            
-            pdf_processor = PDFProcessor(self.config)
+
+            pdf_processor = PDFProcessor(self.raw_config)
             result = await pdf_processor.process_pdf_unified(pdf_path, {
                 'extract_text': False,
                 'extract_images': True,
@@ -902,7 +969,7 @@ photo_2: xxx
             图片记录列表，包含描述、URL、embedding
         """
         # 创建 semaphore 限制并发数（避免 API 限流）
-        max_concurrent = self.config.get('max_concurrent_images', 10)
+        max_concurrent = self.raw_config.get('max_concurrent_images', 10)
         semaphore = asyncio.Semaphore(max_concurrent)
         
         logger.info(f"开始并发处理 {len(images_data)} 张图片（最大并发数: {max_concurrent}）")
@@ -1184,23 +1251,28 @@ photo_2: xxx
     
     async def retrieve(
         self,
-        user_id: str,
         query: str,
+        user_id: str,
         top_k: Optional[int] = None,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        filters: Optional[Dict[str, Any]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> RAGResult:
         """
-        检索相关内容（文本 + 图片）
-        
+        Universal retrieval - implements BaseRAGService.retrieve()
+
+        Retrieves multimodal context (text + images) from vector database.
+
         Args:
-            user_id: 用户 ID
-            query: 查询文本
-            top_k: 返回结果数量
-            filters: 额外过滤条件（如 source_document）
-            
+            query: Search query
+            user_id: User identifier
+            top_k: Number of results to return
+            filters: Filter criteria (e.g., source_document, content_type)
+            options: Search options (rerank, etc.)
+
         Returns:
-            检索结果，包含文本块和相关图片
+            RAGResult with retrieved context items
         """
+        start_time = time.time()
         try:
             top_k = top_k or self.top_k
             
@@ -1254,63 +1326,90 @@ photo_2: xxx
             
             # 4. 限制返回数量
             page_results = page_results[:top_k]
-            
+
             # 统计图片数量
             total_photos = sum(len(p.get('photo_urls', [])) for p in page_results)
-            
+
             logger.info(f"✅ 检索完成: {len(page_results)} 个页面, {total_photos} 张图片")
-            
-            return {
-                'success': True,
-                'query': query,
-                'page_results': page_results,  # 页面级结果
-                'total_pages': len(page_results),
-                'total_photos': total_photos,
-                # 兼容旧接口
-                'text_results': page_results,
-                'image_results': []
-            }
-            
+
+            return RAGResult(
+                success=True,
+                content=f"Retrieved {len(page_results)} pages with {total_photos} images",
+                sources=page_results,
+                metadata={
+                    'query': query,
+                    'total_pages': len(page_results),
+                    'total_photos': total_photos,
+                    'retrieval_method': 'multimodal_vector_search'
+                },
+                mode_used=RAGMode.HYBRID,
+                processing_time=time.time() - start_time
+            )
+
         except Exception as e:
             logger.error(f"检索失败: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'page_results': [],
-                'text_results': [],
-                'image_results': []
-            }
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'query': query},
+                mode_used=RAGMode.HYBRID,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
     
     async def generate(
         self,
-        user_id: str,
         query: str,
-        retrieval_result: Dict[str, Any],
-        generation_config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        user_id: str,
+        context: Optional[Union[str, List[Dict]]] = None,
+        retrieval_result: Optional[RAGResult] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> RAGResult:
         """
-        生成答案（基于检索结果）
-        
+        Universal generation - implements BaseRAGService.generate()
+
+        Generates response from retrieved context or provided context.
+
         Args:
-            user_id: 用户 ID
-            query: 查询问题
-            retrieval_result: 检索结果（来自 retrieve()）
-            generation_config: 生成配置（模型、温度等）
-            
+            query: User question
+            user_id: User identifier
+            context: Pre-provided context (if retrieval_result not given)
+            retrieval_result: Result from retrieve() (auto-extracts context)
+            options: Generation options (model, temperature, etc.)
+
         Returns:
-            生成的答案，包含图片引用
+            RAGResult with generated response
         """
+        start_time = time.time()
         try:
-            generation_config = generation_config or {}
-            
+            options = options or {}
+
             logger.info(f"🤖 生成答案: {query}")
-            
-            # 1. 提取检索结果（页面级）
-            page_results = retrieval_result.get('page_results', [])
-            
-            # 兼容旧格式
-            if not page_results:
-                page_results = retrieval_result.get('text_results', [])
+
+            # 1. Extract page results from RAGResult or context
+            if retrieval_result:
+                # RAGResult.sources contains the page_results list
+                page_results = retrieval_result.sources
+            elif context:
+                # Handle pre-provided context
+                if isinstance(context, str):
+                    # String context - wrap it
+                    page_results = [{'text': context, 'page_number': 1}]
+                elif isinstance(context, list):
+                    page_results = context
+                else:
+                    page_results = []
+            else:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=[],
+                    metadata={'query': query},
+                    mode_used=RAGMode.HYBRID,
+                    processing_time=time.time() - start_time,
+                    error="No retrieval result or context provided"
+                )
             
             # 2. 构建上下文（页面级，包含图片）
             context_parts = []
@@ -1339,7 +1438,7 @@ photo_2: xxx
                     for photo_idx, url in enumerate(photo_urls, 1):
                         context_parts.append(f"  图片{photo_idx}: {url}")
             
-            context = "\n".join(context_parts)
+            context_text = "\n".join(context_parts)
             
             # 3. 构建 prompt
             system_prompt = """你是一个专业的 CRM 系统助手。基于提供的PDF页面内容（包含文字和图片），回答用户的问题。
@@ -1353,72 +1452,75 @@ photo_2: xxx
             
             user_prompt = f"""基于以下内容，回答问题：
 
-{context}
+{context_text}
 
 **用户问题**: {query}
 
 请提供详细、准确的答案。如果有相关图片，请在答案中引用并说明如何查看。"""
             
             # 4. 调用 LLM 生成答案
-            from core.isa_client_factory import get_isa_client
-            
-            isa_client = get_isa_client()
-            llm_result = await isa_client.invoke(
-                input_data=user_prompt,
-                task="chat",
-                service_type="text",
-                model=generation_config.get('model', 'gpt-4o-mini'),
-                system_prompt=system_prompt,
-                temperature=generation_config.get('temperature', 0.3),
-                provider=generation_config.get('provider', 'yyds')  # 使用 yyds provider
+            from core.clients.model_client import get_isa_client
+
+            isa_client = await get_isa_client()
+
+            # Use new chat.completions.create API
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_prompt})
+
+            response = await isa_client.chat.completions.create(
+                model=options.get('model', 'gpt-4o-mini'),
+                messages=messages,
+                temperature=options.get('temperature', 0.3)
             )
-            
-            if not llm_result.get('success'):
-                return {
-                    'success': False,
-                    'error': f"LLM 生成失败: {llm_result.get('error')}"
-                }
-            
-            # 提取答案文本（兼容不同的返回格式）
-            answer = ""
-            if 'result' in llm_result:
-                result = llm_result['result']
-                if isinstance(result, dict):
-                    answer = result.get('text', '') or result.get('response', '')
-                elif isinstance(result, str):
-                    answer = result
-            
-            if not answer:
-                answer = llm_result.get('response', '')
-            
+
+            llm_answer = response.choices[0].message.content
+
+            if not llm_answer:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=page_results,
+                    metadata={'query': query},
+                    mode_used=RAGMode.HYBRID,
+                    processing_time=time.time() - start_time,
+                    error="LLM generation returned empty result"
+                )
+
+            # Use the answer from the new API
+            answer = llm_answer
+
             logger.info(f"✅ 答案生成完成")
-            
+
             # 统计来源
             total_photos = sum(len(p.get('photo_urls', [])) for p in page_results)
-            
-            return {
-                'success': True,
-                'query': query,
-                'answer': answer,
-                'sources': {
+
+            return RAGResult(
+                success=True,
+                content=answer,
+                sources=page_results,
+                metadata={
+                    'query': query,
                     'page_count': len(page_results),
                     'photo_count': total_photos,
-                    'page_sources': page_results,
-                    # 兼容旧格式
-                    'text_count': len(page_results),
-                    'image_count': 0,
-                    'text_sources': page_results,
-                    'image_sources': []
+                    'context_used': context_text
                 },
-                'context_used': context
-            }
-            
+                mode_used=RAGMode.HYBRID,
+                processing_time=time.time() - start_time
+            )
+
         except Exception as e:
             logger.error(f"答案生成失败: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'query': query},
+                mode_used=RAGMode.HYBRID,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
     
     async def query_with_generation(
         self,

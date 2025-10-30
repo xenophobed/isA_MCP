@@ -218,13 +218,14 @@ def setup_logging(
     enable_structured: bool = False,
     max_file_size: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
-    loki_url: Optional[str] = None,
+    loki_host: str = "localhost",
+    loki_port: int = 50054,
     loki_enabled: bool = False,
     service_name: str = "mcp",
     environment: str = "development"
 ) -> None:
     """
-    Setup centralized logging configuration with Loki support
+    Setup centralized logging configuration with Loki gRPC support
 
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -233,8 +234,9 @@ def setup_logging(
         enable_structured: Whether to use structured JSON logging
         max_file_size: Maximum size of log file before rotation
         backup_count: Number of backup files to keep
-        loki_url: Loki server URL for centralized logging
-        loki_enabled: Whether to enable Loki centralized logging
+        loki_host: Loki server host for gRPC connection
+        loki_port: Loki server gRPC port (default 50054)
+        loki_enabled: Whether to enable Loki centralized logging via gRPC
         service_name: Service name for Loki labels
         environment: Environment name (development, staging, production)
     """
@@ -268,31 +270,99 @@ def setup_logging(
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
 
-    # Loki handler (centralized logging - recommended for production)
-    if loki_enabled and loki_url:
+    # Loki gRPC handler (centralized logging - recommended for production)
+    if loki_enabled:
         try:
-            from logging_loki import LokiHandler
+            from isa_common.loki_client import LokiClient
 
-            # Extract logger component from logger name
-            # e.g., "mcp.security" -> logger="security", "mcp" -> logger="main"
-            def get_logger_component(logger_name: str) -> str:
-                if not logger_name or logger_name == service_name:
-                    return "main"
-                return logger_name.replace(f"{service_name}.", "").replace(service_name, "main")
+            # Custom Loki handler that uses isa_common.LokiClient via gRPC
+            class LokiGrpcHandler(logging.Handler):
+                """
+                Custom Loki handler that uses isa_common.LokiClient via gRPC
 
-            # Create Loki labels (used for filtering in Grafana)
-            loki_labels = {
-                "service": service_name,
+                This handler automatically pushes logs to Loki using the LokiClient
+                from isa_common, which handles gRPC connection management, retries,
+                and efficient batching.
+                """
+
+                def __init__(self, loki_host: str, loki_port: int, user_id: str, service_labels: dict):
+                    super().__init__()
+                    self.loki_host = loki_host
+                    self.loki_port = loki_port
+                    self.user_id = user_id
+                    self.service_labels = service_labels
+                    self.client = None
+                    self._error_count = 0
+                    self._success_count = 0
+
+                def emit(self, record):
+                    """Send log record to Loki via gRPC"""
+                    try:
+                        # Lazy initialization of LokiClient (only when needed)
+                        if self.client is None:
+                            self.client = LokiClient(
+                                host=self.loki_host,
+                                port=self.loki_port,
+                                user_id=self.user_id
+                            )
+                            self.client.__enter__()  # Open connection
+
+                        # Format the log message
+                        log_entry = self.format(record)
+
+                        # Build labels with level and logger name
+                        labels = self.service_labels.copy()
+                        labels['level'] = record.levelname.lower()
+                        labels['logger'] = record.name.replace(f"{self.user_id}.", "").replace(self.user_id, "main")
+
+                        # Push to Loki using simple API
+                        self.client.push_log(
+                            message=log_entry,
+                            labels=labels
+                        )
+
+                        self._success_count += 1
+
+                        # Debug: log first few successful pushes
+                        if self._success_count <= 2:
+                            print(f"[LOKI_DEBUG] Successfully pushed log to Loki: {log_entry[:80]}", flush=True)
+
+                    except Exception as e:
+                        # Graceful degradation - don't fail the application
+                        self._error_count += 1
+                        if self._error_count <= 3:
+                            print(f"[LOKI_ERROR] Failed to push log to Loki: {e}", flush=True)
+
+                def close(self):
+                    """Clean up Loki client connection"""
+                    if self.client:
+                        try:
+                            self.client.__exit__(None, None, None)
+                        except:
+                            pass
+                    super().close()
+
+            # Extract service name and logger component
+            # e.g., "mcp.security" -> service="mcp_service", logger="security"
+            service_id = f"{service_name}_service"
+
+            # Labels for Loki (used for filtering and searching)
+            service_labels = {
+                "service": service_id,
                 "environment": environment,
-                "job": f"{service_name}_service"
+                "job": service_id
             }
 
-            # Create Loki handler
-            loki_handler = LokiHandler(
-                url=f"{loki_url}/loki/api/v1/push",
-                tags=loki_labels,
-                version="1",
+            # Create Loki gRPC handler
+            loki_handler = LokiGrpcHandler(
+                loki_host=loki_host,
+                loki_port=loki_port,
+                user_id=service_id,
+                service_labels=service_labels
             )
+
+            # Set formatter
+            loki_handler.setFormatter(console_formatter)
 
             # Only send INFO and above to Loki (reduce network traffic)
             loki_handler.setLevel(logging.INFO)
@@ -300,15 +370,16 @@ def setup_logging(
             root_logger.addHandler(loki_handler)
 
             # Log successful Loki integration
-            root_logger.info(f"✅ Centralized logging enabled | loki_url={loki_url} | service={service_name}")
+            root_logger.info(f"✅ Centralized logging enabled | loki={loki_host}:{loki_port} via gRPC")
 
-        except ImportError:
-            root_logger.warning("⚠️  python-logging-loki not installed. Install with: pip install python-logging-loki")
-            root_logger.info("📝 Logging to console/file only")
+        except ImportError as e:
+            # isa_common not installed
+            root_logger.warning(f"⚠️  Could not setup Loki handler: {e}")
+            root_logger.warning(f"⚠️  Please install isa-common: pip install isa-common")
         except Exception as e:
-            # Loki unavailable - don't fail the app, just log locally
-            root_logger.warning(f"⚠️  Could not connect to Loki: {e}")
-            root_logger.info("📝 Logging to console/file only")
+            # Loki unavailable or other error - don't fail the app
+            root_logger.warning(f"⚠️  Could not connect to Loki at {loki_host}:{loki_port}: {e}")
+            root_logger.info("📝 Logging to console only")
 
     # File handler with rotation (optional, mainly for local dev backup)
     # In production with Loki, file logging is optional
@@ -341,7 +412,7 @@ def get_logger(name: str) -> MCPLogger:
 # Default setup for MCP server
 def setup_mcp_logging(config=None):
     """
-    Setup default logging configuration for MCP server with Loki support
+    Setup default logging configuration for MCP server with Loki gRPC support
 
     Args:
         config: Optional MCPSettings config object. If not provided, uses environment variables.
@@ -354,9 +425,8 @@ def setup_mcp_logging(config=None):
             log_file=log_config.log_file if not log_config.loki_enabled else None,
             enable_console=log_config.enable_console,
             enable_structured=log_config.enable_structured,
-            max_file_size=log_config.max_file_size,
-            backup_count=log_config.backup_count,
-            loki_url=log_config.loki_url,
+            loki_host=log_config.loki_grpc_host,
+            loki_port=log_config.loki_grpc_port,
             loki_enabled=log_config.loki_enabled,
             service_name=log_config.service_name,
             environment=log_config.environment
@@ -367,8 +437,9 @@ def setup_mcp_logging(config=None):
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             log_file=os.getenv("LOG_FILE", "logs/mcp_server.log") if not os.getenv("LOKI_ENABLED", "false").lower() == "true" else None,
             enable_console=True,
-            enable_structured=os.getenv("LOG_STRUCTURED", "false").lower() == "true",
-            loki_url=os.getenv("LOKI_URL", "http://localhost:3100"),
+            enable_structured=os.getenv("ENABLE_STRUCTURED_LOGGING", "false").lower() == "true",
+            loki_host=os.getenv("LOKI_GRPC_HOST", "localhost"),
+            loki_port=int(os.getenv("LOKI_GRPC_PORT", "50054")),
             loki_enabled=os.getenv("LOKI_ENABLED", "false").lower() == "true",
             service_name=os.getenv("SERVICE_NAME", "mcp"),
             environment=os.getenv("ENVIRONMENT", "development")

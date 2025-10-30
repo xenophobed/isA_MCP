@@ -3,7 +3,9 @@ version: '3.8'
 services:
   mcp-staging:
     image: isa-mcp-staging:latest
-    container_name: mcp-staging-test
+    pull_policy: never  # Use locally built image, don't pull from registry
+    container_name: mcp-staging
+    hostname: mcp-staging  # Set hostname for Consul registration
     platform: linux/amd64
 
     ports:
@@ -15,6 +17,10 @@ services:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - DEBUG=true
+      - UVICORN_RELOAD=true  # Enable hot-reload for development
+
+      # Fast startup - lazy load AI selectors in background
+      - LAZY_LOAD_AI_SELECTORS=true
 
       # Service Discovery (Consul will discover all services)
       - CONSUL_ENABLED=${CONSUL_ENABLED:-true}
@@ -33,6 +39,16 @@ services:
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+
+      # Vector Database - Qdrant
+      - QDRANT_HOST=${QDRANT_HOST:-isa-qdrant-grpc}
+      - QDRANT_PORT=${QDRANT_PORT:-50062}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-user_knowledge}
+      - VECTOR_DIMENSION=${VECTOR_DIMENSION:-1536}
+      - QDRANT_DISTANCE=${QDRANT_DISTANCE:-Cosine}
+
+      # ISA Model Service (for embeddings and LLM)
+      - ISA_API_URL=${ISA_API_URL:-http://model-staging-test:8082}
 
       # External API Keys
       - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
@@ -54,12 +70,8 @@ services:
       - HARDWARE_AUTO_SCAN=false
 
     volumes:
-      # Mount source code for development
-      - ../../core:/app/core:ro
-      - ../../tools:/app/tools:ro
-      - ../../prompts:/app/prompts:ro
-      - ../../resources:/app/resources:ro
-      - ../../config:/app/config:ro
+      # Mount entire source code for hot reload (like Agent does!)
+      - ../../:/app
 
       # Persistent cache directory
       - mcp_cache:/app/cache

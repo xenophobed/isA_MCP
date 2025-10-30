@@ -12,8 +12,14 @@ class OCRExtractor:
     
     def __init__(self):
         """Initialize the OCR extractor with ISA Model Client."""
-        from core.isa_client_factory import get_isa_client
-        self.client = get_isa_client()
+        self._client = None
+
+    async def _get_client(self):
+        """Lazy load ISA client"""
+        if self._client is None:
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
+        return self._client
     
     async def extract_text(
         self, 
@@ -34,18 +40,25 @@ class OCRExtractor:
             languages = ["en"]
         
         try:
-            result = await self.client.invoke(
-                input_data=image_path,
-                task="extract",
-                service_type="vision",
+            client = await self._get_client()
+
+            # Use vision API for OCR
+            vision_response = await client.vision.completions.create(
+                image=image_path,
+                prompt=f"Extract text in languages: {', '.join(languages)}",
                 model="isa-suryaocr",
-                provider="isa",
-                languages=languages
+                provider="isa"
             )
-            
-            if result["success"]:
-                response = result["result"]
-                text_results = response.get('text_results', [])
+
+            # Parse response
+            content = vision_response.choices[0].message.content
+            try:
+                import json
+                response = json.loads(content) if isinstance(content, str) else content
+                text_results = response.get('text_results', []) if isinstance(response, dict) else []
+            except:
+                # If not JSON, treat entire content as extracted text
+                text_results = [{"text": content}]
                 total_text = ' '.join([item.get('text', '') for item in text_results])
                 
                 return {

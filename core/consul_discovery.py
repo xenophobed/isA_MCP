@@ -33,37 +33,39 @@ class ConsulServiceDiscovery:
     def get_service_url(self, service_name: str, default_url: Optional[str] = None) -> Optional[str]:
         """
         Get service URL from Consul by service name
-        
+
         Args:
             service_name: Name of the service to discover (e.g., 'model', 'agent')
             default_url: Fallback URL if service not found or Consul unavailable
-            
+
         Returns:
             Service URL (http://host:port) or default_url if not found
         """
         if not self._consul:
             logger.warning(f"Consul not available, using default URL for {service_name}")
             return default_url
-            
+
         try:
             # Get healthy service instances
             _, services = self._consul.health.service(service_name, passing=True)
-            
+
             if not services:
                 logger.warning(f"No healthy instances found for service '{service_name}'")
                 return default_url
-            
+
             # Use random selection for load balancing
             service = random.choice(services)
             service_info = service['Service']
+
+            # Get service address and port from Consul registration
             address = service_info.get('Address', 'localhost')
             port = service_info.get('Port', 80)
-            
+
             # Build service URL
             service_url = f"http://{address}:{port}"
             logger.info(f"Discovered service '{service_name}' at {service_url}")
             return service_url
-            
+
         except Exception as e:
             logger.error(f"Failed to discover service '{service_name}': {e}")
             return default_url
@@ -71,33 +73,38 @@ class ConsulServiceDiscovery:
     def discover_all_instances(self, service_name: str) -> List[Dict[str, Any]]:
         """
         Discover all healthy instances of a service
-        
+
         Args:
             service_name: Name of the service to discover
-            
+
         Returns:
             List of service instances with their details
         """
         if not self._consul:
             return []
-            
+
         try:
             _, services = self._consul.health.service(service_name, passing=True)
-            
+
             instances = []
             for service in services:
                 service_info = service['Service']
+
+                # Get service address and port from Consul registration
+                address = service_info.get('Address', 'localhost')
+                port = service_info.get('Port')
+
                 instances.append({
                     'id': service_info.get('ID'),
                     'name': service_info.get('Service'),
-                    'address': service_info.get('Address'),
-                    'port': service_info.get('Port'),
+                    'address': address,
+                    'port': port,
                     'tags': service_info.get('Tags', []),
-                    'url': f"http://{service_info.get('Address')}:{service_info.get('Port')}"
+                    'url': f"http://{address}:{port}"
                 })
-            
+
             return instances
-            
+
         except Exception as e:
             logger.error(f"Failed to discover instances for '{service_name}': {e}")
             return []
@@ -119,18 +126,10 @@ class ConsulServiceDiscovery:
         parts = url.replace("consul://", "").split("/", 1)
         service_name = parts[0]
         path = "/" + parts[1] if len(parts) > 1 else ""
-        
-        # Default URLs for common services
-        defaults = {
-            "model": os.getenv("ISA_API_URL", "http://localhost:8082"),
-            "agent": os.getenv("AGENT_URL", "http://localhost:8080"),
-            "mcp": os.getenv("MCP_URL", "http://localhost:8081"),
-            "auth": os.getenv("AUTH_SERVICE_URL", "http://localhost:8202"),
-            "storage": os.getenv("STORAGE_SERVICE_URL", "http://localhost:8109")
-        }
-        
-        # Discover service URL
-        discovered_url = self.get_service_url(service_name, defaults.get(service_name))
+
+        # Dynamically discover service URL via Consul
+        # No hardcoded defaults - rely on Consul service discovery
+        discovered_url = self.get_service_url(service_name, default_url=None)
         if discovered_url:
             return discovered_url + path
         

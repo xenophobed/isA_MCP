@@ -26,13 +26,12 @@ class BaseValidator(ABC):
         self.threshold = threshold
         self._isa_client = None
     
-    @property
-    def isa_client(self):
+    async def _get_client(self):
         """Lazy load ISA client"""
         if self._isa_client is None:
             try:
-                from core.isa_client_factory import get_isa_client
-                self._isa_client = get_isa_client()
+                from core.clients.model_client import get_isa_client
+                self._isa_client = await get_isa_client()
             except ImportError:
                 logger.warning("ISA client not available for validation")
         return self._isa_client
@@ -93,10 +92,11 @@ class RelevanceValidator(BaseValidator):
                 }
             
             # Method 2: Use ISA for relevance scoring
-            if self.isa_client:
+            client = await self._get_client()
+            if client:
                 confidence = await self._isa_relevance_check(query, response)
                 passed = confidence >= self.threshold
-                
+
                 return {
                     'passed': passed,
                     'confidence': confidence,
@@ -139,8 +139,9 @@ class RelevanceValidator(BaseValidator):
             
             Provide only a numeric score between 0.0 and 1.0.
             """
-            
-            result = await self.isa_client.invoke(
+
+            client = await self._get_client()
+            result = await client._underlying_client.invoke(
                 input_data=relevance_prompt,
                 task="chat",
                 service_type="text"
@@ -214,7 +215,8 @@ class HallucinationValidator(BaseValidator):
             
             # Use ISA for advanced hallucination detection
             isa_score = 1.0
-            if self.isa_client:
+            client = await self._get_client()
+            if client:
                 isa_score = await self._isa_hallucination_check(query, response)
             
             # Combine scores (weighted average)
@@ -357,8 +359,9 @@ class HallucinationValidator(BaseValidator):
             
             Provide only a numeric score between 0.0 and 1.0.
             """
-            
-            result = await self.isa_client.invoke(
+
+            client = await self._get_client()
+            result = await client._underlying_client.invoke(
                 input_data=hallucination_prompt,
                 task="chat",
                 service_type="text"
@@ -398,7 +401,8 @@ class SafetyValidator(BaseValidator):
             
             # ISA-based safety check
             isa_score = 1.0
-            if self.isa_client:
+            client = await self._get_client()
+            if client:
                 isa_score = await self._isa_safety_check(response)
             
             # Combined score
@@ -467,8 +471,9 @@ class SafetyValidator(BaseValidator):
             
             Provide only a numeric score between 0.0 and 1.0.
             """
-            
-            result = await self.isa_client.invoke(
+
+            client = await self._get_client()
+            result = await client._underlying_client.invoke(
                 input_data=safety_prompt,
                 task="chat",
                 service_type="text"

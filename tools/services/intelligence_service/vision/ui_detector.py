@@ -78,12 +78,11 @@ class UIDetector:
         self._cache_manager = get_vision_cache_manager()
         logger.info("✅ UIDetector initialized as atomic function with vision caching")
     
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client following pattern"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     async def detect_ui_with_coordinates(
@@ -229,19 +228,27 @@ class UIDetector:
     async def _get_ui_elements_with_omniparser(self, image_path: str) -> List[Dict[str, Any]]:
         """Get UI elements using OmniParser"""
         try:
-            result = await self.client.invoke(
-                input_data=image_path,
-                task="detect_ui_elements",
-                service_type="vision",
+            client = await self._get_client()
+
+            # Use vision API for UI detection
+            vision_response = await client.vision.completions.create(
+                image=image_path,
+                prompt="Detect and describe all UI elements",
                 model="isa-omniparser-ui-detection",
                 provider="isa"
             )
-            
-            if not result.get("success"):
-                logger.error(f"❌ OmniParser failed: {result}")
-                return []
-            
-            ui_elements = result.get("result", {}).get("ui_elements", [])
+
+            # Parse the response - for ISA provider, it may return structured data
+            content = vision_response.choices[0].message.content
+
+            # Try to parse as JSON if it's structured
+            try:
+                import json
+                ui_data = json.loads(content) if isinstance(content, str) else content
+                ui_elements = ui_data.get("ui_elements", []) if isinstance(ui_data, dict) else []
+            except:
+                logger.warning("Could not parse UI elements as JSON, returning empty list")
+                ui_elements = []
             logger.info(f"📋 OmniParser found {len(ui_elements)} UI elements")
             
             return ui_elements
@@ -343,15 +350,20 @@ Return ONLY this JSON format with actual element numbers:
             
             prompt += '\n}\n\nReplace 0 with actual element numbers. JSON only!'
             
-            # Call VLM with annotated image
-            result = await self.client.invoke(
-                input_data=annotated_image_path,
-                task="analyze",
-                service_type="vision",
+            # Call VLM with annotated image using new vision API
+            client = await self._get_client()
+
+            vision_response = await client.vision.completions.create(
+                image=annotated_image_path,
                 prompt=prompt,
                 model="gpt-4.1",
                 provider="openai"
             )
+
+            result = {
+                "success": True,
+                "result": vision_response.choices[0].message.content
+            }
             
             if not result.get("success"):
                 logger.error(f"❌ VLM matching failed: {result}")

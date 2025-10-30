@@ -26,7 +26,7 @@ class BaseService:
     def isa_client(self):
         """延迟初始化ISA客户端"""
         if self._isa_client is None:
-            from core.isa_client_factory import get_isa_client
+            from core.clients.model_client import get_isa_client
             self._isa_client = get_isa_client()
         return self._isa_client
     

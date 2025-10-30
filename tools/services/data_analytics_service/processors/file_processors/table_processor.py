@@ -25,8 +25,14 @@ except ImportError:
     NUMPY_AVAILABLE = False
     np = None
 
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+
 from dataclasses import dataclass
-import pandas as pd
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -37,7 +43,7 @@ class TableResult:
     table_id: str
     bbox: Tuple[int, int, int, int]  # (x, y, width, height)
     confidence: float
-    data: pd.DataFrame
+    data: Any  # pd.DataFrame when pandas is available, dict otherwise
     structure: Dict[str, Any]
     extraction_method: str
     processing_time: float
@@ -399,35 +405,40 @@ class TableProcessor:
             logger.error(f"Cell OCR failed: {e}")
             return ""
     
-    async def _cells_to_dataframe(self, cells: List[CellResult], structure: Dict[str, Any]) -> pd.DataFrame:
-        """Convert cell results to pandas DataFrame."""
+    async def _cells_to_dataframe(self, cells: List[CellResult], structure: Dict[str, Any]) -> Any:
+        """Convert cell results to pandas DataFrame or dict."""
         try:
             rows = structure['rows']
             cols = structure['columns']
-            
-            # Create empty DataFrame
+
+            # Create empty data structure
             data = [['' for _ in range(cols)] for _ in range(rows)]
-            
+
             # Fill data from cells
             for cell in cells:
                 if cell.row_index < rows and cell.col_index < cols:
                     data[cell.row_index][cell.col_index] = cell.content
-            
-            # Create DataFrame
-            df = pd.DataFrame(data)
-            
-            # Set column names if first row looks like headers
-            if len(data) > 0:
-                first_row = data[0]
-                if all(cell.strip() for cell in first_row):  # All cells have content
-                    df.columns = first_row
-                    df = df.iloc[1:]  # Remove header row from data
-            
-            return df
-            
+
+            # Return as DataFrame if pandas available, otherwise as dict
+            if PANDAS_AVAILABLE and pd is not None:
+                # Create DataFrame
+                df = pd.DataFrame(data)
+
+                # Set column names if first row looks like headers
+                if len(data) > 0:
+                    first_row = data[0]
+                    if all(cell.strip() for cell in first_row):  # All cells have content
+                        df.columns = first_row
+                        df = df.iloc[1:]  # Remove header row from data
+
+                return df
+            else:
+                # Return as dict when pandas not available
+                return {'rows': data, 'num_rows': rows, 'num_cols': cols}
+
         except Exception as e:
-            logger.error(f"DataFrame conversion failed: {e}")
-            return pd.DataFrame()
+            logger.error(f"Table conversion failed: {e}")
+            return {} if not PANDAS_AVAILABLE else (pd.DataFrame() if pd else {})
     
     async def _extract_tables_from_ocr_page(self, page_ocr: Dict[str, Any]) -> List[TableResult]:
         """Extract tables from OCR page results."""
@@ -463,20 +474,26 @@ class TableProcessor:
                     for row in table_data:
                         padded_row = row + [''] * (max_cols - len(row))
                         padded_data.append(padded_row)
-                    
-                    df = pd.DataFrame(padded_data)
-                    
+
+                    # Create DataFrame if pandas available, otherwise use dict
+                    if PANDAS_AVAILABLE and pd is not None:
+                        data_result = pd.DataFrame(padded_data)
+                        structure = {'rows': len(data_result), 'columns': len(data_result.columns)}
+                    else:
+                        data_result = {'rows': padded_data, 'num_rows': len(padded_data), 'num_cols': max_cols}
+                        structure = {'rows': len(padded_data), 'columns': max_cols}
+
                     # Create table result
                     table_result = TableResult(
                         table_id=f"ocr_table_{page_ocr.get('page_number', 0)}",
                         bbox=(0, 0, 0, 0),  # Unknown bbox for OCR tables
                         confidence=0.6,
-                        data=df,
-                        structure={'rows': len(df), 'columns': len(df.columns)},
+                        data=data_result,
+                        structure=structure,
                         extraction_method='ocr_pattern_matching',
                         processing_time=time.time() - start_time
                     )
-                    
+
                     tables.append(table_result)
             
             return tables
@@ -511,7 +528,7 @@ class TableProcessor:
         """Get supported file formats."""
         return ['image', 'pdf', 'ocr_results']
     
-    async def validate_table_structure(self, table_data: pd.DataFrame) -> Dict[str, Any]:
+    async def validate_table_structure(self, table_data: Any) -> Dict[str, Any]:
         """Validate extracted table structure."""
         try:
             validation = {
@@ -520,19 +537,32 @@ class TableProcessor:
                 'quality_score': 1.0,
                 'recommendations': []
             }
-            
-            # Check for empty table
-            if table_data.empty:
+
+            # Handle dict format when pandas not available
+            if not PANDAS_AVAILABLE or not isinstance(table_data, type(pd.DataFrame() if pd else {})):
+                if isinstance(table_data, dict):
+                    if not table_data.get('rows'):
+                        validation['is_valid'] = False
+                        validation['issues'].append('Table is empty')
+                    return validation
+                else:
+                    validation['is_valid'] = False
+                    validation['issues'].append('Invalid table data format')
+                    return validation
+
+            # Check for empty table (pandas DataFrame)
+            if hasattr(table_data, 'empty') and table_data.empty:
                 validation['is_valid'] = False
                 validation['issues'].append('Table is empty')
                 return validation
-            
+
             # Check for consistency
-            row_lengths = [len(str(cell)) for row in table_data.values for cell in row]
-            if len(set(row_lengths)) > len(row_lengths) * 0.5:
-                validation['issues'].append('Inconsistent cell content lengths')
-                validation['quality_score'] -= 0.2
-            
+            if hasattr(table_data, 'values'):
+                row_lengths = [len(str(cell)) for row in table_data.values for cell in row]
+                if len(set(row_lengths)) > len(row_lengths) * 0.5:
+                    validation['issues'].append('Inconsistent cell content lengths')
+                    validation['quality_score'] -= 0.2
+
             # Check for empty cells
             empty_cells = table_data.isnull().sum().sum()
             if empty_cells > len(table_data) * len(table_data.columns) * 0.3:

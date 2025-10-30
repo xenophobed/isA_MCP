@@ -35,12 +35,11 @@ class ImageAnalyzer:
         self._client = None
         logger.info("✅ ImageAnalyzer initialized as atomic function")
     
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client following text_generator pattern"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     async def analyze(
@@ -71,21 +70,28 @@ class ImageAnalyzer:
             image_path = await self._prepare_image_input(image)
             
             try:
-                # Call ISA client with generic parameters
-                result = await self.client.invoke(
-                    input_data=image_path,
-                    task="analyze",
-                    service_type="vision",
+                # Call ISA client using new vision API
+                client = await self._get_client()
+
+                vision_response = await client.vision.completions.create(
+                    image=image_path,
                     prompt=prompt,
                     model=model,
                     provider=provider
                 )
-                
+
                 processing_time = asyncio.get_event_loop().time() - start_time
-                
-                if not result.get("success"):
-                    error_msg = result.get("error", "Unknown VLM error")
-                    logger.error(f"❌ VLM analysis failed: {error_msg}")
+
+                # Extract description from response
+                description = vision_response.choices[0].message.content
+
+                result = {
+                    "success": True,
+                    "result": description
+                }
+
+                if not description:
+                    logger.error(f"❌ VLM analysis returned empty result")
                     return ImageAnalysisResult(
                         response="",
                         model_used=model or "unknown",

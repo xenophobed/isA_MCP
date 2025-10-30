@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isa-mcp-cli"
+version = "1.0.0"
+description = "ISA MCP CLI - Comprehensive command-line interface for MCP server with RAG capabilities"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "ISA Team", email = "info@isa-mcp.com"}
+]
+keywords = ["mcp", "cli", "rag", "knowledge", "ai", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "aiohttp>=3.8.0",
+    "rich>=13.0.0",
+    "prompt-toolkit>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "mypy>=0.990",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/isA_MCP"
+Documentation = "https://github.com/yourusername/isA_MCP/blob/main/README.md"
+Repository = "https://github.com/yourusername/isA_MCP"
+Issues = "https://github.com/yourusername/isA_MCP/issues"
+
+[project.scripts]
+isa_mcp_cli = "utils.mcp_cli:cli_entry_point"
+
+[tool.setuptools]
+packages = ["utils"]
+
+[tool.setuptools.package-data]
+utils = ["*.py"]

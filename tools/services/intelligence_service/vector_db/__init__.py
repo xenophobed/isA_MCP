@@ -1,33 +1,24 @@
 """
 Vector Database Abstraction Layer
 
-Provides unified interface for different vector database backends:
-- Supabase pgvector (primary)
-- Qdrant (high-performance option)
-- ChromaDB (in-memory/lightweight option)
-- Future: Weaviate, etc.
+Provides unified interface for vector database backends:
+- Qdrant (via isa_common.qdrant_client) - primary, high-performance
+- Weaviate - alternative option
 """
 
-from .base_vector_db import BaseVectorDB, SearchResult, VectorSearchConfig
-from .vector_db_factory import get_vector_db, VectorDBType
-from .supabase_vector_db import SupabaseVectorDB
-
-# Optional imports for ChromaDB
-try:
-    from .chromadb_vector_db import ChromaVectorDB
-    CHROMADB_AVAILABLE = True
-except ImportError:
-    CHROMADB_AVAILABLE = False
-    ChromaVectorDB = None
+from .base_vector_db import BaseVectorDB, SearchResult, VectorSearchConfig, SearchMode, RankingMethod
+from .vector_db_factory import get_vector_db, VectorDBType, create_vector_db, get_default_config
+from .qdrant_vector_db import QdrantVectorDB
 
 __all__ = [
     'BaseVectorDB',
-    'SearchResult', 
+    'SearchResult',
     'VectorSearchConfig',
+    'SearchMode',
+    'RankingMethod',
     'get_vector_db',
     'VectorDBType',
-    'SupabaseVectorDB'
+    'create_vector_db',
+    'get_default_config',
+    'QdrantVectorDB'
 ]
-
-if CHROMADB_AVAILABLE:
-    __all__.append('ChromaVectorDB')

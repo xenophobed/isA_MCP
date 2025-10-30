@@ -16,12 +16,11 @@ class EmbeddingGenerator:
     def __init__(self):
         self._client = None
     
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client with optional authentication"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     async def embed(
@@ -61,13 +60,20 @@ class EmbeddingGenerator:
             params["model"] = model or "text-embedding-3-small"
             params.update(kwargs)
             
-            # Call ISA client
-            response = await self.client.invoke(
-                input_data=text,
-                task=task,
-                service_type="embedding",
-                **params
+            # Call ISA client using the standard embeddings API
+            client = await self._get_client()
+
+            # Use the OpenAI-compatible embeddings interface
+            response_obj = await client.embeddings.create(
+                input=text,  # Works for both single string and list of strings
+                model=params.get("model", "text-embedding-3-small")
             )
+
+            # Extract embeddings from the response
+            if is_single:
+                return response_obj.data[0].embedding
+            else:
+                return [item.embedding for item in response_obj.data]
             
             # Enhanced error handling and response validation for medical text processing
             if not response.get('success') and not response.get('result'):
@@ -227,7 +233,10 @@ class EmbeddingGenerator:
                 params["model"] = model
             params.update(kwargs)
             
-            response = await self.client.invoke(
+            client = await self._get_client()
+
+            
+            response = await client._underlying_client.invoke(
                 input_data=text1,
                 task="similarity",
                 service_type="embedding",
@@ -280,7 +289,10 @@ class EmbeddingGenerator:
                 params["model"] = model
             params.update(kwargs)
             
-            response = await self.client.invoke(
+            client = await self._get_client()
+
+            
+            response = await client._underlying_client.invoke(
                 input_data=query_text,
                 task="similarity",
                 service_type="embedding",
@@ -368,35 +380,12 @@ class EmbeddingGenerator:
                     text, chunk_size, overlap, model, metadata, **kwargs
                 )
             
-            # Use ISA's chunk task for smaller texts
-            params = {
-                "chunk_size": chunk_size,
-                "overlap": overlap
-            }
-            if model:
-                params["model"] = model
-            if metadata:
-                params["metadata"] = metadata
-            params.update(kwargs)
-            
-            response = await self.client.invoke(
-                input_data=text,
-                task="chunk",
-                service_type="embedding",
-                **params
+            # Always use local chunking with embedding generation
+            # ISA's "chunk" task returns embeddings only, not text chunks
+            logger.info(f"Using local chunking for text length {len(text)}")
+            return await self._chunk_large_text_locally(
+                text, chunk_size, overlap, model, metadata, **kwargs
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA chunking failed: {response.get('error', 'Unknown error')}")
-            
-            result = response.get('result', [])
-            # ISA returns chunks directly as array in result field  
-            if isinstance(result, list):
-                return result
-            else:
-                # Fallback for nested format
-                chunks = result.get('chunks', [])
-                return chunks
                 
         except Exception as e:
             logger.error(f"Text chunking failed: {e}")
@@ -528,7 +517,9 @@ class EmbeddingGenerator:
         """
         try:
             # Use ISA's rerank task with correct parameters
-            response = await self.client.invoke(
+            client = await self._get_client()
+
+            response = await client._underlying_client.invoke(
                 input_data=query,
                 task="rerank",
                 service_type="embedding",

@@ -88,12 +88,11 @@ class AtomicImageIntelligence:
             }
         }
     
-    @property
-    def isa_client(self):
+    async def _get_client(self):
         """Lazy load ISA client"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     def _validate_task_type(self, task_type: str) -> bool:
@@ -115,23 +114,20 @@ class AtomicImageIntelligence:
         """Execute a single image task"""
         try:
             config = self.task_configs[task.task_type]
-            
-            # Call ISA client directly with model and provider from config
-            response = await self.isa_client.invoke(
-                input_data=task.input_data,
-                task=config["task"],
-                service_type="image",
+
+            # Call ISA client using new images API
+            client = await self._get_client()
+
+            # Use OpenAI-compatible images.generate() interface
+            image_response = await client.images.generate(
+                prompt=task.input_data,
                 model=config["model"],
                 provider=config["provider"],
                 **task.parameters
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA API call failed: {response.get('error', 'Unknown error')}")
-            
-            # Extract URLs from response - according to ISA docs, URLs are in result
-            result_data = response.get('result', {})
-            image_urls = result_data.get('urls', [])
+
+            # Extract URLs from response
+            image_urls = [item.url for item in image_response.data]
             if isinstance(image_urls, str):
                 image_urls = [image_urls]
             elif not image_urls and 'url' in result_data:

@@ -530,3 +530,103 @@ class HMRAGRAGService(BaseRAGService):
             integrated['final_decision'] = 'weak_consensus'
         
         return integrated
+
+    # ==================== New Interface Methods ====================
+
+    async def store(self,
+                   content: str,
+                   user_id: str,
+                   content_type: str = "text",
+                   metadata: Optional[Dict[str, Any]] = None,
+                   options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Store content"""
+        return await self.process_document(content, user_id, metadata)
+
+    async def retrieve(self,
+                      query: str,
+                      user_id: str,
+                      top_k: int = 5,
+                      filters: Optional[Dict[str, Any]] = None,
+                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Retrieve relevant content"""
+        start_time = time.time()
+        try:
+            search_result = await self.search_knowledge(
+                user_id=user_id,
+                query=query,
+                top_k=top_k or self.config.top_k,
+                enable_rerank=self.config.enable_rerank,
+                search_mode="hybrid"
+            )
+
+            if not search_result['success']:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=[],
+                    metadata={},
+                    mode_used=self.mode,
+                    processing_time=time.time() - start_time,
+                    error=search_result.get('error')
+                )
+
+            return RAGResult(
+                success=True,
+                content="",
+                sources=search_result['search_results'],
+                metadata={'total_results': len(search_result['search_results'])},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time
+            )
+        except Exception as e:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
+
+    async def generate(self,
+                      query: str,
+                      user_id: str,
+                      context: Optional[str] = None,
+                      retrieval_result: Optional[RAGResult] = None,
+                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
+        """Generate response from retrieved context"""
+        start_time = time.time()
+        try:
+            if retrieval_result and retrieval_result.sources:
+                sources = retrieval_result.sources
+            else:
+                retrieval = await self.retrieve(query, user_id, options=options)
+                if not retrieval.success:
+                    return retrieval
+                sources = retrieval.sources
+
+            # Build context
+            context_text = self._build_context_with_citations(sources)
+
+            # Generate with LLM
+            response = await self._generate_response_with_llm(query, context_text, context)
+
+            return RAGResult(
+                success=True,
+                content=response,
+                sources=sources,
+                metadata={'context_length': len(context_text)},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time
+            )
+        except Exception as e:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )

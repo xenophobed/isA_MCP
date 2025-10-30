@@ -7,6 +7,7 @@ Automatically discovers, extracts docstrings, embeds, and registers everything
 import os
 import ast
 import inspect
+import importlib
 import importlib.util
 from typing import Dict, List, Any, Callable, Optional
 from pathlib import Path
@@ -23,12 +24,36 @@ class AutoDiscoverySystem:
     def __init__(self, base_dir: str = "."):
         self.base_dir = Path(base_dir).resolve()
         self.tools_dir = self.base_dir / "tools"
-        self.prompts_dir = self.base_dir / "prompts" 
+        self.prompts_dir = self.base_dir / "prompts"
         self.resources_dir = self.base_dir / "resources"
-        
+
         self.discovered_tools: Dict[str, Dict[str, Any]] = {}
         self.discovered_prompts: Dict[str, Dict[str, Any]] = {}
         self.discovered_resources: Dict[str, Dict[str, Any]] = {}
+
+    def _get_module_path(self, file_path: Path) -> str:
+        """
+        Convert file path to Python module path
+
+        Args:
+            file_path: Path to the Python file
+
+        Returns:
+            Module path like 'tools.memory_tools.memory_tools'
+        """
+        try:
+            # Get relative path from base_dir
+            rel_path = file_path.relative_to(self.base_dir)
+
+            # Convert path to module format
+            parts = list(rel_path.parts[:-1])  # Exclude file name
+            parts.append(rel_path.stem)  # Add stem (filename without .py)
+
+            module_path = '.'.join(parts)
+            return module_path
+        except Exception as e:
+            logger.error(f"Failed to get module path for {file_path}: {e}")
+            return file_path.stem
 
     def extract_docstring_metadata(self, docstring: str) -> Dict[str, Any]:
         """Extract metadata from function docstring"""
@@ -257,9 +282,17 @@ class AutoDiscoverySystem:
     async def auto_register_with_mcp(self, mcp: FastMCP, config: Optional[Dict[str, Any]] = None):
         """Automatically register all discovered items with MCP server"""
         config = config or {}
-        
+
         logger.info("🚀 Auto-registering all discovered items with MCP server")
-        
+
+        # Initialize security manager FIRST (required by some tools)
+        try:
+            from core.security import initialize_security
+            initialize_security()
+            logger.info("✅ Security manager initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to initialize security manager: {e}")
+
         # Register tools from tool modules
         registered_count = 0
         tool_files_processed = set()
@@ -287,30 +320,41 @@ class AutoDiscoverySystem:
             try:
                 module_name = python_file.stem
                 register_func_name = f"register_{module_name}"
-                
-                # Dynamic import
-                spec = importlib.util.spec_from_file_location(module_name, python_file)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    
-                    # Try to find and call register function
-                    if hasattr(module, register_func_name):
-                        register_func = getattr(module, register_func_name)
-                        
-                        # Call the register function with MCP instance
-                        register_func(mcp)
-                        registered_count += 1
-                        tool_files_processed.add(python_file.name)
-                        logger.info(f"  ✅ Registered tools from {module_name}")
+
+                # Get proper module path to preserve package structure
+                module_path = self._get_module_path(python_file)
+
+                # Try proper module import first (preserves package structure)
+                try:
+                    module = importlib.import_module(module_path)
+                    logger.debug(f"  📦 Loaded {module_path} as package module")
+                except (ImportError, ModuleNotFoundError):
+                    # Fallback to file-based import
+                    logger.debug(f"  📄 Fallback to file-based import for {module_name}")
+                    spec = importlib.util.spec_from_file_location(module_name, python_file)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
                     else:
-                        # Check if file has any @mcp.tool decorated functions
-                        has_tools = self._check_for_mcp_tools(python_file)
-                        if has_tools:
-                            logger.warning(f"  ⚠️ {module_name} has tools but no register function")
-                        else:
-                            logger.debug(f"  ⏭️ Skipping {module_name} (no tools found)")
-            
+                        raise ImportError(f"Could not load module from {python_file}")
+
+                # Try to find and call register function
+                if hasattr(module, register_func_name):
+                    register_func = getattr(module, register_func_name)
+
+                    # Call the register function with MCP instance
+                    register_func(mcp)
+                    registered_count += 1
+                    tool_files_processed.add(python_file.name)
+                    logger.info(f"  ✅ Registered tools from {module_name}")
+                else:
+                    # Check if file has any @mcp.tool decorated functions
+                    has_tools = self._check_for_mcp_tools(python_file)
+                    if has_tools:
+                        logger.warning(f"  ⚠️ {module_name} has tools but no register function")
+                    else:
+                        logger.debug(f"  ⏭️ Skipping {module_name} (no tools found)")
+
             except Exception as e:
                 logger.error(f"  ❌ Failed to register tools from {python_file.name}: {e}")
         

@@ -23,10 +23,10 @@ def register_admin_tools(mcp):
     @security_manager.security_check
     async def get_authorization_requests(user_id: str = "admin") -> str:
         """Get pending authorization requests (admin only)
-        
-        This tool provides administrative access to view pending authorization 
+
+        This tool provides administrative access to view pending authorization
         requests that require manual approval for secure operations.
-        
+
         Keywords: admin, authorization, requests, security, approval, management
         Category: admin
         """

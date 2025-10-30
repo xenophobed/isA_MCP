@@ -160,21 +160,126 @@ class WebCrawlService:
     
     async def _bs4_extraction_path(self, url: str, analysis_request: Optional[str]) -> Dict[str, Any]:
         """
-        BS4 extraction path using bs4_service + text_generator
-        
+        Enhanced extraction path with robots.txt compliance and readability
+
         Args:
             url: Target URL
             analysis_request: Analysis request
-            
+
         Returns:
             Extraction results
         """
         try:
-            logger.info("🔧 Starting BS4 extraction...")
-            
+            logger.info("🔧 Starting enhanced extraction...")
+
+            # ===== ENHANCEMENT 1: Robots.txt Compliance Check =====
+            try:
+                from tools.services.web_services.utils.robots_checker import get_robots_checker
+                from tools.services.web_services.utils.user_agents import get_user_agent
+
+                user_agent = get_user_agent(autonomous=True)
+                robots_checker = get_robots_checker(user_agent)
+                can_fetch, reason = await robots_checker.can_fetch(url, autonomous=True)
+
+                if not can_fetch:
+                    logger.warning(f"🚫 Robots.txt blocks autonomous access to {url}")
+                    return {
+                        "method": "blocked_by_robots",
+                        "success": False,
+                        "error": f"Robots.txt disallows autonomous access: {reason}",
+                        "url": url,
+                        "reason": reason
+                    }
+
+                logger.info(f"✅ Robots.txt allows access: {reason}")
+            except Exception as e:
+                logger.warning(f"⚠️ Robots.txt check failed (allowing access): {e}")
+                user_agent = "isA_MCP/1.0 (AI Agent; +https://github.com/yourusername/isA_MCP)"
+
+            # ===== ENHANCEMENT 2: Try Readability First for Better Quality =====
+            try:
+                from tools.services.web_services.utils.content_extractor import get_content_extractor
+                import httpx
+
+                # Fetch HTML with proper User-Agent
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(
+                        url,
+                        headers={"User-Agent": user_agent},
+                        follow_redirects=True
+                    )
+                    html_content = response.text
+                    content_type = response.headers.get("content-type", "")
+
+                logger.info(f"📥 Fetched {len(html_content)} chars from {url}")
+
+                # Extract content with readability (auto-falls back to BS4)
+                extractor = get_content_extractor()
+                extraction_result = await extractor.extract(html_content, url, content_type)
+
+                if extraction_result["success"]:
+                    extraction_method = extraction_result["method"]
+                    logger.info(f"✅ Extracted {extraction_result['length']} chars using {extraction_method} method")
+
+                    # Use extracted content for analysis if requested
+                    final_analysis = ""
+                    if analysis_request and extraction_result.get("content"):
+                        # Synthesize using extracted content
+                        from tools.services.intelligence_service.language.text_generator import generate
+
+                        synthesis_prompt = f"""Based on the following content, {analysis_request}
+
+Content:
+{extraction_result['content'][:4000]}
+
+Provide a comprehensive analysis."""
+
+                        synthesis_result = await generate(
+                            prompt=synthesis_prompt,
+                            provider="anthropic",
+                            max_tokens=2000
+                        )
+
+                        if synthesis_result.success:
+                            final_analysis = synthesis_result.response
+
+                    # Build enhanced result
+                    result = {
+                        "method": f"{extraction_method}_extraction_enhanced",
+                        "success": True,
+                        "content": extraction_result["content"],
+                        "title": extraction_result.get("title", ""),
+                        "author": extraction_result.get("author", ""),
+                        "excerpt": extraction_result.get("excerpt", ""),
+                        "word_count": len(extraction_result["content"].split()),
+                        "processing_time": 0,
+                        "final_report": final_analysis,
+                        "extraction_quality": extraction_method,
+                        "user_agent": user_agent,
+                        "robots_checked": True,
+                        "url": url,
+                        "raw_data": {
+                            "title": extraction_result.get("title", ""),
+                            "content": extraction_result["content"][:1000] + "..." if len(extraction_result["content"]) > 1000 else extraction_result["content"],
+                            "extraction_method": extraction_method,
+                            "length": extraction_result["length"]
+                        }
+                    }
+
+                    return result
+                else:
+                    logger.warning(f"⚠️ Readability extraction failed: {extraction_result.get('error')}")
+                    # Fall through to BS4 fallback
+
+            except Exception as e:
+                logger.warning(f"⚠️ Enhanced extraction failed, falling back to BS4: {e}")
+
+            # ===== FALLBACK: Original BS4 Extraction =====
+            logger.info("🔄 Using BS4 fallback extraction...")
+
             # Use enhanced mode when analysis is requested for richer data
             use_enhanced = bool(analysis_request)
-            
+
             # Extract text using BS4 service
             bs4_result = await bs4_extract(url, enhanced=use_enhanced)
             

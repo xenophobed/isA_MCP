@@ -25,13 +25,12 @@ class TextExtractor:
     def __init__(self):
         self._client = None
     
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client"""
-        from core.isa_client_factory import get_isa_client
+        from core.clients.model_client import get_isa_client
         # 不再每次重置客户端，使用缓存实例
         if self._client is None:
-            self._client = get_isa_client()
+            self._client = await get_isa_client()
         return self._client
     
     async def extract_entities(
@@ -88,24 +87,21 @@ Return JSON format:
     "total_entities": 0
 }}"""
 
-            # Call ISA for entity extraction
-            response = await self.client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
+            # Call ISA for entity extraction using new API
+            client = await self._get_client()
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=1000,  # 设置足够的token限制
-                stream=False,  # 禁用流式输出，获取完整响应
-                response_format={"type": "json_object"}  # 启用 JSON 输出模式
+                max_tokens=1000,
+                stream=False,
+                response_format={"type": "json_object"}  # JSON mode
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle different result types - based on llm.md JSON mode specifications
             result_text = ''
@@ -220,23 +216,20 @@ Return JSON format:
     "categories": ["matched", "categories"]
 }}"""
 
-            response = await self.client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
+            client = await self._get_client()
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=1000,  # 设置足够的token限制
-                stream=False,  # 禁用流式输出，获取完整响应
-                response_format={"type": "json_object"}  # 启用 JSON 输出模式
+                max_tokens=1000,
+                stream=False,
+                response_format={"type": "json_object"}  # JSON mode
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle different result types - based on llm.md JSON mode specifications
             result_text = ''
@@ -333,7 +326,8 @@ Schema:
 
 Return a JSON object that follows the schema structure with the extracted information."""
 
-            response = await self.client.invoke(
+            client = await self._get_client()
+            response = await client._underlying_client.invoke(
                 input_data=prompt,
                 task="chat",
                 service_type="text",
@@ -345,10 +339,11 @@ Return a JSON object that follows the schema structure with the extracted inform
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle different result types - based on llm.md JSON mode specifications
             result_text = ''
@@ -486,7 +481,8 @@ Return JSON format:
     "word_count": 100
 }}"""
 
-            response = await self.client.invoke(
+            client = await self._get_client()
+            response = await client._underlying_client.invoke(
                 input_data=prompt,
                 task="chat",
                 service_type="text",
@@ -499,10 +495,11 @@ Return JSON format:
             
             if not response.get('success'):
                 raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle different result types - based on llm.md JSON mode specifications
             result_text = ''
@@ -597,23 +594,20 @@ Please return a JSON object:
     "emotional_indicators": ["list", "of", "emotional", "words"]
 }}"""
 
-            response = await self.client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
-                model="gpt-4.1-nano",  # 使用稳定支持JSON模式的模型
+            client = await self._get_client()
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=1000,  # 设置足够的token限制
-                stream=False,  # 禁用流式输出，获取完整响应
-                response_format={"type": "json_object"}  # 启用 JSON 输出模式
+                max_tokens=1000,
+                stream=False,
+                response_format={"type": "json_object"}  # JSON mode
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle different result types - based on llm.md JSON mode specifications
             result_text = ''
@@ -748,6 +742,114 @@ Please return a JSON object:
                 fallback[key] = "Unable to extract due to parsing error"
         
         return fallback
+    
+    # ==================== Memory-specific extraction methods ====================
+    
+    async def extract_facts(self, text: str) -> Dict[str, Any]:
+        """Extract factual information from text for factual memory"""
+        try:
+            schema = {
+                "facts": [
+                    {
+                        "subject": "What the fact is about",
+                        "predicate": "The relationship or attribute",
+                        "object_value": "The value or related entity",
+                        "fact_type": "Type of fact (person, organization, location, etc.)",
+                        "context": "Additional context",
+                        "confidence": 0.8
+                    }
+                ]
+            }
+            
+            result = await self.extract_key_information(text, schema)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to extract facts: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {'facts': []}
+            }
+    
+    async def extract_procedures(self, text: str) -> Dict[str, Any]:
+        """Extract procedural knowledge from text"""
+        try:
+            schema = {
+                "procedures": [
+                    {
+                        "description": "Description of the procedure",
+                        "skill_type": "Type of skill or procedure",
+                        "steps": ["step1", "step2"],
+                        "prerequisites": [],
+                        "difficulty_level": "easy/medium/hard",
+                        "domain": "Domain or category"
+                    }
+                ]
+            }
+            
+            result = await self.extract_key_information(text, schema)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to extract procedures: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {'procedures': []}
+            }
+    
+    async def extract_episodes(self, text: str) -> Dict[str, Any]:
+        """Extract episodic events from text"""
+        try:
+            schema = {
+                "episodes": [
+                    {
+                        "description": "What happened",
+                        "event_type": "Type of event",
+                        "location": "Where it occurred",
+                        "participants": ["person1", "person2"],
+                        "date": "When it occurred (ISO format)",
+                        "emotional_valence": 0.0,
+                        "vividness": 0.5
+                    }
+                ]
+            }
+            
+            result = await self.extract_key_information(text, schema)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to extract episodes: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {'episodes': []}
+            }
+    
+    async def extract_concepts(self, text: str) -> Dict[str, Any]:
+        """Extract semantic concepts from text"""
+        try:
+            schema = {
+                "concepts": [
+                    {
+                        "name": "Concept name",
+                        "concept_type": "Type of concept",
+                        "definition": "What it means",
+                        "category": "Concept category",
+                        "properties": {},
+                        "related_concepts": [],
+                        "abstraction_level": "low/medium/high"
+                    }
+                ]
+            }
+            
+            result = await self.extract_key_information(text, schema)
+            return result
+        except Exception as e:
+            logger.error(f"Failed to extract concepts: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': {'concepts': []}
+            }
 
 
 # Global instance for easy import - will be initialized on first use

@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 COMPOSIO_AVAILABLE = False
 try:
     from composio import Composio
-    from composio.client import Client
     try:
         from composio.exceptions import ComposioAPIError as ComposioSDKError
     except ImportError:
@@ -28,9 +27,8 @@ try:
     COMPOSIO_AVAILABLE = True
     logger.info("Composio SDK is available")
 except ImportError as e:
-    logger.warning(f"Composio SDK not available: {e}. Install with: pip install composio")
+    logger.warning(f"Composio SDK not available: {e}. Install with: pip install composio-core")
     Composio = None
-    Client = None
     ComposioSDKError = Exception
 
 class ComposioService(BaseService):

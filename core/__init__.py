@@ -56,5 +56,6 @@ ARCHITECTURE:
 USAGE:
     from core import config, auth, logging, database
     from core.auto_discovery import AutoDiscoverySystem
-    from core.search_service import get_search_service
+    # Search service moved to services/search_service/
+    from services.search_service.search_service import SearchService
 """

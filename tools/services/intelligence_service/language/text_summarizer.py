@@ -42,12 +42,11 @@ class TextSummarizer:
         self._client = None
         self._init_templates()
         
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     def _init_templates(self):
@@ -169,22 +168,20 @@ Text to summarize:
 
 Create the summary according to the specified style and length."""
 
-            # Call ISA client for generation
-            response = await self.client.invoke(
-                input_data=full_prompt,
-                task="chat",
-                service_type="text",
+            # Call ISA client for generation using new API
+            client = await self._get_client()
+
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": full_prompt}],
                 temperature=temperature,
                 max_tokens=max_tokens,
-                stream=False  # 禁用流式输出，获取完整响应
+                stream=False
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result', '')
-            billing_info = response.get('metadata', {}).get('billing', {})
+
+            # Process complete response
+            result = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             # Handle AIMessage object
             if hasattr(result, 'content'):
@@ -270,29 +267,19 @@ Text:
 {text_content}"""
 
             # Call ISA client
-            response = await self.client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
+            client = await self._get_client()
+
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=max_tokens,
-                stream=False  # 禁用流式输出，获取完整响应
+                stream=False
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result', '')
-            billing_info = response.get('metadata', {}).get('billing', {})
-            
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
-                points_text = result.content
-            elif isinstance(result, str):
-                points_text = result
-            else:
-                points_text = str(result)
+
+            # Process complete response
+            points_text = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             if not points_text:
                 raise Exception("No result found in response")
@@ -366,29 +353,19 @@ Text to analyze:
 
 Return your analysis in a clear, organized format."""
 
-            response = await self.client.invoke(
-                input_data=prompt,
-                task="chat",
-                service_type="text",
+            client = await self._get_client()
+
+            response = await client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=1000,
-                stream=False  # 禁用流式输出，获取完整响应
+                stream=False
             )
-            
-            if not response.get('success'):
-                raise Exception(f"ISA generation failed: {response.get('error', 'Unknown error')}")
-            
-            # Process complete response (streaming disabled)
-            result = response.get('result', '')
-            billing_info = response.get('metadata', {}).get('billing', {})
-            
-            # Handle AIMessage object
-            if hasattr(result, 'content'):
-                analysis_text = result.content
-            elif isinstance(result, str):
-                analysis_text = result
-            else:
-                analysis_text = str(result)
+
+            # Process complete response
+            analysis_text = response.choices[0].message.content
+            billing_info = {}  # New API doesn't expose billing in same way
             
             if not analysis_text:
                 raise Exception("No result found in response")

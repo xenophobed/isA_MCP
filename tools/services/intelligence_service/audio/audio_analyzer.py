@@ -84,12 +84,11 @@ class AudioAnalyzer:
     def __init__(self):
         self._client = None
     
-    @property
-    def client(self):
+    async def _get_client(self):
         """Lazy load ISA client"""
         if self._client is None:
-            from core.isa_client_factory import get_isa_client
-            self._client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._client = await get_isa_client()
         return self._client
     
     async def transcribe(
@@ -119,24 +118,25 @@ class AudioAnalyzer:
             if model:
                 params['model'] = model
             
-            # Call ISA client directly for transcription
-            response = await self.client.invoke(
-                input_data=audio,
-                task="transcribe",
-                service_type="audio",
+            # Call ISA client using new audio API
+            client = await self._get_client()
+
+            # Use OpenAI-compatible audio transcription interface
+            transcription = await client.audio.transcriptions.create(
+                file=audio,
                 **params
             )
-            
-            if not response.get('success'):
-                return AnalysisResult(
-                    success=False,
-                    error=f"Transcription failed: {response.get('error', 'Unknown error')}"
-                )
-            
+
             processing_time = time.time() - start_time
-            result_data = response.get('result', {})
-            billing_cost = response.get('billing', {}).get('cost_usd', 0.0)
-            
+
+            # Extract data from transcription response
+            result_data = {
+                'text': transcription.text,
+                'language': getattr(transcription, 'language', None),
+                'duration': getattr(transcription, 'duration', None)
+            }
+            billing_cost = 0.0  # New API doesn't expose billing in same way
+
             # Log billing if available
             if billing_cost > 0:
                 logger.info(f"💰 Audio transcription cost: ${billing_cost:.6f}")
