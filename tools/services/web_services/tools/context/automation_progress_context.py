@@ -17,7 +17,6 @@ Supported Operations: Basic automation, HIL authentication, Multi-step workflows
 """
 
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
 from tools.base_tool import BaseTool
 import logging
 
@@ -39,22 +38,28 @@ class WebAutomationProgressReporter:
     
     Example:
         reporter = WebAutomationProgressReporter(base_tool)
-        
+
+        # Create operation at start
+        operation_id = await base_tool.create_progress_operation(metadata={...})
+
         # Step 1: Capturing
-        await reporter.report_stage(ctx, "capturing", "automation", "taking screenshot")
-        
+        await reporter.report_stage(operation_id, "capturing", "automation", "taking screenshot")
+
         # Step 2: Understanding
-        await reporter.report_stage(ctx, "understanding", "automation", "analyzing page")
-        
+        await reporter.report_stage(operation_id, "understanding", "automation", "analyzing page")
+
         # Step 3: Detecting
-        await reporter.report_stage(ctx, "detecting", "automation", "finding elements")
-        
+        await reporter.report_stage(operation_id, "detecting", "automation", "finding elements")
+
         # Step 4: Planning
-        await reporter.report_stage(ctx, "planning", "automation", "generating actions")
-        
+        await reporter.report_stage(operation_id, "planning", "automation", "generating actions")
+
         # Step 5: Executing with granular progress
         for i in range(1, total_actions + 1):
-            await reporter.report_action_progress(ctx, i, total_actions, "click")
+            await reporter.report_action_progress(operation_id, i, total_actions, "click")
+
+        # Complete operation
+        await base_tool.complete_progress_operation(operation_id, result={...})
     """
     
     # 5-Step Automation Workflow Stages
@@ -106,7 +111,7 @@ class WebAutomationProgressReporter:
     
     async def report_stage(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         operation_type: str,
         sub_progress: Optional[str] = None,
@@ -114,32 +119,34 @@ class WebAutomationProgressReporter:
         workflow_type: str = "automation"
     ):
         """
-        Report progress for a workflow stage
-        
+        Report progress for a workflow stage using ProgressManager (NEW WAY)
+
         Args:
-            ctx: MCP Context for progress reporting
+            operation_id: Operation ID for progress tracking (use ProgressManager)
             stage: Workflow stage name
             operation_type: Operation type - "automation", "hil"
             sub_progress: Optional granular progress within stage
             details: Optional additional details for logging
             workflow_type: Type of workflow - "automation" or "hil"
-        
+
         Workflow Types & Stages:
             automation: capturing -> understanding -> detecting -> planning -> executing (5 stages)
             hil: detecting_hil -> checking_vault -> waiting_user (3 stages)
-        
+
         Examples:
             # Normal automation
-            await reporter.report_stage(ctx, "capturing", "automation", "screenshot.png")
-            -> "Step 1/5 (20%): Capturing - screenshot.png"
-            
+            await reporter.report_stage(operation_id, "capturing", "automation", "screenshot.png")
+            -> Progress: 20% "Capturing - screenshot.png" (via ProgressManager)
+
             # Understanding page
-            await reporter.report_stage(ctx, "understanding", "automation", "analyzing page type")
-            -> "Step 2/5 (40%): Understanding - analyzing page type"
-            
+            await reporter.report_stage(operation_id, "understanding", "automation", "analyzing page type")
+            -> Progress: 40% "Understanding - analyzing page type"
+
             # HIL detection
-            await reporter.report_stage(ctx, "detecting_hil", "hil", "login page", workflow_type="hil")
-            -> "Step 1/3 (33%): Detecting HIL - login page"
+            await reporter.report_stage(operation_id, "detecting_hil", "hil", "login page", workflow_type="hil")
+            -> Progress: 33% "Detecting HIL - login page"
+
+        Note: Client monitors progress via SSE: GET /progress/{operation_id}/stream
         """
         # Select the appropriate stage dictionary
         if workflow_type == "hil":
@@ -148,299 +155,298 @@ class WebAutomationProgressReporter:
         else:
             stages = self.AUTOMATION_STAGES
             total_stages = 5
-        
+
         if stage not in stages:
             logger.warning(f"Unknown stage '{stage}' for workflow type '{workflow_type}', skipping progress report")
             return
-        
+
         stage_info = stages[stage]
         operation_name = self.OPERATION_NAMES.get(operation_type, operation_type.upper())
-        
+
         # Build progress message
         message = f"{stage_info['label']}"
-        
+
         # Add operation type if meaningful (skip redundant "automation")
         if operation_type not in ["automation"]:
             message += f" {operation_name}"
-        
+
         if sub_progress:
             message += f" - {sub_progress}"
-        
-        # Report to Context
-        await self.base_tool.report_progress(
-            ctx,
-            progress=stage_info["step"],
-            total=total_stages,
-            message=message
-        )
-        
-        # Also log for debugging and HTTP mode fallback
+
+        # Report using ProgressManager (NEW WAY)
+        if operation_id:
+            await self.base_tool.update_progress_operation(
+                operation_id,
+                progress=float(stage_info["weight"]),  # 0-100
+                current=stage_info["step"],
+                total=total_stages,
+                message=message
+            )
+
+        # Also log for debugging
         prefix = self.STAGE_PREFIXES.get(stage, "[INFO]")
-        
         log_msg = f"{prefix} Stage {stage_info['step']}/{total_stages} ({stage_info['weight']}%): {message}"
         if details:
             log_msg += f" | {details}"
-        
-        await self.base_tool.log_info(ctx, log_msg)
+
+        logger.info(log_msg)
     
     async def report_action_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         current: int,
         total: int,
         action_type: str = "action"
     ):
         """
         Report progress for individual action execution
-        
+
         This is useful for tracking progress within Step 5 (Executing) when
         multiple actions are being performed sequentially.
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             current: Current action number (1-indexed)
             total: Total number of actions
             action_type: Type of action being executed (click, type, scroll, etc.)
-        
+
         Examples:
             # Executing click action
-            await reporter.report_action_progress(ctx, 1, 5, "click")
-            -> "Step 5/5 (100%): Executing - action 1/5 (click)"
-            
+            await reporter.report_action_progress(operation_id, 1, 5, "click")
+            -> Progress: 100% "Executing - action 1/5 (click)"
+
             # Executing type action
-            await reporter.report_action_progress(ctx, 2, 5, "type")
-            -> "Step 5/5 (100%): Executing - action 2/5 (type)"
+            await reporter.report_action_progress(operation_id, 2, 5, "type")
+            -> Progress: 100% "Executing - action 2/5 (type)"
         """
         sub_progress = f"action {current}/{total} ({action_type})"
-        await self.report_stage(ctx, "executing", "automation", sub_progress)
+        await self.report_stage(operation_id, "executing", "automation", sub_progress)
     
     async def report_hil_detection(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         intervention_type: str,
         provider: str,
         details: Optional[str] = None
     ):
         """
         Report HIL detection progress
-        
+
         Called when the system detects that human intervention is needed
         (login, CAPTCHA, payment, wallet connection, etc.)
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             intervention_type: Type of intervention (login, captcha, payment, wallet, verification)
             provider: Provider name (google, facebook, metamask, stripe, etc.)
             details: Optional additional details about the detection
-        
+
         Examples:
             # Login detected
-            await reporter.report_hil_detection(ctx, "login", "google")
-            -> "Step 1/3 (33%): Detecting HIL - login (google)"
-            
+            await reporter.report_hil_detection(operation_id, "login", "google")
+            -> Progress: 33% "Detecting HIL - login (google)"
+
             # CAPTCHA detected
-            await reporter.report_hil_detection(ctx, "captcha", "recaptcha", "reCAPTCHA v2")
-            -> "Step 1/3 (33%): Detecting HIL - captcha (recaptcha)"
+            await reporter.report_hil_detection(operation_id, "captcha", "recaptcha", "reCAPTCHA v2")
+            -> Progress: 33% "Detecting HIL - captcha (recaptcha)"
         """
         sub_progress = f"{intervention_type} ({provider})"
         if details:
             sub_progress += f" - {details}"
-        
+
         await self.report_stage(
-            ctx, "detecting_hil", "hil", sub_progress,
+            operation_id, "detecting_hil", "hil", sub_progress,
             workflow_type="hil"
         )
     
     async def report_vault_check(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         provider: str,
         has_credentials: bool,
         credential_type: str = "credentials"
     ):
         """
         Report Vault credential check progress
-        
+
         Called after checking the Vault Service for stored credentials.
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             provider: Provider name (google, stripe, metamask, etc.)
             has_credentials: Whether credentials were found in Vault
             credential_type: Type of credentials (credentials, payment, wallet)
-        
+
         Examples:
             # Credentials found
-            await reporter.report_vault_check(ctx, "google", True)
-            -> "Step 2/3 (67%): Checking Vault - google (found in Vault)"
-            
+            await reporter.report_vault_check(operation_id, "google", True)
+            -> Progress: 67% "Checking Vault - google (found in Vault)"
+
             # Credentials not found
-            await reporter.report_vault_check(ctx, "stripe", False, "payment")
-            -> "Step 2/3 (67%): Checking Vault - stripe (not found, need to add)"
+            await reporter.report_vault_check(operation_id, "stripe", False, "payment")
+            -> Progress: 67% "Checking Vault - stripe (not found, need to add)"
         """
         if has_credentials:
             status = f"found in Vault"
         else:
             status = f"not found, need to add {credential_type}"
-        
+
         sub_progress = f"{provider} ({status})"
         await self.report_stage(
-            ctx, "checking_vault", "hil", sub_progress,
+            operation_id, "checking_vault", "hil", sub_progress,
             workflow_type="hil"
         )
     
     async def report_screenshot(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         screenshot_path: str,
         stage: str = "initial"
     ):
         """
         Report screenshot capture progress
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             screenshot_path: Path to screenshot file
             stage: Screenshot stage ("initial" for Step 1, "final" for Step 5)
-        
+
         Examples:
             # Initial screenshot (Step 1)
-            await reporter.report_screenshot(ctx, "/tmp/screenshot_001.png", "initial")
-            -> "Step 1/5 (20%): Capturing - initial screenshot"
-            
+            await reporter.report_screenshot(operation_id, "/tmp/screenshot_001.png", "initial")
+            -> Progress: 20% "Capturing - initial screenshot"
+
             # Final screenshot (Step 5)
-            await reporter.report_screenshot(ctx, "/tmp/screenshot_002.png", "final")
-            -> "Step 5/5 (100%): Executing - final screenshot"
+            await reporter.report_screenshot(operation_id, "/tmp/screenshot_002.png", "final")
+            -> Progress: 100% "Executing - final screenshot"
         """
         sub_progress = f"{stage} screenshot"
-        
+
         if stage == "initial":
-            await self.report_stage(ctx, "capturing", "automation", sub_progress)
+            await self.report_stage(operation_id, "capturing", "automation", sub_progress)
         else:
             # Final screenshot is part of execution
-            await self.report_stage(ctx, "executing", "automation", sub_progress)
-    
+            await self.report_stage(operation_id, "executing", "automation", sub_progress)
+
     async def report_page_analysis(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         page_type: str,
         elements_found: int
     ):
         """
         Report page analysis progress (Step 2: Understanding)
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             page_type: Type of page detected (search_page, form, login, ecommerce, etc.)
             elements_found: Number of required elements identified
-        
+
         Example:
-            await reporter.report_page_analysis(ctx, "search_page", 2)
-            -> "Step 2/5 (40%): Understanding - search_page (2 elements required)"
+            await reporter.report_page_analysis(operation_id, "search_page", 2)
+            -> Progress: 40% "Understanding - search_page (2 elements required)"
         """
         sub_progress = f"{page_type} ({elements_found} elements required)"
-        await self.report_stage(ctx, "understanding", "automation", sub_progress)
-    
+        await self.report_stage(operation_id, "understanding", "automation", sub_progress)
+
     async def report_ui_detection(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         elements_mapped: int,
         detection_success: bool = True
     ):
         """
         Report UI detection progress (Step 3: Detecting)
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             elements_mapped: Number of UI elements successfully mapped
             detection_success: Whether detection was successful
-        
+
         Examples:
             # Successful detection
-            await reporter.report_ui_detection(ctx, 3, True)
-            -> "Step 3/5 (60%): Detecting - 3 elements mapped"
-            
+            await reporter.report_ui_detection(operation_id, 3, True)
+            -> Progress: 60% "Detecting - 3 elements mapped"
+
             # Failed detection
-            await reporter.report_ui_detection(ctx, 0, False)
-            -> "Step 3/5 (60%): Detecting - detection failed, using fallback"
+            await reporter.report_ui_detection(operation_id, 0, False)
+            -> Progress: 60% "Detecting - detection failed, using fallback"
         """
         if detection_success:
             sub_progress = f"{elements_mapped} elements mapped"
         else:
             sub_progress = "detection failed, using fallback"
-        
-        await self.report_stage(ctx, "detecting", "automation", sub_progress)
-    
+
+        await self.report_stage(operation_id, "detecting", "automation", sub_progress)
+
     async def report_action_generation(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         actions_generated: int,
         generation_method: str = "llm"
     ):
         """
         Report action generation progress (Step 4: Planning)
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             actions_generated: Number of actions generated
             generation_method: Method used ("llm", "fallback", "template")
-        
+
         Examples:
-            await reporter.report_action_generation(ctx, 5, "llm")
-            -> "Step 4/5 (80%): Planning - 5 actions generated (llm)"
+            await reporter.report_action_generation(operation_id, 5, "llm")
+            -> Progress: 80% "Planning - 5 actions generated (llm)"
         """
         sub_progress = f"{actions_generated} actions generated ({generation_method})"
-        await self.report_stage(ctx, "planning", "automation", sub_progress)
-    
+        await self.report_stage(operation_id, "planning", "automation", sub_progress)
+
     async def report_execution_summary(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         executed: int,
         successful: int,
         failed: int
     ):
         """
         Report execution summary (Step 5: Executing completion)
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             executed: Number of actions executed
             successful: Number of successful actions
             failed: Number of failed actions
-        
+
         Example:
-            await reporter.report_execution_summary(ctx, 5, 5, 0)
-            -> "Step 5/5 (100%): Executing - completed: 5/5 successful, 0 failed"
+            await reporter.report_execution_summary(operation_id, 5, 5, 0)
+            -> Progress: 100% "Executing - completed: 5/5 successful, 0 failed"
         """
         sub_progress = f"completed: {successful}/{executed} successful, {failed} failed"
-        await self.report_stage(ctx, "executing", "automation", sub_progress)
+        await self.report_stage(operation_id, "executing", "automation", sub_progress)
     
     async def report_complete(
         self,
-        ctx: Optional[Context],
         operation_type: str,
         summary: Optional[Dict[str, Any]] = None
     ):
         """
         Report completion of entire workflow
-        
+
         Args:
-            ctx: MCP Context
             operation_type: Operation type ("automation", "hil")
             summary: Optional summary statistics
-        
+
         Examples:
             # Successful automation
-            await reporter.report_complete(ctx, "automation", {
+            await reporter.report_complete("automation", {
                 "actions_executed": 5,
                 "actions_successful": 5,
                 "task_completed": True,
                 "final_url": "https://example.com/results"
             })
             -> "[✅ DONE] Web Automation complete | {'actions_executed': 5, ...}"
-            
+
             # HIL required
-            await reporter.report_complete(ctx, "hil", {
+            await reporter.report_complete("hil", {
                 "intervention_type": "login",
                 "provider": "google",
                 "action": "request_authorization"
@@ -448,7 +454,7 @@ class WebAutomationProgressReporter:
             -> "[🤚 DONE] HIL Authentication complete | {'intervention_type': 'login', ...}"
         """
         operation_name = self.OPERATION_NAMES.get(operation_type, operation_type.upper())
-        
+
         # Choose appropriate emoji
         if operation_type == "hil":
             prefix = "[🤚 DONE]"
@@ -458,15 +464,15 @@ class WebAutomationProgressReporter:
             prefix = "[⚠️ DONE]"
         else:
             prefix = "[DONE]"
-        
+
         message = f"{prefix} {operation_name} complete"
-        
+
         if summary:
             # Format summary for readability
             summary_str = ", ".join([f"{k}={v}" for k, v in summary.items()])
             message += f" | {summary_str}"
-        
-        await self.base_tool.log_info(ctx, message)
+
+        logger.info(message)
 
 
 class AutomationOperationDetector:

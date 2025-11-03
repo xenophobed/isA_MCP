@@ -16,7 +16,6 @@ Supported Operations: Basic search, Deep search, Content extraction, Summarizati
 """
 
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
 from tools.base_tool import BaseTool
 import logging
 
@@ -38,18 +37,24 @@ class WebSearchProgressReporter:
     Example:
         reporter = WebSearchProgressReporter(base_tool)
 
+        # Create operation at start
+        operation_id = await base_tool.create_progress_operation(metadata={...})
+
         # Stage 1: Searching
-        await reporter.report_stage(ctx, "searching", "web", "executing query")
+        await reporter.report_stage(operation_id, "searching", "web", "executing query")
 
         # Stage 2: Fetching with granular progress
         for i in range(1, total_urls + 1):
-            await reporter.report_granular_progress(ctx, "fetching", "web", i, total_urls, "page")
+            await reporter.report_granular_progress(operation_id, "fetching", "web", i, total_urls, "page")
 
         # Stage 3: Processing
-        await reporter.report_stage(ctx, "processing", "web", "extracting content")
+        await reporter.report_stage(operation_id, "processing", "web", "extracting content")
 
         # Stage 4: Synthesizing
-        await reporter.report_stage(ctx, "synthesizing", "web", "generating summary")
+        await reporter.report_stage(operation_id, "synthesizing", "web", "generating summary")
+
+        # Complete operation
+        await base_tool.complete_progress_operation(operation_id, result={...})
     """
 
     # Search pipeline stages (for basic search)
@@ -110,7 +115,7 @@ class WebSearchProgressReporter:
 
     async def report_stage(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         operation_type: str,
         sub_progress: Optional[str] = None,
@@ -118,10 +123,10 @@ class WebSearchProgressReporter:
         pipeline_type: str = "search"
     ):
         """
-        Report progress for a pipeline stage
+        Report progress for a pipeline stage using ProgressManager (NEW WAY)
 
         Args:
-            ctx: MCP Context for progress reporting
+            operation_id: Operation ID for progress tracking (use ProgressManager)
             stage: Pipeline stage name (varies by pipeline_type)
             operation_type: Operation type - "web", "deep", "crawl", "summarize"
             sub_progress: Optional granular progress within stage
@@ -135,16 +140,18 @@ class WebSearchProgressReporter:
 
         Examples:
             # Basic search
-            await reporter.report_stage(ctx, "searching", "web", pipeline_type="search")
-            -> "Step 1/4 (25%): Searching Web Search"
+            await reporter.report_stage(operation_id, "searching", "web", pipeline_type="search")
+            -> Progress: 25% "Searching Web Search" (via ProgressManager)
 
             # Deep search with planning
-            await reporter.report_stage(ctx, "planning", "deep", "generating queries", pipeline_type="deep_search")
-            -> "Step 1/5 (20%): Planning Deep Search - generating queries"
+            await reporter.report_stage(operation_id, "planning", "deep", "generating queries", pipeline_type="deep_search")
+            -> Progress: 20% "Planning Deep Search - generating queries"
 
             # Crawl with extraction
-            await reporter.report_stage(ctx, "extracting", "crawl", "readability", pipeline_type="crawl")
-            -> "Step 2/3 (67%): Extracting Web Crawl - readability"
+            await reporter.report_stage(operation_id, "extracting", "crawl", "readability", pipeline_type="crawl")
+            -> Progress: 67% "Extracting Web Crawl - readability"
+
+        Note: Client monitors progress via SSE: GET /progress/{operation_id}/stream
         """
         # Select the appropriate stage dictionary
         if pipeline_type == "deep_search":
@@ -174,26 +181,27 @@ class WebSearchProgressReporter:
         if sub_progress:
             message += f" - {sub_progress}"
 
-        # Report to Context
-        await self.base_tool.report_progress(
-            ctx,
-            progress=stage_info["step"],
-            total=total_stages,
-            message=message
-        )
+        # Report using ProgressManager (NEW WAY)
+        if operation_id:
+            await self.base_tool.update_progress_operation(
+                operation_id,
+                progress=float(stage_info["weight"]),  # 0-100
+                current=stage_info["step"],
+                total=total_stages,
+                message=message
+            )
 
-        # Also log for debugging and HTTP mode fallback
+        # Also log for debugging
         prefix = self.STAGE_PREFIXES.get(stage, "[INFO]")
-
         log_msg = f"{prefix} Stage {stage_info['step']}/{total_stages} ({stage_info['weight']}%): {message}"
         if details:
             log_msg += f" | {details}"
 
-        await self.base_tool.log_info(ctx, log_msg)
+        logger.info(log_msg)
 
     async def report_granular_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         operation_type: str,
         current: int,
@@ -207,7 +215,7 @@ class WebSearchProgressReporter:
         This is useful for long-running operations that process multiple items.
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Current pipeline stage
             operation_type: Operation type
             current: Current item number (1-indexed)
@@ -218,22 +226,22 @@ class WebSearchProgressReporter:
         Examples:
             # Fetching multiple URLs
             for i in range(1, total_urls + 1):
-                await reporter.report_granular_progress(ctx, "fetching", "web", i, total_urls, "url")
-            -> "Step 2/4 (50%): Fetching - url 1/10"
-            -> "Step 2/4 (50%): Fetching - url 2/10"
+                await reporter.report_granular_progress(operation_id, "fetching", "web", i, total_urls, "url")
+            -> Progress: 50% "Fetching - url 1/10"
+            -> Progress: 50% "Fetching - url 2/10"
             ...
 
             # Processing search results
             for i in range(1, total_results + 1):
-                await reporter.report_granular_progress(ctx, "processing", "web", i, total_results, "result")
-            -> "Step 3/4 (75%): Processing - result 5/20"
+                await reporter.report_granular_progress(operation_id, "processing", "web", i, total_results, "result")
+            -> Progress: 75% "Processing - result 5/20"
         """
         sub_progress = f"{item_type} {current}/{total}"
-        await self.report_stage(ctx, stage, operation_type, sub_progress, pipeline_type=pipeline_type)
+        await self.report_stage(operation_id, stage, operation_type, sub_progress, pipeline_type=pipeline_type)
 
     async def report_search_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         query: str,
         provider: str = "brave",
         result_count: int = 0
@@ -242,21 +250,21 @@ class WebSearchProgressReporter:
         Report search execution progress
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             query: Search query
             provider: Search provider name
             result_count: Number of results found
 
         Example:
-            await reporter.report_search_progress(ctx, "AI agents", "brave", 10)
-            -> "Step 1/4 (25%): Searching - brave: 10 results"
+            await reporter.report_search_progress(operation_id, "AI agents", "brave", 10)
+            -> Progress: 25% "Searching - brave: 10 results"
         """
         sub_progress = f"{provider}: {result_count} results"
-        await self.report_stage(ctx, "searching", "web", sub_progress)
+        await self.report_stage(operation_id, "searching", "web", sub_progress)
 
     async def report_fetch_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         url: str,
         current: int,
         total: int,
@@ -266,22 +274,22 @@ class WebSearchProgressReporter:
         Report URL fetching progress
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             url: URL being fetched
             current: Current URL number
             total: Total URLs
             method: Extraction method (readability, bs4, vlm)
 
         Example:
-            await reporter.report_fetch_progress(ctx, "https://example.com", 3, 10, "readability")
-            -> "Step 2/4 (50%): Fetching - url 3/10 (readability)"
+            await reporter.report_fetch_progress(operation_id, "https://example.com", 3, 10, "readability")
+            -> Progress: 50% "Fetching - url 3/10 (readability)"
         """
         sub_progress = f"url {current}/{total} ({method})"
-        await self.report_stage(ctx, "fetching", "web", sub_progress)
+        await self.report_stage(operation_id, "fetching", "web", sub_progress)
 
     async def report_summarization_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         content_length: int,
         source_count: int,
         status: str = "generating"
@@ -290,17 +298,17 @@ class WebSearchProgressReporter:
         Report summarization progress
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             content_length: Total content length being summarized
             source_count: Number of sources
             status: "generating", "adding citations", "completed"
 
         Examples:
-            await reporter.report_summarization_progress(ctx, 5000, 5, "generating")
-            -> "Step 4/4 (100%): Synthesizing - generating summary (5 sources, 5000 chars)"
+            await reporter.report_summarization_progress(operation_id, 5000, 5, "generating")
+            -> Progress: 100% "Synthesizing - generating summary (5 sources, 5000 chars)"
 
-            await reporter.report_summarization_progress(ctx, 5000, 5, "adding citations")
-            -> "Step 4/4 (100%): Synthesizing - adding citations (5 sources)"
+            await reporter.report_summarization_progress(operation_id, 5000, 5, "adding citations")
+            -> Progress: 100% "Synthesizing - adding citations (5 sources)"
         """
         if status == "generating":
             sub_progress = f"generating summary ({source_count} sources, {content_length} chars)"
@@ -309,11 +317,11 @@ class WebSearchProgressReporter:
         else:
             sub_progress = f"{status} ({source_count} sources)"
 
-        await self.report_stage(ctx, "synthesizing", "summarize", sub_progress)
+        await self.report_stage(operation_id, "synthesizing", "summarize", sub_progress)
 
     async def report_deep_search_iteration(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         iteration: int,
         total_iterations: int,
         query: str
@@ -322,21 +330,20 @@ class WebSearchProgressReporter:
         Report deep search iteration progress
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             iteration: Current iteration number
             total_iterations: Total iterations planned
             query: Current search query
 
         Example:
-            await reporter.report_deep_search_iteration(ctx, 2, 3, "machine learning frameworks")
-            -> "Step 2/5 (40%): Multi-Stage Search Deep Search - iteration 2/3: machine learning frameworks"
+            await reporter.report_deep_search_iteration(operation_id, 2, 3, "machine learning frameworks")
+            -> Progress: 40% "Multi-Stage Search Deep Search - iteration 2/3: machine learning frameworks"
         """
         sub_progress = f"iteration {iteration}/{total_iterations}: {query[:50]}"
-        await self.report_stage(ctx, "searching", "deep", sub_progress, pipeline_type="deep_search")
+        await self.report_stage(operation_id, "searching", "deep", sub_progress, pipeline_type="deep_search")
 
     async def report_complete(
         self,
-        ctx: Optional[Context],
         operation_type: str,
         summary: Optional[Dict[str, Any]] = None
     ):
@@ -344,12 +351,11 @@ class WebSearchProgressReporter:
         Report completion of entire pipeline
 
         Args:
-            ctx: MCP Context
             operation_type: Operation type
             summary: Optional summary statistics
 
         Example:
-            await reporter.report_complete(ctx, "web", {
+            await reporter.report_complete("web", {
                 "results": 10,
                 "urls_fetched": 5,
                 "summary_length": 500,
@@ -363,7 +369,7 @@ class WebSearchProgressReporter:
         if summary:
             message += f" | {summary}"
 
-        await self.base_tool.log_info(ctx, message)
+        logger.info(message)
 
 
 class SearchOperationDetector:

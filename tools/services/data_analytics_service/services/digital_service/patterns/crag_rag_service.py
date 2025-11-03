@@ -515,26 +515,192 @@ class CRAGRAGService(BaseRAGService):
         else:
             return QualityLevel.INCORRECT
 
-    # ========== Placeholder for Phase 2 & 3 ==========
+    # ========== Response Generation ==========
 
     async def generate(self, request: RAGGenerateRequest) -> RAGResult:
         """
-        生成响应 (Phase 3 will implement)
+        生成响应，带质量感知的上下文选择
 
-        Currently: Basic placeholder
+        CRAG特性:
+        - 优先使用 CORRECT 级别的上下文
+        - 过滤 INCORRECT 级别的上下文
+        - 根据质量级别调整上下文权重
         """
         start_time = time.time()
 
-        # Placeholder: Will implement in Phase 3
-        return RAGResult(
-            success=False,
-            content="",
-            sources=[],
-            metadata={'error': 'generate() not yet implemented in Phase 1'},
-            mode_used=RAGMode.CRAG,
-            processing_time=time.time() - start_time,
-            error='generate() not yet implemented in Phase 1'
-        )
+        try:
+            # 1. 获取 sources（从 request 或执行检索）
+            sources = []
+            if request.retrieval_sources:
+                # 从 dict 转换为 RAGSource
+                for source_dict in request.retrieval_sources:
+                    if isinstance(source_dict, dict):
+                        sources.append(RAGSource(**source_dict))
+                    else:
+                        sources.append(source_dict)
+            else:
+                # 执行检索（使用 CRAG 质量评估）
+                retrieval_result = await self.retrieve(
+                    RAGRetrieveRequest(
+                        query=request.query,
+                        user_id=request.user_id,
+                        top_k=self.config.top_k,
+                        options=request.options
+                    )
+                )
+
+                if not retrieval_result.success:
+                    return retrieval_result
+
+                sources = retrieval_result.sources
+
+            # 2. CRAG特性: 质量感知的上下文过滤
+            # 如果没有质量评估信息，先评估
+            assessed_sources = []
+            for source in sources:
+                if 'quality_assessment' not in source.metadata:
+                    # 需要评估质量
+                    quality_assessment = await self._assess_result_quality(
+                        request.query,
+                        source.text,
+                        source.score
+                    )
+                    quality_level = self._classify_quality(quality_assessment['overall_score'])
+
+                    source.metadata['quality_assessment'] = quality_assessment
+                    source.metadata['quality_level'] = quality_level.value
+
+                assessed_sources.append(source)
+
+            # 过滤掉 INCORRECT 级别的上下文
+            quality_filtered_sources = [
+                s for s in assessed_sources
+                if s.metadata.get('quality_level') != QualityLevel.INCORRECT
+            ]
+
+            # 如果过滤后没有结果，保留最好的
+            if not quality_filtered_sources and assessed_sources:
+                self.logger.warning("All sources marked INCORRECT, keeping best source")
+                quality_filtered_sources = assessed_sources[:1]
+
+            # 统计质量分布
+            quality_stats = {'correct': 0, 'ambiguous': 0, 'incorrect': 0}
+            for source in assessed_sources:
+                level = source.metadata.get('quality_level', 'ambiguous')
+                quality_stats[level] = quality_stats.get(level, 0) + 1
+
+            self.logger.info(
+                f"Quality-filtered context: "
+                f"CORRECT={quality_stats['correct']}, "
+                f"AMBIGUOUS={quality_stats['ambiguous']}, "
+                f"INCORRECT={quality_stats['incorrect']}"
+            )
+
+            # 3. 构建质量感知的上下文
+            use_citations = request.options.get('use_citations', True) if request.options else True
+            context_text = self._build_quality_aware_context(
+                quality_filtered_sources,
+                use_citations=use_citations
+            )
+
+            # 4. 使用 LLM 生成响应
+            if use_citations:
+                prompt = f"""You are an AI assistant that provides accurate answers with inline citations. When you reference information from the provided sources, immediately insert the citation number in square brackets after the relevant statement.
+
+The sources below have been quality-assessed (HIGH/MEDIUM quality). Use them to answer the question.
+
+SOURCES:
+{context_text}
+
+CITATION RULES:
+1. When you use information from a source, insert [1], [2], etc. immediately after the statement
+2. Place citations naturally within sentences, not at the end of responses
+3. Multiple sources can support the same claim: [1][2]
+4. Only cite sources that directly support your statements
+
+USER QUESTION: {request.query}
+
+Please provide a comprehensive answer with proper inline citations based on the quality-assessed sources."""
+            else:
+                prompt = f"""Based on the following quality-assessed context, please answer the user's question accurately and comprehensively.
+
+These sources have been filtered for quality and relevance.
+
+Context:
+{context_text}
+
+User Question: {request.query}
+
+Please provide a helpful response based on the quality-assessed context provided."""
+
+            response_text = await self._generate_response(prompt)
+
+            if not response_text:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=quality_filtered_sources,
+                    metadata={'error': 'Failed to generate response'},
+                    mode_used=RAGMode.CRAG,
+                    processing_time=time.time() - start_time,
+                    error='Failed to generate response'
+                )
+
+            return RAGResult(
+                success=True,
+                content=response_text,
+                sources=quality_filtered_sources,
+                metadata={
+                    'context_length': len(context_text),
+                    'sources_count': len(quality_filtered_sources),
+                    'use_citations': use_citations,
+                    'quality_stats': quality_stats,
+                    'quality_filtering_enabled': True
+                },
+                mode_used=RAGMode.CRAG,
+                processing_time=time.time() - start_time
+            )
+
+        except Exception as e:
+            self.logger.error(f"Generate failed: {e}")
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'error': str(e)},
+                mode_used=RAGMode.CRAG,
+                processing_time=time.time() - start_time,
+                error=str(e)
+            )
+
+    def _build_quality_aware_context(self, sources: List[RAGSource], use_citations: bool = True) -> str:
+        """
+        从 RAGSource 列表构建质量感知的上下文字符串
+
+        CRAG特性: 根据质量级别添加标识
+        """
+        if not sources:
+            return ""
+
+        context_texts = []
+        for i, source in enumerate(sources[:self.config.top_k]):
+            quality_level = source.metadata.get('quality_level', 'ambiguous')
+            quality_badge = {
+                'correct': '[HIGH QUALITY]',
+                'ambiguous': '[MEDIUM QUALITY]',
+                'incorrect': '[LOW QUALITY]'
+            }.get(quality_level, '')
+
+            if use_citations:
+                # 带引用 ID 和质量标识: [1] [HIGH QUALITY] text...
+                context_texts.append(f"[{i+1}] {quality_badge} {source.text}")
+            else:
+                # 传统格式 + 质量标识
+                context_texts.append(
+                    f"Context {i+1} {quality_badge} (Score: {source.score:.3f}): {source.text}"
+                )
+
+        return "\n\n".join(context_texts)
 
     def get_capabilities(self) -> Dict[str, Any]:
         """获取CRAG RAG能力"""
@@ -545,6 +711,7 @@ class CRAGRAGService(BaseRAGService):
                 'Quality assessment (CORRECT/AMBIGUOUS/INCORRECT)',
                 'Dynamic filtering',
                 'Quality-aware retrieval',
+                'Quality-aware generation',
                 'Noise reduction',
                 'Result refinement'
             ],
@@ -560,5 +727,5 @@ class CRAGRAGService(BaseRAGService):
             'processing_speed': 'medium',
             'resource_usage': 'medium',
             'quality_assessment': True,
-            'phase': 'phase1_store_retrieve_only'
+            'phase': 'fully_implemented'
         }

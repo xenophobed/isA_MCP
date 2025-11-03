@@ -2,6 +2,8 @@
 """
 Smart MCP Server with FAST Hot Reload
 Following MCP best practices for uvicorn --reload compatibility
+
+🎯 Now with incremental sync optimization - only syncs changed tools!
 """
 
 import os
@@ -59,7 +61,9 @@ class SmartMCPServer:
         """Initialize MCP with tools/prompts/resources"""
         logger.info("🚀 Initializing Smart MCP Server...")
 
-        # Create FastMCP instance with stateless HTTP
+        # Create FastMCP instance with stateless_http=True
+        # Note: We use ProgressManager for progress tracking, so Context is not needed
+        # This allows simple HTTP calls without session management
         self.mcp = FastMCP("Smart MCP Server", stateless_http=True)
 
         # Auto-discover and register ALL capabilities
@@ -176,6 +180,7 @@ async def lifespan(app):
 # Step 1: Create empty MCP instance
 # The real MCP with tools will be created in lifespan()
 # But we need SOMETHING here for uvicorn to import
+# Using stateless_http=True for simple HTTP calls without session management
 temp_mcp = FastMCP("Smart MCP Server", stateless_http=True)
 
 # Step 2: Create Starlette app from MCP
@@ -257,6 +262,17 @@ async def search_endpoint(request):
             )
             logger.info(f"🌐 [/search] SearchService returned {len(results)} results")
 
+            # Convert protobuf Struct to dict for JSON serialization
+            from google.protobuf.json_format import MessageToDict
+
+            def safe_serialize(obj):
+                """Convert protobuf Struct to dict, handle None"""
+                if obj is None:
+                    return None
+                if hasattr(obj, 'DESCRIPTOR'):  # It's a protobuf message
+                    return MessageToDict(obj, preserving_proto_field_name=True)
+                return obj
+
             return JSONResponse({
                 "status": "success",
                 "query": query,
@@ -268,7 +284,11 @@ async def search_endpoint(request):
                         "name": r.name,
                         "description": r.description,
                         "score": r.score,
-                        "db_id": r.db_id
+                        "db_id": r.db_id,
+                        # Include schema fields for tool calling (converted to dict)
+                        "inputSchema": safe_serialize(r.inputSchema),
+                        "outputSchema": safe_serialize(r.outputSchema),
+                        "annotations": safe_serialize(r.annotations)
                     }
                     for r in results
                 ]
@@ -304,11 +324,72 @@ async def sync_endpoint(request):
         return JSONResponse({"status": "error", "message": str(e)})
 
 
+async def progress_stream_endpoint(request):
+    """SSE streaming endpoint for real-time progress updates"""
+    from starlette.responses import StreamingResponse
+    import asyncio
+
+    operation_id = request.path_params.get('operation_id')
+
+    if not operation_id:
+        return JSONResponse({"status": "error", "message": "operation_id required"})
+
+    # Import ProgressManager
+    from services.progress_service.progress_manager import ProgressManager
+    progress_manager = ProgressManager()
+
+    async def event_generator():
+        """Generate SSE events for progress updates"""
+        try:
+            logger.info(f"📡 Starting SSE stream for operation: {operation_id}")
+
+            while True:
+                # Get current progress
+                progress = await progress_manager.get_progress(operation_id)
+
+                if not progress:
+                    # Operation not found
+                    yield f"event: error\ndata: {{\"error\": \"Operation not found\"}}\n\n"
+                    break
+
+                # Convert to JSON
+                data = json.dumps(progress.to_dict())
+
+                # Send SSE event
+                yield f"event: progress\ndata: {data}\n\n"
+
+                # Check if completed/failed/cancelled
+                if progress.status in ["completed", "failed", "cancelled"]:
+                    logger.info(f"📡 SSE stream ending: {operation_id} status={progress.status}")
+
+                    # Send completion event
+                    yield f"event: done\ndata: {{\"status\": \"{progress.status}\"}}\n\n"
+                    break
+
+                # Wait 1 second before next update
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.error(f"SSE stream error for {operation_id}: {e}")
+            yield f"event: error\ndata: {{\"error\": \"{str(e)}\"}}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+
 # Register routes
 app.router.routes.append(Route("/health", health_check))
 # /discover endpoint removed - use /search instead
 app.router.routes.append(Route("/search", search_endpoint, methods=["POST", "OPTIONS"]))  # NEW!
 app.router.routes.append(Route("/sync", sync_endpoint, methods=["POST", "OPTIONS"]))  # NEW!
+app.router.routes.append(Route("/progress/{operation_id}/stream", progress_stream_endpoint, methods=["GET"]))  # SSE Progress Stream
 
 # ==============================================================================
 # DIRECT EXECUTION (for testing)

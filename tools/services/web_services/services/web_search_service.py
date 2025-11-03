@@ -290,10 +290,10 @@ class WebSearchService:
             logger.info(f"Generating summary using ISA Model Client")
 
             from isa_model.inference_client import AsyncISAModel
-            from core.consul_discovery import discover_service
 
-            # Use Consul service discovery to find model service
-            model_api_url = discover_service('model_service', default_url='http://localhost:8082')
+            # Use settings from core/config (env -> consul -> default)
+            settings = get_settings()
+            model_api_url = settings.isa_service_url
             logger.info(f"Using model service at: {model_api_url}")
 
             # Build context with citations

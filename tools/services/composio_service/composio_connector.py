@@ -13,6 +13,9 @@ import asyncio
 
 from ...base_service import BaseService
 
+# Disable Composio telemetry to prevent timeout errors
+os.environ.setdefault("COMPOSIO_TELEMETRY", "false")
+
 logger = logging.getLogger(__name__)
 
 # Optional Composio SDK import with graceful fallback

@@ -8,23 +8,78 @@ Graph RAG Service - 知识图谱增强RAG实现
 import asyncio
 import logging
 import time
+import os
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..base.base_rag_service import BaseRAGService, RAGResult, RAGMode, RAGConfig
+from ..base.base_rag_service import BaseRAGService
+from ..base.rag_models import (
+    RAGMode,
+    RAGConfig,
+    RAGResult,
+    RAGSource,
+    RAGStoreRequest,
+    RAGRetrieveRequest,
+    RAGGenerateRequest
+)
+
+# Qdrant for fallback
+try:
+    from isa_common.qdrant_client import QdrantClient
+    QDRANT_AVAILABLE = True
+except ImportError:
+    QDRANT_AVAILABLE = False
+    QdrantClient = None
 
 logger = logging.getLogger(__name__)
 
 class GraphRAGService(BaseRAGService):
     """Graph RAG服务实现 - 知识图谱增强RAG"""
-    
+
     def __init__(self, config: RAGConfig):
         super().__init__(config)
         self.mode = RAGMode.GRAPH
         self.logger.info("Graph RAG Service initialized")
-        
+
+        # 初始化 Qdrant 作为降级方案
+        self.qdrant_client: Optional[QdrantClient] = None
+        self.qdrant_collection = os.getenv('QDRANT_COLLECTION', 'user_knowledge')
+        self._init_qdrant_fallback()
+
         # 初始化图相关组件
         self._init_graph_components()
+
+    def _init_qdrant_fallback(self):
+        """初始化 Qdrant 作为降级方案"""
+        if not QDRANT_AVAILABLE:
+            self.logger.warning("Qdrant not available for fallback")
+            return
+
+        try:
+            host = os.getenv('QDRANT_HOST', 'localhost')
+            port = int(os.getenv('QDRANT_PORT', '50062'))
+
+            self.qdrant_client = QdrantClient(host=host, port=port, user_id='graph-rag-fallback')
+            self.logger.info(f"✅ Qdrant fallback initialized: {host}:{port}")
+
+            # 确保 collection 存在
+            try:
+                collection_info = self.qdrant_client.get_collection_info(self.qdrant_collection)
+                if not collection_info:
+                    vector_dim = int(os.getenv('VECTOR_DIMENSION', '1536'))
+                    self.qdrant_client.create_collection(
+                        collection_name=self.qdrant_collection,
+                        vector_size=vector_dim,
+                        distance='Cosine'
+                    )
+                    self.logger.info(f"✅ Created collection '{self.qdrant_collection}'")
+            except Exception as e:
+                self.logger.warning(f"Collection check/create warning: {e}")
+
+        except Exception as e:
+            self.logger.error(f"Qdrant fallback initialization failed: {e}")
+            self.qdrant_client = None
     
     def _init_graph_components(self):
         """初始化图组件"""
@@ -97,36 +152,58 @@ class GraphRAGService(BaseRAGService):
                     self.logger.warning(f"Graph processing failed: {graph_error}")
                     # 继续到降级处理
             
-            # 降级到传统文档处理
-            self.logger.warning("Graph processing not available, falling back to traditional")
-            document_result = await self.add_document(
-                user_id=user_id,
-                document=content,
-                chunk_size=self.config.chunk_size,
-                overlap=self.config.overlap,
-                metadata=metadata
-            )
-            
-            if not document_result['success']:
+            # 降级到传统文档处理 (使用 Qdrant)
+            self.logger.warning("Graph processing not available, falling back to Qdrant storage")
+
+            if not self.qdrant_client:
                 return RAGResult(
                     success=False,
                     content="",
                     sources=[],
-                    metadata={'error': document_result.get('error')},
+                    metadata={'error': 'Both graph and Qdrant fallback unavailable'},
                     mode_used=self.mode,
                     processing_time=time.time() - start_time,
-                    error=document_result.get('error')
+                    error='Storage unavailable'
                 )
-            
+
+            # 分块
+            chunks = self._chunk_text(content)
+
+            # 生成 embeddings 并存储到 Qdrant
+            stored_count = 0
+            for i, chunk in enumerate(chunks):
+                embedding = await self._generate_embedding(chunk['text'])
+                if not embedding:
+                    continue
+
+                point = {
+                    'id': str(uuid.uuid4()),
+                    'vector': embedding,
+                    'payload': {
+                        'user_id': user_id,
+                        'text': chunk['text'],
+                        'chunk_index': i,
+                        'content_type': 'text',
+                        'created_at': datetime.now().isoformat(),
+                        **(metadata or {})
+                    }
+                }
+
+                try:
+                    self.qdrant_client.upsert_points(self.qdrant_collection, [point])
+                    stored_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Failed to store chunk {i}: {e}")
+
             return RAGResult(
                 success=True,
-                content=f"Processed {document_result['stored_chunks']} chunks (fallback mode)",
-                sources=document_result.get('chunks', []),
+                content=f"Processed {stored_count}/{len(chunks)} chunks (Qdrant fallback)",
+                sources=[],
                 metadata={
-                    'chunks_processed': document_result['stored_chunks'],
-                    'total_chunks': document_result['total_chunks'],
-                    'document_length': document_result['document_length'],
-                    'graph_fallback': True
+                    'chunks_processed': stored_count,
+                    'total_chunks': len(chunks),
+                    'graph_fallback': True,
+                    'fallback_method': 'qdrant'
                 },
                 mode_used=self.mode,
                 processing_time=time.time() - start_time
@@ -205,49 +282,98 @@ class GraphRAGService(BaseRAGService):
                     self.logger.warning(f"Graph query failed: {graph_error}")
                     # 继续到降级处理
             
-            # 降级到传统搜索 + citation
-            self.logger.warning("Graph query not available, falling back to traditional search")
-            search_result = await self.search_knowledge(
-                user_id=user_id,
-                query=query,
-                top_k=self.config.top_k,
-                enable_rerank=self.config.enable_rerank,
-                search_mode="hybrid",
-                use_enhanced_search=True
-            )
-            
-            if not search_result['success'] or not search_result['search_results']:
+            # 降级到 Qdrant 搜索
+            self.logger.warning("Graph query not available, falling back to Qdrant search")
+
+            if not self.qdrant_client:
+                return RAGResult(
+                    success=False,
+                    content="Search unavailable",
+                    sources=[],
+                    metadata={'error': 'Both graph and Qdrant fallback unavailable'},
+                    mode_used=self.mode,
+                    processing_time=time.time() - start_time,
+                    error='Search unavailable'
+                )
+
+            # 生成 query embedding
+            query_embedding = await self._generate_embedding(query)
+            if not query_embedding:
+                return RAGResult(
+                    success=False,
+                    content="Failed to generate query embedding",
+                    sources=[],
+                    metadata={'error': 'Embedding generation failed'},
+                    mode_used=self.mode,
+                    processing_time=time.time() - start_time,
+                    error='Embedding generation failed'
+                )
+
+            # 从 Qdrant 搜索
+            try:
+                search_results = self.qdrant_client.search_with_filter(
+                    collection_name=self.qdrant_collection,
+                    vector=query_embedding,
+                    filter_conditions={'must': [{'field': 'user_id', 'match': {'keyword': user_id}}]},
+                    limit=self.config.top_k
+                )
+            except Exception as e:
+                self.logger.error(f"Qdrant search failed: {e}")
+                search_results = []
+
+            if not search_results:
                 return RAGResult(
                     success=False,
                     content="No relevant context found",
                     sources=[],
-                    metadata={'search_method': search_result.get('search_method', 'unknown')},
+                    metadata={'search_method': 'qdrant_fallback'},
                     mode_used=self.mode,
                     processing_time=time.time() - start_time,
-                    error=search_result.get('error', 'No relevant context found')
+                    error='No relevant context found'
                 )
-            
-            # 构建上下文（默认启用citation格式）
-            context_text = self._build_context_with_citations(search_result['search_results'])
-            
-            # 生成响应（使用真正的LLM）
-            response = await self._generate_response_with_llm(
-                query=query, 
-                context=context_text, 
-                additional_context=f"Graph RAG Fallback: Using traditional search due to graph unavailability. {context}" if context else "Graph RAG Fallback: Using traditional search due to graph unavailability.",
-                use_citations=True
-            )
-            
+
+            # 转换为 RAGSource 对象
+            sources = [
+                RAGSource(
+                    text=result['payload']['text'],
+                    score=result['score'],
+                    metadata=result['payload']
+                )
+                for result in search_results
+            ]
+
+            # 构建上下文
+            use_citations = True  # Default to using citations
+            context_text = self._build_context(sources, use_citations=use_citations)
+
+            # 构建 prompt (与 SimpleRAG 一致)
+            prompt = f"""You are an AI assistant that provides accurate answers with inline citations. When you reference information from the provided sources, immediately insert the citation number in square brackets after the relevant statement.
+
+SOURCES:
+{context_text}
+
+CITATION RULES:
+1. When you use information from a source, insert [1], [2], etc. immediately after the statement
+2. Place citations naturally within sentences, not at the end of responses
+3. Multiple sources can support the same claim: [1][2]
+4. Only cite sources that directly support your statements
+
+USER QUESTION: {query}
+
+Please provide a comprehensive answer with proper inline citations."""
+
+            # 生成响应
+            response = await self._generate_response(prompt)
+
             return RAGResult(
                 success=True,
                 content=response,
-                sources=search_result['search_results'],
+                sources=sources,
                 metadata={
-                    'retrieval_method': 'graph_rag_fallback',
+                    'retrieval_method': 'qdrant_fallback',
                     'context_length': len(context_text),
-                    'sources_count': len(search_result['search_results']),
-                    'search_method': search_result.get('search_method', 'unknown'),
-                    'reranking_used': search_result.get('reranking_used', False),
+                    'sources_count': len(sources),
+                    'search_method': 'qdrant',
                     'graph_fallback': True
                 },
                 mode_used=self.mode,
@@ -298,48 +424,93 @@ class GraphRAGService(BaseRAGService):
 
     # ==================== New Interface Methods ====================
 
-    async def store(self,
-                   content: str,
-                   user_id: str,
-                   content_type: str = "text",
-                   metadata: Optional[Dict[str, Any]] = None,
-                   options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Store content"""
-        return await self.process_document(content, user_id, metadata)
+    async def store(self, request: RAGStoreRequest) -> RAGResult:
+        """Store content (unified interface)"""
+        return await self.process_document(
+            content=request.content if isinstance(request.content, str) else str(request.content),
+            user_id=request.user_id,
+            metadata=request.metadata
+        )
 
-    async def retrieve(self,
-                      query: str,
-                      user_id: str,
-                      top_k: int = 5,
-                      filters: Optional[Dict[str, Any]] = None,
-                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Retrieve relevant content"""
+    async def retrieve(self, request: RAGRetrieveRequest) -> RAGResult:
+        """Retrieve relevant content (unified interface)"""
         start_time = time.time()
-        try:
-            search_result = await self.search_knowledge(
-                user_id=user_id,
-                query=query,
-                top_k=top_k or self.config.top_k,
-                enable_rerank=self.config.enable_rerank,
-                search_mode="hybrid"
+
+        # Generate query embedding
+        query_embedding = await self._generate_embedding(request.query)
+        if not query_embedding:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'error': 'Failed to generate embedding'},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error='Failed to generate embedding'
             )
 
-            if not search_result['success']:
-                return RAGResult(
-                    success=False,
-                    content="",
-                    sources=[],
-                    metadata={},
-                    mode_used=self.mode,
-                    processing_time=time.time() - start_time,
-                    error=search_result.get('error')
+        # Try graph retrieval first if available
+        if self.graph_initialized:
+            try:
+                retrieval_results = await self.graph_retriever.retrieve(
+                    query=request.query,
+                    top_k=request.top_k or self.config.top_k,
+                    similarity_threshold=0.7,
+                    include_graph_context=True,
+                    search_modes=["entities", "documents", "attributes", "relations"]
                 )
+
+                if retrieval_results:
+                    sources = [{
+                        'text': r.content,
+                        'relevance_score': r.score,
+                        'metadata': r.metadata,
+                        'source_id': r.source_id
+                    } for r in retrieval_results]
+
+                    return RAGResult(
+                        success=True,
+                        content="",
+                        sources=sources,
+                        metadata={'total_results': len(sources), 'retrieval_method': 'graph'},
+                        mode_used=self.mode,
+                        processing_time=time.time() - start_time
+                    )
+            except Exception as e:
+                self.logger.warning(f"Graph retrieval failed: {e}")
+
+        # Fallback to Qdrant
+        if not self.qdrant_client:
+            return RAGResult(
+                success=False,
+                content="",
+                sources=[],
+                metadata={'error': 'No retrieval backend available'},
+                mode_used=self.mode,
+                processing_time=time.time() - start_time,
+                error='No retrieval backend available'
+            )
+
+        try:
+            search_results = self.qdrant_client.search_with_filter(
+                collection_name=self.qdrant_collection,
+                vector=query_embedding,
+                filter_conditions={'must': [{'field': 'user_id', 'match': {'keyword': request.user_id}}]},
+                limit=request.top_k or self.config.top_k
+            )
+
+            sources = [{
+                'text': r['payload']['text'],
+                'relevance_score': r['score'],
+                'metadata': r['payload'],
+                'knowledge_id': r['id']
+            } for r in search_results]
 
             return RAGResult(
                 success=True,
                 content="",
-                sources=search_result['search_results'],
-                metadata={'total_results': len(search_result['search_results'])},
+                sources=sources,
+                metadata={'total_results': len(sources), 'retrieval_method': 'qdrant_fallback'},
                 mode_used=self.mode,
                 processing_time=time.time() - start_time
             )
@@ -348,49 +519,99 @@ class GraphRAGService(BaseRAGService):
                 success=False,
                 content="",
                 sources=[],
-                metadata={},
+                metadata={'error': str(e)},
                 mode_used=self.mode,
                 processing_time=time.time() - start_time,
                 error=str(e)
             )
 
-    async def generate(self,
-                      query: str,
-                      user_id: str,
-                      context: Optional[str] = None,
-                      retrieval_result: Optional[RAGResult] = None,
-                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Generate response from retrieved context"""
+    async def generate(self, request: RAGGenerateRequest) -> RAGResult:
+        """Generate response from retrieved context (unified interface)"""
         start_time = time.time()
+
         try:
-            if retrieval_result and retrieval_result.sources:
-                sources = retrieval_result.sources
+            # Get sources - either from request or retrieve
+            if request.retrieval_sources:
+                sources = request.retrieval_sources
             else:
-                retrieval = await self.retrieve(query, user_id, options=options)
+                retrieve_request = RAGRetrieveRequest(
+                    query=request.query,
+                    user_id=request.user_id
+                )
+                retrieval = await self.retrieve(retrieve_request)
                 if not retrieval.success:
                     return retrieval
                 sources = retrieval.sources
 
-            # Build context
-            context_text = self._build_context_with_citations(sources)
+            if not sources:
+                return RAGResult(
+                    success=False,
+                    content="No sources available for generation",
+                    sources=[],
+                    metadata={},
+                    mode_used=self.mode,
+                    processing_time=time.time() - start_time,
+                    error='No sources available'
+                )
 
-            # Generate with LLM
-            response = await self._generate_response_with_llm(query, context_text, context)
+            # Convert sources to RAGSource objects
+            rag_sources = [
+                RAGSource(
+                    text=s.get('text', '') if isinstance(s, dict) else str(s),
+                    score=s.get('relevance_score', 0.0) if isinstance(s, dict) else 0.0,
+                    metadata=s.get('metadata', {}) if isinstance(s, dict) else {}
+                )
+                for s in sources
+            ]
+
+            # Build context
+            use_citations = request.options.get('use_citations', True) if request.options else True
+            context_text = self._build_context(rag_sources, use_citations=use_citations)
+
+            # Build prompt (same as SimpleRAG for consistency)
+            if use_citations:
+                prompt = f"""You are an AI assistant that provides accurate answers with inline citations. When you reference information from the provided sources, immediately insert the citation number in square brackets after the relevant statement.
+
+SOURCES:
+{context_text}
+
+CITATION RULES:
+1. When you use information from a source, insert [1], [2], etc. immediately after the statement
+2. Place citations naturally within sentences, not at the end of responses
+3. Multiple sources can support the same claim: [1][2]
+4. Only cite sources that directly support your statements
+
+USER QUESTION: {request.query}
+
+Please provide a comprehensive answer with proper inline citations."""
+            else:
+                prompt = f"""Based on the following context, please answer the user's question accurately and comprehensively.
+
+Context:
+{context_text}
+
+User Question: {request.query}
+
+Please provide a helpful response based on the context provided."""
+
+            # Generate response
+            response = await self._generate_response(prompt)
 
             return RAGResult(
                 success=True,
                 content=response,
                 sources=sources,
-                metadata={'context_length': len(context_text)},
+                metadata={'context_length': len(context_text), 'sources_count': len(sources)},
                 mode_used=self.mode,
                 processing_time=time.time() - start_time
             )
         except Exception as e:
+            self.logger.error(f"Generate failed: {e}")
             return RAGResult(
                 success=False,
                 content="",
                 sources=[],
-                metadata={},
+                metadata={'error': str(e)},
                 mode_used=self.mode,
                 processing_time=time.time() - start_time,
                 error=str(e)

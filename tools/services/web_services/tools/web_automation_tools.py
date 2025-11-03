@@ -193,7 +193,7 @@ def register_web_automation_tools(mcp: FastMCP):
                 url="https://github.com",
                 task="go to search, type 'python async', press enter, click first repo"
             )
-        
+
         Notes:
             - The tool takes screenshots at key stages for debugging and verification
             - All actions are logged with detailed progress reporting
@@ -201,18 +201,28 @@ def register_web_automation_tools(mcp: FastMCP):
             - Session state is not persisted between calls (use Agent layer for session management)
             - Credentials are securely stored in Vault Service and require explicit user authorization
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await web_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "url": url[:100],
+                "task": task[:100],
+                "operation": "web_automation"
+            }
+        )
+
         try:
             # Detect operation type for better logging
             operation_type = AutomationOperationDetector.detect_operation_type(task, url)
-            
+
             await web_tool.log_info(
                 ctx,
                 f"🚀 Starting web automation: '{task}' on {url} (type: {operation_type})"
             )
-            
+
             # Step 1: Capturing - Report initial progress
             await web_tool.progress_reporter.report_stage(
-                ctx, "capturing", "automation", f"loading {url[:50]}..."
+                operation_id, "capturing", "automation", f"loading {url[:50]}..."
             )
             
             # Get automation service (lazy initialization)
@@ -233,9 +243,9 @@ def register_web_automation_tools(mcp: FastMCP):
                 
                 # Report HIL detection (Step 1 of HIL workflow)
                 await web_tool.progress_reporter.report_hil_detection(
-                    ctx, intervention_type, provider, details
+                    operation_id, intervention_type, provider, details
                 )
-                
+
                 # Check Vault status (Step 2 of HIL workflow)
                 has_credentials = result.get("action") == "request_authorization"
                 credential_type = {
@@ -243,9 +253,9 @@ def register_web_automation_tools(mcp: FastMCP):
                     "payment": "payment method",
                     "wallet": "wallet"
                 }.get(intervention_type, "credentials")
-                
+
                 await web_tool.progress_reporter.report_vault_check(
-                    ctx, provider, has_credentials, credential_type
+                    operation_id, provider, has_credentials, credential_type
                 )
                 
                 # Log HIL message
@@ -256,7 +266,7 @@ def register_web_automation_tools(mcp: FastMCP):
                 
                 # Report completion for HIL workflow
                 await web_tool.progress_reporter.report_complete(
-                    ctx, "hil",
+                    "hil",
                     {
                         "intervention_type": intervention_type,
                         "provider": provider,
@@ -287,21 +297,21 @@ def register_web_automation_tools(mcp: FastMCP):
                 step2 = workflow.get("step2_analysis", {})
                 page_type = step2.get("page_type", "unknown")
                 elements_required = len(step2.get("required_elements", []))
-                
+
                 await web_tool.progress_reporter.report_page_analysis(
-                    ctx, page_type, elements_required
+                    operation_id, page_type, elements_required
                 )
-                
+
                 # Report Step 3: Detecting
                 elements_mapped = workflow.get("step3_ui_detection", 0)
                 await web_tool.progress_reporter.report_ui_detection(
-                    ctx, elements_mapped, elements_mapped > 0
+                    operation_id, elements_mapped, elements_mapped > 0
                 )
-                
+
                 # Report Step 4: Planning
                 actions = workflow.get("step4_actions", [])
                 await web_tool.progress_reporter.report_action_generation(
-                    ctx, len(actions), "llm"
+                    operation_id, len(actions), "llm"
                 )
                 
                 # Report Step 5: Executing (with action-by-action progress)
@@ -317,12 +327,12 @@ def register_web_automation_tools(mcp: FastMCP):
                 for i, action_result in enumerate(action_results, 1):
                     action_type = action_result.get("action_type", "unknown")
                     await web_tool.progress_reporter.report_action_progress(
-                        ctx, i, len(action_results), action_type
+                        operation_id, i, len(action_results), action_type
                     )
-                
+
                 # Report execution summary
                 await web_tool.progress_reporter.report_execution_summary(
-                    ctx, executed, successful, failed
+                    operation_id, executed, successful, failed
                 )
                 
                 # Final logging
@@ -336,7 +346,7 @@ def register_web_automation_tools(mcp: FastMCP):
                 
                 # Report completion
                 await web_tool.progress_reporter.report_complete(
-                    ctx, "automation",
+                    "automation",
                     {
                         "actions_executed": executed,
                         "actions_successful": successful,
@@ -344,6 +354,15 @@ def register_web_automation_tools(mcp: FastMCP):
                         "task_completed": task_completed,
                         "initial_url": result.get("initial_url"),
                         "final_url": result.get("final_url")
+                    }
+                )
+
+                # Complete progress operation
+                await web_tool.complete_progress_operation(
+                    operation_id,
+                    result={
+                        "actions_executed": executed,
+                        "task_completed": task_completed
                     }
                 )
             else:
@@ -363,6 +382,7 @@ def register_web_automation_tools(mcp: FastMCP):
                     "web_automation",
                     {
                         **result,
+                        "operation_id": operation_id,  # ✅ Return operation_id for SSE monitoring
                         "context": context_info
                     }
                 )
@@ -380,9 +400,13 @@ def register_web_automation_tools(mcp: FastMCP):
                 )
         
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await web_tool.fail_progress_operation(operation_id, str(e))
+
             logger.exception(f"Web automation failed: {e}")
             await web_tool.log_error(ctx, f"❌ Web automation failed: {str(e)}")
-            
+
             # Extract context even in error case
             context_info = web_tool.extract_context_info(ctx, user_id)
             

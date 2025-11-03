@@ -207,7 +207,7 @@ class QueryAnalyzer:
         for level in ['expert', 'high', 'medium', 'simple']:
             if any(re.search(pattern, query, re.IGNORECASE)
                    for pattern in self.complexity_indicators[level]):
-                return QueryComplexity(level.upper())
+                return QueryComplexity(level)
 
         # Heuristic: word count
         word_count = len(query.split())

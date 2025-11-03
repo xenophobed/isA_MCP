@@ -3,6 +3,7 @@ Prompt Repository - Data access layer for MCP prompts
 Handles database operations for prompt registry
 """
 
+import json
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -106,14 +107,19 @@ class PromptRepository:
         """Create a new prompt"""
         try:
             with self.db:
+                # Serialize complex types to JSON strings for gRPC compatibility
+                arguments = prompt_data.get('arguments', [])
+                metadata = prompt_data.get('metadata', {})
+                tags = prompt_data.get('tags', [])
+
                 record = {
                     'name': prompt_data['name'],
                     'description': prompt_data.get('description'),
                     'category': prompt_data.get('category'),
                     'content': prompt_data['content'],
-                    'arguments': prompt_data.get('arguments', []),
-                    'metadata': prompt_data.get('metadata', {}),
-                    'tags': prompt_data.get('tags', []),
+                    'arguments': json.dumps(arguments) if isinstance(arguments, (list, dict)) else arguments,
+                    'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata,
+                    'tags': json.dumps(tags) if isinstance(tags, list) else tags,
                     'version': prompt_data.get('version', '1.0.0'),
                     'is_active': prompt_data.get('is_active', True)
                 }
@@ -135,8 +141,14 @@ class PromptRepository:
                 params = []
                 param_idx = 1
 
+                # Serialize complex types to JSON strings for gRPC compatibility
                 for key, value in updates.items():
                     if key not in ['id', 'created_at', 'updated_at']:
+                        # Serialize complex types
+                        if key in ['arguments', 'metadata', 'tags']:
+                            if isinstance(value, (list, dict)):
+                                value = json.dumps(value)
+
                         set_parts.append(f"{key} = ${param_idx}")
                         params.append(value)
                         param_idx += 1

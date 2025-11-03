@@ -273,101 +273,85 @@ else
 fi
 
 # ============================================
-# Test 11: Context Test - Info Extraction
+# Test 11: Progress Tracking - Start Long Task
 # ============================================
-print_header "Test 11: Context Test - Information Extraction"
+print_header "Test 11: Progress Tracking - Start Long Task"
 
-REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"test_context_info","arguments":{"test_message":"Testing from bash script"}}}'
-CONTEXT_INFO_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
+REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"start_long_task","arguments":{"task_type":"test_task","duration_seconds":10,"steps":3}}}'
+START_TASK_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d "$REQUEST_PAYLOAD")
 
-CONTEXT_INFO_DATA=$(echo "$CONTEXT_INFO_RESP" | grep "^data: " | sed 's/^data: //')
-CONTEXT_AVAILABLE=$(echo "$CONTEXT_INFO_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.context_available' 2>/dev/null)
-HAS_REQUEST_ID=$(echo "$CONTEXT_INFO_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.has_request_id' 2>/dev/null)
+START_DATA=$(echo "$START_TASK_RESP" | grep "^data: " | sed 's/^data: //' || echo "$START_TASK_RESP")
+OPERATION_ID=$(echo "$START_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.operation_id' 2>/dev/null)
 
-show_request_response "Context Info" "$REQUEST_PAYLOAD" "$CONTEXT_INFO_DATA"
+show_request_response "Start Long Task" "$REQUEST_PAYLOAD" "$START_DATA"
 
-if [ "$CONTEXT_AVAILABLE" = "true" ] && [ "$HAS_REQUEST_ID" = "true" ]; then
-    print_success "Context extraction - Context available with request_id"
-elif [ "$CONTEXT_AVAILABLE" = "false" ]; then
-    print_success "Context extraction - HTTP mode (no context, expected)"
+if [ -n "$OPERATION_ID" ] && [ "$OPERATION_ID" != "null" ]; then
+    print_success "Progress tracking - Task started with operation_id: ${OPERATION_ID:0:12}..."
+    # Save for next tests
+    PROGRESS_OP_ID="$OPERATION_ID"
 else
-    print_fail "Context extraction - Unexpected behavior"
+    print_fail "Progress tracking - Failed to start task"
+    PROGRESS_OP_ID=""
 fi
 
 # ============================================
-# Test 12: Context Test - Logging
+# Test 12: Progress Tracking - Get Progress
 # ============================================
-print_header "Test 12: Context Test - Logging Features"
+print_header "Test 12: Progress Tracking - Get Progress"
 
-REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"test_context_logging","arguments":{"test_all_levels":true}}}'
-CONTEXT_LOG_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
+if [ -n "$PROGRESS_OP_ID" ]; then
+    sleep 2  # Wait a bit for progress
+
+    REQUEST_PAYLOAD="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":1,\"params\":{\"name\":\"get_task_progress\",\"arguments\":{\"operation_id\":\"$PROGRESS_OP_ID\"}}}"
+    PROGRESS_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json, text/event-stream" \
+      -d "$REQUEST_PAYLOAD")
+
+    PROGRESS_DATA=$(echo "$PROGRESS_RESP" | grep "^data: " | sed 's/^data: //' || echo "$PROGRESS_RESP")
+    PROGRESS_PCT=$(echo "$PROGRESS_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.progress' 2>/dev/null)
+    PROGRESS_STATUS=$(echo "$PROGRESS_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.status' 2>/dev/null)
+
+    show_request_response "Get Task Progress" "$REQUEST_PAYLOAD" "$PROGRESS_DATA"
+
+    if [ -n "$PROGRESS_PCT" ] && [ "$PROGRESS_PCT" != "null" ]; then
+        print_success "Progress tracking - Progress: ${PROGRESS_PCT}%, Status: $PROGRESS_STATUS"
+    else
+        print_fail "Progress tracking - Failed to get progress"
+    fi
+else
+    print_fail "Progress tracking - Skipped (no operation_id from previous test)"
+fi
+
+# ============================================
+# Test 13: Progress Tracking - List Operations
+# ============================================
+print_header "Test 13: Progress Tracking - List Operations"
+
+REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"list_operations","arguments":{"limit":5}}}'
+LIST_OPS_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d "$REQUEST_PAYLOAD")
 
-CONTEXT_LOG_DATA=$(echo "$CONTEXT_LOG_RESP" | grep "^data: " | sed 's/^data: //')
-LOGS_SENT=$(echo "$CONTEXT_LOG_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.total_logs' 2>/dev/null)
+LIST_DATA=$(echo "$LIST_OPS_RESP" | grep "^data: " | sed 's/^data: //' || echo "$LIST_OPS_RESP")
+OPS_COUNT=$(echo "$LIST_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.count' 2>/dev/null)
 
-show_request_response "Context Logging" "$REQUEST_PAYLOAD" "$CONTEXT_LOG_DATA"
+show_request_response "List Operations" "$REQUEST_PAYLOAD" "$LIST_DATA"
 
-if [ "$LOGS_SENT" -gt 0 ]; then
-    print_success "Context logging - Sent $LOGS_SENT log messages"
+if [ -n "$OPS_COUNT" ] && [ "$OPS_COUNT" != "null" ] && [ "$OPS_COUNT" -gt 0 ]; then
+    print_success "Progress tracking - Found $OPS_COUNT operations"
 else
-    print_fail "Context logging - No logs sent"
+    print_fail "Progress tracking - No operations found"
 fi
 
 # ============================================
-# Test 13: Context Test - Progress Reporting
+# Test 14: Error Handling
 # ============================================
-print_header "Test 13: Context Test - Progress Reporting"
-
-REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"test_context_progress","arguments":{"total_steps":5,"delay_ms":50}}}'
-CONTEXT_PROGRESS_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d "$REQUEST_PAYLOAD")
-
-CONTEXT_PROGRESS_DATA=$(echo "$CONTEXT_PROGRESS_RESP" | grep "^data: " | sed 's/^data: //')
-PROGRESS_REPORTS=$(echo "$CONTEXT_PROGRESS_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.total_steps' 2>/dev/null)
-
-show_request_response "Context Progress" "$REQUEST_PAYLOAD" "$CONTEXT_PROGRESS_DATA"
-
-if [ "$PROGRESS_REPORTS" -gt 0 ]; then
-    print_success "Context progress - Reported $PROGRESS_REPORTS steps"
-else
-    print_fail "Context progress - No progress reported"
-fi
-
-# ============================================
-# Test 14: Context Test - Comprehensive Workflow
-# ============================================
-print_header "Test 14: Context Test - Comprehensive Workflow"
-
-REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"test_context_comprehensive","arguments":{"scenario_name":"Bash test workflow"}}}'
-CONTEXT_COMP_RESP=$(curl -s -X POST "$MCP_URL/mcp" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d "$REQUEST_PAYLOAD")
-
-CONTEXT_COMP_DATA=$(echo "$CONTEXT_COMP_RESP" | grep "^data: " | sed 's/^data: //')
-STEPS_COMPLETED=$(echo "$CONTEXT_COMP_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.steps_completed' 2>/dev/null)
-FEATURES_TESTED=$(echo "$CONTEXT_COMP_DATA" | jq -r '.result.content[0].text' 2>/dev/null | jq -r '.data.features_tested | length' 2>/dev/null)
-
-show_request_response "Context Comprehensive" "$REQUEST_PAYLOAD" "$CONTEXT_COMP_DATA"
-
-if [ "$STEPS_COMPLETED" -gt 0 ] && [ "$FEATURES_TESTED" -gt 0 ]; then
-    print_success "Context comprehensive - Completed $STEPS_COMPLETED steps, tested $FEATURES_TESTED features"
-else
-    print_fail "Context comprehensive - Workflow incomplete"
-fi
-
-# ============================================
-# Test 15: Error Handling
-# ============================================
-print_header "Test 15: Error Handling - Invalid Tool"
+print_header "Test 14: Error Handling - Invalid Tool"
 
 REQUEST_PAYLOAD='{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"nonexistent_tool","arguments":{}}}'
 ERROR_RESP=$(curl -s -X POST "$MCP_URL/mcp" \

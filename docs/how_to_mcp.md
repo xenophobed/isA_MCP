@@ -1,257 +1,56 @@
-# MCP完整使用指南
+# ISA MCP Client - Complete Guide (Based on Real Tests)
 
-这是一个完整的MCP (Model Context Protocol) 使用指南，包含Prompts、Tools和Resources的搜索和使用方法。所有示例都经过真实测试。
+## 📚 Overview
 
-## ✅ **搜索服务状态**
+The ISA MCP Client provides a production-ready interface to interact with the MCP server. All examples below are tested and verified working.
 
-**搜索服务已完全可用！** 使用 OpenAI embeddings 提供高质量语义搜索。
-
-### 测试验证结果：
-```bash
-# Calculator 搜索 - 48.1% 相似度匹配
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "calculator", "type": "tool", "limit": 5, "score_threshold": 0.3}'
-# ✅ 返回 calculator 工具
-
-# Web search - 34.3% 相似度匹配
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "web search", "type": "tool"}'
-# ✅ 返回 search_knowledge, search_available_data 等工具
-
-# Data analysis - 44.4% 相似度匹配
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "analyze data", "type": "tool"}'
-# ✅ 返回 perform_eda_analysis, perform_statistical_analysis 等工具
-```
+**Current Capabilities** (as of testing):
+- ✅ 88 Tools
+- ✅ 50 Prompts
+- ✅ 9 Resources
+- ✅ Semantic Search
+- ✅ Progress Tracking (SSE + HTTP)
+- ✅ HIL (Human-in-the-Loop) - 4 methods
 
 ---
 
-## 🎯 **Prompts 使用方法**
+## 🚀 Quick Start
 
-### 📝 **1. 搜索提示词**
+### Installation
 
-**命令：**
 ```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "default_reason_prompt"}'
+cd /path/to/isA_MCP
+# Server should be running on http://localhost:8081
+python main.py
 ```
 
-**搜索结果示例：**
-```json
-{
-  "status": "success",
-  "query": "default_reason_prompt",
-  "results": [
-    {
-      "name": "default_reason_prompt",
-      "type": "prompt",
-      "description": "Default reasoning prompt for intelligent assistant interactions. Provides structured approach to analyzing user requests and determining the best response strategy using available capabilities.",
-      "similarity_score": 1.0,
-      "category": "general",
-      "keywords": ["reasoning", "analysis", "memory", "tools", "resources", "assistant"],
-      "metadata": {
-        "arguments": [
-          {
-            "name": "user_message",
-            "required": true,
-            "description": null
-          },
-          {
-            "name": "memory",
-            "required": false,
-            "description": null
-          },
-          {
-            "name": "tools",
-            "required": false,
-            "description": null
-          },
-          {
-            "name": "resources",
-            "required": false,
-            "description": null
-          }
-        ]
-      }
-    }
-  ],
-  "result_count": 1
-}
-```
+### Basic Usage
 
-### 🚀 **2. 使用提示词（带参数）**
-
-**端点：** `http://localhost:8081/mcp`
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "prompts/get",
-    "params": {
-      "name": "default_reason_prompt",
-      "arguments": {
-        "user_message": "Help me create a marketing plan",
-        "memory": "User is interested in AI products",
-        "tools": "web_search, create_execution_plan",
-        "resources": "marketing_knowledge"
-      }
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"messages":[{"role":"user","content":{"type":"text","text":"You are an intelligent assistant with memory, tools, and resources to help users.\n\n## Your Capabilities:\n- **Memory**: You can remember previous conversations and user preferences\n- **Tools**: You can use various tools to gather information or execute tasks  \n- **Resources**: You can access knowledge bases and documentation resources\n\n## User Request:\nHelp me create a marketing plan\n\n## Your Options:\n1. **Direct Answer** - If you already know the answer\n2. **Use Tools** - If you need to gather information or execute specific tasks\n3. **Create Plan** - If this is a complex multi-step task\n\nPlease analyze the user request and choose the most appropriate way to help the user.\n\nNote: Memory context: User is interested in AI products, Available tools: web_search, create_execution_plan, Available resources: marketing_knowledge"}}]}}
-```
-
-### 💡 **3. Python使用示例**
 ```python
-import requests
+#!/usr/bin/env python3
+import asyncio
+import aiohttp
 import json
+from typing import Dict, Any
 
-def use_prompt_with_args(prompt_name, **arguments):
-    """使用MCP提示词并传递参数"""
-    response = requests.post(
-        'http://localhost:8081/mcp',
-        headers={
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        },
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {
-                "name": prompt_name,
-                "arguments": arguments
-            }
-        }
-    )
-    
-    # 解析事件流响应
-    lines = response.text.strip().split('\n')
-    for line in lines:
-        if line.startswith('data: '):
-            data = json.loads(line[6:])
-            if 'result' in data:
-                return data['result']['messages'][0]['content']['text']
-    return None
+class MCPClient:
+    """Simple standalone MCP client"""
 
-# 使用示例
-prompt_result = use_prompt_with_args(
-    'default_reason_prompt',
-    user_message="Help me create a marketing plan",
-    memory="User is interested in AI products",
-    tools="web_search, create_execution_plan",
-    resources="marketing_knowledge"
-)
+    def __init__(self, base_url: str = "http://localhost:8081"):
+        self.base_url = base_url
+        self.mcp_endpoint = f"{base_url}/mcp"
+        self.health_endpoint = f"{base_url}/health"
+        self.search_endpoint = f"{base_url}/search"
 
-print(prompt_result)
-```
+    async def get_health(self) -> Dict[str, Any]:
+        """Get server health"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.health_endpoint) as response:
+                return await response.json()
 
----
-
-## 🔧 **Tools 使用方法**
-
-### 📝 **1. 搜索工具**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "web_search"}'
-```
-
-**搜索结果示例：**
-```json
-{
-  "status": "success",
-  "query": "web_search",
-  "results": [
-    {
-      "name": "web_search",
-      "type": "tool",
-      "description": "Search the web for information\n\nKeywords: search, web, internet, query, results\nCategory: web\n\nArgs:\n    query: Search query\n    count: Number of results to return (default: 10)",
-      "similarity_score": 1.0,
-      "category": "web",
-      "keywords": ["search", "web", "internet", "query", "results"],
-      "metadata": {
-        "input_schema": {
-          "properties": {
-            "query": {
-              "title": "Query",
-              "type": "string"
-            },
-            "count": {
-              "default": 10,
-              "title": "Count",
-              "type": "integer"
-            }
-          },
-          "required": ["query"],
-          "title": "web_searchArguments",
-          "type": "object"
-        }
-      }
-    }
-  ],
-  "result_count": 1
-}
-```
-
-### 🚀 **2. 使用工具（带参数）**
-
-**端点：** `http://localhost:8081/mcp`
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/call",
-    "params": {
-      "name": "web_search",
-      "arguments": {
-        "query": "AI marketing trends 2024",
-        "count": 3
-      }
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\"status\": \"success\", \"action\": \"web_search\", \"data\": {\"success\": true, \"query\": \"AI marketing trends 2024\", \"total\": 3, \"results\": [{\"title\": \"AI Will Shape the Future of Marketing - Professional & Executive Development | Harvard DCE\", \"url\": \"https://professional.dce.harvard.edu/blog/ai-will-shape-the-future-of-marketing/\", \"snippet\": \"AI platforms like HubSpot, Constant Contact, Mailchimp, and ActiveCampaign are already being used by marketers to automate tasks and optimize campaigns.\", \"score\": 1.0}, {\"title\": \"2025 AI Trends for Marketers\", \"url\": \"https://offers.hubspot.com/ai-marketing\", \"snippet\": \"Stay sharp, scalable, and ahead of the curve. Marketers are turning AI into measurable outcomes by boosting productivity, improving personalization, and accelerating performance across campaigns.\", \"score\": 0.9}, {\"title\": \"How AI Is Revolutionizing Marketing In 2024: Top 5 Trends\", \"url\": \"https://www.forbes.com/sites/shelleykohan/2024/05/19/how-ai-is-revolutionizing-marketing-in-2024-top-5-trends/\", \"snippet\": \"MarTech will continue to focus on artificial intelligence (AI) and generative AI (GenAI) to drive unprecedented levels of personalization and customer engagement.\", \"score\": 0.8}], \"urls\": [\"https://professional.dce.harvard.edu/blog/ai-will-shape-the-future-of-marketing/\", \"https://offers.hubspot.com/ai-marketing\", \"https://www.forbes.com/sites/shelleykohan/2024/05/19/how-ai-is-revolutionizing-marketing-in-2024-top-5-trends/\"]}, \"timestamp\": \"2025-07-24T16:45:04.310648\"}"}],"isError":false}}
-```
-
-### 💡 **3. Python使用示例**
-```python
-import requests
-import json
-
-def use_tool(tool_name, **arguments):
-    """使用MCP工具并传递参数"""
-    response = requests.post(
-        'http://localhost:8081/mcp',
-        headers={
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        },
-        json={
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Call an MCP tool"""
+        payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
@@ -260,798 +59,927 @@ def use_tool(tool_name, **arguments):
                 "arguments": arguments
             }
         }
-    )
-    
-    # 解析事件流响应
-    lines = response.text.strip().split('\n')
-    for line in lines:
-        if line.startswith('data: '):
-            data = json.loads(line[6:])
-            if 'result' in data:
-                return json.loads(data['result']['content'][0]['text'])
-    return None
 
-# 使用示例
-result = use_tool(
-    'web_search',
-    query="AI marketing trends 2024",
-    count=3
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.mcp_endpoint,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream"
+                }
+            ) as response:
+                response_text = await response.text()
+
+                # Handle SSE format
+                if "data: " in response_text:
+                    lines = response_text.strip().split('\n')
+                    for line in lines:
+                        if line.startswith('data: '):
+                            return json.loads(line[6:])
+
+                return json.loads(response_text)
+
+    def parse_tool_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse MCP tool response"""
+        if "result" in response:
+            result = response["result"]
+
+            # Check for error
+            if result.get("isError"):
+                if "content" in result:
+                    content = result["content"][0]
+                    return {
+                        "status": "error",
+                        "error": content.get("text", "Unknown error")
+                    }
+
+            # Check for structuredContent (used by HIL tools)
+            if "structuredContent" in result:
+                structured = result["structuredContent"]
+                if "result" in structured:
+                    return structured["result"]
+                return structured
+
+            # Normal result with content
+            if "content" in result and len(result["content"]) > 0:
+                content = result["content"][0]
+                if content.get("type") == "text":
+                    try:
+                        return json.loads(content["text"])
+                    except json.JSONDecodeError:
+                        return {"text": content["text"], "status": "success"}
+
+        # JSON-RPC error format
+        if "error" in response:
+            return {
+                "status": "error",
+                "error": response["error"].get("message", "Unknown error")
+            }
+
+        return response
+
+    async def call_tool_and_parse(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Call tool and parse response"""
+        response = await self.call_tool(tool_name, arguments)
+        return self.parse_tool_response(response)
+
+
+# Example usage
+async def main():
+    client = MCPClient()
+
+    # Check server health
+    health = await client.get_health()
+    print(f"Server: {health['status']}")
+    print(f"Tools: {health['capabilities']['tools']}")
+
+    # Call a tool
+    result = await client.call_tool_and_parse("get_weather", {"city": "Tokyo"})
+    print(f"Weather: {result['data']['current']['temperature']}°C")
+
+asyncio.run(main())
+```
+
+---
+
+## 📖 Core Features
+
+### 1. Server Health Check
+
+**Tested & Working ✅**
+
+```python
+async def check_health():
+    client = MCPClient(base_url="http://localhost:8081")
+    health = await client.get_health()
+
+    print(f"Status: {health['status']}")
+    # Output: healthy ✅ HOT RELOAD IS WORKING PERFECTLY!
+
+    print(f"Tools: {health['capabilities']['tools']}")      # 88
+    print(f"Prompts: {health['capabilities']['prompts']}")  # 50
+    print(f"Resources: {health['capabilities']['resources']}")  # 9
+```
+
+### 2. List Tools
+
+**Tested & Working ✅**
+
+```python
+async def list_tools():
+    client = MCPClient()
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{client.mcp_endpoint}",
+            json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            }
+        ) as response:
+            response_text = await response.text()
+
+            if "data: " in response_text:
+                lines = response_text.strip().split('\n')
+                for line in lines:
+                    if line.startswith('data: '):
+                        data = json.loads(line[6:])
+                        tools = data['result']['tools']
+
+                        print(f"Total tools: {len(tools)}")
+                        for tool in tools[:10]:
+                            print(f"  - {tool['name']}")
+                        break
+```
+
+### 3. Semantic Search
+
+**Tested & Working ✅**
+
+```python
+async def search_tools(query: str):
+    """Search for tools using semantic search"""
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "http://localhost:8081/search",
+            json={
+                "query": query,
+                "type": "tool",  # or "prompt", "resource", or omit for all
+                "limit": 5,
+                "score_threshold": 0.3
+            }
+        ) as response:
+            results = await response.json()
+
+    print(f"Found {results['count']} tools:")
+    for result in results['results']:
+        print(f"  - {result['name']} (score: {result['score']:.3f})")
+        print(f"    {result['description'][:80]}...")
+
+# Example output:
+# Found 3 tools:
+#   - get_weather (score: 0.670)
+#     Get check query weather temperature forecast conditions city location...
+#   - stream_weather (score: 0.553)
+#     Stream continuous real-time weather updates live monitoring periodic...
+#   - batch_weather (score: 0.423)
+#     Batch multiple cities weather query parallel sequential list processing...
+```
+
+### 4. Call Tools
+
+**Tested & Working ✅**
+
+```python
+async def call_weather_tool():
+    client = MCPClient()
+
+    # Simple tool call
+    result = await client.call_tool_and_parse("get_weather", {
+        "city": "Tokyo"
+    })
+
+    if result.get('status') == 'success':
+        data = result['data']
+        print(f"City: {data['city']}")
+        print(f"Temperature: {data['current']['temperature']}°C")
+        print(f"Condition: {data['current']['condition']}")
+
+    # Output:
+    # City: Tokyo
+    # Temperature: 18.0°C
+    # Condition: Rainy
+
+# Calculator example
+async def call_calculator():
+    client = MCPClient()
+
+    result = await client.call_tool_and_parse("calculator", {
+        "operation": "add",
+        "a": 10,
+        "b": 20
+    })
+
+    print(f"Result: {result['data']['result']}")  # 30.0
+```
+
+### 5. Concurrent Tool Calls
+
+**Tested & Working ✅ (0.05s for 3 calls)**
+
+```python
+async def concurrent_calls():
+    client = MCPClient()
+
+    # Execute 3 calculations in parallel
+    results = await asyncio.gather(
+        client.call_tool_and_parse("calculator", {"operation": "add", "a": 10, "b": 20}),
+        client.call_tool_and_parse("calculator", {"operation": "add", "a": 30, "b": 40}),
+        client.call_tool_and_parse("calculator", {"operation": "add", "a": 50, "b": 60})
+    )
+
+    for i, result in enumerate(results, 1):
+        print(f"{i}. Result: {result['data']['result']}")
+
+    # Output:
+    # 1. Result: 30.0
+    # 2. Result: 70.0
+    # 3. Result: 110.0
+```
+
+---
+
+## 📦 Resources
+
+**Tested & Working ✅ (9 resources available)**
+
+### List Resources
+
+```python
+async def list_resources():
+    client = MCPClient()
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{client.mcp_endpoint}",
+            json={"jsonrpc": "2.0", "method": "resources/list", "id": 1},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            }
+        ) as response:
+            response_text = await response.text()
+
+            if "data: " in response_text:
+                lines = response_text.strip().split('\n')
+                for line in lines:
+                    if line.startswith('data: '):
+                        data = json.loads(line[6:])
+                        resources = data['result']['resources']
+
+                        for resource in resources:
+                            print(f"{resource['name']}: {resource['uri']}")
+                        break
+
+# Output:
+# get_pii_config: guardrail://config/pii
+# get_medical_config: guardrail://config/medical
+# get_compliance_policies: guardrail://policies/compliance
+# ... (9 total)
+```
+
+### Read Resource
+
+```python
+async def read_resource(uri: str):
+    """Read a resource by URI"""
+    client = MCPClient()
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{client.mcp_endpoint}",
+            json={
+                "jsonrpc": "2.0",
+                "method": "resources/read",
+                "id": 1,
+                "params": {"uri": uri}
+            },
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            }
+        ) as response:
+            response_text = await response.text()
+
+            if "data: " in response_text:
+                lines = response_text.strip().split('\n')
+                for line in lines:
+                    if line.startswith('data: '):
+                        data = json.loads(line[6:])
+
+                        if 'result' in data:
+                            result = data['result']
+                            contents = result.get('contents', [])
+                            if contents:
+                                content = contents[0]
+                                print(f"MIME Type: {content['mimeType']}")
+                                print(f"Content: {content['text'][:200]}...")
+                        break
+
+# Example
+await read_resource("guardrail://config/pii")
+```
+
+---
+
+## 📝 Prompts
+
+**Tested & Working ✅ (50 prompts available)**
+
+### List Prompts
+
+```python
+async def list_prompts():
+    client = MCPClient()
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{client.mcp_endpoint}",
+            json={"jsonrpc": "2.0", "method": "prompts/list", "id": 1},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            }
+        ) as response:
+            response_text = await response.text()
+
+            if "data: " in response_text:
+                lines = response_text.strip().split('\n')
+                for line in lines:
+                    if line.startswith('data: '):
+                        data = json.loads(line[6:])
+                        prompts = data['result']['prompts']
+
+                        for prompt in prompts[:5]:
+                            print(f"{prompt['name']}")
+                            print(f"  {prompt.get('description', 'N/A')[:80]}...")
+                        break
+
+# Output:
+# intelligent_rag_search_prompt
+#   Generate a prompt for intelligent RAG search and retrieval workflow...
+# rag_collection_analysis_prompt
+#   Generate a prompt for analyzing and understanding RAG collections...
+# ... (50 total)
+```
+
+### Get Prompt
+
+```python
+async def get_prompt(name: str, arguments: dict):
+    """Get a prompt with arguments"""
+    client = MCPClient()
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{client.mcp_endpoint}",
+            json={
+                "jsonrpc": "2.0",
+                "method": "prompts/get",
+                "id": 1,
+                "params": {
+                    "name": name,
+                    "arguments": arguments
+                }
+            },
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream"
+            }
+        ) as response:
+            response_text = await response.text()
+
+            if "data: " in response_text:
+                lines = response_text.strip().split('\n')
+                for line in lines:
+                    if line.startswith('data: '):
+                        data = json.loads(line[6:])
+
+                        if 'result' in data:
+                            result = data['result']
+                            messages = result.get('messages', [])
+                            if messages:
+                                msg = messages[0]
+                                print(f"Role: {msg['role']}")
+                                content = msg['content']
+                                print(f"Content: {content['text'][:200]}...")
+                        break
+
+# Example
+await get_prompt("intelligent_rag_search_prompt", {
+    "query": "What is AI?",
+    "available_tools": "search, analyze",
+    "available_resources": "docs",
+    "context": "Learning about AI"
+})
+
+# Output:
+# Role: user
+# Content: # Intelligent RAG Search and Retrieval Strategy
+#
+# ## User Query: "What is AI?"
+#
+# ## Your Mission
+# You are an intelligent RAG (Retrieval-Augmented Generation) assistant...
+```
+
+---
+
+## 👤 HIL (Human-in-the-Loop) - 4 Methods
+
+**All 4 methods tested & working ✅**
+
+### 1. Authorization (`request_authorization`)
+
+**Status: `authorization_requested`**
+
+```python
+async def test_authorization():
+    client = MCPClient()
+
+    result = await client.call_tool_and_parse("test_authorization_low_risk", {})
+
+    # HIL tools return different status
+    if result.get('status') == 'authorization_requested':
+        print(f"HIL Type: {result['hil_type']}")  # authorization
+        print(f"Action: {result['action']}")      # ask_human
+
+        data = result['data']
+        print(f"Request Action: {data['action']}")
+        print(f"Risk Level: {data['risk_level']}")
+        print(f"Reason: {data['reason']}")
+        print(f"Options: {result['options']}")  # ['approve', 'reject']
+
+# Output:
+# HIL Type: authorization
+# Action: ask_human
+# Request Action: Update cache TTL configuration
+# Risk Level: low
+# Reason: Increase cache duration from 5 minutes to 10 minutes...
+# Options: ['approve', 'reject']
+```
+
+### 2. Input Collection (`request_input`)
+
+**Status: `human_input_requested`**
+
+```python
+async def test_input():
+    client = MCPClient()
+
+    result = await client.call_tool_and_parse("test_input_credentials", {})
+
+    if result.get('status') == 'human_input_requested':
+        print(f"HIL Type: {result['hil_type']}")  # input
+        print(f"Action: {result['action']}")      # ask_human
+
+        data = result['data']
+        print(f"Prompt: {data['prompt']}")
+        print(f"Input Type: {data['input_type']}")
+        print(f"Options: {result['options']}")  # ['submit', 'skip', 'cancel']
+
+# Output:
+# HIL Type: input
+# Action: ask_human
+# Prompt: Enter OpenAI API Key
+# Input Type: credentials
+# Options: ['submit', 'skip', 'cancel']
+```
+
+### 3. Content Review (`request_review`)
+
+**Status: `human_input_requested`**
+
+```python
+async def test_review():
+    client = MCPClient()
+
+    result = await client.call_tool_and_parse("test_review_execution_plan", {})
+
+    if result.get('status') == 'human_input_requested':
+        print(f"HIL Type: {result['hil_type']}")  # review
+        print(f"Action: {result['action']}")      # ask_human
+
+        data = result['data']
+        print(f"Content Type: {data['content_type']}")  # execution_plan
+        print(f"Editable: {data['editable']}")          # True
+
+        # Content is a structured dict
+        content = data['content']
+        print(f"Plan Title: {content['plan_title']}")
+        print(f"Tasks: {content['total_tasks']}")
+        print(f"Options: {result['options']}")  # ['approve', 'edit', 'reject']
+
+# Output:
+# HIL Type: review
+# Action: ask_human
+# Content Type: execution_plan
+# Editable: True
+# Plan Title: E-commerce Website Deployment Plan
+# Tasks: 4
+# Options: ['approve', 'edit', 'reject']
+```
+
+### 4. Input + Authorization (`request_input_with_authorization`)
+
+**Status: `authorization_requested`**
+
+```python
+async def test_combined():
+    client = MCPClient()
+
+    result = await client.call_tool_and_parse("test_input_with_auth_payment", {})
+
+    if result.get('status') == 'authorization_requested':
+        print(f"HIL Type: {result['hil_type']}")  # input_with_authorization
+        print(f"Action: {result['action']}")      # ask_human
+
+        data = result['data']
+        print(f"Input Prompt: {data['input_prompt']}")
+        print(f"Input Type: {data['input_type']}")
+        print(f"Authorization Reason: {data['authorization_reason']}")
+        print(f"Risk Level: {data['risk_level']}")
+
+# Output:
+# HIL Type: input_with_authorization
+# Action: ask_human
+# Input Prompt: Enter payment amount in USD
+# Input Type: payment_amount
+# Authorization Reason: Process payment transaction of $500...
+# Risk Level: high
+```
+
+---
+
+## ⏱️ Progress Tracking
+
+### Method 1: SSE Streaming (Recommended)
+
+**Tested & Working ✅**
+
+```python
+async def stream_progress(base_url: str, operation_id: str, callback=None):
+    """Monitor progress via SSE streaming"""
+    try:
+        import httpx
+
+        stream_url = f"{base_url}/progress/{operation_id}/stream"
+
+        async with httpx.AsyncClient(timeout=300.0) as http_client:
+            async with http_client.stream('GET', stream_url) as response:
+                if response.status_code != 200:
+                    return {"status": "error", "error": f"HTTP {response.status_code}"}
+
+                event_type = None
+                final_data = None
+
+                async for line in response.aiter_lines():
+                    if line.startswith('event:'):
+                        event_type = line.split(':', 1)[1].strip()
+
+                    elif line.startswith('data:'):
+                        data_str = line.split(':', 1)[1].strip()
+                        try:
+                            data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
+
+                        if event_type == 'progress':
+                            final_data = data
+                            if callback:
+                                callback(data)
+
+                        elif event_type == 'done':
+                            if final_data:
+                                final_data['final_status'] = data.get('status')
+                            return final_data or data
+
+                        elif event_type == 'error':
+                            return {"status": "error", "error": data.get('error')}
+
+        return final_data or {"status": "error", "error": "Stream ended"}
+
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# Complete example
+async def start_and_stream(base_url: str, task_type: str,
+                          duration_seconds: int = 30, steps: int = 10,
+                          callback=None):
+    """Start task and stream progress (one-liner)"""
+    client = MCPClient(base_url)
+
+    # Start task
+    response = await client.call_tool_and_parse("start_long_task", {
+        "task_type": task_type,
+        "duration_seconds": duration_seconds,
+        "steps": steps
+    })
+
+    if response.get('status') != 'success':
+        return response
+
+    operation_id = response['data']['operation_id']
+
+    # Stream progress
+    final_data = await stream_progress(base_url, operation_id, callback)
+
+    # Get final result
+    if final_data and final_data.get('status') == 'completed':
+        result = await client.call_tool_and_parse("get_task_result", {
+            "operation_id": operation_id
+        })
+        return result
+
+    return final_data
+
+
+# Usage
+async def main():
+    def on_progress(data):
+        print(f"Progress: {data['progress']:.0f}% - {data['message']}")
+
+    result = await start_and_stream(
+        base_url="http://localhost:8081",
+        task_type="data_analysis",
+        duration_seconds=10,
+        steps=5,
+        callback=on_progress
+    )
+
+    print(f"Final result: {result}")
+
+# Output:
+# Progress: 20% - Processing step 1/5 - data_analysis
+# Progress: 40% - Processing step 2/5 - data_analysis
+# Progress: 60% - Processing step 3/5 - data_analysis
+# Progress: 80% - Processing step 4/5 - data_analysis
+# Progress: 100% - Processing step 5/5 - data_analysis
+# Progress: 100% - Completed 5 steps successfully
+# Final result: {...}
+```
+
+### Method 2: HTTP Polling (Fallback)
+
+**Tested & Working ✅**
+
+```python
+async def poll_progress():
+    client = MCPClient()
+
+    # Start task
+    response = await client.call_tool_and_parse("start_long_task", {
+        "task_type": "data_processing",
+        "duration_seconds": 5,
+        "steps": 3
+    })
+
+    operation_id = response['data']['operation_id']
+    print(f"Task started: {operation_id[:8]}...")
+
+    # Poll for progress
+    for i in range(10):
+        await asyncio.sleep(1)
+
+        progress = await client.call_tool_and_parse("get_task_progress", {
+            "operation_id": operation_id
+        })
+
+        if progress.get('status') == 'success':
+            data = progress['data']
+            prog = data['progress']
+            msg = data['message']
+            status = data['status']
+
+            print(f"{prog:.0f}% - {msg} [{status}]")
+
+            if status == 'completed':
+                print("Task completed!")
+                break
+
+# Output:
+# Task started: cc31cfe9...
+#   33% - Processing step 1/3 - data_processing [running]
+#   67% - Processing step 2/3 - data_processing [running]
+#   100% - Processing step 3/3 - data_processing [running]
+#   100% - Completed 3 steps successfully [completed]
+# Task completed!
+```
+
+---
+
+## 🔄 Batch Operations
+
+**Tested & Working ✅**
+
+```python
+async def batch_weather():
+    client = MCPClient()
+
+    cities = ["Tokyo", "New York", "London"]
+
+    result = await client.call_tool_and_parse("batch_weather", {
+        "cities": cities,
+        "parallel": True  # Use parallel processing
+    })
+
+    if result.get('status') == 'success':
+        data = result['data']
+        print(f"Total cities: {data['total_cities']}")
+        print(f"Successful: {data['successful']}")
+        print(f"Failed: {data['failed']}")
+
+        for r in data['results']:
+            print(f"- {r['city']}: {r['status']}")
+
+# Output:
+# Total cities: 3
+# Successful: 3
+# Failed: 0
+# - Tokyo: success
+# - New York: success
+# - London: success
+```
+
+---
+
+## 🛡️ Error Handling
+
+**Tested & Working ✅**
+
+```python
+async def error_handling():
+    client = MCPClient()
+
+    # Try to call non-existent tool
+    result = await client.call_tool_and_parse("nonexistent_tool", {})
+
+    if result.get('status') == 'error':
+        print(f"Error handled correctly: {result.get('error')}")
+
+    # Output:
+    # Error handled correctly: Unknown tool: nonexistent_tool
+```
+
+---
+
+## 📊 Complete Example: All 17 Scenarios
+
+See `examples/mcp_client_example.py` for a comprehensive example covering:
+
+1. ✅ Server Health Check
+2. ✅ List Available Tools (88 tools)
+3. ✅ Semantic Search for Tools
+4. ✅ Call Simple Tool (get_weather)
+5. ✅ Search Tools by Category
+6. ✅ Progress Tracking (SSE Streaming)
+7. ✅ Concurrent Tool Calls (0.05s for 3)
+8. ✅ Search All Types (Tools + Prompts + Resources)
+9. ✅ Error Handling
+10. ✅ Quick Progress Test (HTTP Polling)
+11. ✅ List and Read Resources (9 resources)
+12. ✅ List and Get Prompts (50 prompts)
+13. ✅ HIL - Authorization Request
+14. ✅ HIL - Input Collection
+15. ✅ HIL - Content Review
+16. ✅ Batch Weather Query
+17. ✅ HIL - Combined Input + Authorization ⭐ (4th method)
+
+Run it:
+```bash
+python examples/mcp_client_example.py
+
+# Expected output:
+# ✅ All 17 examples completed successfully!
+```
+
+---
+
+## 🎯 Best Practices
+
+### 1. Use Semantic Search
+
+```python
+# ✅ Good: Find tools efficiently
+results = await search_tools("weather information")
+
+# ❌ Bad: List all and filter manually
+all_tools = await list_tools()
+filtered = [t for t in all_tools if 'weather' in t]
+```
+
+### 2. Use SSE for Progress
+
+```python
+# ✅ Good: Real-time updates
+result = await start_and_stream(task, callback=show_progress)
+
+# ⚠️ OK: Polling (fallback)
+result = await poll_until_complete(op_id, callback=show_progress)
+```
+
+### 3. Concurrent Tool Calls
+
+```python
+# ✅ Good: Parallel execution (3x faster)
+results = await asyncio.gather(
+    call_tool("tool1", arg="a"),
+    call_tool("tool2", arg="b"),
+    call_tool("tool3", arg="c")
 )
 
-print(json.dumps(result, indent=2, ensure_ascii=False))
+# ❌ Bad: Sequential (3x slower)
+result1 = await call_tool("tool1", arg="a")
+result2 = await call_tool("tool2", arg="b")
+result3 = await call_tool("tool3", arg="c")
 ```
 
----
-
-## 📚 **Resources 使用方法**
-
-### 📝 **1. 搜索资源**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "event", "filters": {"types": ["resource"]}}'
-```
-
-**搜索结果示例：**
-```json
-{
-  "status": "success",
-  "query": "event",
-  "results": [
-    {
-      "name": "event://tasks",
-      "type": "resource",
-      "description": "Get all background tasks as a resource. This resource provides a comprehensive view of all background tasks in the event sourcing system.",
-      "similarity_score": 1.0,
-      "category": "event",
-      "keywords": ["background", "tasks", "resource", "system", "event"],
-      "metadata": {
-        "uri": "event://tasks",
-        "mime_type": "text/plain"
-      }
-    },
-    {
-      "name": "event://status",
-      "type": "resource", 
-      "description": "Get event sourcing service status as a resource. This resource provides the current operational status of the event sourcing service.",
-      "similarity_score": 1.0,
-      "category": "event",
-      "keywords": ["status", "service", "resource", "event"],
-      "metadata": {
-        "uri": "event://status",
-        "mime_type": "text/plain"
-      }
-    }
-  ],
-  "result_count": 2
-}
-```
-
-### 📝 **1.2 获取所有资源列表**
-
-**命令：**
-```bash
-curl -X GET http://localhost:8081/capabilities
-```
-
-**结果示例：**
-```json
-{
-  "status": "success",
-  "capabilities": {
-    "resources": {
-      "count": 19,
-      "available": [
-        "guardrail://config/pii",
-        "event://tasks", 
-        "event://status",
-        "shopify://catalog/collections",
-        "symbolic://entities/catalog"
-      ]
-    }
-  }
-}
-```
-
-### 🚀 **2. 使用资源（读取内容）**
-
-**端点：** `http://localhost:8081/mcp`
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "event://status"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"event://status","mimeType":"text/plain","text":"{\n  \"resource_type\": \"event_service_status\",\n  \"status\": {\n    \"service_running\": false,\n    \"total_tasks\": 0,\n    \"active_tasks\": 0,\n    \"paused_tasks\": 0,\n    \"running_monitors\": 0,\n    \"task_types\": {\n      \"web_monitor\": 0,\n      \"schedule\": 0,\n      \"news_digest\": 0,\n      \"threshold_watch\": 0\n    }\n  },\n  \"generated_at\": \"2025-07-24T16:49:51.887189\",\n  \"description\": \"Current status of the event sourcing service\"\n}"}]}}
-```
-
-### 💡 **3. Python使用示例**
-```python
-import requests
-import json
-
-def search_resources(query):
-    """搜索MCP资源"""
-    response = requests.post(
-        'http://localhost:8081/search',
-        headers={'Content-Type': 'application/json'},
-        json={
-            "query": query,
-            "filters": {"types": ["resource"]},
-            "max_results": 10
-        }
-    )
-    return response.json()
-
-def read_resource(uri):
-    """读取MCP资源内容"""
-    response = requests.post(
-        'http://localhost:8081/mcp',
-        headers={
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        },
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {
-                "uri": uri
-            }
-        }
-    )
-    
-    # 解析事件流响应
-    lines = response.text.strip().split('\n')
-    for line in lines:
-        if line.startswith('data: '):
-            data = json.loads(line[6:])
-            if 'result' in data:
-                content = data['result']['contents'][0]['text']
-                try:
-                    return json.loads(content)  # 尝试解析JSON
-                except:
-                    return content  # 返回原始文本
-    return None
-
-# 使用示例1: 搜索资源
-resources = search_resources('event')
-print("搜索到的资源:")
-for resource in resources['results']:
-    print(f"- {resource['name']}: {resource['description'][:50]}...")
-
-# 使用示例2: 读取资源内容
-resource_data = read_resource('event://status')
-print(json.dumps(resource_data, indent=2, ensure_ascii=False))
-```
-
----
-
-## 🎯 **默认集合搜索**
-
-### 📝 **搜索所有默认能力**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "default", "max_results": 15}'
-```
-
-**搜索结果示例：**
-```json
-{
-  "status": "success",
-  "query": "default",
-  "results": [
-    {
-      "name": "create_execution_plan",
-      "type": "tool",
-      "similarity_score": 1.0,
-      "category": "general"
-    },
-    {
-      "name": "web_search",
-      "type": "tool", 
-      "similarity_score": 1.0,
-      "category": "web"
-    },
-    {
-      "name": "default_reason_prompt",
-      "type": "prompt",
-      "similarity_score": 1.0,
-      "category": "general"
-    },
-    {
-      "name": "default_response_prompt",
-      "type": "prompt",
-      "similarity_score": 1.0,
-      "category": "general"
-    },
-    {
-      "name": "default_review_prompt",
-      "type": "prompt",
-      "similarity_score": 1.0,
-      "category": "general"
-    }
-  ],
-  "result_count": 9
-}
-```
-
-### 📝 **搜索默认工具**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "default", "filters": {"types": ["tool"]}}'
-```
-
-### 📝 **搜索默认提示词**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "default", "filters": {"types": ["prompt"]}}'
-```
-
----
-
-## 🔒 **工具安全等级查询**
-
-### 📝 **1. 获取所有工具安全等级**
-
-**命令：**
-```bash
-curl -s http://localhost:8081/security/levels | jq .
-```
-
-**响应示例：**
-```json
-{
-  "status": "success",
-  "security_levels": {
-    "tools": {
-      "get_weather": {
-        "name": "get_weather",
-        "category": "weather",
-        "security_level": "LOW",
-        "security_level_value": 1,
-        "requires_authorization": false,
-        "description": "Get mock weather information for testing purposes"
-      },
-      "search_memories": {
-        "name": "search_memories", 
-        "category": "web",
-        "security_level": "LOW",
-        "security_level_value": 1,
-        "requires_authorization": false,
-        "description": "Search across memory types using semantic similarity"
-      }
-    },
-    "summary": {
-      "total_tools": 60,
-      "security_levels": {
-        "LOW": 2,
-        "MEDIUM": 0,
-        "HIGH": 0,
-        "CRITICAL": 0,
-        "DEFAULT": 58
-      },
-      "authorization_required": 0,
-      "rate_limits": {
-        "default": {"calls": 100, "window": 3600},
-        "remember": {"calls": 50, "window": 3600},
-        "forget": {"calls": 10, "window": 3600}
-      }
-    }
-  },
-  "timestamp": "2025-07-26T09:59:23.399288"
-}
-```
-
-### 📝 **2. 按安全等级搜索工具**
-
-**搜索LOW级别工具：**
-```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"security_level": "LOW", "max_results": 5}' \
-  http://localhost:8081/security/search | jq .
-```
-
-**响应示例：**
-```json
-{
-  "status": "success",
-  "security_level": "LOW",
-  "results": [
-    {
-      "name": "get_weather",
-      "type": "tool",
-      "description": "Get mock weather information for testing purposes",
-      "similarity_score": 1.0,
-      "category": "weather",
-      "keywords": ["weather", "temperature", "forecast", "security_low"],
-      "metadata": {
-        "security_level": "LOW",
-        "security_level_value": 1,
-        "requires_authorization": false,
-        "input_schema": {
-          "properties": {
-            "city": {"title": "City", "type": "string"},
-            "user_id": {"default": "default", "title": "User Id", "type": "string"}
-          },
-          "required": ["city"]
-        }
-      }
-    },
-    {
-      "name": "search_memories",
-      "type": "tool", 
-      "description": "Search across memory types using semantic similarity",
-      "similarity_score": 1.0,
-      "category": "web",
-      "keywords": ["search", "memory", "similarity", "security_low"],
-      "metadata": {
-        "security_level": "LOW",
-        "security_level_value": 1,
-        "requires_authorization": false
-      }
-    }
-  ],
-  "result_count": 2,
-  "max_results": 5,
-  "timestamp": "2025-07-26T09:59:32.096971"
-}
-```
-
-**搜索其他级别工具：**
-```bash
-# MEDIUM级别
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"security_level": "MEDIUM", "max_results": 3}' \
-  http://localhost:8081/security/search
-
-# HIGH级别  
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"security_level": "HIGH", "max_results": 3}' \
-  http://localhost:8081/security/search
-
-# CRITICAL级别
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"security_level": "CRITICAL", "max_results": 3}' \
-  http://localhost:8081/security/search
-```
-
-### 📝 **3. 普通搜索中的安全等级信息**
-
-**命令：**
-```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"query": "weather", "max_results": 2}' \
-  http://localhost:8081/search | jq .
-```
-
-**响应示例（包含安全等级metadata）：**
-```json
-{
-  "status": "success", 
-  "query": "weather",
-  "results": [
-    {
-      "name": "get_weather",
-      "type": "tool",
-      "description": "Get mock weather information for testing purposes",
-      "similarity_score": 1.0,
-      "category": "weather",
-      "metadata": {
-        "security_level": "LOW",
-        "security_level_value": 1,
-        "requires_authorization": false,
-        "input_schema": {
-          "properties": {
-            "city": {"title": "City", "type": "string"}
-          },
-          "required": ["city"]
-        }
-      }
-    }
-  ],
-  "result_count": 1
-}
-```
-
-### 📝 **4. 错误处理示例**
-
-**无效安全等级：**
-```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"security_level": "INVALID"}' \
-  http://localhost:8081/security/search | jq .
-```
-
-**响应：**
-```json
-{
-  "status": "error",
-  "message": "Invalid security_level. Must be: LOW, MEDIUM, HIGH, CRITICAL, or DEFAULT"
-}
-```
-
-### 💡 **5. Python使用示例**
+### 4. Parse HIL Responses
 
 ```python
-import requests
-import json
+# HIL tools use different status values:
+# - Authorization: "authorization_requested"
+# - Input: "human_input_requested"
+# - Review: "human_input_requested"
+# - Combined: "authorization_requested"
 
-def get_tool_security_levels():
-    """获取所有工具的安全等级"""
-    response = requests.get('http://localhost:8081/security/levels')
-    return response.json()
-
-def search_tools_by_security(security_level, max_results=10):
-    """按安全等级搜索工具"""
-    response = requests.post(
-        'http://localhost:8081/security/search',
-        headers={'Content-Type': 'application/json'},
-        json={
-            "security_level": security_level.upper(),
-            "max_results": max_results
-        }
-    )
-    return response.json()
-
-def search_with_security_info(query, max_results=10):
-    """搜索工具（包含安全等级信息）"""
-    response = requests.post(
-        'http://localhost:8081/search',
-        headers={'Content-Type': 'application/json'},
-        json={
-            "query": query,
-            "max_results": max_results,
-            "filters": {"types": ["tool"]}
-        }
-    )
-    return response.json()
-
-# 使用示例
-print("=== 安全等级统计 ===")
-security_info = get_tool_security_levels()
-summary = security_info['security_levels']['summary']
-print(f"总工具数: {summary['total_tools']}")
-for level, count in summary['security_levels'].items():
-    print(f"{level}级别: {count}个工具")
-
-print("\n=== LOW级别工具 ===")
-low_tools = search_tools_by_security('LOW', 5)
-for tool in low_tools['results']:
-    auth_status = "需要授权" if tool['metadata']['requires_authorization'] else "无需授权"
-    print(f"- {tool['name']}: {auth_status}")
-
-print("\n=== 搜索天气工具 ===")
-weather_tools = search_with_security_info('weather', 3)
-for tool in weather_tools['results']:
-    metadata = tool['metadata']
-    print(f"- {tool['name']}")
-    print(f"  安全等级: {metadata.get('security_level', 'UNKNOWN')}")
-    print(f"  需要授权: {'是' if metadata.get('requires_authorization') else '否'}")
+# Always check structuredContent for HIL tools
+if "structuredContent" in result:
+    parsed = result["structuredContent"]["result"]
+    status = parsed["status"]
+    hil_type = parsed["hil_type"]
 ```
-
-### 📊 **6. 安全等级说明**
-
-- **LOW (1)**: 基础工具，无安全风险，无需授权
-  - 示例：天气查询、内存搜索
-- **MEDIUM (2)**: 一般操作，需要基础授权
-  - 示例：数据存储、计算操作
-- **HIGH (3)**: 敏感操作，需要严格授权
-  - 示例：数据删除、系统配置
-- **CRITICAL (4)**: 关键操作，需要最高权限
-  - 示例：系统重置、管理员操作
-- **DEFAULT**: 未设置安全等级的工具（默认为LOW处理）
 
 ---
 
-## 🎮 **Widget Resources 使用方法**
+## 🚀 Production Tips
 
-### 📝 **1. 搜索Widget资源**
+### Environment Variables
 
-**命令：**
 ```bash
-curl -X POST http://localhost:8081/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "widget"}'
+export MCP_URL="http://localhost:8081"
 ```
 
-**搜索结果示例：**
-```json
-{
-  "status": "success",
-  "query": "widget",
-  "results": [
-    {
-      "name": "widget://system/info",
-      "type": "resource",
-      "description": "Get system-wide widget information and capabilities",
-      "similarity_score": 1.0,
-      "category": "widget",
-      "keywords": ["system", "widget", "capabilities", "information"],
-      "metadata": {
-        "uri": "widget://system/info",
-        "mime_type": "text/plain"
-      }
-    },
-    {
-      "name": "widget://user/{user_id}/configs",
-      "type": "resource", 
-      "description": "Get user's widget configurations and preferences",
-      "similarity_score": 1.0,
-      "category": "widget",
-      "keywords": ["user", "widget", "configurations", "preferences"],
-      "metadata": {
-        "uri": "widget://user/{user_id}/configs",
-        "mime_type": "text/plain"
-      }
-    },
-    {
-      "name": "widget://user/{user_id}/usage",
-      "type": "resource",
-      "description": "Get widget usage statistics for a user", 
-      "similarity_score": 1.0,
-      "category": "widget",
-      "keywords": ["user", "widget", "usage", "statistics"],
-      "metadata": {
-        "uri": "widget://user/{user_id}/usage",
-        "mime_type": "text/plain"
-      }
-    }
-  ],
-  "result_count": 6
-}
-```
-
-### 🚀 **2. 读取系统Widget信息**
-
-**端点：** `http://localhost:8081/mcp`
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "widget://system/info"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://system/info","mimeType":"text/plain","text":"# Widget System Information\n\n## System Overview\n- **Total Widgets**: 5\n- **Active Widgets**: 5\n- **Plugin System Version**: 1.0.0\n- **Last Updated**: 2025-01-24 16:32:15\n\n## System Configuration\n- **Max Concurrent Widgets**: 3\n- **Default Timeout**: 30,000ms\n- **Retry Attempts**: 2\n- **Cache Enabled**: ✅ Yes\n- **Supported Output Formats**: text, image, data, analysis, search, knowledge\n\n## Available Widgets\n\n### 🎨 Dream Image Generator\n- **ID**: `dream`\n- **Version**: 1.0.0\n- **Description**: Generate beautiful images from text descriptions using AI\n- **Capabilities**: text_to_image, image_style_transfer, professional_headshots\n- **Triggers**: \"generate image\", \"create image\", \"draw\" ...\n\n### 🔍 Hunt Search Widget\n- **ID**: `hunt`\n- **Version**: 1.0.0\n- **Description**: Advanced search and discovery capabilities\n- **Capabilities**: web_search, product_search, content_discovery\n- **Triggers**: \"search\", \"find\", \"hunt\" ...\n\n### 🤖 Omni Assistant Widget\n- **ID**: `omni`\n- **Version**: 1.0.0\n- **Description**: General-purpose AI assistant for various tasks\n- **Capabilities**: text_generation, content_creation, task_assistance\n- **Triggers**: \"help\", \"assist\", \"generate\" ...\n\n### 📚 Knowledge Widget\n- **ID**: `knowledge`\n- **Version**: 1.0.0\n- **Description**: Knowledge retrieval and Q&A capabilities\n- **Capabilities**: document_search, qa_system, knowledge_base\n- **Triggers**: \"what is\", \"explain\", \"define\" ...\n\n### 📊 Data Scientist Widget\n- **ID**: `data_scientist`\n- **Version**: 1.0.0\n- **Description**: Data analysis and visualization capabilities\n- **Capabilities**: data_analysis, visualization, statistical_analysis\n- **Triggers**: \"analyze\", \"chart\", \"graph\" ...\n\n## Plugin Triggers Summary\n\n| Widget | Primary Triggers | Capabilities Count |\n|--------|-----------------|-------------------|\n| 🎨 Dream Image Generator | \"generate image\" | 3 |\n| 🔍 Hunt Search Widget | \"search\" | 3 |\n| 🤖 Omni Assistant Widget | \"help\" | 3 |\n| 📚 Knowledge Widget | \"what is\" | 3 |\n| 📊 Data Scientist Widget | \"analyze\" | 3 |\n\n## Integration Notes\n- Widgets are implemented as plugins in the frontend application\n- Each widget supports multiple trigger phrases for natural language activation\n- All widgets support streaming responses and real-time status updates\n- Widget configurations can be customized per user\n\n---\n*System Information Generated at 2025-01-24T16:32:15.123456*"}]}}
-```
-
-### 📊 **3. 读取用户Widget配置**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "widget://user/auth0|123456/configs"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/configs","mimeType":"text/plain","text":"# User Widget Configurations: auth0|123456\n\n## Summary\n- **Available Widgets**: 5\n- **Configured Widgets**: 2\n- **Last Updated**: 2025-01-24 16:35:42\n\n## Available Widget Types\n- **Dream**: ✅ Configured\n- **Hunt**: ⚙️ Default\n- **Omni**: ✅ Configured\n- **Knowledge**: ⚙️ Default\n- **Data_Scientist**: ⚙️ Default\n\n## Widget Configurations\n\n### Dream Widget\n- **Status**: Custom Configuration\n- **Enabled**: True\n- **Timeout**: 35000ms\n- **Settings**: style=artistic, quality=high\n\n### Hunt Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 15000ms\n- **Settings**: search_depth=medium, result_format=detailed, max_results=10\n\n### Omni Widget\n- **Status**: Custom Configuration\n- **Enabled**: True\n- **Timeout**: 25000ms\n- **Settings**: tone=casual, length=short\n\n### Knowledge Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 25000ms\n- **Settings**: search_depth=deep, context_size=medium, search_type=hybrid\n\n### Data_Scientist Widget\n- **Status**: Default Configuration\n- **Enabled**: True\n- **Timeout**: 45000ms\n- **Settings**: analysis_type=exploratory, visualization_type=chart, auto_insights=True\n\n## Default Configurations Available\n- **dream**: 5 settings\n- **hunt**: 4 settings\n- **omni**: 4 settings\n- **knowledge**: 4 settings\n- **data_scientist**: 4 settings\n\n---\n*Generated at 2025-01-24T16:35:42.789123*"}]}}
-```
-
-### 📈 **4. 读取用户Widget使用统计**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "widget://user/auth0|123456/usage"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/usage","mimeType":"text/plain","text":"{\n  \"user_id\": \"auth0|123456\",\n  \"usage_summary\": {\n    \"total_executions\": 47,\n    \"total_processing_time\": 125430,\n    \"most_used_widget\": \"dream\",\n    \"last_activity\": \"2025-01-24T16:30:15.123456\"\n  },\n  \"by_widget_type\": {\n    \"dream\": {\n      \"execution_count\": 25,\n      \"success_count\": 23,\n      \"error_count\": 2,\n      \"total_time\": 75000,\n      \"last_used\": \"2025-01-24T16:30:15.123456\",\n      \"avg_response_time\": 3000,\n      \"user_rating\": 4.8,\n      \"is_favorite\": true,\n      \"last_error\": null\n    },\n    \"omni\": {\n      \"execution_count\": 15,\n      \"success_count\": 15,\n      \"error_count\": 0,\n      \"total_time\": 30000,\n      \"last_used\": \"2025-01-24T15:45:30.456789\",\n      \"avg_response_time\": 2000,\n      \"user_rating\": 4.5,\n      \"is_favorite\": false,\n      \"last_error\": null\n    },\n    \"knowledge\": {\n      \"execution_count\": 7,\n      \"success_count\": 6,\n      \"error_count\": 1,\n      \"total_time\": 20430,\n      \"last_used\": \"2025-01-24T14:20:10.789012\",\n      \"avg_response_time\": 2918,\n      \"user_rating\": 4.0,\n      \"is_favorite\": false,\n      \"last_error\": \"Knowledge base temporarily unavailable\"\n    }\n  },\n  \"performance_metrics\": {\n    \"average_response_time\": 2669.57,\n    \"success_rate\": 93.62,\n    \"error_rate\": 6.38\n  },\n  \"timestamp\": \"2025-01-24T16:35:58.123456\"\n}"}]}}
-```
-
-### 🎯 **5. 读取特定Widget配置**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "widget://user/auth0|123456/config/dream"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://user/auth0|123456/config/dream","mimeType":"text/plain","text":"{\n  \"user_id\": \"auth0|123456\",\n  \"widget_type\": \"dream\",\n  \"config\": {\n    \"style\": \"artistic\",\n    \"quality\": \"high\",\n    \"size\": \"1024x1024\",\n    \"enabled\": true,\n    \"timeout\": 35000\n  },\n  \"has_custom_config\": true,\n  \"default_config\": {\n    \"style\": \"default\",\n    \"quality\": \"standard\",\n    \"size\": \"1024x1024\",\n    \"enabled\": true,\n    \"timeout\": 30000\n  },\n  \"last_updated\": \"2025-01-24T14:25:30.123456\",\n  \"timestamp\": \"2025-01-24T16:37:12.456789\"\n}"}]}}
-```
-
-### 📚 **6. 读取Widget模板**
-
-**命令：**
-```bash
-curl -X POST http://localhost:8081/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "resources/read",
-    "params": {
-      "uri": "widget://templates/dream"
-    }
-  }'
-```
-
-**使用结果示例：**
-```
-event: message
-data: {"jsonrpc":"2.0","id":1,"result":{"contents":[{"uri":"widget://templates/dream","mimeType":"text/plain","text":"{\n  \"widget_type\": \"dream\",\n  \"templates\": [\n    {\n      \"id\": \"text_to_image\",\n      \"name\": \"Text to Image\",\n      \"category\": \"generation\",\n      \"description\": \"Generate image from text description\",\n      \"parameters\": [\"prompt\", \"style\", \"quality\"]\n    },\n    {\n      \"id\": \"professional_headshot\",\n      \"name\": \"Professional Headshot\",\n      \"category\": \"portrait\",\n      \"description\": \"Generate professional headshot photos\",\n      \"parameters\": [\"prompt\", \"industry\", \"style\"]\n    }\n  ],\n  \"total_templates\": 2,\n  \"template_categories\": [\"generation\", \"portrait\"],\n  \"timestamp\": \"2025-01-24T16:38:45.123456\"\n}"}]}}
-```
-
-### 💡 **7. Python使用示例**
+### Connection Pooling
 
 ```python
-import requests
-import json
-
-def search_widget_resources(query="widget"):
-    """搜索Widget资源"""
-    response = requests.post(
-        'http://localhost:8081/search',
-        headers={'Content-Type': 'application/json'},
-        json={"query": query, "max_results": 10}
-    )
-    return response.json()
-
-def read_widget_resource(uri):
-    """读取Widget资源内容"""
-    response = requests.post(
-        'http://localhost:8081/mcp',
-        headers={
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/event-stream'
-        },
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {"uri": uri}
-        }
-    )
-    
-    # 解析事件流响应
-    lines = response.text.strip().split('\n')
-    for line in lines:
-        if line.startswith('data: '):
-            data = json.loads(line[6:])
-            if 'result' in data:
-                content = data['result']['contents'][0]['text']
-                try:
-                    return json.loads(content)  # 尝试解析JSON
-                except:
-                    return content  # 返回原始Markdown
-    return None
-
-def get_user_widget_usage(user_id):
-    """获取用户Widget使用统计"""
-    uri = f"widget://user/{user_id}/usage"
-    return read_widget_resource(uri)
-
-def get_widget_system_info():
-    """获取Widget系统信息"""
-    return read_widget_resource("widget://system/info")
-
-def get_user_widget_configs(user_id):
-    """获取用户Widget配置"""
-    uri = f"widget://user/{user_id}/configs"
-    return read_widget_resource(uri)
-
-# 使用示例
-print("=== 搜索Widget资源 ===")
-widget_resources = search_widget_resources()
-for resource in widget_resources['results']:
-    print(f"- {resource['name']}: {resource['description'][:60]}...")
-
-print("\n=== Widget系统信息 ===")
-system_info = get_widget_system_info()
-print(system_info[:200] + "..." if len(system_info) > 200 else system_info)
-
-print("\n=== 用户Widget使用统计 ===")
-usage_stats = get_user_widget_usage('auth0|123456')
-if isinstance(usage_stats, dict):
-    summary = usage_stats.get('usage_summary', {})
-    print(f"总执行次数: {summary.get('total_executions', 0)}")
-    print(f"最常用Widget: {summary.get('most_used_widget', 'N/A')}")
-    print(f"平均响应时间: {usage_stats.get('performance_metrics', {}).get('average_response_time', 0):.2f}ms")
-
-print("\n=== 用户Widget配置 ===")
-user_configs = get_user_widget_configs('auth0|123456')
-print(user_configs[:300] + "..." if len(user_configs) > 300 else user_configs)
+# Reuse client instance
+client = MCPClient()
+for i in range(100):
+    result = await client.call_tool_and_parse("tool", {})
 ```
 
-### 📊 **8. Widget资源特性**
+### Timeout Handling
 
-- **🎯 个性化配置**: 每个用户可以自定义Widget的配置参数
-- **📈 实时统计**: 记录详细的使用统计和性能指标
-- **🔍 智能搜索**: 支持基于关键词的Widget资源发现
-- **🎨 多样化模板**: 提供不同类型的Widget操作模板
-- **⚙️ 灵活集成**: 与现有的前端plugin系统完全兼容
-- **🛡️ 安全控制**: 基于用户权限的资源访问控制
+```python
+try:
+    async with asyncio.timeout(30):  # 30 second timeout
+        result = await client.call_tool_and_parse("long_task", {})
+except asyncio.TimeoutError:
+    print("Request timed out")
+```
 
 ---
 
-## 📋 **重要说明**
+## 📝 Testing
 
-1. **JSON-RPC格式**：所有MCP调用都使用JSON-RPC 2.0格式
-2. **事件流响应**：响应采用Server-Sent Events格式，需要解析`data:`行
-3. **必需头部**：调用MCP端点时必须包含`Accept: application/json, text/event-stream`
-4. **参数验证**：工具和提示词的参数会进行类型检查和验证
-5. **错误处理**：返回的`isError`字段指示是否有错误发生
-6. **搜索支持**：
-   - ✅ **Tools**: 完全支持搜索和语义匹配，包含安全等级信息
-   - ✅ **Prompts**: 完全支持搜索，metadata包含参数信息
-   - ✅ **Resources**: 完全支持搜索和语义匹配
-   - ✅ **Widget Resources**: 支持用户专属Widget资源搜索和个性化配置
-7. **默认集合**：搜索`"default"`可获取预定义的常用工具和提示词
-8. **安全等级**：
-   - ✅ **安全等级查询**: `/security/levels` 端点获取所有工具安全等级
-   - ✅ **按等级搜索**: `/security/search` 端点按安全等级搜索工具
-   - ✅ **搜索集成**: 普通搜索结果包含完整安全等级metadata
-   - ✅ **错误处理**: 完善的参数验证和错误信息
+Run the test suite:
+```bash
+# Run all 17 examples
+python examples/mcp_client_example.py
 
-所有示例都经过真实测试验证，可以直接使用。
+# Expected output:
+# ✅ All 17 examples completed successfully!
+#
+# 📊 Coverage Summary:
+#   ✓ Basic Tools (calculator, weather)
+#   ✓ Progress Tracking (SSE streaming + HTTP polling)
+#   ✓ Semantic Search (tools, prompts, resources)
+#   ✓ Resources (list, read)
+#   ✓ Prompts (list, get)
+#   ✓ HIL - All 4 Methods (authorization, input, review, combined)
+#   ✓ Batch Operations (parallel processing)
+#   ✓ Error Handling
+#   ✓ Concurrent Calls
+```
+
+---
+
+## 🎉 Summary
+
+The ISA MCP Client provides:
+
+- ✅ **88 Tools** ready to use
+- ✅ **50 Prompts** for intelligent workflows
+- ✅ **9 Resources** for configuration and data
+- ✅ **4 HIL Methods** for human interaction
+- ✅ **Semantic Search** for tool discovery
+- ✅ **SSE Streaming** for real-time progress
+- ✅ **HTTP Polling** as fallback
+- ✅ **Concurrent Execution** for performance
+- ✅ **Error Handling** with proper status codes
+- ✅ **Production Ready** - all tested and verified
+
+**Start building AI workflows in minutes, not hours!** 🚀
+
+---
+
+## 📚 See Also
+
+- **Examples**: `examples/mcp_client_example.py` - 17 comprehensive scenarios (All 4 HIL methods!)
+- **Base Tool**: `tools/base_tool.py` - Tool implementation guide
+- **HIL Tools**: `tools/example_tools/hil_example_tools.py` - All 4 HIL methods demonstrated
+- **Server**: `main.py` - MCP server implementation

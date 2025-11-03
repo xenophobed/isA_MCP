@@ -580,7 +580,19 @@ Format as a professional markdown report."""
         """Start browser if not already running"""
         if self.browser is None:
             playwright = await async_playwright().start()
-            self.browser = await playwright.chromium.launch(headless=True)
+            # Docker-compatible Chrome args
+            self.browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            )
             context = await self.browser.new_context(
                 viewport={'width': 1920, 'height': 1080}
             )

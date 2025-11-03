@@ -3,6 +3,10 @@
 # Build & Deploy MCP Staging Container
 # Rebuilds image every time to capture latest code changes
 # Uses Docker layer caching to speed up unchanged parts
+#
+# Usage:
+#   ./deploy_mcp_staging.sh           # Build with cache (fast)
+#   ./deploy_mcp_staging.sh --no-cache # Full rebuild without cache
 # ============================================
 
 set -e
@@ -14,6 +18,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Parse command line arguments
+NO_CACHE=""
+if [[ "$1" == "--no-cache" ]]; then
+    NO_CACHE="--no-cache"
+    echo -e "${YELLOW}⚠️  No-cache mode enabled - full rebuild${NC}"
+fi
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  MCP Staging - Build & Deploy${NC}"
@@ -79,7 +90,11 @@ echo -e "${CYAN}  Step 1: Building Docker Image${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${BLUE}🔨 Building image with latest code changes...${NC}"
-echo -e "${YELLOW}   (Docker will cache unchanged layers for speed)${NC}"
+if [ -z "$NO_CACHE" ]; then
+    echo -e "${YELLOW}   (Docker will cache unchanged layers for speed)${NC}"
+else
+    echo -e "${YELLOW}   (Building without cache - this will take longer)${NC}"
+fi
 echo ""
 
 # Build the image for AMD64 platform with BuildKit for ultra-fast caching
@@ -92,6 +107,7 @@ echo ""
 DOCKER_BUILDKIT=1 docker build \
     --platform linux/amd64 \
     --pull \
+    $NO_CACHE \
     -f "$DOCKERFILE" \
     -t "$IMAGE_NAME:$IMAGE_TAG" \
     --progress=plain \
@@ -225,7 +241,11 @@ echo "   • Shell access:  docker exec -it $CONTAINER_NAME /bin/bash"
 echo ""
 echo -e "${BLUE}💡 Notes:${NC}"
 echo "   • Image rebuilt with latest code changes"
-echo "   • Docker cached unchanged layers for speed"
+if [ -z "$NO_CACHE" ]; then
+    echo "   • Docker cached unchanged layers for speed"
+else
+    echo "   • Full rebuild performed (no cache used)"
+fi
 echo "   • Source code mounted via volumes for live updates"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

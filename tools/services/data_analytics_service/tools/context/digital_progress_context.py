@@ -16,7 +16,6 @@ Supported Assets: PDF, PPT, DOCX, Image, Audio, Video, and future types
 """
 
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
 from tools.base_tool import BaseTool
 import logging
 
@@ -38,19 +37,25 @@ class DigitalAssetProgressReporter:
     Example:
         reporter = DigitalAssetProgressReporter(base_tool)
 
+        # Create operation at start
+        operation_id = await base_tool.create_progress_operation(metadata={...})
+
         # Stage 1: Processing
-        await reporter.report_stage(ctx, "processing", "pdf")
+        await reporter.report_stage(operation_id, "processing", "pdf")
 
         # Stage 2: AI Extraction with granular progress
         for i in range(1, total_pages + 1):
-            await reporter.report_granular_progress(ctx, "extraction", "pdf", i, total_pages, "page")
+            await reporter.report_granular_progress(operation_id, "extraction", "pdf", i, total_pages, "page")
 
         # Stage 3: Embedding
-        await reporter.report_stage(ctx, "embedding", "pdf")
+        await reporter.report_stage(operation_id, "embedding", "pdf")
 
         # Stage 4: Storing
-        await reporter.report_storage_progress(ctx, "pdf", "minio", "uploading")
-        await reporter.report_storage_progress(ctx, "pdf", "vector_db", "indexing")
+        await reporter.report_storage_progress(operation_id, "pdf", "minio", "uploading")
+        await reporter.report_storage_progress(operation_id, "pdf", "vector_db", "indexing")
+
+        # Complete operation
+        await base_tool.complete_progress_operation(operation_id, result={...})
     """
 
     # Ingestion pipeline stages (for store_knowledge)
@@ -126,7 +131,7 @@ class DigitalAssetProgressReporter:
 
     async def report_stage(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         asset_type: str,
         sub_progress: Optional[str] = None,
@@ -134,10 +139,10 @@ class DigitalAssetProgressReporter:
         pipeline_type: str = "ingestion"
     ):
         """
-        Report progress for a pipeline stage
+        Report progress for a pipeline stage using ProgressManager (NEW WAY)
 
         Args:
-            ctx: MCP Context for progress reporting
+            operation_id: Operation ID for progress tracking (use ProgressManager)
             stage: Pipeline stage name (varies by pipeline_type)
             asset_type: Asset type - "pdf", "ppt", "image", "audio", "video", "query", etc.
             sub_progress: Optional granular progress within stage (e.g., "page 3/10")
@@ -151,16 +156,18 @@ class DigitalAssetProgressReporter:
 
         Examples:
             # Ingestion (store_knowledge)
-            await reporter.report_stage(ctx, "processing", "pdf", pipeline_type="ingestion")
-            -> "Step 1/4 (25%): Processing PDF"
+            await reporter.report_stage(operation_id, "processing", "pdf", pipeline_type="ingestion")
+            -> Progress: 25% "Processing PDF" (via ProgressManager)
 
             # Retrieval (search_knowledge)
-            await reporter.report_stage(ctx, "matching", "query", "top 5 results", pipeline_type="retrieval")
-            -> "Step 3/4 (75%): Vector Matching Query - top 5 results"
+            await reporter.report_stage(operation_id, "matching", "query", "top 5 results", pipeline_type="retrieval")
+            -> Progress: 75% "Vector Matching Query - top 5 results"
 
             # Generation (knowledge_response)
-            await reporter.report_stage(ctx, "generation", "query", pipeline_type="generation")
-            -> "Step 4/4 (100%): AI Generation Query"
+            await reporter.report_stage(operation_id, "generation", "query", pipeline_type="generation")
+            -> Progress: 100% "AI Generation Query"
+
+        Note: Client monitors progress via SSE: GET /progress/{operation_id}/stream
         """
         # Select the appropriate stage dictionary
         if pipeline_type == "retrieval":
@@ -187,31 +194,33 @@ class DigitalAssetProgressReporter:
         if sub_progress:
             message += f" - {sub_progress}"
 
-        # Report to Context (4 total stages)
-        await self.base_tool.report_progress(
-            ctx,
-            progress=stage_info["step"],
-            total=4,
-            message=message
-        )
+        # Report using ProgressManager (NEW WAY)
+        if operation_id:
+            await self.base_tool.update_progress_operation(
+                operation_id,
+                progress=float(stage_info["weight"]),  # 0-100
+                current=stage_info["step"],
+                total=4,
+                message=message
+            )
 
-        # Also log for debugging and HTTP mode fallback
+        # Also log for debugging
         prefix = self.STAGE_PREFIXES.get(stage, "[INFO]")
-
         log_msg = f"{prefix} Stage {stage_info['step']}/4 ({stage_info['weight']}%): {message}"
         if details:
             log_msg += f" | {details}"
 
-        await self.base_tool.log_info(ctx, log_msg)
+        logger.info(log_msg)
 
     async def report_granular_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         asset_type: str,
         current: int,
         total: int,
-        item_type: str = "item"
+        item_type: str = "item",
+        pipeline_type: str = "ingestion"
     ):
         """
         Report granular progress within a stage (for loops/batches)
@@ -219,59 +228,60 @@ class DigitalAssetProgressReporter:
         This is useful for long-running operations that process multiple items.
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Current pipeline stage
             asset_type: Asset type
             current: Current item number (1-indexed)
             total: Total number of items
             item_type: Type of item being processed (e.g., "page", "slide", "frame")
+            pipeline_type: Type of pipeline
 
         Examples:
             # PDF page processing
             for i in range(1, total_pages + 1):
-                await reporter.report_granular_progress(ctx, "extraction", "pdf", i, total_pages, "page")
-            -> "Step 2/4 (50%): AI Extraction - analyzing page 1/10"
-            -> "Step 2/4 (50%): AI Extraction - analyzing page 2/10"
-            ...
+                await reporter.report_granular_progress(operation_id, "extraction", "pdf", i, total_pages, "page")
+            -> Progress: 50% "AI Extraction - analyzing page 1/10"
 
             # Video frame processing
             for i in range(1, total_frames + 1):
-                await reporter.report_granular_progress(ctx, "extraction", "video", i, total_frames, "frame")
-            -> "Step 2/4 (50%): AI Extraction - analyzing frame 50/500"
+                await reporter.report_granular_progress(operation_id, "extraction", "video", i, total_frames, "frame")
+            -> Progress: 50% "AI Extraction - analyzing frame 50/500"
 
             # PPT slide processing
             for i in range(1, total_slides + 1):
-                await reporter.report_granular_progress(ctx, "extraction", "ppt", i, total_slides, "slide")
-            -> "Step 2/4 (50%): AI Extraction - analyzing slide 1/20"
+                await reporter.report_granular_progress(operation_id, "extraction", "ppt", i, total_slides, "slide")
+            -> Progress: 50% "AI Extraction - analyzing slide 1/20"
         """
         sub_progress = f"analyzing {item_type} {current}/{total}"
-        await self.report_stage(ctx, stage, asset_type, sub_progress)
+        await self.report_stage(operation_id, stage, asset_type, sub_progress, pipeline_type=pipeline_type)
 
     async def report_storage_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         asset_type: str,
         storage_target: str,
-        status: str = "uploading"
+        status: str = "uploading",
+        pipeline_type: str = "ingestion"
     ):
         """
         Report storage progress with specific targets
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             asset_type: Asset type
             storage_target: "minio", "vector_db", "neo4j", or "all"
             status: "uploading", "indexing", "completed"
+            pipeline_type: Type of pipeline
 
         Examples:
-            await reporter.report_storage_progress(ctx, "pdf", "minio", "uploading")
-            -> "Step 4/4 (100%): Storing PDF - uploading to MinIO"
+            await reporter.report_storage_progress(operation_id, "pdf", "minio", "uploading")
+            -> Progress: 100% "Storing PDF - uploading to MinIO"
 
-            await reporter.report_storage_progress(ctx, "pdf", "vector_db", "indexing")
-            -> "Step 4/4 (100%): Storing PDF - indexing in Vector DB"
+            await reporter.report_storage_progress(operation_id, "pdf", "vector_db", "indexing")
+            -> Progress: 100% "Storing PDF - indexing in Vector DB"
 
-            await reporter.report_storage_progress(ctx, "pdf", "neo4j", "completed")
-            -> "Step 4/4 (100%): Storing PDF - completed in Neo4j Graph DB"
+            await reporter.report_storage_progress(operation_id, "pdf", "neo4j", "completed")
+            -> Progress: 100% "Storing PDF - completed in Neo4j Graph DB"
         """
         target_names = {
             "minio": "MinIO",
@@ -283,16 +293,17 @@ class DigitalAssetProgressReporter:
         target_name = target_names.get(storage_target, storage_target)
         sub_progress = f"{status} to {target_name}"
 
-        await self.report_stage(ctx, "storing", asset_type, sub_progress)
+        await self.report_stage(operation_id, "storing", asset_type, sub_progress, pipeline_type=pipeline_type)
 
     async def report_batch_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         asset_type: str,
         batch_current: int,
         batch_total: int,
-        batch_type: str = "batch"
+        batch_type: str = "batch",
+        pipeline_type: str = "ingestion"
     ):
         """
         Report batch processing progress
@@ -300,23 +311,23 @@ class DigitalAssetProgressReporter:
         Useful for parallel/concurrent processing scenarios.
 
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Pipeline stage
             asset_type: Asset type
             batch_current: Current batch number
             batch_total: Total batches
             batch_type: Type of batch (e.g., "batch", "chunk", "segment")
+            pipeline_type: Type of pipeline
 
         Example:
-            await reporter.report_batch_progress(ctx, "embedding", "pdf", 2, 5, "chunk batch")
-            -> "Step 3/4 (75%): Embedding PDF - processing chunk batch 2/5"
+            await reporter.report_batch_progress(operation_id, "embedding", "pdf", 2, 5, "chunk batch")
+            -> Progress: 75% "Embedding PDF - processing chunk batch 2/5"
         """
         sub_progress = f"processing {batch_type} {batch_current}/{batch_total}"
-        await self.report_stage(ctx, stage, asset_type, sub_progress)
+        await self.report_stage(operation_id, stage, asset_type, sub_progress, pipeline_type=pipeline_type)
 
     async def report_complete(
         self,
-        ctx: Optional[Context],
         asset_type: str,
         summary: Optional[Dict[str, Any]] = None
     ):
@@ -324,12 +335,11 @@ class DigitalAssetProgressReporter:
         Report completion of entire pipeline
 
         Args:
-            ctx: MCP Context
             asset_type: Asset type
             summary: Optional summary statistics (e.g., pages processed, storage size)
 
         Example:
-            await reporter.report_complete(ctx, "pdf", {
+            await reporter.report_complete("pdf", {
                 "pages": 10,
                 "images": 5,
                 "storage_mb": 2.4
@@ -342,7 +352,7 @@ class DigitalAssetProgressReporter:
         if summary:
             message += f" | {summary}"
 
-        await self.base_tool.log_info(ctx, message)
+        logger.info(message)
 
 
 class AssetTypeDetector:

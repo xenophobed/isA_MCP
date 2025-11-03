@@ -16,7 +16,6 @@ Supported Operations: data_ingest, data_search, data_query
 """
 
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
 from tools.base_tool import BaseTool
 import logging
 
@@ -37,19 +36,25 @@ class DataProgressReporter:
     
     Example:
         reporter = DataProgressReporter(base_tool)
-        
+
+        # Create operation at start
+        operation_id = await base_tool.create_progress_operation(metadata={...})
+
         # Stage 1: Processing
-        await reporter.report_stage(ctx, "processing", "csv", pipeline_type="ingestion")
-        
+        await reporter.report_stage(operation_id, "processing", "csv", pipeline_type="ingestion")
+
         # Stage 2: Extraction with granular progress
-        await reporter.report_stage(ctx, "extraction", "csv", "semantic enrichment")
-        
+        await reporter.report_stage(operation_id, "extraction", "csv", "semantic enrichment")
+
         # Stage 3: Embedding
-        await reporter.report_granular_progress(ctx, "embedding", "csv", 50, 100, "embedding")
-        
+        await reporter.report_granular_progress(operation_id, "embedding", "csv", 50, 100, "embedding")
+
         # Stage 4: Storing
-        await reporter.report_storage_progress(ctx, "csv", "minio", "uploading")
-        await reporter.report_storage_progress(ctx, "csv", "vector_db", "indexing")
+        await reporter.report_storage_progress(operation_id, "csv", "minio", "uploading")
+        await reporter.report_storage_progress(operation_id, "csv", "vector_db", "indexing")
+
+        # Complete operation
+        await base_tool.complete_progress_operation(operation_id, result={...})
     """
     
     # Ingestion pipeline stages (for data_ingest)
@@ -116,7 +121,7 @@ class DataProgressReporter:
     
     async def report_stage(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         data_source_type: str,
         sub_progress: Optional[str] = None,
@@ -124,33 +129,35 @@ class DataProgressReporter:
         pipeline_type: str = "ingestion"
     ):
         """
-        Report progress for a pipeline stage
-        
+        Report progress for a pipeline stage using ProgressManager (NEW WAY)
+
         Args:
-            ctx: MCP Context for progress reporting
+            operation_id: Operation ID for progress tracking (use ProgressManager)
             stage: Pipeline stage name (varies by pipeline_type)
             data_source_type: Data source type - "csv", "parquet", "json", "query", etc.
             sub_progress: Optional granular progress within stage (e.g., "row 1000/5000")
             details: Optional additional details for logging
             pipeline_type: Type of pipeline - "ingestion", "search", or "query"
-        
+
         Pipeline Types & Stages:
             ingestion: processing -> extraction -> embedding -> storing
             search: processing -> embedding -> matching -> ranking
             query: processing -> retrieval -> execution -> visualization
-        
+
         Examples:
             # Ingestion (data_ingest)
-            await reporter.report_stage(ctx, "processing", "csv", pipeline_type="ingestion")
-            -> "Step 1/4 (25%): Processing Data CSV"
-            
+            await reporter.report_stage(operation_id, "processing", "csv", pipeline_type="ingestion")
+            -> Progress: 25% "Processing Data CSV" (via ProgressManager)
+
             # Search (data_search)
-            await reporter.report_stage(ctx, "matching", "query", "top 10 results", pipeline_type="search")
-            -> "Step 3/4 (75%): Similarity Matching - top 10 results"
-            
+            await reporter.report_stage(operation_id, "matching", "query", "top 10 results", pipeline_type="search")
+            -> Progress: 75% "Similarity Matching - top 10 results"
+
             # Query (data_query)
-            await reporter.report_stage(ctx, "execution", "query", "DuckDB SQL", pipeline_type="query")
-            -> "Step 3/4 (75%): Query Execution - DuckDB SQL"
+            await reporter.report_stage(operation_id, "execution", "query", "DuckDB SQL", pipeline_type="query")
+            -> Progress: 75% "Query Execution - DuckDB SQL"
+
+        Note: Client monitors progress via SSE: GET /progress/{operation_id}/stream
         """
         # Select the appropriate stage dictionary
         if pipeline_type == "search":
@@ -159,44 +166,45 @@ class DataProgressReporter:
             stages = self.QUERY_STAGES
         else:
             stages = self.INGESTION_STAGES
-        
+
         if stage not in stages:
             logger.warning(f"Unknown stage '{stage}' for pipeline type '{pipeline_type}', skipping progress report")
             return
-        
+
         stage_info = stages[stage]
         source_name = self.DATA_SOURCE_NAMES.get(data_source_type.lower(), data_source_type.upper())
-        
+
         # Build progress message
         message = f"{stage_info['label']}"
-        
+
         # For queries, don't add source name redundantly
         if data_source_type not in ["query"]:
             message += f" {source_name}"
-        
+
         if sub_progress:
             message += f" - {sub_progress}"
-        
-        # Report to Context (4 total stages)
-        await self.base_tool.report_progress(
-            ctx,
-            progress=stage_info["step"],
-            total=4,
-            message=message
-        )
-        
-        # Also log for debugging and HTTP mode fallback
+
+        # Report using ProgressManager (NEW WAY)
+        if operation_id:
+            await self.base_tool.update_progress_operation(
+                operation_id,
+                progress=float(stage_info["weight"]),  # 0-100
+                current=stage_info["step"],
+                total=4,
+                message=message
+            )
+
+        # Also log for debugging
         prefix = self.STAGE_PREFIXES.get(stage, "[INFO]")
-        
         log_msg = f"{prefix} Stage {stage_info['step']}/4 ({stage_info['weight']}%): {message}"
         if details:
             log_msg += f" | {details}"
-        
-        await self.base_tool.log_info(ctx, log_msg)
+
+        logger.info(log_msg)
     
     async def report_granular_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         data_source_type: str,
         current: int,
@@ -206,62 +214,64 @@ class DataProgressReporter:
     ):
         """
         Report granular progress within a stage (for loops/batches)
-        
+
         This is useful for long-running operations that process multiple items.
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Current pipeline stage
             data_source_type: Data source type
             current: Current item number (1-indexed)
             total: Total number of items
             item_type: Type of item being processed (e.g., "row", "embedding", "chunk")
             pipeline_type: Type of pipeline
-        
+
         Examples:
             # CSV row processing
             for i in range(1, total_rows + 1):
-                await reporter.report_granular_progress(ctx, "processing", "csv", i, total_rows, "row")
-            -> "Step 1/4 (25%): Processing Data CSV - processing row 1000/5000"
-            
+                await reporter.report_granular_progress(operation_id, "processing", "csv", i, total_rows, "row")
+            -> Progress: 25% "Processing Data CSV - processing row 1000/5000"
+
             # Embedding generation
             for i in range(1, total_embeddings + 1):
-                await reporter.report_granular_progress(ctx, "embedding", "csv", i, total_embeddings, "embedding")
-            -> "Step 3/4 (75%): Vector Embedding - processing embedding 50/100"
-            
+                await reporter.report_granular_progress(operation_id, "embedding", "csv", i, total_embeddings, "embedding")
+            -> Progress: 75% "Vector Embedding - processing embedding 50/100"
+
             # Query result processing
             for i in range(1, total_results + 1):
-                await reporter.report_granular_progress(ctx, "matching", "query", i, total_results, "result", "search")
-            -> "Step 3/4 (75%): Similarity Matching - processing result 5/10"
+                await reporter.report_granular_progress(operation_id, "matching", "query", i, total_results, "result", "search")
+            -> Progress: 75% "Similarity Matching - processing result 5/10"
         """
         sub_progress = f"processing {item_type} {current}/{total}"
-        await self.report_stage(ctx, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
+        await self.report_stage(operation_id, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
     
     async def report_storage_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         data_source_type: str,
         storage_target: str,
-        status: str = "uploading"
+        status: str = "uploading",
+        pipeline_type: str = "ingestion"
     ):
         """
         Report storage progress with specific targets
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             data_source_type: Data source type
             storage_target: "minio", "vector_db", "metadata_store", or "all"
             status: "uploading", "indexing", "completed"
-        
+            pipeline_type: Type of pipeline
+
         Examples:
-            await reporter.report_storage_progress(ctx, "csv", "minio", "uploading")
-            -> "Step 4/4 (100%): Storing Data CSV - uploading to MinIO"
-            
-            await reporter.report_storage_progress(ctx, "csv", "vector_db", "indexing")
-            -> "Step 4/4 (100%): Storing Data CSV - indexing in Vector DB"
-            
-            await reporter.report_storage_progress(ctx, "parquet", "metadata_store", "completed")
-            -> "Step 4/4 (100%): Storing Data Parquet - completed in Metadata Store"
+            await reporter.report_storage_progress(operation_id, "csv", "minio", "uploading")
+            -> Progress: 100% "Storing Data CSV - uploading to MinIO"
+
+            await reporter.report_storage_progress(operation_id, "csv", "vector_db", "indexing")
+            -> Progress: 100% "Storing Data CSV - indexing in Vector DB"
+
+            await reporter.report_storage_progress(operation_id, "parquet", "metadata_store", "completed")
+            -> Progress: 100% "Storing Data Parquet - completed in Metadata Store"
         """
         target_names = {
             "minio": "MinIO",
@@ -270,15 +280,15 @@ class DataProgressReporter:
             "duckdb": "DuckDB",
             "all": "All Storage Systems"
         }
-        
+
         target_name = target_names.get(storage_target, storage_target)
         sub_progress = f"{status} to {target_name}"
-        
-        await self.report_stage(ctx, "storing", data_source_type, sub_progress)
+
+        await self.report_stage(operation_id, "storing", data_source_type, sub_progress, pipeline_type=pipeline_type)
     
     async def report_batch_progress(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         data_source_type: str,
         batch_current: int,
@@ -288,28 +298,28 @@ class DataProgressReporter:
     ):
         """
         Report batch processing progress
-        
+
         Useful for parallel/concurrent processing scenarios.
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Pipeline stage
             data_source_type: Data source type
             batch_current: Current batch number
             batch_total: Total batches
             batch_type: Type of batch (e.g., "batch", "chunk", "partition")
             pipeline_type: Type of pipeline
-        
+
         Example:
-            await reporter.report_batch_progress(ctx, "embedding", "csv", 2, 5, "chunk batch")
-            -> "Step 3/4 (75%): Vector Embedding CSV - processing chunk batch 2/5"
+            await reporter.report_batch_progress(operation_id, "embedding", "csv", 2, 5, "chunk batch")
+            -> Progress: 75% "Vector Embedding CSV - processing chunk batch 2/5"
         """
         sub_progress = f"processing {batch_type} {batch_current}/{batch_total}"
-        await self.report_stage(ctx, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
+        await self.report_stage(operation_id, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
     
     async def report_data_stats(
         self,
-        ctx: Optional[Context],
+        operation_id: Optional[str],
         stage: str,
         data_source_type: str,
         rows: Optional[int] = None,
@@ -319,19 +329,19 @@ class DataProgressReporter:
     ):
         """
         Report data statistics during processing
-        
+
         Args:
-            ctx: MCP Context
+            operation_id: Operation ID for progress tracking
             stage: Current pipeline stage
             data_source_type: Data source type
             rows: Number of rows processed
             columns: Number of columns detected
             quality_score: Data quality score (0.0-1.0)
             pipeline_type: Type of pipeline
-        
+
         Example:
-            await reporter.report_data_stats(ctx, "processing", "csv", rows=5000, columns=12, quality_score=0.95)
-            -> "Step 1/4 (25%): Processing Data CSV - 5000 rows, 12 columns, quality: 0.95"
+            await reporter.report_data_stats(operation_id, "processing", "csv", rows=5000, columns=12, quality_score=0.95)
+            -> Progress: 25% "Processing Data CSV - 5000 rows, 12 columns, quality: 0.95"
         """
         stats = []
         if rows is not None:
@@ -340,28 +350,26 @@ class DataProgressReporter:
             stats.append(f"{columns} columns")
         if quality_score is not None:
             stats.append(f"quality: {quality_score:.2f}")
-        
+
         sub_progress = ", ".join(stats) if stats else None
-        await self.report_stage(ctx, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
+        await self.report_stage(operation_id, stage, data_source_type, sub_progress, pipeline_type=pipeline_type)
     
     async def report_complete(
         self,
-        ctx: Optional[Context],
         data_source_type: str,
         summary: Optional[Dict[str, Any]] = None,
         pipeline_type: str = "ingestion"
     ):
         """
         Report completion of entire pipeline
-        
+
         Args:
-            ctx: MCP Context
             data_source_type: Data source type
             summary: Optional summary statistics (e.g., rows processed, storage size)
             pipeline_type: Type of pipeline
-        
+
         Example:
-            await reporter.report_complete(ctx, "csv", {
+            await reporter.report_complete("csv", {
                 "rows": 5000,
                 "columns": 12,
                 "storage_mb": 2.4,
@@ -370,18 +378,18 @@ class DataProgressReporter:
             -> "[DONE] CSV ingestion complete | {'rows': 5000, 'columns': 12, 'storage_mb': 2.4, 'embeddings': 100}"
         """
         source_name = self.DATA_SOURCE_NAMES.get(data_source_type.lower(), data_source_type.upper())
-        
+
         if pipeline_type == "search":
             message = f"[DONE] {source_name} search complete"
         elif pipeline_type == "query":
             message = f"[DONE] {source_name} query complete"
         else:
             message = f"[DONE] {source_name} ingestion complete"
-        
+
         if summary:
             message += f" | {summary}"
-        
-        await self.base_tool.log_info(ctx, message)
+
+        logger.info(message)
 
 
 class DataSourceDetector:

@@ -7,7 +7,11 @@ RAG Factory - RAG服务工厂
 New Architecture (Migrated):
 - ✅ SimpleRAGService (basic vector retrieval)
 - ✅ CRAGRAGService (quality-aware retrieval)
-- TODO: RAPTORRAGService, SelfRAGService, etc.
+- ✅ SelfRAGService (self-reflection)
+- ✅ RAGFusionService (multi-query + RRF)
+- ✅ HyDERAGService (hypothetical document embeddings)
+- ✅ RAPTORRAGService (hierarchical tree structure)
+- TODO: PlanRAGService, GraphRAGService, etc.
 """
 
 import asyncio
@@ -19,14 +23,16 @@ from datetime import datetime
 from .base.base_rag_service import BaseRAGService
 from .base.rag_models import RAGConfig, RAGResult, RAGMode
 from .patterns.simple_rag_service import SimpleRAGService
+from .patterns.crag_rag_service import CRAGRAGService  # ✅ Migrated
+from .patterns.self_rag_service import SelfRAGService  # ✅ Migrated
+from .patterns.rag_fusion_service import RAGFusionService  # ✅ Migrated
+from .patterns.hyde_rag_service import HyDERAGService  # ✅ Migrated
+from .patterns.raptor_rag_service import RAPTORRAGService  # ✅ Migrated
+from .patterns.graph_rag_service import GraphRAGService  # ✅ Migrated
 
 # TODO: Migrate these services to new architecture
-# from .patterns.raptor_rag_service import RAPTORRAGService
-# from .patterns.self_rag_service import SelfRAGService
-from .patterns.crag_rag_service import CRAGRAGService  # ✅ Migrated
 # from .patterns.plan_rag_service import PlanRAGRAGService
 # from .patterns.hm_rag_service import HMRAGRAGService
-# from .patterns.graph_rag_service import GraphRAGService
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +85,89 @@ def get_rag_service(
             max_context_length=config.get('max_context_length', 4000)
         )
         return CRAGRAGService(rag_config)
+    elif mode == "self_rag":
+        rag_config = RAGConfig(
+            mode=RAGMode.SELF_RAG,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000),
+            enable_self_reflection=True  # Self-RAG specific
+        )
+        return SelfRAGService(rag_config)
+    elif mode == "rag_fusion":
+        rag_config = RAGConfig(
+            mode=RAGMode.RAG_FUSION,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000),
+            extra_config={
+                'num_queries': config.get('num_queries', 3),
+                'fusion_weight': config.get('fusion_weight', 'equal')
+            }
+        )
+        return RAGFusionService(rag_config)
+    elif mode == "hyde":
+        rag_config = RAGConfig(
+            mode=RAGMode.HYDE,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000),
+            extra_config={
+                'hyde_model': config.get('hyde_model', 'gpt-4.1-nano'),
+                'num_hypotheses': config.get('num_hypotheses', 1)
+            }
+        )
+        return HyDERAGService(rag_config)
+    elif mode == "raptor":
+        rag_config = RAGConfig(
+            mode=RAGMode.RAPTOR,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000),
+            extra_config={
+                'cluster_threshold': config.get('cluster_threshold', 0.8),
+                'max_summary_length': config.get('max_summary_length', 500)
+            }
+        )
+        return RAPTORRAGService(rag_config)
+    elif mode == "graph":
+        rag_config = RAGConfig(
+            mode=RAGMode.GRAPH,
+            chunk_size=config.get('chunk_size', 400),
+            overlap=config.get('overlap', 50),
+            top_k=config.get('top_k', 5),
+            embedding_model=config.get('embedding_model', 'text-embedding-3-small'),
+            enable_rerank=config.get('enable_rerank', False),
+            similarity_threshold=config.get('similarity_threshold', 0.7),
+            max_context_length=config.get('max_context_length', 4000),
+            extra_config={
+                'neo4j_host': config.get('neo4j_host'),
+                'neo4j_port': config.get('neo4j_port', 50063),
+                'neo4j_database': config.get('neo4j_database', 'neo4j'),
+                'graph_expansion_depth': config.get('graph_expansion_depth', 2)
+            }
+        )
+        return GraphRAGService(rag_config)
     else:
         raise ValueError(
             f"Unknown RAG mode: {mode}. "
-            f"Currently only 'simple' and 'crag' modes are migrated. "
+            f"Currently 'simple', 'crag', 'self_rag', 'rag_fusion', 'hyde', 'raptor', and 'graph' modes are supported. "
             f"Other modes need migration to new architecture."
         )
 
@@ -97,6 +182,31 @@ def get_crag_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGServ
     return get_rag_service(mode="crag", config=config)
 
 
+def get_self_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for Self-RAG (self-reflection)"""
+    return get_rag_service(mode="self_rag", config=config)
+
+
+def get_rag_fusion_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for RAG Fusion (multi-query + RRF)"""
+    return get_rag_service(mode="rag_fusion", config=config)
+
+
+def get_hyde_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for HyDE RAG (hypothetical document embeddings)"""
+    return get_rag_service(mode="hyde", config=config)
+
+
+def get_raptor_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for RAPTOR RAG (hierarchical tree structure)"""
+    return get_rag_service(mode="raptor", config=config)
+
+
+def get_graph_rag_service(config: Optional[Dict[str, Any]] = None) -> BaseRAGService:
+    """Convenience function for Graph RAG (knowledge graph enhanced)"""
+    return get_rag_service(mode="graph", config=config)
+
+
 # ============================================================================
 # Legacy RAGFactory Class (For backward compatibility)
 # ============================================================================
@@ -108,12 +218,14 @@ class RAGFactory:
         self._services: Dict[RAGMode, Type[BaseRAGService]] = {
             RAGMode.SIMPLE: SimpleRAGService,
             RAGMode.CRAG: CRAGRAGService,  # ✅ Migrated
+            RAGMode.SELF_RAG: SelfRAGService,  # ✅ Migrated
+            RAGMode.RAG_FUSION: RAGFusionService,  # ✅ Migrated
+            RAGMode.HYDE: HyDERAGService,  # ✅ Migrated
+            RAGMode.RAPTOR: RAPTORRAGService,  # ✅ Migrated
+            RAGMode.GRAPH: GraphRAGService,  # ✅ Migrated
             # TODO: Migrate other services
-            # RAGMode.RAPTOR: RAPTORRAGService,
-            # RAGMode.SELF_RAG: SelfRAGService,
             # RAGMode.PLAN_RAG: PlanRAGRAGService,
             # RAGMode.HM_RAG: HMRAGRAGService,
-            # RAGMode.GRAPH: GraphRAGService,
         }
         self._instances: Dict[str, BaseRAGService] = {}
 

@@ -4,6 +4,10 @@
 # Web Automation Tools Test Suite
 # 
 # Tests the 5-step atomic workflow with progress tracking and HIL support
+# via MCP HTTP endpoint (the actual user-facing interface)
+#
+# Based on: test_web_search.sh pattern
+# Tests: tools/services/web_services/tools/web_automation_tools.py -> web_automation tool
 #
 # Test Scenarios:
 # 1. Basic search automation
@@ -12,10 +16,33 @@
 # 4. HIL detection (login, CAPTCHA)
 # 5. Error handling
 #
-# Usage: ./test_web_automation.sh
+# Usage: ./test_web_automation.sh [--verbose] [--url http://localhost:8081]
 ###############################################################################
 
 set -e  # Exit on error
+
+# Flags
+VERBOSE=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --verbose|-v)
+            VERBOSE=true
+            shift
+            ;;
+        --url)
+            MCP_URL="$2"
+            MCP_ENDPOINT="$MCP_URL/mcp"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--verbose] [--url http://localhost:8081]"
+            exit 1
+            ;;
+    esac
+done
 
 # Color output
 RED='\033[0;31m'
@@ -24,10 +51,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Test configuration
-MCP_SERVER="http://localhost:8000"
+# Configuration
+MCP_URL="${MCP_URL:-http://localhost:8081}"
+MCP_ENDPOINT="$MCP_URL/mcp"
 USER_ID="test_user_$(date +%s)"
 RESULTS_DIR="./results/automation_$(date +%Y%m%d_%H%M%S)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Create results directory
 mkdir -p "$RESULTS_DIR"
@@ -72,26 +102,23 @@ run_test() {
     echo "  User: $user_id"
     echo ""
     
-    # Prepare request payload
-    local payload=$(cat <<EOF
-{
-    "method": "tools/call",
-    "params": {
-        "name": "web_automation",
-        "arguments": {
-            "url": "$url",
-            "task": "$task",
-            "user_id": "$user_id"
-        }
-    }
-}
-EOF
-)
-    
-    # Make request
-    local response=$(curl -s -X POST "$MCP_SERVER/mcp" \
+    # Make request with JSON-RPC format (like test_web_search.sh)
+    local response=$(curl -s -X POST "$MCP_ENDPOINT" \
         -H "Content-Type: application/json" \
-        -d "$payload" \
+        -H "Accept: application/json, text/event-stream" \
+        -d "{
+            \"jsonrpc\": \"2.0\",
+            \"id\": $TOTAL_TESTS,
+            \"method\": \"tools/call\",
+            \"params\": {
+                \"name\": \"web_automation\",
+                \"arguments\": {
+                    \"url\": \"$url\",
+                    \"task\": \"$task\",
+                    \"user_id\": \"$user_id\"
+                }
+            }
+        }" \
         2>&1)
     
     # Save response
@@ -99,10 +126,43 @@ EOF
     
     # Check if request succeeded
     if [ $? -eq 0 ]; then
-        # Parse response
-        local status=$(echo "$response" | jq -r '.result.status // .status // "unknown"')
-        local action=$(echo "$response" | jq -r '.result.action // .action // "unknown"')
-        local success=$(echo "$response" | jq -r '.result.data.success // false')
+        # Parse event stream response (like test_web_search.sh)
+        local data_line=$(echo "$response" | grep "^data: " | head -1)
+        
+        if [ -z "$data_line" ]; then
+            error "No data line in response: $test_name"
+            echo "  Response: $response"
+            echo ""
+            return
+        fi
+        
+        # Extract JSON from data line
+        local json_data=$(echo "$data_line" | sed 's/^data: //')
+        
+        # Check for errors
+        local is_error=$(echo "$json_data" | jq -r '.result.isError // false')
+        if [ "$is_error" = "true" ]; then
+            error "Tool call returned error: $test_name"
+            echo "$json_data" | jq '.result.content[0].text'
+            echo ""
+            return
+        fi
+        
+        # Parse tool response
+        local tool_response=$(echo "$json_data" | jq -r '.result.content[0].text')
+        
+        # Parse nested JSON (handle both string JSON and already parsed JSON)
+        local status=$(echo "$tool_response" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
+        if [ "$status" = "unknown" ]; then
+            # Try parsing as string JSON
+            local parsed=$(echo "$tool_response" | jq -r '.' 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                status=$(echo "$parsed" | jq -r '.status // "unknown"')
+            fi
+        fi
+        
+        local action=$(echo "$tool_response" | jq -r '.action // "unknown"' 2>/dev/null || echo "unknown")
+        local success=$(echo "$tool_response" | jq -r '.data.success // false' 2>/dev/null || echo "false")
         
         echo "  Status: $status"
         echo "  Action: $action"
@@ -114,8 +174,8 @@ EOF
             success "Test passed: $test_name"
             
             # Extract workflow details
-            local actions_executed=$(echo "$response" | jq -r '.result.data.workflow_results.step5_execution.actions_executed // 0')
-            local task_completed=$(echo "$response" | jq -r '.result.data.workflow_results.step5_execution.task_completed // false')
+            local actions_executed=$(echo "$tool_response" | jq -r '.data.workflow_results.step5_execution.actions_executed // 0')
+            local task_completed=$(echo "$tool_response" | jq -r '.data.workflow_results.step5_execution.task_completed // false')
             
             echo "  📊 Workflow Summary:"
             echo "     - Actions executed: $actions_executed"
@@ -126,8 +186,8 @@ EOF
             warning "HIL required: $test_name (expected behavior)"
             
             # Extract HIL details
-            local intervention_type=$(echo "$response" | jq -r '.result.data.intervention_type // "unknown"')
-            local provider=$(echo "$response" | jq -r '.result.data.provider // "unknown"')
+            local intervention_type=$(echo "$tool_response" | jq -r '.data.intervention_type // "unknown"')
+            local provider=$(echo "$tool_response" | jq -r '.data.provider // "unknown"')
             
             echo "  🤚 HIL Details:"
             echo "     - Intervention type: $intervention_type"
@@ -138,8 +198,23 @@ EOF
             ((PASSED_TESTS++))  # HIL is expected behavior
             
         else
-            error "Test failed: $test_name"
-            echo "  Response: $response"
+            error "Test failed: $test_name (status: $status)"
+            # Show error details
+            local error_msg=$(echo "$tool_response" | jq -r '.error // .data.error // .data.error_details // empty' 2>/dev/null)
+            if [ -n "$error_msg" ] && [ "$error_msg" != "null" ] && [ "$error_msg" != "" ]; then
+                # Extract first line of error message (usually the key issue)
+                local first_line=$(echo "$error_msg" | head -1)
+                echo "  Error: $first_line"
+                # If verbose, show full error
+                if [ "$VERBOSE" = true ]; then
+                    echo "  Full error:"
+                    echo "$error_msg" | sed 's/^/    /'
+                fi
+            fi
+            if [ "$VERBOSE" = true ]; then
+                echo "  Full response:"
+                echo "$tool_response" | jq '.' 2>/dev/null || echo "$tool_response"
+            fi
             echo ""
         fi
     else
@@ -166,21 +241,20 @@ check_dependencies() {
         exit 1
     fi
     
-    success "All dependencies found"
+    echo -e "${GREEN}✅ Required commands: curl, jq${NC}"
     echo ""
 }
 
 # Check MCP server
 check_server() {
-    log "Checking MCP server at $MCP_SERVER..."
+    log "Checking MCP server at $MCP_URL..."
     
-    local response=$(curl -s -o /dev/null -w "%{http_code}" "$MCP_SERVER/health" 2>&1)
-    
-    if [ "$response" = "200" ] || [ "$response" = "404" ]; then
-        success "MCP server is running"
+    if curl -s -f "$MCP_URL/health" > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ MCP server is running at $MCP_URL${NC}"
     else
-        error "MCP server is not accessible (HTTP $response)"
+        error "MCP server not accessible at $MCP_URL"
         warning "Please start the MCP server first"
+        log "Start server with: cd $PROJECT_ROOT && python main.py"
         exit 1
     fi
     echo ""
@@ -325,9 +399,12 @@ test_hil_workflow() {
     log "Testing complete HIL workflow..."
     
     # Step 1: Trigger HIL
-    local hil_response=$(curl -s -X POST "$MCP_SERVER/mcp" \
+    local hil_response=$(curl -s -X POST "$MCP_ENDPOINT" \
         -H "Content-Type: application/json" \
+        -H "Accept: application/json, text/event-stream" \
         -d '{
+            "jsonrpc": "2.0",
+            "id": 100,
             "method": "tools/call",
             "params": {
                 "name": "web_automation",
@@ -339,7 +416,11 @@ test_hil_workflow() {
             }
         }')
     
-    local action=$(echo "$hil_response" | jq -r '.result.action')
+    # Parse event stream
+    local data_line=$(echo "$hil_response" | grep "^data: " | head -1)
+    local json_data=$(echo "$data_line" | sed 's/^data: //')
+    local tool_response=$(echo "$json_data" | jq -r '.result.content[0].text')
+    local action=$(echo "$tool_response" | jq -r '.action')
     
     if [ "$action" = "request_authorization" ] || [ "$action" = "ask_human" ]; then
         success "HIL triggered successfully"

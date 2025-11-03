@@ -6,26 +6,25 @@ Output: new url + task results
 
 5-Step Atomic Workflow:
 1. Playwright Screenshot
-2. image_analyzer (Screen Understanding) 
-3. ui_detector (UI Detection + Coordinates)
-4. text_generator (Action Reasoning)
-5. Playwright Execution + image_analyzer (Result Analysis)
+2. Vision API (Screen Understanding) - Direct ISA Model
+3. Vision API (UI Detection + Coordinates) - Direct ISA Model OmniParser
+4. Chat API (Action Reasoning) - Direct ISA Model
+5. Playwright Execution + Vision API (Result Analysis)
 """
 
 import json
 import tempfile
 import os
 import asyncio
+import re
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from playwright.async_api import async_playwright, Browser, Page
 
 from core.logging import get_logger
 
-# Import atomic functions
-from tools.services.intelligence_service.vision.image_analyzer import analyze as image_analyze
-from tools.services.intelligence_service.vision.ui_detector import detect_ui_with_coordinates
-from tools.services.intelligence_service.language.text_generator import generate_playwright_actions
+# Import ISA Model client directly - NO intelligence service
+from core.clients.model_client import get_isa_client
 
 # Import enhanced action executor
 from tools.services.web_services.core.action_executor import get_action_executor
@@ -33,13 +32,192 @@ from tools.services.web_services.core.action_executor import get_action_executor
 logger = get_logger(__name__)
 
 
+class ImageAnalysisResult:
+    """Simple wrapper for image analysis results to match expected interface"""
+    def __init__(self, success: bool, response: str = ""):
+        self.success = success
+        self.response = response
+
+
+async def image_analyze(image: str, prompt: str, provider: str = "openai", model: str = "gpt-4o-mini") -> ImageAnalysisResult:
+    """
+    Helper function to analyze images using ISA Model client directly.
+
+    Args:
+        image: Path to image file or URL
+        prompt: Analysis prompt
+        provider: Model provider (default: openai)
+        model: Model name (default: gpt-4o-mini)
+
+    Returns:
+        ImageAnalysisResult with .success and .response attributes
+    """
+    try:
+        client = await get_isa_client()
+        vision_response = await client.vision.completions.create(
+            image=image,
+            prompt=prompt,
+            model=model,
+            provider=provider
+        )
+        return ImageAnalysisResult(success=True, response=vision_response.text)
+    except Exception as e:
+        logger.error(f"Image analysis failed: {e}")
+        return ImageAnalysisResult(success=False, response=f"Error: {e}")
+
+
+class UIDetectionResult:
+    """Simple wrapper for UI detection results"""
+    def __init__(self, ui_elements: List[Dict[str, Any]] = None, annotated_image_path: str = None,
+                 element_mappings: Dict[str, Any] = None, success: bool = False, error: str = ""):
+        self.ui_elements = ui_elements or []
+        self.annotated_image_path = annotated_image_path
+        self.element_mappings = element_mappings or {}
+        self.success = success
+        self.error = error
+
+
+async def detect_ui_with_coordinates(screenshot: str, requirements: List[Dict[str, Any]]) -> UIDetectionResult:
+    """
+    Detect UI elements with coordinates using ISA Model OmniParser directly.
+
+    Args:
+        screenshot: Path to screenshot image
+        requirements: List of required elements from Step 2 analysis
+
+    Returns:
+        UIDetectionResult with detected elements and coordinates
+    """
+    try:
+        client = await get_isa_client()
+
+        # Build prompt for UI detection
+        elements_desc = "\n".join([
+            f"- {req['element_name']}: {req.get('visual_description', req.get('element_purpose', ''))}"
+            for req in requirements
+        ])
+
+        prompt = f"""Detect and locate these UI elements in the screenshot:
+
+{elements_desc}
+
+For each element, provide:
+1. Element name
+2. Coordinates (x, y) - center point
+3. Bounding box (if available)
+4. Suggested action type (click, type, select, etc.)
+
+Return JSON format:
+{{
+    "elements": [
+        {{
+            "name": "element_name",
+            "x": 400,
+            "y": 200,
+            "bbox": {{"x1": 350, "y1": 180, "x2": 450, "y2": 220}},
+            "action": "click" or "type"
+        }}
+    ]
+}}"""
+
+        # Try ISA OmniParser first (if available)
+        try:
+            vision_response = await client.vision.completions.create(
+                image=screenshot,
+                prompt=prompt,
+                model="isa-omniparser-ui-detection",
+                provider="isa"
+            )
+            response_text = vision_response.text
+            logger.info(f"✅ ISA OmniParser UI detection successful")
+        except Exception as e:
+            # Fallback to OpenAI vision if OmniParser not available
+            logger.warning(f"ISA OmniParser not available, falling back to OpenAI vision: {e}")
+            vision_response = await client.vision.completions.create(
+                image=screenshot,
+                prompt=prompt,
+                model="gpt-4o-mini",
+                provider="openai"
+            )
+            response_text = vision_response.text
+
+        # Parse JSON response
+        json_match = re.search(r'\{[\s\S]*\}', response_text)
+        if not json_match:
+            logger.error("No JSON found in UI detection response")
+            return UIDetectionResult(success=False, error="No JSON in response")
+
+        detection_data = json.loads(json_match.group())
+        elements = detection_data.get('elements', [])
+
+        # Build element mappings
+        element_mappings = {}
+        ui_elements = []
+
+        for elem in elements:
+            name = elem.get('name', f"element_{len(element_mappings)}")
+            element_mappings[name] = {
+                'x': elem.get('x', 0),
+                'y': elem.get('y', 0),
+                'bbox': elem.get('bbox'),
+                'action': elem.get('action', 'click')
+            }
+            ui_elements.append(elem)
+
+        logger.info(f"🎯 Detected {len(element_mappings)} UI elements")
+        return UIDetectionResult(
+            ui_elements=ui_elements,
+            annotated_image_path=screenshot,
+            element_mappings=element_mappings,
+            success=True
+        )
+
+    except Exception as e:
+        logger.error(f"UI detection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return UIDetectionResult(success=False, error=str(e))
+
+
+async def generate_playwright_actions(prompt: str, temperature: float = 0.3) -> str:
+    """
+    Generate Playwright actions using ISA Model chat completion directly.
+
+    Args:
+        prompt: Prompt for action generation
+        temperature: Temperature for generation (default: 0.3 for consistency)
+
+    Returns:
+        Generated actions as text (JSON array)
+    """
+    try:
+        client = await get_isa_client()
+
+        # Use chat completion for action generation
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature
+        )
+
+        action_text = response.choices[0].message.content
+        logger.info(f"🤖 Generated actions: {len(action_text)} chars")
+        return action_text
+
+    except Exception as e:
+        logger.error(f"Action generation failed: {e}")
+        # Return empty array as fallback
+        return "[]"
+
+
 class WebAutomationService:
     """5-Step Atomic Workflow Web Automation Service"""
-    
+
     def __init__(self):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
         self.action_executor = get_action_executor()
+        self._model_client = None
         logger.info("✅ WebAutomationService initialized with enhanced action executor")
     
     async def execute_task(self, url: str, task: str, user_id: str = "default") -> Dict[str, Any]:
@@ -134,7 +312,19 @@ class WebAutomationService:
         """Start browser for automation"""
         if self.browser is None:
             playwright = await async_playwright().start()
-            self.browser = await playwright.chromium.launch(headless=True)
+            # Docker-compatible Chrome args
+            self.browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            )
             context = await self.browser.new_context(
                 viewport={'width': 1920, 'height': 1080}
             )
@@ -148,11 +338,15 @@ class WebAutomationService:
             return tmp.name
     
     async def _step2_screen_understanding(self, screenshot_path: str, task: str) -> Dict[str, Any]:
-        """Step 2: Screen understanding using image_analyzer atomic function"""
+        """Step 2: Screen understanding using ISA Model Vision API directly"""
         try:
             print("🧠 Step 2: Analyzing page content and task requirements...")
-            
-            # Use image_analyzer atomic function for screen understanding
+
+            # Get ISA model client
+            if not self._model_client:
+                self._model_client = await get_isa_client()
+
+            # Vision prompt for screen understanding
             prompt = f"""Analyze this webpage screenshot to understand what UI elements are needed for this task: {task}
 
 Provide a JSON response with:
@@ -160,10 +354,10 @@ Provide a JSON response with:
 2. Required UI elements for the task
 3. Interaction strategy
 
-Return JSON format:
+Return ONLY JSON format:
 {{
-    "page_suitable": true/false,
-    "page_type": "search_page/form/ecommerce/etc",
+    "page_suitable": true,
+    "page_type": "search_page",
     "required_elements": [
         {{
             "element_name": "search_input",
@@ -172,31 +366,36 @@ Return JSON format:
             "interaction_type": "click_and_type"
         }}
     ],
-    "interaction_strategy": "step-by-step plan",
-    "confidence": 0.9
+    "interaction_strategy": "step-by-step plan"
 }}"""
-            
-            # Call image_analyzer atomic function
-            result = await image_analyze(
+
+            # Call ISA Model vision API directly (Example 7 pattern)
+            vision_response = await self._model_client.vision.completions.create(
                 image=screenshot_path,
                 prompt=prompt,
+                model="gpt-4o-mini",
                 provider="openai"
             )
-            
-            if result.success:
-                # Parse JSON from response
-                import re
-                json_match = re.search(r'\{[\s\S]*\}', result.response)
-                if json_match:
-                    analysis = json.loads(json_match.group())
-                    logger.info(f"📋 Page analysis: {analysis.get('page_type', 'unknown')}")
-                    return analysis
-            
+
+            # Extract text from vision response (.text attribute, NOT .choices)
+            response_text = vision_response.text
+            logger.info(f"📋 Vision response received: {len(response_text)} chars")
+
+            # Parse JSON from response
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if json_match:
+                analysis = json.loads(json_match.group())
+                logger.info(f"✅ Page analysis: {analysis.get('page_type', 'unknown')}")
+                return analysis
+
             # Fallback: basic task analysis
+            logger.warning("⚠️ No JSON found in vision response, using fallback")
             return self._basic_task_analysis(task)
-            
+
         except Exception as e:
             logger.error(f"❌ Step 2 failed: {e}")
+            import traceback
+            traceback.print_exc()
             return self._basic_task_analysis(task)
     
     async def _step3_ui_detection(self, screenshot_path: str, page_analysis: Dict[str, Any]):
@@ -232,7 +431,6 @@ Return JSON format:
         except Exception as e:
             logger.error(f"❌ Step 3 failed: {e}")
             # Return empty result
-            from tools.services.intelligence_service.vision.ui_detector import UIDetectionResult
             return UIDetectionResult(
                 ui_elements=[],
                 annotated_image_path=None,

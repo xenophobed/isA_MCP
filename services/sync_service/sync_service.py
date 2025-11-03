@@ -64,12 +64,12 @@ class SyncService:
 
     async def sync_all(self) -> Dict[str, Any]:
         """
-        Sync all tools, prompts, and resources
+        Sync all tools, prompts, and resources with automatic cleanup
 
         Returns:
             Sync results summary
         """
-        logger.info("Starting full sync...")
+        logger.info("Starting full sync with automatic cleanup...")
 
         results = {
             'tools': await self.sync_tools(),
@@ -79,20 +79,24 @@ class SyncService:
 
         # Summary
         total_synced = sum(r['synced'] for r in results.values())
+        total_skipped = sum(r.get('skipped', 0) for r in results.values())
         total_failed = sum(r['failed'] for r in results.values())
+        total_deleted = sum(r.get('deleted', 0) for r in results.values())
 
-        logger.info(f"Sync completed: {total_synced} synced, {total_failed} failed")
+        logger.info(f"🎯 Incremental sync completed: {total_synced} updated, {total_skipped} skipped (no changes), {total_failed} failed, {total_deleted} orphaned entries deleted")
 
         return {
             'success': True,
             'total_synced': total_synced,
+            'total_skipped': total_skipped,
             'total_failed': total_failed,
+            'total_deleted': total_deleted,
             'details': results
         }
 
     async def sync_tools(self) -> Dict[str, Any]:
         """
-        Sync tools from MCP Server API to database
+        Sync tools from MCP Server API to database with automatic cleanup
 
         Returns:
             Sync results
@@ -105,6 +109,7 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': ['MCP Server not initialized']
             }
 
@@ -113,11 +118,36 @@ class SyncService:
             mcp_tools = await self.mcp_server.list_tools()
             logger.info(f"Retrieved {len(mcp_tools)} tools from MCP Server")
 
+            # 2. Get existing tools from Qdrant
+            qdrant_tools = await self.vector_repo.get_all_by_type('tool')
+            logger.info(f"Found {len(qdrant_tools)} existing tools in Qdrant")
+
+            # Build a dict for quick lookup: name -> qdrant_tool
+            qdrant_tools_dict = {tool['name']: tool for tool in qdrant_tools}
+
+            # 3. Find orphaned tools (exist in Qdrant but not in MCP)
+            mcp_tool_names = {tool.name for tool in mcp_tools}
+            orphaned_ids = []
+            orphaned_names = []
+
+            for qdrant_tool in qdrant_tools:
+                if qdrant_tool['name'] not in mcp_tool_names:
+                    orphaned_ids.append(qdrant_tool['id'])
+                    orphaned_names.append(qdrant_tool['name'])
+
+            # 4. Delete orphaned tools from Qdrant
+            deleted = 0
+            if orphaned_ids:
+                logger.info(f"Found {len(orphaned_ids)} orphaned tools to clean up: {orphaned_names}")
+                deleted = await self.vector_repo.delete_multiple_vectors(orphaned_ids)
+                logger.info(f"Deleted {deleted} orphaned tools from Qdrant")
+
+            # 5. Sync current tools
             synced = 0
+            skipped = 0
             failed = 0
             errors = []
 
-            # 2. Sync each tool
             for tool in mcp_tools:
                 try:
                     # Convert MCP tool format to our format
@@ -127,17 +157,27 @@ class SyncService:
                         'input_schema': tool.inputSchema if hasattr(tool, 'inputSchema') else {},
                         'category': 'general'  # MCP tools don't have category, use default
                     }
-                    await self._sync_single_tool(tool.name, tool_info)
-                    synced += 1
+                    # Pass existing qdrant data for change detection
+                    existing_qdrant = qdrant_tools_dict.get(tool.name)
+                    changed = await self._sync_single_tool(tool.name, tool_info, existing_qdrant)
+                    if changed:
+                        synced += 1
+                    else:
+                        skipped += 1
                 except Exception as e:
                     logger.error(f"Failed to sync tool {tool.name}: {e}")
                     failed += 1
                     errors.append({'tool': tool.name, 'error': str(e)})
 
+            logger.info(f"Tools sync: {synced} updated, {skipped} skipped (no changes), {failed} failed")
+
             return {
                 'total': len(mcp_tools),
                 'synced': synced,
+                'skipped': skipped,
                 'failed': failed,
+                'deleted': deleted,
+                'orphaned_tools': orphaned_names,
                 'errors': errors
             }
 
@@ -147,17 +187,22 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': [str(e)]
             }
 
-    async def _sync_single_tool(self, tool_name: str, tool_info: Dict[str, Any]):
+    async def _sync_single_tool(self, tool_name: str, tool_info: Dict[str, Any], existing_qdrant: Optional[Dict[str, Any]] = None) -> bool:
         """
         Sync a single tool to PostgreSQL and Qdrant
 
         增量同步逻辑：
-        1. 检查工具是否存在
+        1. 检查工具是否存在于 Qdrant
         2. 如果存在，比较 description 是否变化
-        3. 只有在变化时才重新生成 embedding
+        3. 只有在变化时才重新生成 embedding 和更新 Qdrant
+        4. PostgreSQL 始终更新（保持数据一致性）
+
+        Returns:
+            True if updated, False if skipped (no changes)
         """
         # 1. Check if exists
         existing_tool = await self.tool_service.get_tool(tool_name)
@@ -175,43 +220,51 @@ class SyncService:
             'is_active': True
         }
 
-        # 3. Update or create tool in PostgreSQL
+        # 3. Check if content changed (compare with Qdrant data)
+        needs_update = True
+        if existing_qdrant:
+            # Compare description to determine if embedding needs regeneration
+            if existing_qdrant.get('description') == tool_data['description']:
+                needs_update = False
+                logger.debug(f"⏭️  Tool '{tool_name}' unchanged, skipping embedding update")
+
+        # 4. Update or create tool in PostgreSQL (always update for consistency)
         if existing_tool:
-            # 更新 PostgreSQL
             db_record = await self.tool_service.update_tool(tool_name, tool_data)
-            logger.info(f"Updated tool '{tool_name}' in PostgreSQL")
+            logger.debug(f"Updated tool '{tool_name}' in PostgreSQL")
         else:
-            # 新工具
             db_record = await self.tool_service.register_tool(tool_data)
             logger.info(f"Registered new tool '{tool_name}' in PostgreSQL")
 
-        # 4. Always generate embedding and sync to Qdrant
-        # (Embedding generation is fast, no need to optimize by skipping)
-        # Build search-friendly text
-        search_text = self._build_tool_search_text(tool_data)
+        # 5. Only generate embedding and update Qdrant if content changed
+        if needs_update:
+            # Build search-friendly text
+            search_text = self._build_tool_search_text(tool_data)
 
-        # Generate embedding
-        embedding = await self.embedding_gen.embed_single(search_text)
+            # Generate embedding
+            embedding = await self.embedding_gen.embed_single(search_text)
 
-        # Upsert to Qdrant (use db_id as Qdrant point ID)
-        success = await self.vector_repo.upsert_vector(
-            item_id=int(db_record['id']),  # Convert to int
-            item_type='tool',
-            name=tool_name,
-            description=tool_data['description'],
-            embedding=embedding,
-            db_id=db_record['id'],
-            is_active=True,
-            metadata={
-                'category': tool_data.get('category'),
-                'has_schema': bool(tool_data.get('input_schema'))
-            }
-        )
+            # Upsert to Qdrant (use db_id as Qdrant point ID)
+            success = await self.vector_repo.upsert_vector(
+                item_id=int(db_record['id']),  # Convert to int
+                item_type='tool',
+                name=tool_name,
+                description=tool_data['description'],
+                embedding=embedding,
+                db_id=db_record['id'],
+                is_active=True,
+                metadata={
+                    'category': tool_data.get('category'),
+                    'has_schema': bool(tool_data.get('input_schema'))
+                }
+            )
 
-        if success:
-            logger.info(f"✅ Synced tool to Qdrant: {tool_name}")
-        else:
-            raise Exception(f"Failed to upsert to Qdrant: {tool_name}")
+            if success:
+                logger.info(f"✅ Synced tool to Qdrant: {tool_name}")
+            else:
+                raise Exception(f"Failed to upsert to Qdrant: {tool_name}")
+
+        return needs_update
 
     def _build_tool_search_text(self, tool_data: Dict[str, Any]) -> str:
         """
@@ -229,7 +282,7 @@ class SyncService:
         return description
 
     async def sync_prompts(self) -> Dict[str, Any]:
-        """Sync prompts from MCP Server API to database"""
+        """Sync prompts from MCP Server API to database with automatic cleanup"""
         logger.info("Syncing prompts from MCP Server...")
 
         if not self.mcp_server:
@@ -238,6 +291,7 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': ['MCP Server not initialized']
             }
 
@@ -246,7 +300,33 @@ class SyncService:
             mcp_prompts = await self.mcp_server.list_prompts()
             logger.info(f"Retrieved {len(mcp_prompts)} prompts from MCP Server")
 
+            # 2. Get existing prompts from Qdrant
+            qdrant_prompts = await self.vector_repo.get_all_by_type('prompt')
+            logger.info(f"Found {len(qdrant_prompts)} existing prompts in Qdrant")
+
+            # Build a dict for quick lookup: name -> qdrant_prompt
+            qdrant_prompts_dict = {prompt['name']: prompt for prompt in qdrant_prompts}
+
+            # 3. Find orphaned prompts
+            mcp_prompt_names = {prompt.name for prompt in mcp_prompts}
+            orphaned_ids = []
+            orphaned_names = []
+
+            for qdrant_prompt in qdrant_prompts:
+                if qdrant_prompt['name'] not in mcp_prompt_names:
+                    orphaned_ids.append(qdrant_prompt['id'])
+                    orphaned_names.append(qdrant_prompt['name'])
+
+            # 4. Delete orphaned prompts
+            deleted = 0
+            if orphaned_ids:
+                logger.info(f"Found {len(orphaned_ids)} orphaned prompts to clean up: {orphaned_names}")
+                deleted = await self.vector_repo.delete_multiple_vectors(orphaned_ids)
+                logger.info(f"Deleted {deleted} orphaned prompts from Qdrant")
+
+            # 5. Sync current prompts
             synced = 0
+            skipped = 0
             failed = 0
             errors = []
 
@@ -259,17 +339,27 @@ class SyncService:
                         'arguments': prompt.arguments if hasattr(prompt, 'arguments') else [],
                         'template': prompt.description or f'Prompt: {prompt.name}'  # Use description as template
                     }
-                    await self._sync_single_prompt(prompt.name, prompt_info)
-                    synced += 1
+                    # Pass existing qdrant data for change detection
+                    existing_qdrant = qdrant_prompts_dict.get(prompt.name)
+                    changed = await self._sync_single_prompt(prompt.name, prompt_info, existing_qdrant)
+                    if changed:
+                        synced += 1
+                    else:
+                        skipped += 1
                 except Exception as e:
                     logger.error(f"Failed to sync prompt {prompt.name}: {e}")
                     failed += 1
                     errors.append({'prompt': prompt.name, 'error': str(e)})
 
+            logger.info(f"Prompts sync: {synced} updated, {skipped} skipped (no changes), {failed} failed")
+
             return {
                 'total': len(mcp_prompts),
                 'synced': synced,
+                'skipped': skipped,
                 'failed': failed,
+                'deleted': deleted,
+                'orphaned_prompts': orphaned_names,
                 'errors': errors
             }
 
@@ -279,11 +369,17 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': [str(e)]
             }
 
-    async def _sync_single_prompt(self, prompt_name: str, prompt_info: Dict[str, Any]):
-        """Sync a single prompt (增量同步)"""
+    async def _sync_single_prompt(self, prompt_name: str, prompt_info: Dict[str, Any], existing_qdrant: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Sync a single prompt (增量同步)
+
+        Returns:
+            True if updated, False if skipped (no changes)
+        """
         # Check if exists
         existing_prompt = await self.prompt_service.get_prompt(prompt_name)
 
@@ -299,32 +395,42 @@ class SyncService:
             'is_active': True
         }
 
-        # Update or create in PostgreSQL
+        # Check if content changed (compare with Qdrant data)
+        needs_update = True
+        if existing_qdrant:
+            if existing_qdrant.get('description') == prompt_data['description']:
+                needs_update = False
+                logger.debug(f"⏭️  Prompt '{prompt_name}' unchanged, skipping embedding update")
+
+        # Update or create in PostgreSQL (always update for consistency)
         if existing_prompt:
             db_record = await self.prompt_service.update_prompt(prompt_name, prompt_data)
-            logger.info(f"Updated prompt '{prompt_name}' in PostgreSQL")
+            logger.debug(f"Updated prompt '{prompt_name}' in PostgreSQL")
         else:
             db_record = await self.prompt_service.register_prompt(prompt_data)
             logger.info(f"Registered new prompt '{prompt_name}' in PostgreSQL")
 
-        # Always generate embedding and sync to Qdrant
-        search_text = self._build_prompt_search_text(prompt_data)
-        embedding = await self.embedding_gen.embed_single(search_text)
+        # Only generate embedding and update Qdrant if content changed
+        if needs_update:
+            search_text = self._build_prompt_search_text(prompt_data)
+            embedding = await self.embedding_gen.embed_single(search_text)
 
-        success = await self.vector_repo.upsert_vector(
-            item_id=int(db_record['id']),  # Convert to int
-            item_type='prompt',
-            name=prompt_name,
-            description=prompt_data['description'],
-            embedding=embedding,
-            db_id=db_record['id'],
-            is_active=True
-        )
+            success = await self.vector_repo.upsert_vector(
+                item_id=int(db_record['id']),  # Convert to int
+                item_type='prompt',
+                name=prompt_name,
+                description=prompt_data['description'],
+                embedding=embedding,
+                db_id=db_record['id'],
+                is_active=True
+            )
 
-        if success:
-            logger.info(f"✅ Synced prompt to Qdrant: {prompt_name}")
-        else:
-            raise Exception(f"Failed to upsert to Qdrant: {prompt_name}")
+            if success:
+                logger.info(f"✅ Synced prompt to Qdrant: {prompt_name}")
+            else:
+                raise Exception(f"Failed to upsert to Qdrant: {prompt_name}")
+
+        return needs_update
 
     def _build_prompt_search_text(self, prompt_data: Dict[str, Any]) -> str:
         """Build search-friendly text for prompt - just use description"""
@@ -337,7 +443,7 @@ class SyncService:
         return description
 
     async def sync_resources(self) -> Dict[str, Any]:
-        """Sync resources from MCP Server API to database"""
+        """Sync resources from MCP Server API to database with automatic cleanup"""
         logger.info("Syncing resources from MCP Server...")
 
         if not self.mcp_server:
@@ -346,6 +452,7 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': ['MCP Server not initialized']
             }
 
@@ -354,7 +461,33 @@ class SyncService:
             mcp_resources = await self.mcp_server.list_resources()
             logger.info(f"Retrieved {len(mcp_resources)} resources from MCP Server")
 
+            # 2. Get existing resources from Qdrant
+            qdrant_resources = await self.vector_repo.get_all_by_type('resource')
+            logger.info(f"Found {len(qdrant_resources)} existing resources in Qdrant")
+
+            # Build a dict for quick lookup: name -> qdrant_resource
+            qdrant_resources_dict = {resource['name']: resource for resource in qdrant_resources}
+
+            # 3. Find orphaned resources
+            mcp_resource_names = {resource.name or str(resource.uri).split('://')[-1] for resource in mcp_resources}
+            orphaned_ids = []
+            orphaned_names = []
+
+            for qdrant_resource in qdrant_resources:
+                if qdrant_resource['name'] not in mcp_resource_names:
+                    orphaned_ids.append(qdrant_resource['id'])
+                    orphaned_names.append(qdrant_resource['name'])
+
+            # 4. Delete orphaned resources
+            deleted = 0
+            if orphaned_ids:
+                logger.info(f"Found {len(orphaned_ids)} orphaned resources to clean up: {orphaned_names}")
+                deleted = await self.vector_repo.delete_multiple_vectors(orphaned_ids)
+                logger.info(f"Deleted {deleted} orphaned resources from Qdrant")
+
+            # 5. Sync current resources
             synced = 0
+            skipped = 0
             failed = 0
             errors = []
 
@@ -363,24 +496,35 @@ class SyncService:
                     # Convert MCP resource format to our format
                     # Important: Convert AnyUrl to string!
                     resource_uri = str(resource.uri)
+                    resource_name = resource.name or resource_uri.split('://')[-1]
                     resource_info = {
                         'uri': resource_uri,
-                        'name': resource.name or resource_uri.split('://')[-1],
+                        'name': resource_name,
                         'description': resource.description or '',
                         'mime_type': resource.mimeType if hasattr(resource, 'mimeType') else 'text/plain',
                         'type': 'resource'  # Default type
                     }
-                    await self._sync_single_resource(resource_uri, resource_info)
-                    synced += 1
+                    # Pass existing qdrant data for change detection
+                    existing_qdrant = qdrant_resources_dict.get(resource_name)
+                    changed = await self._sync_single_resource(resource_uri, resource_info, existing_qdrant)
+                    if changed:
+                        synced += 1
+                    else:
+                        skipped += 1
                 except Exception as e:
                     logger.error(f"Failed to sync resource {resource.uri}: {e}")
                     failed += 1
                     errors.append({'resource': resource.uri, 'error': str(e)})
 
+            logger.info(f"Resources sync: {synced} updated, {skipped} skipped (no changes), {failed} failed")
+
             return {
                 'total': len(mcp_resources),
                 'synced': synced,
+                'skipped': skipped,
                 'failed': failed,
+                'deleted': deleted,
+                'orphaned_resources': orphaned_names,
                 'errors': errors
             }
 
@@ -390,11 +534,17 @@ class SyncService:
                 'total': 0,
                 'synced': 0,
                 'failed': 0,
+                'deleted': 0,
                 'errors': [str(e)]
             }
 
-    async def _sync_single_resource(self, resource_uri: str, resource_info: Dict[str, Any]):
-        """Sync a single resource (增量同步)"""
+    async def _sync_single_resource(self, resource_uri: str, resource_info: Dict[str, Any], existing_qdrant: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Sync a single resource (增量同步)
+
+        Returns:
+            True if updated, False if skipped (no changes)
+        """
         # Check if exists
         existing_resource = await self.resource_service.get_resource(resource_uri)
 
@@ -412,36 +562,46 @@ class SyncService:
             'is_public': True  # Default to public
         }
 
-        # Update or create in PostgreSQL
+        # Check if content changed (compare with Qdrant data)
+        needs_update = True
+        if existing_qdrant:
+            if existing_qdrant.get('description') == resource_data['description']:
+                needs_update = False
+                logger.debug(f"⏭️  Resource '{resource_uri}' unchanged, skipping embedding update")
+
+        # Update or create in PostgreSQL (always update for consistency)
         if existing_resource:
             db_record = await self.resource_service.update_resource(resource_uri, resource_data)
-            logger.info(f"Updated resource '{resource_uri}' in PostgreSQL")
+            logger.debug(f"Updated resource '{resource_uri}' in PostgreSQL")
         else:
             db_record = await self.resource_service.register_resource(resource_data)
             logger.info(f"Registered new resource '{resource_uri}' in PostgreSQL")
 
-        # Always generate embedding and sync to Qdrant
-        search_text = self._build_resource_search_text(resource_data)
-        embedding = await self.embedding_gen.embed_single(search_text)
+        # Only generate embedding and update Qdrant if content changed
+        if needs_update:
+            search_text = self._build_resource_search_text(resource_data)
+            embedding = await self.embedding_gen.embed_single(search_text)
 
-        success = await self.vector_repo.upsert_vector(
-            item_id=int(db_record['id']),  # Convert to int
-            item_type='resource',
-            name=resource_data['name'],
-            description=resource_data['description'],
-            embedding=embedding,
-            db_id=db_record['id'],
-            is_active=True,
-            metadata={
-                'resource_type': resource_data.get('resource_type'),
-                'uri': resource_uri
-            }
-        )
+            success = await self.vector_repo.upsert_vector(
+                item_id=int(db_record['id']),  # Convert to int
+                item_type='resource',
+                name=resource_data['name'],
+                description=resource_data['description'],
+                embedding=embedding,
+                db_id=db_record['id'],
+                is_active=True,
+                metadata={
+                    'resource_type': resource_data.get('resource_type'),
+                    'uri': resource_uri
+                }
+            )
 
-        if success:
-            logger.info(f"✅ Synced resource to Qdrant: {resource_uri}")
-        else:
-            raise Exception(f"Failed to upsert to Qdrant: {resource_uri}")
+            if success:
+                logger.info(f"✅ Synced resource to Qdrant: {resource_uri}")
+            else:
+                raise Exception(f"Failed to upsert to Qdrant: {resource_uri}")
+
+        return needs_update
 
     def _build_resource_search_text(self, resource_data: Dict[str, Any]) -> str:
         """Build search-friendly text for resource - just use description"""

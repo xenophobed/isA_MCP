@@ -34,6 +34,14 @@ except ImportError:
     QDRANT_AVAILABLE = False
     QdrantClient = None
 
+# 使用配置系统
+try:
+    from core.config.infra_config import InfraConfig
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    InfraConfig = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,8 +69,15 @@ class SimpleRAGService(BaseRAGService):
             return
 
         try:
-            host = os.getenv('QDRANT_HOST', 'isa-qdrant-grpc')
-            port = int(os.getenv('QDRANT_PORT', '50062'))
+            # 优先使用配置系统，回退到环境变量
+            if CONFIG_AVAILABLE:
+                config = InfraConfig.from_env()
+                host = config.qdrant_grpc_host
+                port = config.qdrant_grpc_port
+            else:
+                host = os.getenv('QDRANT_HOST', 'localhost')
+                port = int(os.getenv('QDRANT_PORT', '50062'))
+
             vector_dim = int(os.getenv('VECTOR_DIMENSION', '1536'))
 
             self.qdrant_client = QdrantClient(host=host, port=port)
@@ -111,14 +126,19 @@ class SimpleRAGService(BaseRAGService):
 
         self.logger.info(f"{'='*80}")
         self.logger.info(f"▶▶▶ SimpleRAGService.store() CALLED ◀◀◀")
-        self.logger.info(f"user_id={request.user_id}, content_length={len(request.content)}")
+        self.logger.info(f"user_id={request.user_id}, content_type={request.content_type}, content_length={len(request.content)}")
         self.logger.info(f"qdrant_client available: {self.qdrant_client is not None}")
         self.logger.info(f"{'='*80}")
 
         try:
+            # 0. 处理内容：文件 → 文本（支持多模态）
+            self.logger.info(f"→ Step 0: Processing content (type={request.content_type})...")
+            text_content = await self._process_content(request)
+            self.logger.info(f"✓ Content processed: {len(text_content)} characters")
+
             # 1. 分块文本
             self.logger.info("→ Step 1: Chunking text...")
-            chunks = self._chunk_text(request.content)
+            chunks = self._chunk_text(text_content)
             self.logger.info(f"✓ Chunked into {len(chunks)} chunks")
 
             if not chunks:
@@ -189,7 +209,9 @@ class SimpleRAGService(BaseRAGService):
                 metadata={
                     'chunks_processed': stored_count,
                     'total_chunks': len(chunks),
-                    'content_length': len(request.content)
+                    'content_length': len(request.content),
+                    'content_type': request.content_type,
+                    'text_length': len(text_content)
                 },
                 mode_used=RAGMode.SIMPLE,
                 processing_time=time.time() - start_time

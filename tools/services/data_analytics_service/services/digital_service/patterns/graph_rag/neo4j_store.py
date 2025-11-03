@@ -13,7 +13,7 @@ import json
 from datetime import datetime
 
 from .neo4j_client import Neo4jClient
-from tools.services.data_analytics_service.services.knowledge_service.graph_constructor import GraphConstructor
+from .graph_constructor import GraphConstructor
 from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
 
 logger = get_logger(__name__)

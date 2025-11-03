@@ -52,6 +52,7 @@ services:
 
       # External API Keys
       - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - COMPOSIO_TELEMETRY=${COMPOSIO_TELEMETRY:-false}
       - BRAVE_TOKEN=${BRAVE_TOKEN}
 
       # MCP Service

@@ -312,6 +312,103 @@ class VectorRepository:
             logger.error(f"Failed to get stats: {e}")
             return {'error': str(e)}
 
+    async def get_all_by_type(self, item_type: str) -> List[Dict[str, Any]]:
+        """
+        Get all vectors of a specific type from Qdrant
+
+        Args:
+            item_type: Type to filter ('tool', 'prompt', 'resource')
+
+        Returns:
+            List of vector metadata
+        """
+        try:
+            # Build filter conditions for isa_common QdrantClient
+            filter_conditions = {
+                'must': [
+                    {'field': 'type', 'match': {'keyword': item_type}}
+                ]
+            }
+
+            # Scroll through all points of this type
+            items = []
+            offset_id = None
+
+            while True:
+                with self.client:
+                    result = self.client.scroll(
+                        collection_name=self.collection_name,
+                        filter_conditions=filter_conditions,
+                        limit=1000,  # Page size
+                        offset_id=offset_id,
+                        with_payload=True,
+                        with_vectors=False
+                    )
+
+                if not result or 'points' not in result:
+                    break
+
+                points = result['points']
+                if not points:
+                    break
+
+                # Extract metadata from points
+                for point in points:
+                    items.append({
+                        'id': point['id'],
+                        'name': point['payload'].get('name'),
+                        'description': point['payload'].get('description', ''),
+                        'type': point['payload'].get('type'),
+                        'db_id': point['payload'].get('db_id'),
+                        'is_active': point['payload'].get('is_active'),
+                        'metadata': point['payload'].get('metadata', {})
+                    })
+
+                # Check for next page
+                offset_id = result.get('next_offset')
+                if not offset_id:
+                    break
+
+            logger.debug(f"Retrieved {len(items)} items of type '{item_type}' from Qdrant")
+            return items
+
+        except Exception as e:
+            logger.error(f"Failed to get items by type '{item_type}': {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+    async def delete_multiple_vectors(self, item_ids: List[int]) -> int:
+        """
+        Delete multiple vectors by IDs
+
+        Args:
+            item_ids: List of vector identifiers
+
+        Returns:
+            Number of successfully deleted vectors
+        """
+        if not item_ids:
+            return 0
+
+        try:
+            with self.client:
+                operation_id = self.client.delete_points(
+                    self.collection_name,
+                    item_ids
+                )
+
+            if operation_id:
+                logger.info(f"Deleted {len(item_ids)} vectors")
+                return len(item_ids)
+            else:
+                logger.error(f"Failed to delete vectors")
+                return 0
+
+        except Exception as e:
+            logger.error(f"Failed to delete vectors: {e}")
+            return 0
+
     async def clear_collection(self) -> bool:
         """
         Clear all vectors from collection (for testing/reset)

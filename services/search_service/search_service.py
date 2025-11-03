@@ -24,6 +24,9 @@ class SearchResult:
     score: float               # 相似度得分 (0-1)
     db_id: int                 # PostgreSQL ID
     metadata: Dict[str, Any]   # 额外元数据
+    inputSchema: Optional[Dict[str, Any]] = None    # Tool input schema (for tool calling)
+    outputSchema: Optional[Dict[str, Any]] = None   # Tool output schema
+    annotations: Optional[Dict[str, Any]] = None     # MCP annotations
 
 
 class SearchService:
@@ -41,9 +44,17 @@ class SearchService:
         """Initialize search service"""
         from services.vector_service import VectorRepository
         from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
+        from services.tool_service.tool_repository import ToolRepository
+        from services.prompt_service.prompt_repository import PromptRepository
+        from services.resource_service.resource_repository import ResourceRepository
 
         self.vector_repo = VectorRepository()
         self.embedding_gen = EmbeddingGenerator()
+
+        # Add repositories to fetch full schemas
+        self.tool_repo = ToolRepository()
+        self.prompt_repo = PromptRepository()
+        self.resource_repo = ResourceRepository()
 
         logger.info("SearchService initialized")
 
@@ -107,11 +118,38 @@ class SearchService:
                 logger.error(f"❌ [SearchService] Qdrant search failed: {e}")
                 raise
 
-            # 3. 转换为 SearchResult 对象
-            logger.info(f"📦 [SearchService] Step 3: Converting to SearchResult objects...")
+            # 3. 转换为 SearchResult 对象并获取完整 schema
+            logger.info(f"📦 [SearchService] Step 3: Enriching results with full schemas...")
             search_results = []
             for i, r in enumerate(results):
                 try:
+                    item_type = r['type']
+                    db_id = r['db_id']
+
+                    # Fetch full schema from PostgreSQL based on type
+                    inputSchema = None
+                    outputSchema = None
+                    annotations = None
+
+                    if item_type == 'tool' and db_id:
+                        tool_data = await self.tool_repo.get_tool_by_id(db_id)
+                        if tool_data:
+                            inputSchema = tool_data.get('input_schema')
+                            outputSchema = tool_data.get('output_schema')
+                            annotations = tool_data.get('annotations')
+                            logger.debug(f"   ✅ Fetched schema for tool '{r['name']}' (id={db_id})")
+                        else:
+                            logger.warning(f"   ⚠️  Tool '{r['name']}' not found in PostgreSQL (id={db_id})")
+                    elif item_type == 'prompt' and db_id:
+                        prompt_data = await self.prompt_repo.get_prompt_by_id(db_id)
+                        if prompt_data:
+                            # Prompts may have different schema structure
+                            annotations = prompt_data.get('annotations')
+                    elif item_type == 'resource' and db_id:
+                        resource_data = await self.resource_repo.get_resource_by_id(db_id)
+                        if resource_data:
+                            annotations = resource_data.get('annotations')
+
                     search_results.append(SearchResult(
                         id=r['id'],
                         type=r['type'],
@@ -119,14 +157,18 @@ class SearchService:
                         description=r['description'],
                         score=r['score'],
                         db_id=r['db_id'],
-                        metadata=r.get('metadata', {})
+                        metadata=r.get('metadata', {}),
+                        inputSchema=inputSchema,
+                        outputSchema=outputSchema,
+                        annotations=annotations
                     ))
                 except Exception as e:
-                    logger.error(f"   Failed to convert result {i}: {e}, data: {r}")
+                    logger.error(f"   Failed to enrich result {i}: {e}, data: {r}")
 
             logger.info(f"✅ [SearchService] Final result: {len(search_results)} items")
             for i, r in enumerate(search_results[:3]):
-                logger.info(f"   {i+1}. {r.name} ({r.type}): score={r.score:.3f}")
+                has_schema = "✓" if r.inputSchema else "✗"
+                logger.info(f"   {i+1}. {r.name} ({r.type}): score={r.score:.3f}, schema={has_schema}")
 
             return search_results
 

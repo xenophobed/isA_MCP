@@ -18,6 +18,8 @@ class RAGMode(str, Enum):
     RAPTOR = "raptor"           # 层次化文档
     SELF_RAG = "self_rag"       # 自我反思
     CRAG = "crag"               # 检索质量评估
+    RAG_FUSION = "rag_fusion"   # 多查询重写 + RRF 融合
+    HYDE = "hyde"               # 假设文档嵌入
     PLAN_RAG = "plan_rag"       # 结构化推理
     HM_RAG = "hm_rag"           # 多智能体协作
     CUSTOM = "custom"           # 自定义多模态
@@ -40,6 +42,9 @@ class RAGConfig(BaseModel):
     enable_quality_assessment: bool = False
     enable_planning: bool = False
     enable_multi_agent: bool = False
+
+    # 额外配置（用于特定模式的高级选项）
+    extra_config: Optional[Dict[str, Any]] = None
 
     class Config:
         use_enum_values = True

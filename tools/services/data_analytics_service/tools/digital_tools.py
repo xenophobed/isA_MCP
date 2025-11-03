@@ -79,6 +79,15 @@ def register_digital_tools(mcp: FastMCP):
             store_knowledge(user_id="user1", content="/path/to/document.pdf", content_type="pdf",
                           options={"enable_vlm_analysis": True, "enable_minio_upload": True, "max_pages": 14})
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await digital_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "content_type": content_type,
+                "operation": "store_knowledge"
+            }
+        )
+
         try:
             metadata = metadata or {}
             options = options or {}
@@ -89,9 +98,9 @@ def register_digital_tools(mcp: FastMCP):
             # Route to appropriate storage method based on content_type
             if content_type == "text":
                 # Simple 4-stage progress for text
-                await digital_tool.progress_reporter.report_stage(ctx, "processing", "text")
-                await digital_tool.progress_reporter.report_stage(ctx, "extraction", "text")
-                await digital_tool.progress_reporter.report_stage(ctx, "embedding", "text")
+                await digital_tool.progress_reporter.report_stage(operation_id, "processing", "text")
+                await digital_tool.progress_reporter.report_stage(operation_id, "extraction", "text")
+                await digital_tool.progress_reporter.report_stage(operation_id, "embedding", "text")
 
                 # Use RAG Factory for text storage (aligned with architecture)
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
@@ -117,16 +126,17 @@ def register_digital_tools(mcp: FastMCP):
 
                 result = {
                     'success': rag_result.success,
-                    'error': rag_result.error if not rag_result.success else None
+                    'error': rag_result.error if not rag_result.success else None,
+                    'metadata': rag_result.metadata  # Include RAG metadata (tree_levels, total_nodes, etc.)
                 }
 
-                await digital_tool.progress_reporter.report_stage(ctx, "storing", "text")
+                await digital_tool.progress_reporter.report_stage(operation_id, "storing", "text")
 
             elif content_type == "document":
                 # 4-stage progress for document chunking
-                await digital_tool.progress_reporter.report_stage(ctx, "processing", "document")
-                await digital_tool.progress_reporter.report_stage(ctx, "extraction", "document")
-                await digital_tool.progress_reporter.report_stage(ctx, "embedding", "document")
+                await digital_tool.progress_reporter.report_stage(operation_id, "processing", "document")
+                await digital_tool.progress_reporter.report_stage(operation_id, "extraction", "document")
+                await digital_tool.progress_reporter.report_stage(operation_id, "embedding", "document")
 
                 # Use RAG Factory for document storage (aligned with architecture)
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
@@ -145,16 +155,17 @@ def register_digital_tools(mcp: FastMCP):
 
                 result = {
                     'success': rag_result.success,
-                    'error': rag_result.error if not rag_result.success else None
+                    'error': rag_result.error if not rag_result.success else None,
+                    'metadata': rag_result.metadata  # Include RAG metadata
                 }
 
-                await digital_tool.progress_reporter.report_stage(ctx, "storing", "document")
+                await digital_tool.progress_reporter.report_stage(operation_id, "storing", "document")
 
             elif content_type == "image":
                 # 4-stage progress for image with VLM
-                await digital_tool.progress_reporter.report_stage(ctx, "processing", "image")
-                await digital_tool.progress_reporter.report_stage(ctx, "extraction", "image", "VLM analysis")
-                await digital_tool.progress_reporter.report_stage(ctx, "embedding", "image")
+                await digital_tool.progress_reporter.report_stage(operation_id, "processing", "image")
+                await digital_tool.progress_reporter.report_stage(operation_id, "extraction", "image", "VLM analysis")
+                await digital_tool.progress_reporter.report_stage(operation_id, "embedding", "image")
 
                 # Use RAG Factory for image storage (aligned with architecture)
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
@@ -173,15 +184,16 @@ def register_digital_tools(mcp: FastMCP):
 
                 result = {
                     'success': rag_result.success,
-                    'error': rag_result.error if not rag_result.success else None
+                    'error': rag_result.error if not rag_result.success else None,
+                    'metadata': rag_result.metadata  # Include RAG metadata
                 }
 
-                await digital_tool.progress_reporter.report_stage(ctx, "storing", "image")
+                await digital_tool.progress_reporter.report_stage(operation_id, "storing", "image")
 
             elif content_type == "pdf":
                 # Detailed 4-stage progress for PDF multimodal processing
                 # Stage 1: Processing - Extract PDF pages
-                await digital_tool.progress_reporter.report_stage(ctx, "processing", "pdf", "extracting pages")
+                await digital_tool.progress_reporter.report_stage(operation_id, "processing", "pdf", "extracting pages")
 
                 # Use RAG Factory to get service (defaults to custom for PDF)
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
@@ -202,7 +214,7 @@ def register_digital_tools(mcp: FastMCP):
                 rag_service = get_rag_service(mode=rag_mode, config=rag_config)
 
                 # Stage 2: AI Extraction - VLM analysis of pages
-                await digital_tool.progress_reporter.report_stage(ctx, "extraction", "pdf", "VLM page analysis")
+                await digital_tool.progress_reporter.report_stage(operation_id, "extraction", "pdf", "VLM page analysis")
 
                 # Create RAGStoreRequest using new Pydantic model
                 store_request = RAGStoreRequest(
@@ -225,26 +237,32 @@ def register_digital_tools(mcp: FastMCP):
                 if rag_result.success:
                     total_pages = result['pages_processed']
                     await digital_tool.progress_reporter.report_stage(
-                        ctx, "embedding", "pdf",
+                        operation_id, "embedding", "pdf",
                         details={"pages": total_pages}
                     )
 
                     # Stage 4: Storing - MinIO + Vector DB
                     await digital_tool.progress_reporter.report_storage_progress(
-                        ctx, "pdf", "minio", "uploading"
+                        operation_id, "pdf", "minio", "uploading"
                     )
                     await digital_tool.progress_reporter.report_storage_progress(
-                        ctx, "pdf", "vector_db", "indexing"
+                        operation_id, "pdf", "vector_db", "indexing"
                     )
 
                     # Add ingestion method to result
                     result['ingestion_method'] = f'{rag_mode}_rag_multimodal'
 
-                    # Report completion
-                    await digital_tool.progress_reporter.report_complete(ctx, "pdf", {
+                    # Report completion (no ctx needed for report_complete)
+                    await digital_tool.progress_reporter.report_complete("pdf", {
                         "pages": total_pages,
                         "photos": result['total_photos']
                     })
+
+                    # Complete progress operation
+                    await digital_tool.complete_progress_operation(
+                        operation_id,
+                        result={"pages": total_pages, "photos": result['total_photos']}
+                    )
 
             else:
                 return digital_tool.create_response(
@@ -256,25 +274,36 @@ def register_digital_tools(mcp: FastMCP):
             if result.get('success'):
                 await digital_tool.log_info(ctx, f"{content_type} storage completed successfully")
 
+                # Complete progress operation for non-PDF content types
+                if content_type != "pdf":  # PDF already completed above
+                    await digital_tool.complete_progress_operation(
+                        operation_id,
+                        result=result
+                    )
+
             return digital_tool.create_response(
                 "success" if result.get('success') else "error",
                 "store_knowledge",
                 {
                     **result,
                     "content_type": content_type,
-                    "context": digital_tool.extract_context_info(ctx, user_id)
+                    "operation_id": operation_id,  # ✅ Return operation_id for SSE monitoring
+                    "context": digital_tool.extract_context_info(ctx)
                 },
                 result.get('error') if not result.get('success') else None
             )
 
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await digital_tool.fail_progress_operation(operation_id, str(e))
             # Log full traceback to identify exact error location
             full_traceback = traceback.format_exc()
             await digital_tool.log_error(ctx, f"Storage failed: {str(e)}\n\nFull traceback:\n{full_traceback}")
             logger.error(f"Storage failed with full traceback:\n{full_traceback}")
             return digital_tool.create_response(
                 "error", "store_knowledge",
-                {"context": digital_tool.extract_context_info(ctx, user_id)},
+                {"context": digital_tool.extract_context_info(ctx)},
                 f"Storage failed: {str(e)}"
             )
     
@@ -392,7 +421,8 @@ def register_digital_tools(mcp: FastMCP):
                         'total_results': len(search_results),
                         'total_photos': rag_result.metadata.get('total_photos', 0) if rag_result.metadata else 0,
                         'search_method': f'{rag_mode}_rag_multimodal',
-                        'query': query
+                        'query': query,
+                        'metadata': rag_result.metadata if rag_result.metadata else {}
                     }
 
             # Handle content type filtering
@@ -434,7 +464,8 @@ def register_digital_tools(mcp: FastMCP):
                         'search_results': search_results,
                         'total_results': len(search_results),
                         'search_method': f'{rag_mode}_rag_unified',
-                        'query': query
+                        'query': query,
+                        'metadata': rag_result.metadata if rag_result.metadata else {}
                     }
                 else:
                     result = {'success': False, 'error': rag_result.error}
@@ -477,7 +508,8 @@ def register_digital_tools(mcp: FastMCP):
                         'total_results': len(search_results),
                         'total_photos': rag_result.metadata.get('total_photos', 0) if rag_result.metadata else 0,
                         'search_method': f'{rag_mode}_rag_unified',
-                        'query': query
+                        'query': query,
+                        'metadata': rag_result.metadata if rag_result.metadata else {}
                     }
                 else:
                     result = {'success': False, 'error': rag_result.error}
@@ -529,7 +561,7 @@ def register_digital_tools(mcp: FastMCP):
                 {
                     **result,
                     "search_options_used": search_options,
-                    "context": digital_tool.extract_context_info(ctx, user_id)
+                    "context": digital_tool.extract_context_info(ctx)
                 },
                 result.get('error') if not result.get('success') else None
             )
@@ -541,7 +573,7 @@ def register_digital_tools(mcp: FastMCP):
             logger.error(f"Search failed with full traceback:\n{full_traceback}")
             return digital_tool.create_response(
                 "error", "search_knowledge",
-                {"context": digital_tool.extract_context_info(ctx, user_id)},
+                {"context": digital_tool.extract_context_info(ctx)},
                 f"Search failed: {str(e)}"
             )
     
@@ -554,20 +586,26 @@ def register_digital_tools(mcp: FastMCP):
     ) -> Dict[str, Any]:
         """
         Universal RAG response generation - handles all RAG modes and contexts
-        
+
         This is the unified response generation interface supporting all RAG modes and multimodal context.
-        
+
         Keywords: generate, answer, RAG, response, intelligent, context
         Category: core_knowledge
-        
+
         Args:
             user_id: User identifier for knowledge isolation
-            query: User question or query for response generation  
+            query: User question or query for response generation
             response_options: Response configuration as dict with options:
-                - rag_mode: "simple", "raptor", "self_rag", "crag", "plan_rag", "hm_rag", "graph" (default: "simple")
+                - rag_mode: RAG pattern selection (default: "simple")
+                  * "simple": Fast basic retrieval (90% of cases) - use for straightforward queries
+                  * "crag": Quality-aware retrieval with filtering - use when accuracy is critical
+                  * "self_rag": Self-reflection with quality assessment - use for complex analysis
+                  * "rag_fusion": Multi-query + RRF fusion - use for ambiguous/broad queries (20-30% better recall)
+                  * "hyde": Hypothetical document embeddings - use for abstract/poorly-worded queries
                 - context_limit: Max context items (default: 3)
                 - include_images: Include image context (default: True)
                 - enable_citations: Include inline citations (default: True)
+                - num_queries: For rag_fusion mode, number of query variants (default: 3)
                 - modes: ["simple", "crag"] - for hybrid multi-mode query
                 - recommend_mode: Auto-recommend best mode (default: False)
                 - use_pdf_context: Use PDF-aware RAG pipeline (default: False)
@@ -597,12 +635,21 @@ def register_digital_tools(mcp: FastMCP):
             knowledge_response(user_id="user1", query="How to create new customer in CRM?",
                              response_options={"use_pdf_context": True, "context_limit": 5})
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await digital_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "query": query[:100],  # Truncate for metadata
+                "operation": "knowledge_response"
+            }
+        )
+
         try:
             response_options = response_options or {}
 
             # Stage 1/4 (25%): Query Analysis
             await digital_tool.progress_reporter.report_stage(
-                ctx, "processing", "query", "Analyzing query",
+                operation_id, "processing", "query", "Analyzing query",
                 pipeline_type="generation"
             )
             await digital_tool.log_info(ctx, f"Starting RAG response for query: '{query}' (user: {user_id})")
@@ -663,7 +710,7 @@ def register_digital_tools(mcp: FastMCP):
 
                 # Stage 2/4 (50%): Context Retrieval - Search knowledge base
                 await digital_tool.progress_reporter.report_stage(
-                    ctx, "retrieval", "query", f"Searching knowledge base (top {context_limit})",
+                    operation_id, "retrieval", "query", f"Searching knowledge base (top {context_limit})",
                     pipeline_type="generation"
                 )
 
@@ -686,14 +733,14 @@ def register_digital_tools(mcp: FastMCP):
                 # Stage 3/4 (75%): Context Preparation - Prepare and rank context
                 pages_found = len(rag_retrieval.sources) if rag_retrieval.sources else 0
                 await digital_tool.progress_reporter.report_stage(
-                    ctx, "preparation", "query", f"Preparing {pages_found} context items",
+                    operation_id, "preparation", "query", f"Preparing {pages_found} context items",
                     pipeline_type="generation"
                 )
 
                 # 2. Generate with RAG service (includes image references)
                 # Stage 4/4 (100%): AI Generation - Generate response
                 await digital_tool.progress_reporter.report_stage(
-                    ctx, "generation", "query", f"Generating response (mode: {selected_rag_mode})",
+                    operation_id, "generation", "query", f"Generating response (mode: {selected_rag_mode})",
                     pipeline_type="generation"
                 )
 
@@ -753,7 +800,7 @@ def register_digital_tools(mcp: FastMCP):
 
             # Stage 2/4 (50%): Context Retrieval
             await digital_tool.progress_reporter.report_stage(
-                ctx, "retrieval", "query", f"Retrieving context (limit: {context_limit})",
+                operation_id, "retrieval", "query", f"Retrieving context (limit: {context_limit})",
                 pipeline_type="generation"
             )
 
@@ -777,13 +824,13 @@ def register_digital_tools(mcp: FastMCP):
             # Stage 3/4 (75%): Context Preparation
             sources_found = len(rag_retrieval.sources) if rag_retrieval.sources else 0
             await digital_tool.progress_reporter.report_stage(
-                ctx, "preparation", "query", f"Preparing {sources_found} context items",
+                operation_id, "preparation", "query", f"Preparing {sources_found} context items",
                 pipeline_type="generation"
             )
 
             # Stage 4/4 (100%): AI Generation
             await digital_tool.progress_reporter.report_stage(
-                ctx, "generation", "query", f"Generating with {rag_mode} mode",
+                operation_id, "generation", "query", f"Generating with {rag_mode} mode",
                 pipeline_type="generation"
             )
 
@@ -849,9 +896,14 @@ def register_digital_tools(mcp: FastMCP):
 
                 # Report completion with summary
                 await digital_tool.progress_reporter.report_complete(
-                    ctx,
                     "query",
                     {"response_length": response_len, "rag_mode": rag_mode, "context_limit": context_limit}
+                )
+
+                # Complete progress operation
+                await digital_tool.complete_progress_operation(
+                    operation_id,
+                    result={"response_length": response_len, "rag_mode": rag_mode}
                 )
 
             return digital_tool.create_response(
@@ -862,19 +914,23 @@ def register_digital_tools(mcp: FastMCP):
                     "response_type": response_type,
                     "rag_mode_used": rag_mode,
                     "response_options_used": response_options,
-                    "context": digital_tool.extract_context_info(ctx, user_id)
+                    "operation_id": operation_id,  # ✅ Return operation_id for SSE monitoring
+                    "context": digital_tool.extract_context_info(ctx)
                 },
                 result.get('error') if not result.get('success') else None
             )
 
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await digital_tool.fail_progress_operation(operation_id, str(e))
             # Log full traceback to identify exact error location
             full_traceback = traceback.format_exc()
             await digital_tool.log_error(ctx, f"Response generation failed: {str(e)}\n\nFull traceback:\n{full_traceback}")
             logger.error(f"Response generation failed with full traceback:\n{full_traceback}")
             return digital_tool.create_response(
                 "error", "knowledge_response",
-                {"context": digital_tool.extract_context_info(ctx, user_id)},
+                {"context": digital_tool.extract_context_info(ctx)},
                 f"Response generation failed: {str(e)}"
             )
     

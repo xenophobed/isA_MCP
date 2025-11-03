@@ -656,3 +656,92 @@ class DigitalKnowledgeResources:
 
 # Global instance
 digital_knowledge_resources = DigitalKnowledgeResources()
+
+# ============================================================================
+# MCP RESOURCE REGISTRATION
+# ============================================================================
+
+def register_digital_resource(mcp):
+    """
+    Register digital knowledge resources with MCP server
+    
+    Exposes user knowledge base, RAG sessions, and digital analytics
+    resources for agent access.
+    """
+    from mcp.server.fastmcp import FastMCP
+    
+    @mcp.resource("knowledge://stats/global")
+    def get_knowledge_stats() -> str:
+        """
+        Get global knowledge base statistics
+        
+        Provides overview of registered knowledge items, users, and resource types.
+        
+        Keywords: knowledge, statistics, overview, analytics, global
+        Category: knowledge
+        """
+        stats = digital_knowledge_resources.get_global_stats()
+        return json.dumps({
+            "description": "Global Knowledge Base Statistics",
+            "stats": stats,
+            "usage": "Use to understand available knowledge resources"
+        }, indent=2)
+    
+    @mcp.resource("knowledge://user/{user_id}/resources")
+    def get_user_resources(user_id: str) -> str:
+        """
+        Get knowledge resources for a specific user
+        
+        Lists all knowledge items, documents, and RAG sessions owned by the user.
+        
+        Keywords: knowledge, user, resources, personal, knowledge-base
+        Category: knowledge
+        """
+        user_resources = digital_knowledge_resources.get_user_resources(user_id)
+        
+        if not user_resources.get('success'):
+            return json.dumps({
+                "error": user_resources.get('error', 'User not found'),
+                "user_id": user_id
+            }, indent=2)
+        
+        return json.dumps({
+            "description": f"Knowledge resources for user {user_id}",
+            "user_id": user_id,
+            "total_resources": user_resources['total_resources'],
+            "resources": user_resources['resources'],
+            "usage": "These are the knowledge items available for this user"
+        }, indent=2)
+    
+    @mcp.resource("knowledge://types/supported")
+    def get_supported_types() -> str:
+        """
+        Get supported knowledge resource types
+        
+        Lists all types of knowledge resources that can be registered and accessed.
+        
+        Keywords: knowledge, types, supported, capabilities, resource-types
+        Category: knowledge
+        """
+        return json.dumps({
+            "description": "Supported Knowledge Resource Types",
+            "types": list(digital_knowledge_resources.resource_types),
+            "details": {
+                "knowledge_item": "Individual knowledge base entries with embeddings",
+                "document_chunk": "Chunked document sections for RAG",
+                "rag_session": "Active RAG conversation sessions",
+                "analytics_report": "Digital analytics reports",
+                "embedding_collection": "Collections of semantic embeddings"
+            },
+            "usage": "Reference these types when working with knowledge resources"
+        }, indent=2)
+    
+    logger.info(f"✅ Registered digital knowledge resources")
+
+
+# Export for auto-discovery
+__all__ = [
+    'DigitalKnowledgeResources',
+    'digital_knowledge_resources',
+    'register_digital_resource'
+]

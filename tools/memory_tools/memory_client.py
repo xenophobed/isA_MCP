@@ -120,12 +120,17 @@ class MemoryServiceClient:
             try:
                 async with session.request(method, url, **kwargs) as response:
                     if response.status == 200:
-                        return await response.json()
+                        result = await response.json()
+                        # Close session after successful request to prevent unclosed session warnings
+                        await self.close()
+                        return result
                     elif response.status == 404:
                         error_detail = await response.text()
+                        await self.close()
                         raise Exception(f"Not found: {error_detail}")
                     else:
                         error_detail = await response.text()
+                        await self.close()
                         raise Exception(f"HTTP {response.status}: {error_detail}")
 
             except aiohttp.ClientError as e:
@@ -136,8 +141,11 @@ class MemoryServiceClient:
                     await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
                     # Reset service URL to trigger re-discovery
                     self.service_url = None
+                    # Close and recreate session for retry
+                    await self.close()
                 continue
 
+        await self.close()
         raise Exception(f"All retry attempts failed. Last error: {last_error}")
 
     async def close(self):

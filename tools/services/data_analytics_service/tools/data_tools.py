@@ -146,23 +146,33 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns: {"status": "success", "data": {...}}
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await data_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "source_path": source_path,
+                "dataset_name": dataset_name or "auto",
+                "operation": "data_ingest"
+            }
+        )
+
         try:
             from pathlib import Path
             from tools.services.data_analytics_service.services.data_service.preprocessor.preprocessor_service import get_preprocessor_service
             from tools.services.data_analytics_service.services.data_service.storage.data_storage_service import DataStorageService
             from tools.services.data_analytics_service.tools.context import DataSourceDetector
-            
+
             # Generate dataset name if not provided
             if not dataset_name:
                 dataset_name = Path(source_path).stem
-            
+
             # Detect data source type
             data_source_type = DataSourceDetector.detect_from_path(source_path)
-            
+
             # Log start and report Stage 1: Processing
             await data_tool.log_info(ctx, f"Starting data ingestion for user {user_id}: {source_path}")
             await data_tool.progress_reporter.report_stage(
-                ctx, "processing", data_source_type, 
+                operation_id, "processing", data_source_type,
                 f"loading {dataset_name}",
                 pipeline_type="ingestion"
             )
@@ -186,7 +196,7 @@ def register_data_tools(mcp: FastMCP):
             
             # Report data statistics
             await data_tool.progress_reporter.report_data_stats(
-                ctx, "processing", data_source_type,
+                operation_id, "processing", data_source_type,
                 rows=pipeline_result.rows_detected,
                 columns=pipeline_result.columns_detected,
                 quality_score=pipeline_result.data_quality_score,
@@ -206,7 +216,7 @@ def register_data_tools(mcp: FastMCP):
             # Step 3: Store to MinIO Parquet using professional storage service
             await data_tool.log_info(ctx, f"Storing data to MinIO Parquet: {dataset_name}")
             await data_tool.progress_reporter.report_storage_progress(
-                ctx, data_source_type, "minio", "uploading"
+                operation_id, data_source_type, "minio", "uploading"
             )
             
             storage_success = False
@@ -289,7 +299,7 @@ def register_data_tools(mcp: FastMCP):
             # Stage 2: Extraction - Metadata extraction and semantic enrichment
             await data_tool.log_info(ctx, "Starting metadata extraction and semantic enrichment")
             await data_tool.progress_reporter.report_stage(
-                ctx, "extraction", data_source_type,
+                operation_id, "extraction", data_source_type,
                 "extracting metadata",
                 pipeline_type="ingestion"
             )
@@ -325,7 +335,7 @@ def register_data_tools(mcp: FastMCP):
                     # Step 2: Semantic enrichment
                     logger.info("STEP4: Performing semantic enrichment...")
                     await data_tool.progress_reporter.report_stage(
-                        ctx, "extraction", data_source_type,
+                        operation_id, "extraction", data_source_type,
                         "AI semantic enrichment",
                         pipeline_type="ingestion"
                     )
@@ -341,7 +351,7 @@ def register_data_tools(mcp: FastMCP):
                     # Stage 3: Embedding - Generate vector embeddings
                     await data_tool.log_info(ctx, "Generating vector embeddings")
                     await data_tool.progress_reporter.report_stage(
-                        ctx, "embedding", data_source_type,
+                        operation_id, "embedding", data_source_type,
                         "generating embeddings",
                         pipeline_type="ingestion"
                     )
@@ -363,10 +373,10 @@ def register_data_tools(mcp: FastMCP):
                     if metadata_embeddings_count > 0:
                         metadata_success = True
                         logger.info(f"STEP4: Metadata stored successfully: {metadata_embeddings_count} embeddings (failed: {failed_count})")
-                        
+
                         # Report embedding progress with granular details
                         await data_tool.progress_reporter.report_stage(
-                            ctx, "embedding", data_source_type,
+                            operation_id, "embedding", data_source_type,
                             f"{metadata_embeddings_count} embeddings created",
                             pipeline_type="ingestion"
                         )
@@ -381,15 +391,15 @@ def register_data_tools(mcp: FastMCP):
             
             # Stage 4: Storing - Final storage completion
             await data_tool.progress_reporter.report_storage_progress(
-                ctx, data_source_type, "vector_db", "indexing"
+                operation_id, data_source_type, "vector_db", "indexing"
             )
             await data_tool.progress_reporter.report_storage_progress(
-                ctx, data_source_type, "metadata_store", "completed"
+                operation_id, data_source_type, "metadata_store", "completed"
             )
             
             # Report completion with summary
             await data_tool.progress_reporter.report_complete(
-                ctx, data_source_type,
+                data_source_type,
                 {
                     "rows": pipeline_result.rows_detected,
                     "columns": pipeline_result.columns_detected,
@@ -398,8 +408,19 @@ def register_data_tools(mcp: FastMCP):
                 },
                 pipeline_type="ingestion"
             )
+
+            # Complete progress operation
+            await data_tool.complete_progress_operation(
+                operation_id,
+                result={
+                    "rows": pipeline_result.rows_detected,
+                    "columns": pipeline_result.columns_detected,
+                    "embeddings": metadata_embeddings_count
+                }
+            )
+
             await data_tool.log_info(ctx, f"Data ingestion completed successfully: {dataset_name}")
-            
+
             # Success - return clean result like digital_tools (avoid any numpy objects)
             success_result = {
                 "success": True,
@@ -413,9 +434,10 @@ def register_data_tools(mcp: FastMCP):
                 "storage_location": "analytics-data bucket (MinIO Parquet)",
                 "metadata_stored": bool(metadata_success),
                 "metadata_embeddings": int(metadata_embeddings_count),
+                "operation_id": str(operation_id),  # ✅ Return operation_id for SSE monitoring
                 "message": "Data ingestion and metadata storage completed successfully"
             }
-            
+
             # Use weather_tools pattern - direct json.dumps (bypass BaseTool)
             response = {
                 "status": "success",
@@ -423,10 +445,13 @@ def register_data_tools(mcp: FastMCP):
                 "data": success_result,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             return json.dumps(response, ensure_ascii=False)
-                
+
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await data_tool.fail_progress_operation(operation_id, str(e))
             logger.error(f"Data ingestion failed: {str(e)}")
             await data_tool.log_error(ctx, f"Data ingestion failed: {str(e)}")
             # Use weather_tools pattern for error too
@@ -565,14 +590,23 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns top N most similar entities
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await data_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "search_query": search_query or "all_datasets",
+                "operation": "data_search"
+            }
+        )
+
         try:
             from tools.services.data_analytics_service.services.data_service.management.metadata.metadata_embedding import get_embedding_service
             from core.database.supabase_client import get_supabase_client
-            
+
             # Stage 1: Query Processing
             await data_tool.log_info(ctx, f"Starting dataset search for user {user_id}")
             await data_tool.progress_reporter.report_stage(
-                ctx, "processing", "query",
+                operation_id, "processing", "query",
                 "analyzing search query" if search_query else "listing all datasets",
                 pipeline_type="search"
             )
@@ -596,15 +630,15 @@ def register_data_tools(mcp: FastMCP):
             if search_query:
                 # Stage 2: Query Embedding
                 await data_tool.progress_reporter.report_stage(
-                    ctx, "embedding", "query",
+                    operation_id, "embedding", "query",
                     "generating query embedding",
                     pipeline_type="search"
                 )
-                
+
                 try:
                     # Stage 3: Similarity Matching
                     await data_tool.progress_reporter.report_stage(
-                        ctx, "matching", "query",
+                        operation_id, "matching", "query",
                         "searching vector database",
                         pipeline_type="search"
                     )
@@ -629,17 +663,17 @@ def register_data_tools(mcp: FastMCP):
                     logger.warning(f"Search failed: {str(e)}")
                     await data_tool.log_error(ctx, f"Search failed: {str(e)}")
                     search_results = []
-            
+
             # Stage 4: Result Ranking
             await data_tool.progress_reporter.report_stage(
-                ctx, "ranking", "query",
+                operation_id, "ranking", "query",
                 f"{len(search_results)} results found",
                 pipeline_type="search"
             )
-            
+
             # Report completion
             await data_tool.progress_reporter.report_complete(
-                ctx, "query",
+                "query",
                 {
                     "total_embeddings": total_embeddings,
                     "results_found": len(search_results),
@@ -647,6 +681,16 @@ def register_data_tools(mcp: FastMCP):
                 },
                 pipeline_type="search"
             )
+
+            # Complete progress operation
+            await data_tool.complete_progress_operation(
+                operation_id,
+                result={
+                    "total_embeddings": total_embeddings,
+                    "results_found": len(search_results)
+                }
+            )
+
             await data_tool.log_info(ctx, f"Search completed: {len(search_results)} results found")
             
             result = {
@@ -679,19 +723,23 @@ def register_data_tools(mcp: FastMCP):
                 
             if search_query and result["search_count"] == 0:
                 result["recommendations"].append(f"No results for '{search_query}'. Try broader search terms.")
-            
+
             result["message"] = f"Found {result['database_summary']['total_embeddings']} metadata entities and {result['pipeline_info']['total_processed_sources']} data sources"
-            
+            result["operation_id"] = str(operation_id)  # ✅ Return operation_id for SSE monitoring
+
             response = {
-                "status": "success", 
+                "status": "success",
                 "action": "data_search",
                 "data": result,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             return json.dumps(response, ensure_ascii=False)
-                
+
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await data_tool.fail_progress_operation(operation_id, str(e))
             logger.error(f"Data search failed: {str(e)}")
             await data_tool.log_error(ctx, f"Data search failed: {str(e)}")
             error_response = {
@@ -754,11 +802,20 @@ def register_data_tools(mcp: FastMCP):
             ... )
             >>> # Returns: {"status": "success", "data": {actual_sales_data...}}
         """
+        # Create progress operation at start (NEW WAY)
+        operation_id = await data_tool.create_progress_operation(
+            metadata={
+                "user_id": user_id,
+                "query": natural_language_query[:100],
+                "operation": "data_query"
+            }
+        )
+
         try:
             # Stage 1: Query Analysis
             await data_tool.log_info(ctx, f"Starting data query for user {user_id}: {natural_language_query}")
             await data_tool.progress_reporter.report_stage(
-                ctx, "processing", "query",
+                operation_id, "processing", "query",
                 "analyzing natural language query",
                 pipeline_type="query"
             )
@@ -803,10 +860,10 @@ def register_data_tools(mcp: FastMCP):
             
             result["services_used"].append("embedding_service")
             result["execution_times"]["metadata_check"] = (datetime.now() - service_start).total_seconds()
-            
+
             # Stage 2: Data Retrieval
             await data_tool.progress_reporter.report_stage(
-                ctx, "retrieval", "query",
+                operation_id, "retrieval", "query",
                 "searching for relevant data",
                 pipeline_type="query"
             )
@@ -965,10 +1022,10 @@ def register_data_tools(mcp: FastMCP):
                 storage_path = f"analytics-data/default_user/{lookup_name if 'lookup_name' in locals() else 'sales_data'}.parquet"
             
             logger.info(f"STEP3: Loading data from MinIO: {storage_path}")
-            
+
             # Stage 3: Query Execution
             await data_tool.progress_reporter.report_stage(
-                ctx, "execution", "query",
+                operation_id, "execution", "query",
                 "loading and executing query on Parquet data",
                 pipeline_type="query"
             )
@@ -1176,7 +1233,7 @@ def register_data_tools(mcp: FastMCP):
             visualization_spec = None
             if include_visualization and execution_result.data:
                 await data_tool.progress_reporter.report_stage(
-                    ctx, "visualization", "query",
+                    operation_id, "visualization", "query",
                     "generating chart specifications",
                     pipeline_type="query"
                 )
@@ -1329,7 +1386,7 @@ def register_data_tools(mcp: FastMCP):
             
             # Report completion
             await data_tool.progress_reporter.report_complete(
-                ctx, "query",
+                "query",
                 {
                     "rows_returned": execution_result.row_count,
                     "services_used": len(result['services_used']),
@@ -1338,18 +1395,33 @@ def register_data_tools(mcp: FastMCP):
                 },
                 pipeline_type="query"
             )
+
+            # Complete progress operation
+            await data_tool.complete_progress_operation(
+                operation_id,
+                result={
+                    "rows_returned": execution_result.row_count,
+                    "execution_time": result["total_execution_time"]
+                }
+            )
+
             await data_tool.log_info(ctx, f"Query completed successfully: {execution_result.row_count} rows returned")
-            
+
+            result["operation_id"] = str(operation_id)  # ✅ Return operation_id for SSE monitoring
+
             response = {
                 "status": "success",
-                "action": "data_query", 
+                "action": "data_query",
                 "data": result,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             return json.dumps(response, ensure_ascii=False)
-                
+
         except Exception as e:
+            # Fail progress operation on error
+            if 'operation_id' in locals():
+                await data_tool.fail_progress_operation(operation_id, str(e))
             logger.error(f"Data query failed: {str(e)}")
             await data_tool.log_error(ctx, f"Data query failed: {str(e)}")
             error_response = {

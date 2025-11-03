@@ -2,73 +2,184 @@
 """
 Self-RAG Service - 自我反思RAG实现
 
-基于multi_mode_rag_service.py中的SelfRAGPattern，实现独立的Self-RAG服务。
+基于CRAG架构，添加自我反思和迭代refinement功能。
+使用Qdrant + ISA Model。
 """
 
+import os
 import asyncio
 import logging
 import time
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..base.base_rag_service import BaseRAGService, RAGResult, RAGMode, RAGConfig
+from ..base.base_rag_service import BaseRAGService
+from ..base.rag_models import (
+    RAGMode,
+    RAGConfig,
+    RAGStoreRequest,
+    RAGRetrieveRequest,
+    RAGGenerateRequest,
+    RAGResult,
+    RAGSource
+)
+
+# Qdrant client
+try:
+    from isa_common.qdrant_client import QdrantClient
+    QDRANT_AVAILABLE = True
+except ImportError:
+    QDRANT_AVAILABLE = False
+    QdrantClient = None
 
 logger = logging.getLogger(__name__)
 
 class SelfRAGService(BaseRAGService):
-    """Self-RAG服务实现 - 自我反思RAG"""
-    
+    """
+    Self-RAG服务实现 - 自我反思RAG
+
+    核心特性:
+    1. 自动存储和检索 (基于 Qdrant)
+    2. 自我评估响应质量
+    3. 迭代refinement
+    """
+
     def __init__(self, config: RAGConfig):
         super().__init__(config)
-        self.logger.info("Self-RAG Service initialized")
-    
-    async def process_document(self, 
-                             content: str, 
+
+        # 初始化 Qdrant 客户端 (复用 CRAG 的实现)
+        self.qdrant_client: Optional[QdrantClient] = None
+        self.qdrant_collection = os.getenv('QDRANT_COLLECTION', 'user_knowledge')
+        self._init_qdrant()
+
+        self.logger.info("✅ Self-RAG Service initialized with Qdrant")
+
+    def _init_qdrant(self):
+        """初始化 Qdrant 客户端 (与 CRAG 相同)"""
+        if not QDRANT_AVAILABLE:
+            self.logger.warning("Qdrant not available")
+            return
+
+        try:
+            host = os.getenv('QDRANT_HOST', 'isa-qdrant-grpc')
+            port = int(os.getenv('QDRANT_PORT', '50062'))
+            vector_dim = int(os.getenv('VECTOR_DIMENSION', '1536'))
+
+            self.qdrant_client = QdrantClient(host=host, port=port)
+            self.logger.info(f"✅ Qdrant initialized: {host}:{port}")
+
+            # Ensure collection exists
+            try:
+                collection_info = self.qdrant_client.get_collection_info(self.qdrant_collection)
+                if collection_info:
+                    self.logger.info(f"✅ Collection '{self.qdrant_collection}' exists")
+                else:
+                    self.logger.warning(f"Collection '{self.qdrant_collection}' not found, creating...")
+                    result = self.qdrant_client.create_collection(
+                        collection_name=self.qdrant_collection,
+                        vector_size=vector_dim,
+                        distance='Cosine'
+                    )
+                    if result:
+                        self.logger.info(f"✅ Created collection '{self.qdrant_collection}'")
+                    else:
+                        self.logger.error(f"Failed to create collection")
+                        self.qdrant_client = None
+            except Exception as e:
+                self.logger.error(f"Collection check/create failed: {e}")
+                self.logger.warning("Continuing with Qdrant client, assuming collection exists")
+
+        except Exception as e:
+            self.logger.error(f"Qdrant initialization failed: {e}")
+            self.qdrant_client = None
+
+    async def process_document(self,
+                             content: str,
                              user_id: str,
                              metadata: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """处理文档 - 添加自我反思标记"""
+        """处理文档 - 使用Qdrant存储，添加自我反思标记"""
         start_time = time.time()
-        
+
         try:
-            # 使用基类的add_document方法进行分块和存储
-            document_result = await self.add_document(
-                user_id=user_id,
-                document=content,
-                chunk_size=self.config.chunk_size,
-                overlap=self.config.overlap,
-                metadata={
-                    **(metadata or {}),
-                    'self_rag_mode': True,
-                    'reflection_enabled': True
-                }
-            )
-            
-            if not document_result['success']:
+            # 1. 分块文本
+            chunks = self._chunk_text(content)
+            self.logger.info(f"Chunked into {len(chunks)} chunks")
+
+            if not chunks:
                 return RAGResult(
                     success=False,
                     content="",
                     sources=[],
-                    metadata={'error': document_result.get('error')},
-                    mode_used=self.mode,
+                    metadata={'error': 'Failed to chunk text'},
+                    mode_used=RAGMode.SELF_RAG,
                     processing_time=time.time() - start_time,
-                    error=document_result.get('error')
+                    error='Failed to chunk text'
                 )
-            
+
+            # 2. 为每个块生成 embedding 并存储到 Qdrant
+            stored_count = 0
+            for i, chunk_data in enumerate(chunks):
+                chunk_id = str(uuid.uuid4())
+                chunk_text = chunk_data['text']
+
+                # 生成 embedding
+                embedding = await self._generate_embedding(chunk_text)
+                if not embedding:
+                    self.logger.warning(f"Failed to generate embedding for chunk {chunk_data['id']}")
+                    continue
+
+                # 准备 payload (包含 self-rag 标记)
+                payload = {
+                    'user_id': user_id,
+                    'text': chunk_text,
+                    'chunk_id': chunk_data['id'],
+                    'start_pos': chunk_data['start_pos'],
+                    'end_pos': chunk_data['end_pos'],
+                    'stored_at': datetime.now().isoformat(),
+                    'self_rag_mode': True,  # Self-RAG特性
+                    'reflection_enabled': True,  # Self-RAG特性
+                    **(metadata or {})
+                }
+
+                # 存储到 Qdrant
+                if self.qdrant_client:
+                    try:
+                        operation_id = self.qdrant_client.upsert_points(
+                            self.qdrant_collection,
+                            [{
+                                'id': chunk_id,
+                                'vector': embedding,
+                                'payload': payload
+                            }]
+                        )
+
+                        if operation_id:
+                            stored_count += 1
+                            self.logger.info(f"Stored chunk {i+1} with self-rag metadata")
+                        else:
+                            self.logger.warning(f"Upsert returned None for chunk {i+1}")
+
+                    except Exception as e:
+                        self.logger.error(f"Qdrant storage failed for chunk {i+1}: {e}")
+                else:
+                    self.logger.error(f"Qdrant client not available!")
+
             return RAGResult(
                 success=True,
-                content=f"Processed {document_result['stored_chunks']} chunks with self-reflection",
-                sources=document_result.get('chunks', []),
+                content=f"Stored {stored_count}/{len(chunks)} chunks with self-reflection",
+                sources=[],
                 metadata={
-                    'chunks_processed': document_result['stored_chunks'],
-                    'total_chunks': document_result['total_chunks'],
-                    'document_length': document_result['document_length'],
+                    'chunks_processed': stored_count,
+                    'total_chunks': len(chunks),
+                    'content_length': len(content),
                     'self_rag_mode': True,
                     'reflection_enabled': True
                 },
-                mode_used=self.mode,
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time
             )
-            
+
         except Exception as e:
             self.logger.error(f"Self-RAG document processing failed: {e}")
             return RAGResult(
@@ -76,7 +187,7 @@ class SelfRAGService(BaseRAGService):
                 content="",
                 sources=[],
                 metadata={'error': str(e)},
-                mode_used=self.mode,
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time,
                 error=str(e)
             )
@@ -278,107 +389,286 @@ class SelfRAGService(BaseRAGService):
 
         return "\n".join(refined_parts)
 
-    # ==================== New Interface Methods ====================
+    # ==================== New Interface Methods (Pydantic) ====================
 
-    async def store(self,
-                   content: str,
-                   user_id: str,
-                   content_type: str = "text",
-                   metadata: Optional[Dict[str, Any]] = None,
-                   options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Store content using Self-RAG strategy"""
-        return await self.process_document(content, user_id, metadata)
+    async def store(self, request: RAGStoreRequest) -> RAGResult:
+        """
+        Store content using Self-RAG strategy
 
-    async def retrieve(self,
-                      query: str,
-                      user_id: str,
-                      top_k: int = 5,
-                      filters: Optional[Dict[str, Any]] = None,
-                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Retrieve with self-assessment"""
+        Args:
+            request: Storage request (Pydantic validated)
+
+        Returns:
+            RAGResult with storage statistics
+        """
+        return await self.process_document(
+            request.content,
+            request.user_id,
+            request.metadata
+        )
+
+    async def retrieve(self, request: RAGRetrieveRequest) -> RAGResult:
+        """
+        Retrieve with Qdrant (similar to CRAG but without quality filtering)
+
+        Args:
+            request: Retrieval request (Pydantic validated)
+
+        Returns:
+            RAGResult with retrieved sources
+        """
         start_time = time.time()
         try:
-            search_result = await self.search_knowledge(
-                user_id=user_id,
-                query=query,
-                top_k=top_k or self.config.top_k,
-                enable_rerank=self.config.enable_rerank,
-                search_mode="hybrid"
-            )
-
-            if not search_result['success']:
+            # 1. Generate query embedding
+            query_embedding = await self._generate_embedding(request.query)
+            if not query_embedding:
                 return RAGResult(
                     success=False,
                     content="",
                     sources=[],
-                    metadata={},
-                    mode_used=self.mode,
+                    metadata={'error': 'Failed to generate query embedding'},
+                    mode_used=RAGMode.SELF_RAG,
                     processing_time=time.time() - start_time,
-                    error=search_result.get('error')
+                    error='Failed to generate query embedding'
                 )
+
+            # 2. Search Qdrant
+            if not self.qdrant_client:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=[],
+                    metadata={'error': 'Qdrant client not available'},
+                    mode_used=RAGMode.SELF_RAG,
+                    processing_time=time.time() - start_time,
+                    error='Qdrant client not available'
+                )
+
+            top_k = request.top_k or self.config.top_k
+
+            # Build filter conditions
+            filter_conditions = {'must': [
+                {'field': 'user_id', 'match': {'keyword': request.user_id}}
+            ]}
+            if request.filters:
+                for key, value in request.filters.items():
+                    filter_conditions['must'].append({
+                        'field': key,
+                        'match': {'keyword': value}
+                    })
+
+            # Execute search
+            search_results = self.qdrant_client.search_with_filter(
+                collection_name=self.qdrant_collection,
+                vector=query_embedding,
+                filter_conditions=filter_conditions,
+                limit=top_k
+            )
+
+            # 3. Convert to RAGSource objects
+            sources = []
+            if search_results:
+                for result in search_results:
+                    if result is None:
+                        continue
+                    payload = result.get('payload', {}) or {}
+                    similarity_score = result.get('score', 0.0)
+                    text = payload.get('text', '') or ''
+
+                    sources.append(RAGSource(
+                        text=text,
+                        score=similarity_score,
+                        metadata=payload
+                    ))
 
             return RAGResult(
                 success=True,
                 content="",
-                sources=search_result['search_results'],
-                metadata={'total_results': len(search_result['search_results'])},
-                mode_used=self.mode,
+                sources=sources,
+                metadata={
+                    'total_results': len(sources),
+                    'self_rag_mode': True
+                },
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time
             )
+
         except Exception as e:
+            self.logger.error(f"Self-RAG retrieve failed: {e}")
             return RAGResult(
                 success=False,
                 content="",
                 sources=[],
-                metadata={},
-                mode_used=self.mode,
+                metadata={'error': str(e)},
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time,
                 error=str(e)
             )
 
-    async def generate(self,
-                      query: str,
-                      user_id: str,
-                      context: Optional[str] = None,
-                      retrieval_result: Optional[RAGResult] = None,
-                      options: Optional[Dict[str, Any]] = None) -> RAGResult:
-        """Generate with self-reflection"""
+    async def generate(self, request: RAGGenerateRequest) -> RAGResult:
+        """
+        Generate with self-reflection
+
+        Self-RAG特性:
+        - 生成初始响应
+        - 自我评估质量
+        - 迭代refinement
+        - 质量保证
+
+        Args:
+            request: Generation request (Pydantic validated)
+
+        Returns:
+            RAGResult with refined response
+        """
         start_time = time.time()
         try:
-            if retrieval_result and retrieval_result.sources:
-                sources = retrieval_result.sources
+            # 1. Get sources (from request or retrieve)
+            sources = []
+            if request.retrieval_sources:
+                # Convert dict to RAGSource if needed
+                for source_dict in request.retrieval_sources:
+                    if isinstance(source_dict, dict):
+                        sources.append(RAGSource(**source_dict))
+                    else:
+                        sources.append(source_dict)
             else:
-                retrieval = await self.retrieve(query, user_id, options=options)
+                # Retrieve sources
+                retrieval = await self.retrieve(
+                    RAGRetrieveRequest(
+                        query=request.query,
+                        user_id=request.user_id,
+                        top_k=self.config.top_k,
+                        options=request.options
+                    )
+                )
                 if not retrieval.success:
                     return retrieval
                 sources = retrieval.sources
 
-            # Build context and generate initial response
-            context_text = self._build_context_with_citations(sources)
-            initial_response = await self._generate_response_with_llm(query, context_text, context)
+            # 2. Generate initial response with citations
+            use_citations = request.options.get('use_citations', True) if request.options else True
+            context_text = self._build_context(sources, use_citations=use_citations)
 
-            # Self-assess and refine
-            refined_response = await self._self_assess_and_refine(query, initial_response)
+            initial_prompt = f"""Based on the following sources, provide a comprehensive answer to the question.
+
+SOURCES:
+{context_text}
+
+QUESTION: {request.query}
+
+Please provide a detailed answer."""
+
+            self.logger.info(f"🔍 Self-RAG calling LLM with prompt length: {len(initial_prompt)} chars, {len(sources)} sources")
+            self.logger.info(f"🔍 Context preview: {context_text[:200]}...")
+            initial_response = await self._generate_response(initial_prompt, model="gpt-4.1-nano")
+            self.logger.info(f"✅ Self-RAG LLM call completed, response length: {len(initial_response) if initial_response else 0}")
+
+            if not initial_response:
+                return RAGResult(
+                    success=False,
+                    content="",
+                    sources=sources,
+                    metadata={'error': 'Failed to generate initial response'},
+                    mode_used=RAGMode.SELF_RAG,
+                    processing_time=time.time() - start_time,
+                    error='Failed to generate initial response'
+                )
+
+            # 3. Self-RAG特性: 自我评估和refinement
+            self.logger.info(f"Initial response generated ({len(initial_response)} chars), starting self-reflection...")
+
+            assessment = await self._assess_response_quality_simple(request.query, initial_response, sources)
+
+            if assessment['needs_improvement']:
+                self.logger.info(f"Response needs improvement (score={assessment['quality_score']:.2f}), refining...")
+                refined_response = await self._refine_response_simple(
+                    request.query,
+                    initial_response,
+                    sources,
+                    assessment
+                )
+                refinement_performed = True
+            else:
+                self.logger.info(f"Response quality acceptable (score={assessment['quality_score']:.2f})")
+                refined_response = initial_response
+                refinement_performed = False
 
             return RAGResult(
                 success=True,
                 content=refined_response,
                 sources=sources,
                 metadata={
-                    'self_assessed': True,
+                    'self_reflection_used': True,
+                    'refinement_performed': refinement_performed,
+                    'quality_score': assessment['quality_score'],
                     'initial_response_length': len(initial_response),
-                    'refined_response_length': len(refined_response)
+                    'final_response_length': len(refined_response),
+                    'use_citations': use_citations
                 },
-                mode_used=self.mode,
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time
             )
+
         except Exception as e:
+            self.logger.error(f"Self-RAG generate failed: {e}")
             return RAGResult(
                 success=False,
                 content="",
                 sources=[],
-                metadata={},
-                mode_used=self.mode,
+                metadata={'error': str(e)},
+                mode_used=RAGMode.SELF_RAG,
                 processing_time=time.time() - start_time,
                 error=str(e)
             )
+
+    async def _assess_response_quality_simple(self, query: str, response: str, sources: List[RAGSource]) -> Dict[str, Any]:
+        """简化的质量评估"""
+        quality_indicators = {
+            'has_relevant_sources': any(s.score > 0.5 for s in sources),
+            'response_length_ok': len(response) > 50,
+            'answers_query': any(word.lower() in response.lower() for word in query.split()[:5])
+        }
+
+        quality_score = sum(quality_indicators.values()) / len(quality_indicators)
+        needs_improvement = quality_score < 0.7
+
+        return {
+            'quality_score': quality_score,
+            'needs_improvement': needs_improvement,
+            'indicators': quality_indicators
+        }
+
+    async def _refine_response_simple(
+        self,
+        query: str,
+        initial_response: str,
+        sources: List[RAGSource],
+        assessment: Dict[str, Any]
+    ) -> str:
+        """简化的refinement"""
+        try:
+            context_text = self._build_context(sources, use_citations=True)
+
+            refine_prompt = f"""The initial response needs improvement. Please provide a better answer.
+
+ORIGINAL QUESTION: {query}
+
+INITIAL RESPONSE:
+{initial_response}
+
+AVAILABLE SOURCES:
+{context_text}
+
+IMPROVEMENT NEEDED:
+- Quality score: {assessment['quality_score']:.2f} (target: 0.7+)
+- Issues: {', '.join([k for k, v in assessment['indicators'].items() if not v])}
+
+Please provide an improved, more comprehensive response that addresses these issues."""
+
+            refined = await self._generate_response(refine_prompt, model="gpt-4.1-nano")
+            return refined if refined else initial_response
+
+        except Exception as e:
+            self.logger.error(f"Refinement failed: {e}")
+            return initial_response

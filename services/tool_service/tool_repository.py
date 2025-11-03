@@ -3,6 +3,7 @@ Tool Repository - Data access layer for MCP tools
 Handles database operations for tool registry
 """
 
+import json
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -101,13 +102,17 @@ class ToolRepository:
         """Create a new tool"""
         try:
             with self.db:
+                # Serialize complex types to JSON strings for gRPC compatibility
+                input_schema = tool_data.get('input_schema', {})
+                metadata = tool_data.get('metadata', {})
+
                 # Prepare data (let database set created_at/updated_at)
                 record = {
                     'name': tool_data['name'],
                     'description': tool_data.get('description'),
                     'category': tool_data.get('category'),
-                    'input_schema': tool_data.get('input_schema', {}),
-                    'metadata': tool_data.get('metadata', {}),
+                    'input_schema': json.dumps(input_schema) if isinstance(input_schema, dict) else input_schema,
+                    'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata,
                     'is_active': tool_data.get('is_active', True)
                 }
 
@@ -130,8 +135,14 @@ class ToolRepository:
                 params = []
                 param_idx = 1
 
+                # Serialize complex types to JSON strings for gRPC compatibility
                 for key, value in updates.items():
                     if key not in ['id', 'created_at', 'updated_at']:  # Skip immutable fields
+                        # Serialize complex types
+                        if key in ['input_schema', 'metadata']:
+                            if isinstance(value, dict):
+                                value = json.dumps(value)
+
                         set_parts.append(f"{key} = ${param_idx}")
                         params.append(value)
                         param_idx += 1

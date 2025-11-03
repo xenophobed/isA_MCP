@@ -22,7 +22,7 @@ from .models import (
 )
 from .query_analyzer import QueryAnalyzer
 from .multi_strategy_search import MultiStrategySearch
-from ..engines.search_engine import SearchEngine
+from ...engines.search_engine import SearchEngine
 
 logger = get_logger(__name__)
 
