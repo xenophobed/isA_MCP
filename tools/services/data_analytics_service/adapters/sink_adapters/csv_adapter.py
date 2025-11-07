@@ -4,7 +4,7 @@ CSV Sink Adapter
 Stores data TO CSV files for universal compatibility
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from pathlib import Path
@@ -63,7 +63,7 @@ class CSVSinkAdapter(BaseSinkAdapter):
         # No persistent connections for file-based storage
         return True
     
-    def store_dataframe(self, df: pd.DataFrame, 
+    def store_dataframe(self, df: pl.DataFrame, 
                        destination: str,
                        table_name: Optional[str] = None,
                        storage_options: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -182,7 +182,7 @@ class CSVSinkAdapter(BaseSinkAdapter):
                 'file_name': table_name
             }
     
-    def read_csv(self, file_path: str, **kwargs) -> pd.DataFrame:
+    def read_csv(self, file_path: str, **kwargs) -> pl.DataFrame:
         """
         Read CSV file back to DataFrame
         
@@ -205,7 +205,7 @@ class CSVSinkAdapter(BaseSinkAdapter):
                 
         except Exception as e:
             logger.error(f"Failed to read CSV file: {e}")
-            return pd.DataFrame()
+            return pl.DataFrame()
     
     def _detect_encoding(self, file_path: str) -> str:
         """Auto-detect file encoding"""

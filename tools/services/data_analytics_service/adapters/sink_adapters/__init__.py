@@ -1,25 +1,23 @@
 """
 Sink Adapters Package
 Data storage adapters for writing processed data TO various destinations
+MinIO + Parquet workflow (DuckDB removed)
 """
 
 from .base_sink_adapter import BaseSinkAdapter
-from .duckdb_adapter import DuckDBSinkAdapter
 from .parquet_adapter import ParquetSinkAdapter
 from .csv_adapter import CSVSinkAdapter
 
 __all__ = [
     'BaseSinkAdapter',
-    'DuckDBSinkAdapter', 
     'ParquetSinkAdapter',
     'CSVSinkAdapter'
 ]
 
-# Adapter registry for dynamic loading
+# Adapter registry for dynamic loading (MinIO + Parquet workflow)
 SINK_ADAPTERS = {
-    'duckdb': DuckDBSinkAdapter,
-    'parquet': ParquetSinkAdapter,
-    'csv': CSVSinkAdapter
+    'parquet': ParquetSinkAdapter,  # Primary: MinIO Parquet storage
+    'csv': CSVSinkAdapter  # Secondary: CSV exports
 }
 
 def get_sink_adapter(adapter_type: str, **kwargs):
@@ -27,7 +25,7 @@ def get_sink_adapter(adapter_type: str, **kwargs):
     Factory function to get sink adapter by type
     
     Args:
-        adapter_type: Type of adapter ('duckdb', 'parquet', 'csv')
+        adapter_type: Type of adapter ('parquet', 'csv')
         **kwargs: Adapter-specific initialization parameters
         
     Returns:

@@ -13,7 +13,7 @@ def register_lifestyle_personal_prompts(mcp):
     
     @mcp.prompt("productivity_guide_prompt")
     async def productivity_guide_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

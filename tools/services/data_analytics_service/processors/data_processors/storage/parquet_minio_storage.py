@@ -13,7 +13,7 @@ from pathlib import Path
 import io
 import uuid
 
-from core.minio_client import get_minio_client
+from core.clients.minio_client import get_minio_client
 
 logger = logging.getLogger(__name__)
 

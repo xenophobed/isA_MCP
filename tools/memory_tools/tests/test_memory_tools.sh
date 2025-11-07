@@ -10,21 +10,27 @@
 # 2. Executed with proper input validation
 # 3. Successfully communicate with memory microservice
 # 4. Return properly formatted responses
+# Tools Tested (15 total):
+# Storage Tools (6):
+#   ✓ store_factual_memory - AI-powered fact extraction
+#   ✓ store_episodic_memory - Event memory extraction
+#   ✓ store_semantic_memory - Concept memory extraction
+#   ✓ store_procedural_memory - Procedure extraction
+#   ✓ store_working_memory - Short-term memory storage
+#   ✓ store_session_message - Conversation tracking
+# Search Tools (4):
+#   ✓ search_memories - Universal search across all types
+#   ✓ search_facts_by_subject - Factual search
+#   ✓ search_episodes_by_event_type - Episodic search
+#   ✓ search_concepts_by_category - Semantic search
+# Retrieval Tools (3):
+#   ✓ get_session_context - Session retrieval
+#   ✓ summarize_session - AI session summarization
+#   ✓ get_active_working_memories - Working memory retrieval
+# Utility Tools (2):
+#   ✓ get_memory_statistics - User memory stats
+#   ✓ memory_health_check - Service health
 #
-# Tools Tested (14 total):
-#  store_factual_memory - AI-powered fact extraction
-#  store_episodic_memory - Event memory extraction
-#  store_semantic_memory - Concept memory extraction
-#  store_procedural_memory - Procedure extraction
-#  store_working_memory - Short-term memory storage
-#  store_session_message - Conversation tracking
-#  search_facts_by_subject - Factual search
-#  search_concepts_by_category - Semantic search
-#  get_session_context - Session retrieval
-#  summarize_session - AI session summarization
-#  get_active_working_memories - Working memory retrieval
-#  get_memory_statistics - User memory stats
-#  memory_health_check - Service health
 #
 # Services Used:
 #  Memory Microservice (localhost:8223)
@@ -171,11 +177,11 @@ expected_tools = [
     'store_procedural_memory',
     'store_working_memory',
     'store_session_message',
-    # Search tools (4: 2 working, 2 placeholders)
-    'search_memories',  # Placeholder - endpoint doesn't exist
+    # Search tools (4) - All implemented!
+    'search_memories',  # Universal search across all types
     'search_facts_by_subject',
-    'search_episodes_by_event_type',  # NEW - episodic search
-    'search_concepts_by_category',  # Placeholder - endpoint doesn't exist
+    'search_episodes_by_event_type',
+    'search_concepts_by_category',
     # Retrieval tools (3)
     'get_session_context',
     'summarize_session',
@@ -635,6 +641,125 @@ EOF
     fi
 }
 
+test_search_memories() {
+    TESTS_RUN=$((TESTS_RUN + 1))
+    print_test "search_memories Tool (Universal Search)"
+
+    print_info "Testing universal memory search across all types..."
+
+    cat > /tmp/test_search_memories.py << EOF
+import asyncio
+import sys
+import json
+sys.path.insert(0, '${PROJECT_ROOT}')
+
+from mcp.server.fastmcp import FastMCP
+from tools.memory_tools.memory_tools import register_memory_tools
+from core.security import initialize_security
+
+async def test():
+    initialize_security()
+    mcp = FastMCP("test_memory_tools")
+    register_memory_tools(mcp)
+
+    # Test 1: Search all memory types
+    result1 = await mcp._tool_manager._tools['search_memories'].fn(
+        user_id="${TEST_USER_ID}",
+        query="python programming",
+        top_k=10
+    )
+
+    # Handle both dict and string responses
+    if isinstance(result1, str):
+        result_dict1 = json.loads(result1)
+    else:
+        result_dict1 = result1
+
+    print(f"Status: {result_dict1['status']}")
+    assert result_dict1['status'] == 'success', "Universal search failed"
+    print(f"✓ Search all types completed")
+
+    # Test 2: Search specific memory types
+    result2 = await mcp._tool_manager._tools['search_memories'].fn(
+        user_id="${TEST_USER_ID}",
+        query="python",
+        memory_types=["factual", "semantic"],
+        top_k=5
+    )
+
+    if isinstance(result2, str):
+        result_dict2 = json.loads(result2)
+    else:
+        result_dict2 = result2
+
+    print(f"✓ Search specific types (factual, semantic) completed")
+
+asyncio.run(test())
+EOF
+
+    if python3 /tmp/test_search_memories.py 2>&1 | tee /tmp/test_output.log; then
+        print_success "search_memories tool working correctly"
+        return 0
+    else
+        print_failure "search_memories tool failed"
+        tail -20 /tmp/test_output.log
+        return 1
+    fi
+}
+
+test_search_episodes_by_event_type() {
+    TESTS_RUN=$((TESTS_RUN + 1))
+    print_test "search_episodes_by_event_type Tool"
+
+    print_info "Testing episodic memory search by event type..."
+
+    cat > /tmp/test_search_episodes.py << EOF
+import asyncio
+import sys
+import json
+sys.path.insert(0, '${PROJECT_ROOT}')
+
+from mcp.server.fastmcp import FastMCP
+from tools.memory_tools.memory_tools import register_memory_tools
+from core.security import initialize_security
+
+async def test():
+    initialize_security()
+    mcp = FastMCP("test_memory_tools")
+    register_memory_tools(mcp)
+
+    result = await mcp._tool_manager._tools['search_episodes_by_event_type'].fn(
+        user_id="${TEST_USER_ID}",
+        event_type="meeting",
+        limit=10
+    )
+
+    # Handle both dict and string responses
+    if isinstance(result, str):
+        result_dict = json.loads(result)
+    else:
+        result_dict = result
+
+    print(f"Status: {result_dict['status']}")
+    assert result_dict['status'] == 'success', "Search failed"
+
+    print(f"✓ Search completed successfully")
+    results = result_dict['data'].get('results', [])
+    print(f"✓ Results found: {len(results)}")
+
+asyncio.run(test())
+EOF
+
+    if python3 /tmp/test_search_episodes.py 2>&1 | tee /tmp/test_output.log; then
+        print_success "search_episodes_by_event_type tool working correctly"
+        return 0
+    else
+        print_failure "search_episodes_by_event_type tool failed"
+        tail -20 /tmp/test_output.log
+        return 1
+    fi
+}
+
 test_search_concepts_by_category() {
     TESTS_RUN=$((TESTS_RUN + 1))
     print_test "search_concepts_by_category Tool"
@@ -735,6 +860,61 @@ EOF
         return 0
     else
         print_failure "get_session_context tool failed"
+        tail -20 /tmp/test_output.log
+        return 1
+    fi
+}
+
+test_summarize_session() {
+    TESTS_RUN=$((TESTS_RUN + 1))
+    print_test "summarize_session Tool"
+
+    print_info "Testing AI-powered session summarization..."
+
+    cat > /tmp/test_summarize_session.py << EOF
+import asyncio
+import sys
+import json
+sys.path.insert(0, '${PROJECT_ROOT}')
+
+from mcp.server.fastmcp import FastMCP
+from tools.memory_tools.memory_tools import register_memory_tools
+from core.security import initialize_security
+
+async def test():
+    initialize_security()
+    mcp = FastMCP("test_memory_tools")
+    register_memory_tools(mcp)
+
+    result = await mcp._tool_manager._tools['summarize_session'].fn(
+        user_id="${TEST_USER_ID}",
+        session_id="${TEST_SESSION_ID}",
+        force_update=True,
+        compression_level="medium"
+    )
+
+    # Handle both dict and string responses
+    if isinstance(result, str):
+        result_dict = json.loads(result)
+    else:
+        result_dict = result
+
+    print(f"Status: {result_dict['status']}")
+    assert result_dict['status'] == 'success', "Summarize session failed"
+
+    print(f"✓ Session summarized successfully")
+    if 'summary' in result_dict.get('data', {}):
+        summary = result_dict['data']['summary']
+        print(f"✓ Summary generated: {summary[:100]}...")
+
+asyncio.run(test())
+EOF
+
+    if python3 /tmp/test_summarize_session.py 2>&1 | tee /tmp/test_output.log; then
+        print_success "summarize_session tool working correctly"
+        return 0
+    else
+        print_failure "summarize_session tool failed"
         tail -20 /tmp/test_output.log
         return 1
     fi
@@ -871,7 +1051,7 @@ main() {
     echo "Session ID: ${TEST_SESSION_ID}"
     echo ""
     echo "Memory Service: localhost:8223"
-    echo "Total Tools: 15 (13 working, 2 placeholders)"
+    echo "Total Tools: 15 (6 storage + 4 search + 3 retrieval + 2 utility)"
     echo ""
 
     # Setup
@@ -916,19 +1096,31 @@ main() {
     test_search_facts_by_subject
     echo ""
 
-    # Test 10: Search Concepts
+    # Test 10: Universal Search (All Types)
+    test_search_memories
+    echo ""
+
+    # Test 11: Search Episodes by Event Type
+    test_search_episodes_by_event_type
+    echo ""
+
+    # Test 12: Search Concepts by Category
     test_search_concepts_by_category
     echo ""
 
-    # Test 11: Get Session Context
+    # Test 13: Get Session Context
     test_get_session_context
     echo ""
 
-    # Test 12: Get Active Working Memories
+    # Test 14: Summarize Session
+    test_summarize_session
+    echo ""
+
+    # Test 15: Get Active Working Memories
     test_get_active_working_memories
     echo ""
 
-    # Test 13: Get Memory Statistics
+    # Test 16: Get Memory Statistics
     test_get_memory_statistics
     echo ""
 
@@ -947,7 +1139,7 @@ main() {
         echo ""
         print_success "<� All memory tool tests passed!"
         echo ""
-        echo " All 14 tools registered as MCP tools"
+        echo " All 15 tools registered as MCP tools"
         echo " Tool discovery working correctly"
         echo " Memory service communication functional"
         echo " Response formatting correct"

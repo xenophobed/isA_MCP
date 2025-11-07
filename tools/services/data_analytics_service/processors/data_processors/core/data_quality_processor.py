@@ -5,6 +5,7 @@ Advanced data quality assessment tool building on the existing CSV processor inf
 Provides anomaly detection, data validation, and quality metrics.
 """
 
+import polars as pl
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple, Union
@@ -60,7 +61,12 @@ class DataQualityProcessor:
         try:
             if not self.csv_processor.load_csv():
                 return False
-            self.df = self.csv_processor.df
+            # Convert polars DataFrame to pandas for quality processing
+            polars_df = self.csv_processor.df
+            if isinstance(polars_df, pl.DataFrame):
+                self.df = polars_df.to_pandas()
+            else:
+                self.df = polars_df
             return True
         except Exception as e:
             logger.error(f"Failed to load data: {e}")
@@ -380,12 +386,12 @@ class DataQualityProcessor:
             
             # Overall duplicate analysis
             duplicate_rows = self.df.duplicated()
-            total_duplicates = duplicate_rows.sum()
+            total_duplicates = int(duplicate_rows.sum())
             
             uniqueness["overall"] = {
                 "total_rows": len(self.df),
-                "duplicate_rows": int(total_duplicates),
-                "unique_rows": len(self.df) - int(total_duplicates),
+                "duplicate_rows": total_duplicates,
+                "unique_rows": len(self.df) - total_duplicates,
                 "uniqueness_rate": round((len(self.df) - total_duplicates) / len(self.df), 3) if len(self.df) > 0 else 1.0,
                 "duplicate_percentage": round((total_duplicates / len(self.df)) * 100, 2) if len(self.df) > 0 else 0.0
             }

@@ -4,7 +4,7 @@ Column Standardization Processor
 Standardizes column names and formats
 """
 
-import pandas as pd
+import polars as pl
 import re
 from typing import Dict, List, Any, Optional, Tuple
 import logging
@@ -51,9 +51,9 @@ class ColumnStandardizer:
             (r'^_|_$', ''),          # Remove leading/trailing underscores
         ]
     
-    def standardize_columns(self, df: pd.DataFrame, 
+    def standardize_columns(self, df: pl.DataFrame, 
                           target_hint: Optional[str] = None,
-                          preserve_original: bool = True) -> Tuple[pd.DataFrame, Dict[str, str]]:
+                          preserve_original: bool = True) -> Tuple[pl.DataFrame, Dict[str, str]]:
         """
         Standardize DataFrame column names
         
@@ -66,19 +66,19 @@ class ColumnStandardizer:
             Tuple of (standardized_df, column_mapping_dict)
         """
         try:
-            result_df = df.copy()
+            result_df = df.clone()
             column_mapping = {}
             
             # Step 1: Handle user-specified target column first
             if target_hint and target_hint in df.columns:
                 new_name = 'target'
-                result_df = result_df.rename(columns={target_hint: new_name})
+                result_df = result_df.rename({target_hint: new_name})
                 column_mapping[target_hint] = new_name
                 logger.info(f"User target column '{target_hint}' mapped to 'target'")
             
             # Step 2: Clean all column names
             cleaned_mapping = self._clean_column_names(result_df.columns)
-            result_df = result_df.rename(columns=cleaned_mapping)
+            result_df = result_df.rename(cleaned_mapping)
             column_mapping.update(cleaned_mapping)
             
             # Step 3: Apply business domain mappings
@@ -86,7 +86,7 @@ class ColumnStandardizer:
                 result_df.columns, 
                 exclude_columns=['target'] if target_hint else []
             )
-            result_df = result_df.rename(columns=business_mapping)
+            result_df = result_df.rename(business_mapping)
             
             # Update mapping chain
             for old_col, temp_col in column_mapping.items():
@@ -202,7 +202,7 @@ class ColumnStandardizer:
         
         return intersection / union if union > 0 else 0
     
-    def _resolve_duplicate_names(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str]]:
+    def _resolve_duplicate_names(self, df: pl.DataFrame) -> Tuple[pl.DataFrame, Dict[str, str]]:
         """Resolve duplicate column names"""
         mapping = {}
         
@@ -225,7 +225,7 @@ class ColumnStandardizer:
         
         return df, mapping
     
-    def suggest_target_column(self, df: pd.DataFrame) -> Optional[str]:
+    def suggest_target_column(self, df: pl.DataFrame) -> Optional[str]:
         """Suggest which column might be the target variable"""
         
         for col in df.columns:
@@ -263,8 +263,8 @@ class ColumnStandardizer:
         
         return summary
     
-    def reverse_mapping(self, standardized_df: pd.DataFrame, 
-                       column_mapping: Dict[str, str]) -> pd.DataFrame:
+    def reverse_mapping(self, standardized_df: pl.DataFrame, 
+                       column_mapping: Dict[str, str]) -> pl.DataFrame:
         """Reverse column standardization to original names"""
         try:
             # Create reverse mapping
@@ -277,7 +277,7 @@ class ColumnStandardizer:
                 if col in reverse_map
             }
             
-            result_df = standardized_df.rename(columns=actual_reverse_map)
+            result_df = standardized_df.rename(actual_reverse_map)
             logger.info(f"Reversed {len(actual_reverse_map)} column names")
             
             return result_df

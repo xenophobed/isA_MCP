@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..management.metadata.metadata_store_service import get_metadata_store_service
-from core.storage_client import get_storage_client
+from core.clients.storage_client import get_storage_client
 
 logger = logging.getLogger(__name__)
 

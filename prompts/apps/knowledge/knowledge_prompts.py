@@ -10,8 +10,8 @@ def register_knowledge_prompts(mcp: FastMCP):
     
     @mcp.prompt()
     def knowledge_analyze_prompt(
-        prompt: str,
-        file_url: str,  
+        prompt: str = "",
+        file_url: str = "",
         depth: str = "comprehensive"
     ) -> str:
         """

@@ -577,6 +577,30 @@ class BaseTool:
     #   3. complete_progress_operation(operation_id, result)
     # ============================================================================
 
+    async def report_progress(
+        self,
+        ctx: Optional[Context],
+        current: int,
+        total: int,
+        message: str
+    ):
+        """
+        Backward compatibility method for progress reporting
+        
+        Args:
+            ctx: MCP Context (optional, for compatibility)
+            current: Current step number
+            total: Total steps
+            message: Progress message
+            
+        Note:
+            This is a simple logging wrapper. For full progress tracking,
+            use ProgressManager (create_progress_operation, etc.)
+        """
+        progress_pct = int((current / total) * 100) if total > 0 else 0
+        log_msg = f"[{current}/{total} ({progress_pct}%)] {message}"
+        await self.log_info(ctx, log_msg)
+
     async def log_info(self, ctx: Optional[Context], message: str, **extra):
         """Log info message via Context or standard logging"""
         if ctx and MCP_SDK_AVAILABLE:

@@ -117,9 +117,9 @@ class PromptRepository:
                     'description': prompt_data.get('description'),
                     'category': prompt_data.get('category'),
                     'content': prompt_data['content'],
-                    'arguments': json.dumps(arguments) if isinstance(arguments, (list, dict)) else arguments,
-                    'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata,
-                    'tags': json.dumps(tags) if isinstance(tags, list) else tags,
+                    'arguments': json.dumps(arguments) if isinstance(arguments, (list, dict)) else arguments,  # jsonb field
+                    'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata,  # jsonb field
+                    'tags': tags if isinstance(tags, list) else [],  # array field - pass as list, not JSON string
                     'version': prompt_data.get('version', '1.0.0'),
                     'is_active': prompt_data.get('is_active', True)
                 }
@@ -145,9 +145,12 @@ class PromptRepository:
                 for key, value in updates.items():
                     if key not in ['id', 'created_at', 'updated_at']:
                         # Serialize complex types
-                        if key in ['arguments', 'metadata', 'tags']:
+                        if key in ['arguments', 'metadata']:  # jsonb fields
                             if isinstance(value, (list, dict)):
                                 value = json.dumps(value)
+                        elif key == 'tags':  # array field - keep as list
+                            if not isinstance(value, list):
+                                value = []
 
                         set_parts.append(f"{key} = ${param_idx}")
                         params.append(value)

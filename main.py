@@ -25,6 +25,7 @@ from starlette.middleware.cors import CORSMiddleware
 from core.config import get_settings
 from core.logging import setup_mcp_logging
 from core.auto_discovery import AutoDiscoverySystem
+from routes_registry import get_routes_for_consul, SERVICE_METADATA
 
 # Initialize settings and logging at module level (required for hot reload)
 settings = get_settings()
@@ -56,6 +57,7 @@ class SmartMCPServer:
         # Services
         self.sync_service = None
         self.search_service = None
+        self.consul_registry = None
 
     async def initialize(self):
         """Initialize MCP with tools/prompts/resources"""
@@ -77,6 +79,36 @@ class SmartMCPServer:
         resources = await self.mcp.list_resources()
 
         logger.info(f"✅ Registered {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
+
+        # Consul service registration
+        if settings.consul.enabled:
+            try:
+                from isa_common.consul_client import ConsulRegistry
+
+                # Get route metadata
+                route_meta = get_routes_for_consul()
+
+                # Merge service metadata
+                consul_meta = {
+                    'version': SERVICE_METADATA['version'],
+                    'capabilities': ','.join(SERVICE_METADATA['capabilities']),
+                    **route_meta
+                }
+
+                self.consul_registry = ConsulRegistry(
+                    service_name=SERVICE_METADATA['service_name'],
+                    service_port=settings.port,
+                    consul_host=settings.consul.host,
+                    consul_port=settings.consul.port,
+                    tags=SERVICE_METADATA['tags'],
+                    meta=consul_meta,
+                    health_check_type='http'
+                )
+                self.consul_registry.register()
+                logger.info(f"✅ Service registered with Consul: {route_meta.get('route_count', 0)} routes")
+            except Exception as e:
+                logger.warning(f"Failed to register with Consul: {e}")
+                self.consul_registry = None
 
         # Initialize services (Qdrant-based semantic search)
         logger.info("🔄 Initializing sync and search services...")
@@ -121,20 +153,6 @@ async def lifespan(app):
 
     logger.info("🔥 Starting MCP Server with HOT RELOAD enabled...")
 
-    # Register with Consul
-    consul_registration = None
-    if os.getenv("CONSUL_ENABLED", "true").lower() == "true":
-        try:
-            from core.consul_registry import initialize_consul_registry
-            consul_registration = initialize_consul_registry(
-                "mcp_service",
-                int(os.getenv("SERVICE_PORT", "8081"))
-            )
-            if consul_registration:
-                logger.info("✅ Registered with Consul")
-        except Exception as e:
-            logger.warning(f"⚠️ Consul registration failed: {e}")
-
     # Initialize server (tools, prompts, resources, embeddings)
     smart_server = SmartMCPServer()
     mcp = await smart_server.initialize()
@@ -162,13 +180,15 @@ async def lifespan(app):
         finally:
             # Cleanup
             logger.info("🛑 Shutting down...")
-            if consul_registration:
+
+            # Consul deregistration
+            if smart_server and smart_server.consul_registry:
                 try:
-                    from core.consul_registry import cleanup_consul_registry
-                    cleanup_consul_registry()
-                    logger.info("✅ Deregistered from Consul")
+                    smart_server.consul_registry.deregister()
+                    logger.info("✅ Service deregistered from Consul")
                 except Exception as e:
-                    logger.error(f"Consul deregistration error: {e}")
+                    logger.error(f"Failed to deregister from Consul: {e}")
+
             logger.info("✅ Shutdown complete")
 
 # ==============================================================================

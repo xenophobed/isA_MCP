@@ -60,6 +60,9 @@ class WebSearchTool(BaseTool):
         depth: int = 2,
         max_results_per_level: int = 5,
 
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
         # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> Dict[str, Any]:
@@ -121,17 +124,45 @@ class WebSearchTool(BaseTool):
                 summarize=True,
                 user_id="researcher"
             )
+
+            # Advanced: Provide operation_id for SSE monitoring
+            import uuid
+            op_id = str(uuid.uuid4())
+
+            # Start search with custom operation_id
+            search_task = asyncio.create_task(
+                web_search(query="AI", operation_id=op_id)
+            )
+
+            # Concurrently monitor progress via SSE
+            await stream_progress(op_id)
+
+            # Get result
+            result = await search_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await self.create_progress_operation(
-            metadata={
-                "user_id": user_id or "anonymous",
-                "query": query[:100],
-                "summarize": summarize,
-                "deep_search": deep_search,
-                "operation": "web_search"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await self.create_progress_operation(
+                metadata={
+                    "user_id": user_id or "anonymous",
+                    "query": query[:100],
+                    "summarize": summarize,
+                    "deep_search": deep_search,
+                    "operation": "web_search"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await self.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id or "anonymous",
+                    "query": query[:100],
+                    "summarize": summarize,
+                    "deep_search": deep_search,
+                    "operation": "web_search"
+                }
+            )
 
         try:
             # Validate user_id for AI features
@@ -390,16 +421,17 @@ class WebSearchTool(BaseTool):
 
 
 def register_web_search_tools(mcp: FastMCP):
-    """Register web search tool"""
+    """Register web search tools"""
     web_tool = WebSearchTool()
 
-    # Register using BaseTool.register_tool() for proper Context injection
+    # Register web_search (supports both sync and async usage)
     web_tool.register_tool(
         mcp,
         web_tool.web_search_impl,
         name="web_search",
         description="Enhanced web search with AI-powered summarization and inline citations. "
-                    "Keywords: search, web, internet, query, results, summarize, citations. "
+                    "Supports real-time progress monitoring via SSE (provide operation_id for monitoring). "
+                    "Keywords: search, web, internet, query, results, summarize, citations, progress. "
                     "Category: web",
         security_level=SecurityLevel.LOW,
         timeout=120.0,
@@ -408,8 +440,17 @@ def register_web_search_tools(mcp: FastMCP):
         )
     )
 
-    logger.info("✅ Web Search Tools registered: 1 enhanced function")
-    logger.info("🔍 web_search: Basic search + AI summarization + citations")
-    logger.info("📄 Features: Inline citations [1][2], content extraction, progress tracking")
+    logger.info("✅ Web Search Tools registered: 1 unified function")
+    logger.info("🔍 web_search: Basic search + AI summarization + citations + progress tracking")
+    logger.info("📄 Features:")
+    logger.info("   • Inline citations [1][2]")
+    logger.info("   • Content extraction")
+    logger.info("   • Real-time progress tracking (optional)")
+    logger.info("   • Deep search with multi-strategy fusion")
+    logger.info("")
+    logger.info("📊 Usage:")
+    logger.info("   Simple: web_search(query='AI')")
+    logger.info("   With progress: web_search(query='AI', operation_id='custom-id')")
+    logger.info("   Monitor via SSE: GET /progress/{operation_id}/stream")
 
     return web_tool

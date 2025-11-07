@@ -498,8 +498,11 @@ class BaseRAGService(ABC):
         """
         PDF → 文本（+ 可选图片描述）
 
+        现在使用 PDFProcessor.process_pdf() 统一接口
+        支持 URL、base64、本地文件
+
         Args:
-            request: 存储请求，content 为 PDF 文件路径
+            request: 存储请求，content 为 PDF 源（URL/base64/本地路径）
 
         Returns:
             提取的文本内容
@@ -509,29 +512,47 @@ class BaseRAGService(ABC):
             return f"PDF file: {request.content}"
 
         try:
-            result = await self.pdf_processor.process_pdf_unified(
-                request.content,  # pdf_path
-                {'extract_text': True, 'extract_images': True}
+            # 从 config 或 metadata 获取 VLM 选项
+            extra_config = self.config.extra_config or {}
+            metadata = request.metadata or {}
+
+            # 确定是否启用 VLM（默认关闭，需要显式启用）
+            enable_vlm = metadata.get('enable_vlm_analysis', extra_config.get('enable_vlm_analysis', False))
+            max_pages = metadata.get('max_pages', extra_config.get('max_pages'))
+
+            mode = 'full' if enable_vlm else 'text'
+
+            self.logger.info(f"[EXTRACT_PDF] Processing PDF with mode={mode}, vlm={enable_vlm}, max_pages={max_pages}")
+
+            # 使用统一接口处理 PDF
+            result = await self.pdf_processor.process_pdf(
+                pdf_input=request.content,  # 支持 URL/base64/本地路径
+                options={
+                    'mode': mode,
+                    'enable_vlm_analysis': enable_vlm,
+                    'max_pages': max_pages,
+                    'vlm_model': extra_config.get('vlm_model', 'gpt-4o-mini'),
+                    'vlm_provider': extra_config.get('vlm_provider', 'openai')
+                }
             )
 
             if not result.get('success'):
                 raise ValueError(f"PDF processing failed: {result.get('error')}")
 
-            # 提取文本
-            text_extraction = result.get('text_extraction', {})
-            full_text = text_extraction.get('full_text', '')
+            # 获取提取的文本（已包含图片描述，如果启用了 VLM）
+            full_text = result.get('text', '')
 
             if not full_text or not full_text.strip():
-                self.logger.warning("PDF text extraction returned empty result")
+                self.logger.warning("PDF extraction returned empty result")
                 return f"PDF file: {request.content} (empty content)"
 
-            # TODO: 可选处理图片（使用 VLM）
-            # enable_vlm = self.config.extra_config.get('enable_vlm_analysis', False)
-            # if enable_vlm:
-            #     images = result.get('image_analysis', {}).get('extracted_images', [])
-            #     if images:
-            #         image_descriptions = await self._process_images_with_vlm(images)
-            #         full_text += "\n\n图片内容:\n" + "\n".join(image_descriptions)
+            # 记录处理统计
+            metadata_info = result.get('metadata', {})
+            self.logger.info(
+                f"[EXTRACT_PDF] Success: pages={metadata_info.get('pages_processed')}, "
+                f"images={metadata_info.get('images_processed')}, "
+                f"time={metadata_info.get('processing_time', 0):.2f}s"
+            )
 
             return full_text
 
@@ -541,23 +562,50 @@ class BaseRAGService(ABC):
 
     async def _extract_text_from_image(self, request: RAGStoreRequest) -> str:
         """
-        Image → 文本描述（OCR + VLM）
+        Image → 文本描述（OCR + VLM）+ AI元数据
 
         Args:
             request: 存储请求，content 为图片文件路径
 
         Returns:
             图片的文本描述
+
+        Side Effects:
+            将 AI 生成的 metadata (categories, tags, mood等) 合并到 request.metadata 中
         """
+        self.logger.info(f"[EXTRACT_IMAGE] Called with file: {request.content}, has processor: {self.image_processor is not None}")
+
         if not self.image_processor:
             self.logger.warning("Image processor not available")
             return f"Image file: {request.content}"
 
         try:
+            self.logger.info(f"[EXTRACT_IMAGE] Calling analyze_image on: {request.content}")
             result = await self.image_processor.analyze_image(request.content)
+            self.logger.info(f"[EXTRACT_IMAGE] analyze_image returned: success={result.get('success')}, description_len={len(result.get('description', ''))}")
 
             description = result.get('description', '')
             ocr_text = result.get('ocr_text', '')
+            ai_metadata = result.get('metadata', {})
+
+            # 合并 AI 生成的 metadata 到 request.metadata 中
+            # 这样它们会被存储到 Qdrant payload 里
+            if ai_metadata and request.metadata is None:
+                request.metadata = {}
+
+            if ai_metadata:
+                # 添加 AI 元数据，使用 'ai_' 前缀避免冲突
+                request.metadata['ai_categories'] = ai_metadata.get('categories', [])
+                request.metadata['ai_tags'] = ai_metadata.get('tags', [])
+                request.metadata['ai_mood'] = ai_metadata.get('mood', '')
+                request.metadata['ai_style'] = ai_metadata.get('style', '')
+                request.metadata['ai_quality_score'] = ai_metadata.get('quality_score', 0.0)
+                request.metadata['ai_has_people'] = ai_metadata.get('has_people', False)
+                request.metadata['ai_has_text'] = ai_metadata.get('has_text', False)
+                request.metadata['ai_dominant_colors'] = ai_metadata.get('dominant_colors', [])
+                request.metadata['ai_composition'] = ai_metadata.get('composition', '')
+
+                self.logger.info(f"✓ AI metadata extracted: categories={ai_metadata.get('categories')}, tags count={len(ai_metadata.get('tags', []))}")
 
             if ocr_text:
                 return f"{description}\n\nOCR Text:\n{ocr_text}"

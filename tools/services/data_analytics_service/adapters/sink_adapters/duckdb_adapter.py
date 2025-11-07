@@ -4,7 +4,7 @@ DuckDB Sink Adapter
 Stores data TO DuckDB using enterprise DuckDB service
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from pathlib import Path
@@ -92,23 +92,24 @@ class DuckDBSinkAdapter(BaseSinkAdapter):
             logger.error(f"Failed to disconnect from DuckDB service: {e}")
             return False
     
-    def store_dataframe(self, df: pd.DataFrame, 
+    def store_dataframe(self, df: pl.DataFrame,
                        destination: str,
                        table_name: Optional[str] = None,
                        storage_options: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Store DataFrame in DuckDB using enterprise service
-        
+
         Args:
             df: DataFrame to store
             destination: DuckDB database path
             table_name: Table name (default: 'data')
             storage_options: Storage configuration
-            
+
         Returns:
             Storage result information
         """
-        start_time = pd.Timestamp.now()
+        from datetime import datetime
+        start_time = datetime.now()
         
         try:
             # Validate DataFrame
@@ -133,27 +134,27 @@ class DuckDBSinkAdapter(BaseSinkAdapter):
             table_name = self._sanitize_table_name(table_name or 'data')
             if_exists = options.get('if_exists', 'replace')  # replace, append, fail
             
-            # Store DataFrame using enterprise service
+            # Store DataFrame using enterprise service (DuckDB supports Polars natively)
             self.duckdb_service.create_table_from_dataframe(
                 data=df,
                 table_name=table_name,
-                framework='pandas',
+                framework='polars',
                 if_exists=if_exists
             )
-            
+
             # Verify storage and get table info
             verify_query = f"""
-                SELECT 
+                SELECT
                     COUNT(*) as row_count,
                     COUNT(DISTINCT *) as unique_rows
                 FROM {table_name}
             """
             table_info = self.duckdb_service.execute_query(
-                verify_query, 
+                verify_query,
                 access_level=AccessLevel.READ_ONLY
             )
-            
-            storage_duration = (pd.Timestamp.now() - start_time).total_seconds()
+
+            storage_duration = (datetime.now() - start_time).total_seconds()
             
             result = {
                 'success': True,
@@ -180,15 +181,15 @@ class DuckDBSinkAdapter(BaseSinkAdapter):
             return result
             
         except Exception as e:
-            storage_duration = (pd.Timestamp.now() - start_time).total_seconds()
+            storage_duration = (datetime.now() - start_time).total_seconds()
             error_msg = str(e)
-            
+
             self._log_storage_operation('DataFrame storage', False, {
                 'error': error_msg,
                 'duration': f"{storage_duration:.2f}s",
                 'service': 'enterprise'
             })
-            
+
             return {
                 'success': False,
                 'error': error_msg,
@@ -196,38 +197,38 @@ class DuckDBSinkAdapter(BaseSinkAdapter):
                 'destination': destination,
                 'table_name': table_name
             }
-    
-    def query_table(self, table_name: str, query: Optional[str] = None) -> pd.DataFrame:
+
+    def query_table(self, table_name: str, query: Optional[str] = None) -> pl.DataFrame:
         """
         Query data from DuckDB table using enterprise service
-        
+
         Args:
             table_name: Name of table to query
             query: Optional SQL query (default: SELECT * FROM table)
-            
+
         Returns:
             DataFrame with query results
         """
         try:
             if not self._duckdb_service:
                 raise Exception("DuckDB service not initialized")
-            
+
             if query:
                 return self.duckdb_service.execute_query_df(
                     query=query,
-                    framework='pandas',
+                    framework='polars',
                     access_level=AccessLevel.READ_ONLY
                 )
             else:
                 return self.duckdb_service.execute_query_df(
                     query=f"SELECT * FROM {table_name}",
-                    framework='pandas',
+                    framework='polars',
                     access_level=AccessLevel.READ_ONLY
                 )
-                
+
         except Exception as e:
             logger.error(f"Query failed: {e}")
-            return pd.DataFrame()
+            return pl.DataFrame()
     
     def list_tables(self) -> List[str]:
         """List all tables in the DuckDB database using enterprise service"""

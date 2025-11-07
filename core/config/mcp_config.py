@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from .logging_config import LoggingConfig
 from .infra_config import InfraConfig
+from .consul_config import ConsulConfig
 
 def _bool(val: str) -> bool:
     return val.lower() == "true"
@@ -55,6 +56,7 @@ class MCPConfig:
     # Sub-configurations
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     infrastructure: InfraConfig = field(default_factory=InfraConfig)
+    consul: ConsulConfig = field(default_factory=ConsulConfig)
 
     @classmethod
     def from_env(cls) -> 'MCPConfig':
@@ -90,5 +92,6 @@ class MCPConfig:
             lazy_load_external_services=_bool(os.getenv("LAZY_LOAD_EXTERNAL_SERVICES", "true")),
             # Load sub-configs
             logging=LoggingConfig.from_env(),
-            infrastructure=InfraConfig.from_env()
+            infrastructure=InfraConfig.from_env(),
+            consul=ConsulConfig.from_env()
         )

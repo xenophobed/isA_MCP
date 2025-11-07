@@ -333,10 +333,21 @@ class SyncService:
             for prompt in mcp_prompts:
                 try:
                     # Convert MCP prompt format to our format
+                    # Convert PromptArgument objects to dicts for JSON serialization
+                    arguments = []
+                    if hasattr(prompt, 'arguments') and prompt.arguments:
+                        for arg in prompt.arguments:
+                            arg_dict = {
+                                'name': arg.name,
+                                'description': arg.description or '',
+                                'required': arg.required if hasattr(arg, 'required') else False
+                            }
+                            arguments.append(arg_dict)
+
                     prompt_info = {
                         'name': prompt.name,
                         'description': prompt.description or '',
-                        'arguments': prompt.arguments if hasattr(prompt, 'arguments') else [],
+                        'arguments': arguments,
                         'template': prompt.description or f'Prompt: {prompt.name}'  # Use description as template
                     }
                     # Pass existing qdrant data for change detection

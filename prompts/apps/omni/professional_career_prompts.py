@@ -13,7 +13,7 @@ def register_professional_career_prompts(mcp):
     
     @mcp.prompt("career_guide_prompt")
     async def career_guide_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

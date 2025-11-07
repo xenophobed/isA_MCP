@@ -4,7 +4,6 @@ gRPC Clients Factory
 Provides unified access to isa-common gRPC clients
 """
 
-import os
 import logging
 from typing import Optional, Any
 
@@ -40,12 +39,8 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
             consul = None
             if host is None:
                 try:
-                    # Read Consul config from environment
-                    consul_host = os.getenv('CONSUL_HOST', 'localhost')
-                    consul_port = int(os.getenv('CONSUL_PORT', '8500'))
-
-                    consul = ConsulRegistry(consul_host=consul_host, consul_port=consul_port)
-                    logger.info(f"✅ Using Consul at {consul_host}:{consul_port} for service discovery")
+                    consul = ConsulRegistry()
+                    logger.debug("Using Consul for MinIO service discovery")
                 except Exception as e:
                     logger.warning(f"Consul registry creation failed: {e}")
 
@@ -58,7 +53,7 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
                 enable_compression=True,
                 enable_retry=True,
                 consul_registry=consul,
-                service_name_override='minio-grpc-service'
+                service_name_override='minio'
             )
 
             logger.info(f"✅ Created MinIO gRPC client for user: {user_id}")

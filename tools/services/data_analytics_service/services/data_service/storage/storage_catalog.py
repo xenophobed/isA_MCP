@@ -3,7 +3,7 @@ Storage Catalog Service - Step 3 of Storage Pipeline
 Updates metadata store and creates storage catalogs/indexes
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from dataclasses import dataclass, field

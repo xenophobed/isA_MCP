@@ -13,7 +13,7 @@ def register_rag_prompts(mcp):
     
     @mcp.prompt("intelligent_rag_search_prompt")
     async def intelligent_rag_search_prompt(
-        query: str,
+        query: str = "",
         available_tools: str = "",
         available_resources: str = "",
         context: str = ""
@@ -117,7 +117,7 @@ Remember: Your goal is to provide comprehensive, accurate, and well-sourced info
     
     @mcp.prompt("rag_collection_analysis_prompt")
     async def rag_collection_analysis_prompt(
-        collection_name: str,
+        collection_name: str = "",
         user_query: str = "",
         analysis_type: str = "overview"
     ) -> str:
@@ -205,8 +205,8 @@ Remember: Provide actionable insights that help users understand whether and how
     
     @mcp.prompt("rag_synthesis_prompt")
     async def rag_synthesis_prompt(
-        search_results: str,
-        original_query: str,
+        search_results: str = "",
+        original_query: str = "",
         sources_info: str = ""
     ) -> str:
         """

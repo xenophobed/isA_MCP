@@ -3,7 +3,7 @@ Data Persistence Service - Step 2 of Storage Pipeline
 Executes actual data storage using sink adapters
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from dataclasses import dataclass, field
@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from tools.services.data_analytics_service.adapters.sink_adapters import (
-    DuckDBSinkAdapter, ParquetSinkAdapter, CSVSinkAdapter
+    ParquetSinkAdapter, CSVSinkAdapter
 )
 
 logger = logging.getLogger(__name__)
@@ -45,17 +45,16 @@ class DataPersistenceService:
             'average_duration': 0.0
         }
         
-        # Initialize sink adapters
+        # Initialize sink adapters (MinIO + Parquet workflow)
         self.adapters = {
-            'duckdb': DuckDBSinkAdapter(),
-            'parquet': ParquetSinkAdapter(),
-            'csv': CSVSinkAdapter()
+            'parquet': ParquetSinkAdapter(),  # Primary: MinIO Parquet storage
+            'csv': CSVSinkAdapter()  # Secondary: CSV exports
         }
         
         logger.info("Data Persistence Service initialized")
     
-    def persist_data(self, 
-                    data: pd.DataFrame,
+    def persist_data(self,
+                    data: pl.DataFrame,
                     persistence_config: Dict[str, Any]) -> PersistenceResult:
         """
         Execute data persistence operations
@@ -70,7 +69,7 @@ class DataPersistenceService:
         start_time = datetime.now()
         
         try:
-            storage_type = persistence_config.get('storage_type', 'duckdb')
+            storage_type = persistence_config.get('storage_type', 'parquet')  # Default to Parquet (MinIO)
             destination = persistence_config.get('destination')
             table_name = persistence_config.get('table_name', 'data')
             
@@ -191,9 +190,9 @@ class DataPersistenceService:
         
         return options
     
-    def _execute_storage(self, 
+    def _execute_storage(self,
                         adapter,
-                        data: pd.DataFrame,
+                        data: pl.DataFrame,
                         destination: str,
                         table_name: str,
                         storage_options: Dict[str, Any],
@@ -312,8 +311,8 @@ class DataPersistenceService:
         except Exception as e:
             return {'error': str(e)}
     
-    def persist_multiple_formats(self, 
-                                 data: pd.DataFrame,
+    def persist_multiple_formats(self,
+                                 data: pl.DataFrame,
                                  format_configs: List[Dict[str, Any]]) -> Dict[str, PersistenceResult]:
         """Persist data in multiple formats simultaneously"""
         results = {}

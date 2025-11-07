@@ -13,7 +13,7 @@ def register_dream_prompts(mcp):
     
     @mcp.prompt("text_to_image_prompt")
     async def text_to_image_prompt(
-        prompt: str,
+        prompt: str = "",
         style_preset: str = "photorealistic",
         quality: str = "high"
     ) -> str:
@@ -55,7 +55,7 @@ Generate a professional-quality image that meets these specifications.
     
     @mcp.prompt("image_to_image_prompt")
     async def image_to_image_prompt(
-        prompt: str,
+        prompt: str = "",
         style_preset: str = "enhanced",
         strength: str = "medium"
     ) -> str:
@@ -97,7 +97,7 @@ Transform the image while preserving its core composition and identity.
     
     @mcp.prompt("style_transfer_prompt")
     async def style_transfer_prompt(
-        prompt: str,
+        prompt: str = "",
         style_preset: str = "impressionist",
         strength: str = "medium"
     ) -> str:
@@ -177,7 +177,7 @@ Create a seamless face swap that looks completely natural.
     
     @mcp.prompt("professional_headshot_prompt")
     async def professional_headshot_prompt(
-        prompt: str,
+        prompt: str = "",
         industry: str = "corporate",
         quality: str = "executive"
     ) -> str:
@@ -219,7 +219,7 @@ Create a professional headshot that commands respect and trust.
     
     @mcp.prompt("emoji_generation_prompt")
     async def emoji_generation_prompt(
-        prompt: str,
+        prompt: str = "",
         expression: str = "happy",
         style_preset: str = "kawaii",
         color_scheme: str = "vibrant"
@@ -265,7 +265,7 @@ Design an emoji that communicates emotion instantly and universally.
     
     @mcp.prompt("photo_inpainting_prompt")
     async def photo_inpainting_prompt(
-        prompt: str,
+        prompt: str = "",
         fill_method: str = "content_aware",
         strength: str = "seamless"
     ) -> str:
@@ -307,7 +307,7 @@ Restore the photo with invisible, professional-quality inpainting.
     
     @mcp.prompt("photo_outpainting_prompt")
     async def photo_outpainting_prompt(
-        prompt: str,
+        prompt: str = "",
         direction: str = "all_sides",
         strength: str = "natural"
     ) -> str:
@@ -349,7 +349,7 @@ Expand the scene naturally while maintaining photographic integrity.
     
     @mcp.prompt("sticker_generation_prompt")
     async def sticker_generation_prompt(
-        prompt: str,
+        prompt: str = "",
         style_preset: str = "kawaii",
         theme: str = "cute_animal"
     ) -> str:

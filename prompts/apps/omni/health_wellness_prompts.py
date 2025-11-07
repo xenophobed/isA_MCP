@@ -13,7 +13,7 @@ def register_health_wellness_prompts(mcp):
     
     @mcp.prompt("wellness_guide_prompt")
     async def wellness_guide_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

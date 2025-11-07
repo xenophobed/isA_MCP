@@ -13,7 +13,7 @@ def register_education_learning_prompts(mcp):
     
     @mcp.prompt("tutorial_prompt")
     async def tutorial_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -76,7 +76,7 @@ Create an engaging, practical tutorial that facilitates effective learning.
     
     @mcp.prompt("course_material_prompt")
     async def course_material_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

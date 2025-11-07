@@ -63,6 +63,11 @@ def register_web_automation_tools(mcp: FastMCP):
         url: str,
         task: str,
         user_id: str = "default",
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> Dict[str, Any]:
         """
@@ -194,6 +199,25 @@ def register_web_automation_tools(mcp: FastMCP):
                 task="go to search, type 'python async', press enter, click first repo"
             )
 
+            # Advanced: Provide operation_id for SSE monitoring
+            import uuid
+            op_id = str(uuid.uuid4())
+
+            # Start automation with custom operation_id
+            automation_task = asyncio.create_task(
+                web_automation(
+                    url="https://www.google.com",
+                    task="search for AI",
+                    operation_id=op_id
+                )
+            )
+
+            # Concurrently monitor progress via SSE
+            await stream_progress(op_id)
+
+            # Get result
+            result = await automation_task
+
         Notes:
             - The tool takes screenshots at key stages for debugging and verification
             - All actions are logged with detailed progress reporting
@@ -201,15 +225,27 @@ def register_web_automation_tools(mcp: FastMCP):
             - Session state is not persisted between calls (use Agent layer for session management)
             - Credentials are securely stored in Vault Service and require explicit user authorization
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await web_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "url": url[:100],
-                "task": task[:100],
-                "operation": "web_automation"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await web_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "url": url[:100],
+                    "task": task[:100],
+                    "operation": "web_automation"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await web_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "url": url[:100],
+                    "task": task[:100],
+                    "operation": "web_automation"
+                }
+            )
 
         try:
             # Detect operation type for better logging
@@ -276,7 +312,7 @@ def register_web_automation_tools(mcp: FastMCP):
                 )
                 
                 # Extract context info
-                context_info = web_tool.extract_context_info(ctx, user_id)
+                context_info = web_tool.extract_context_info(ctx)
                 
                 # Return HIL response
                 return web_tool.create_response(
@@ -373,7 +409,7 @@ def register_web_automation_tools(mcp: FastMCP):
                 )
             
             # Extract context info
-            context_info = web_tool.extract_context_info(ctx, user_id)
+            context_info = web_tool.extract_context_info(ctx)
             
             # Return response
             if result.get("success"):
@@ -408,7 +444,7 @@ def register_web_automation_tools(mcp: FastMCP):
             await web_tool.log_error(ctx, f"❌ Web automation failed: {str(e)}")
 
             # Extract context even in error case
-            context_info = web_tool.extract_context_info(ctx, user_id)
+            context_info = web_tool.extract_context_info(ctx)
             
             return web_tool.create_response(
                 "error",

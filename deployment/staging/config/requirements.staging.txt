@@ -15,11 +15,16 @@ asyncpg>=0.29.0
 psycopg[binary]>=3.0.0  # Lighter than psycopg2-binary
 pgvector>=0.2.0
 
+# Data Processing (replaced pandas with polars)
+polars-lts-cpu>=0.20.0  # CPU-compatible version for Docker/Apple Silicon
+pyarrow>=14.0.0  # Required for Parquet support in Polars
+openpyxl>=3.1.0  # Required for Excel file support in Polars
+
 # AI/LLM
 openai>=1.0.0
 tiktoken>=0.5.0
 isa-model[cloud]  # Latest version with cloud support
-isa-common  # isA common gRPC clients
+isa-common>=0.1.8  # isA common gRPC clients with Consul support
 
 # HTTP Clients
 httpx>=0.25.2
@@ -49,7 +54,7 @@ python-logging-loki>=0.3.1
 prometheus-client>=0.19.0
 
 # Service Discovery
-python-consul>=1.1.0
+python-consul2>=0.1.5
 
 # Utilities
 click>=8.1.0
@@ -57,10 +62,10 @@ rich>=13.6.0
 aiolimiter>=1.1.0
 
 # ============================================
-# REMOVED HEAVY DEPENDENCIES (save ~500MB+):
+# REMOVED/REPLACED HEAVY DEPENDENCIES (save ~500MB+):
 # ============================================
-# - pandas, numpy (~200MB) - Use data analytics service when needed
-# - duckdb (~100MB) - Use data analytics service
+# - pandas, numpy (~200MB) - REPLACED with Polars (~50MB) for 5-10x performance
+# - duckdb (~100MB) - Moved to isa-common service
 # - neo4j (~50MB) - Use graph service when needed
 # - PyMuPDF (~40MB) - Use intelligence service for PDFs
 # - openpyxl (~30MB) - Use data service for Excel

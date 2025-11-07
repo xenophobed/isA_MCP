@@ -10,7 +10,7 @@ def register_hunt_prompts(mcp: FastMCP):
     
     @mcp.prompt()
     def hunt_ecommerce_prompt(
-        query: str,
+        query: str = "",
         search_depth: str = "medium",
         result_format: str = "structured"
     ) -> str:
@@ -70,8 +70,8 @@ Transform "{query}" into comprehensive shopping intelligence that helps users ma
 
     @mcp.prompt()
     def hunt_academic_prompt(
-        query: str,
-        search_depth: str = "medium", 
+        query: str = "",
+        search_depth: str = "medium",
         result_format: str = "structured"
     ) -> str:
         """
@@ -130,9 +130,9 @@ Transform "{query}" into comprehensive academic intelligence that provides schol
 
     @mcp.prompt()
     def hunt_social_prompt(
-        query: str,
+        query: str = "",
         search_depth: str = "medium",
-        result_format: str = "structured" 
+        result_format: str = "structured"
     ) -> str:
         """
         Social media and community focused search template
@@ -190,7 +190,7 @@ Transform "{query}" into comprehensive social intelligence that captures communi
 
     @mcp.prompt()
     def hunt_general_prompt(
-        query: str,
+        query: str = "",
         search_depth: str = "medium",
         result_format: str = "structured"
     ) -> str:

@@ -9,12 +9,12 @@ from .base_adapter import FileAdapter
 from .base_adapter import TableInfo, ColumnInfo
 
 try:
-    import pandas as pd
+    import polars as pl
     import openpyxl
-    PANDAS_AVAILABLE = True
+    POLARS_AVAILABLE = True
     OPENPYXL_AVAILABLE = True
 except ImportError:
-    PANDAS_AVAILABLE = False
+    POLARS_AVAILABLE = False
     OPENPYXL_AVAILABLE = False
 
 class ExcelAdapter(FileAdapter):
@@ -22,8 +22,8 @@ class ExcelAdapter(FileAdapter):
     
     def __init__(self):
         super().__init__()
-        if not PANDAS_AVAILABLE:
-            raise ImportError("pandas is required for Excel adapter. Install with: pip install pandas")
+        if not POLARS_AVAILABLE:
+            raise ImportError("polars is required for Excel adapter. Install with: pip install polars")
         if not OPENPYXL_AVAILABLE:
             raise ImportError("openpyxl is required for Excel adapter. Install with: pip install openpyxl")
         
@@ -34,19 +34,20 @@ class ExcelAdapter(FileAdapter):
     def _load_file(self, file_path: str) -> Any:
         """Load Excel file and all sheets"""
         try:
-            # Load Excel file with all sheets
-            excel_file = pd.ExcelFile(file_path)
-            self.sheet_names = excel_file.sheet_names
-            
-            # Load each sheet
+            # Load workbook to get sheet names first
+            wb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
+            self.sheet_names = wb.sheetnames
+            wb.close()
+
+            # Load each sheet using Polars
             sheet_data = {}
             for sheet_name in self.sheet_names:
                 try:
-                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    df = pl.read_excel(file_path, sheet_name=sheet_name)
                     sheet_data[sheet_name] = df
                 except Exception as e:
                     print(f"Warning: Could not load sheet '{sheet_name}': {e}")
-                    sheet_data[sheet_name] = pd.DataFrame()  # Empty dataframe
+                    sheet_data[sheet_name] = pl.DataFrame()  # Empty dataframe
             
             self.sheet_data = sheet_data
             
@@ -72,33 +73,33 @@ class ExcelAdapter(FileAdapter):
         
         for sheet_name, df in self.sheet_data.items():
             sheet_info = {
-                "rows": len(df),
-                "columns": len(df.columns),
+                "rows": df.height,
+                "columns": df.width,
                 "column_names": list(df.columns),
                 "has_header": self._detect_header(df),
-                "data_types": {str(col): str(df[col].dtype) for col in df.columns},
-                "empty_rows": df.isnull().all(axis=1).sum(),
-                "empty_columns": df.isnull().all(axis=0).sum()
+                "data_types": {str(col): str(df.get_column(str(col)).dtype) for col in df.columns},
+                "empty_rows": df.select(pl.all().is_null()).sum_horizontal().sum(),
+                "empty_columns": df.null_count().sum()
             }
             structure["sheets_info"][sheet_name] = sheet_info
         
         return structure
     
-    def _detect_header(self, df: pd.DataFrame) -> bool:
+    def _detect_header(self, df: pl.DataFrame) -> bool:
         """Detect if first row is header"""
-        if df.empty:
+        if df.height == 0:
             return False
         
         # Check if first row has different data types than rest
-        if len(df) < 2:
+        if df.height < 2:
             return True  # Assume header if only one row
         
-        first_row = df.iloc[0]
-        second_row = df.iloc[1]
+        first_row = df.row(0)
+        second_row = df.row(1)
         
         # If first row is all strings and second row has numbers, likely header
-        first_all_strings = all(isinstance(val, str) for val in first_row if pd.notna(val))
-        second_has_numbers = any(isinstance(val, (int, float)) for val in second_row if pd.notna(val))
+        first_all_strings = all(isinstance(val, str) for val in first_row if not pl.is_null(val))
+        second_has_numbers = any(isinstance(val, (int, float)) for val in second_row if not pl.is_null(val))
         
         return first_all_strings and second_has_numbers
     
@@ -115,7 +116,7 @@ class ExcelAdapter(FileAdapter):
                 table_name=sheet_name,
                 schema_name="excel_file",
                 table_type="SHEET",
-                record_count=len(df),
+                record_count=df.height,
                 table_comment=f"Excel sheet: {sheet_name}",
                 created_date="",
                 last_modified="",
@@ -142,7 +143,7 @@ class ExcelAdapter(FileAdapter):
             df = self.sheet_data[sheet_name]
             
             for idx, column_name in enumerate(df.columns):
-                column_series = df[column_name]
+                column_series = df.get_column(column_name)
                 
                 # Analyze column data
                 data_analysis = self._analyze_column_data(column_series)
@@ -150,9 +151,9 @@ class ExcelAdapter(FileAdapter):
                 column_info = ColumnInfo(
                     table_name=sheet_name,
                     column_name=str(column_name),
-                    data_type=self._map_pandas_to_sql_type(column_series.dtype),
+                    data_type=self._map_polars_to_sql_type(column_series.dtype),
                     max_length=data_analysis.get('max_length'),
-                    is_nullable=column_series.isnull().any(),
+                    is_nullable=column_series.null_count() > 0,
                     default_value="",
                     column_comment=f"Column from Excel sheet {sheet_name}",
                     ordinal_position=idx + 1,
@@ -167,29 +168,29 @@ class ExcelAdapter(FileAdapter):
         
         return columns
     
-    def _analyze_column_data(self, series: pd.Series) -> Dict[str, Any]:
-        """Analyze pandas series data"""
+    def _analyze_column_data(self, series: pl.Series) -> Dict[str, Any]:
+        """Analyze polars series data"""
         analysis = {}
         
         # Basic stats
-        total_count = len(series)
-        null_count = series.isnull().sum()
-        non_null_series = series.dropna()
+        total_count = series.len()
+        null_count = series.null_count()
+        non_null_series = series.drop_nulls()
         
         analysis['null_percentage'] = null_count / total_count if total_count > 0 else 0
-        analysis['unique_count'] = non_null_series.nunique()
-        analysis['unique_percentage'] = analysis['unique_count'] / len(non_null_series) if len(non_null_series) > 0 else 0
+        analysis['unique_count'] = non_null_series.n_unique()
+        analysis['unique_percentage'] = analysis['unique_count'] / non_null_series.len() if non_null_series.len() > 0 else 0
         
         # Sample values
-        sample_size = min(10, len(non_null_series))
+        sample_size = min(10, non_null_series.len())
         if sample_size > 0:
-            analysis['sample_values'] = non_null_series.sample(sample_size).tolist()
+            analysis['sample_values'] = non_null_series.sample(n=sample_size).to_list()
         else:
             analysis['sample_values'] = []
         
         # Value range for numeric columns
-        if pd.api.types.is_numeric_dtype(series):
-            if len(non_null_series) > 0:
+        if series.dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
+            if non_null_series.len() > 0:
                 analysis['value_range'] = {
                     'min': float(non_null_series.min()),
                     'max': float(non_null_series.max()),
@@ -197,17 +198,17 @@ class ExcelAdapter(FileAdapter):
                 }
         
         # Max length for string columns
-        if pd.api.types.is_string_dtype(series) or pd.api.types.is_object_dtype(series):
-            string_lengths = non_null_series.astype(str).str.len()
-            if len(string_lengths) > 0:
+        if series.dtype == pl.Utf8 or series.dtype == pl.Object:
+            string_lengths = non_null_series.cast(pl.Utf8).str.len_chars()
+            if string_lengths.len() > 0:
                 analysis['max_length'] = int(string_lengths.max())
             else:
                 analysis['max_length'] = 0
         
         return analysis
     
-    def _map_pandas_to_sql_type(self, dtype) -> str:
-        """Map pandas dtype to SQL-like type"""
+    def _map_polars_to_sql_type(self, dtype) -> str:
+        """Map polars dtype to SQL-like type"""
         dtype_str = str(dtype)
         
         if 'int' in dtype_str:
@@ -223,7 +224,7 @@ class ExcelAdapter(FileAdapter):
         else:
             return 'text'
     
-    def _infer_business_type(self, column_name: str, series: pd.Series) -> str:
+    def _infer_business_type(self, column_name: str, series: pl.Series) -> str:
         """Infer business type from column name and data"""
         column_lower = str(column_name).lower()
         
@@ -248,7 +249,7 @@ class ExcelAdapter(FileAdapter):
             return 'category'
         
         # Email columns
-        elif 'email' in column_lower or '@' in str(series.iloc[0] if len(series) > 0 else ''):
+        elif 'email' in column_lower or '@' in str(series[0] if series.len() > 0 else ''):
             return 'email'
         
         # Phone columns
@@ -258,7 +259,7 @@ class ExcelAdapter(FileAdapter):
         else:
             return 'general'
     
-    def _categorize_sheet(self, sheet_name: str, df: pd.DataFrame) -> str:
+    def _categorize_sheet(self, sheet_name: str, df: pl.DataFrame) -> str:
         """Categorize sheet based on name and content"""
         sheet_lower = sheet_name.lower()
         
@@ -273,32 +274,32 @@ class ExcelAdapter(FileAdapter):
         else:
             return 'data'
     
-    def _calculate_data_quality_score(self, df: pd.DataFrame) -> float:
+    def _calculate_data_quality_score(self, df: pl.DataFrame) -> float:
         """Calculate data quality score for sheet"""
-        if df.empty:
+        if df.height == 0:
             return 0.0
         
-        total_cells = df.size
-        null_cells = df.isnull().sum().sum()
+        total_cells = df.height * df.width
+        null_cells = df.null_count().sum_horizontal()[0]
         completeness = 1 - (null_cells / total_cells)
         
         # Simple quality score based on completeness
         return round(completeness, 2)
     
-    def _identify_key_columns(self, df: pd.DataFrame) -> List[str]:
+    def _identify_key_columns(self, df: pl.DataFrame) -> List[str]:
         """Identify potential key columns"""
         key_columns = []
         
         for column in df.columns:
             column_lower = str(column).lower()
-            series = df[column]
+            series = df.get_column(column)
             
             # Check if column name suggests it's a key
             if any(keyword in column_lower for keyword in ['id', 'key', 'code']):
                 key_columns.append(str(column))
             
             # Check if column has unique values (potential key)
-            elif series.nunique() == len(series.dropna()) and len(series.dropna()) > 0:
+            elif series.n_unique() == len(series.drop_nulls()) and len(series.drop_nulls()) > 0:
                 key_columns.append(str(column))
         
         return key_columns[:3]  # Return max 3 key columns
@@ -312,7 +313,7 @@ class ExcelAdapter(FileAdapter):
         sample_df = df.head(limit)
         
         # Convert to list of dictionaries
-        return sample_df.to_dict('records')
+        return sample_df.to_dicts()
     
     def _analyze_column_distribution(self, sheet_name: str, column_name: str, sample_size: int) -> Dict[str, Any]:
         """Analyze column data distribution"""
@@ -324,7 +325,7 @@ class ExcelAdapter(FileAdapter):
         if column_name not in df.columns:
             return {"error": f"Column {column_name} not found in sheet {sheet_name}"}
         
-        series = df[column_name]
+        series = df.get_column(column_name)
         return self._analyze_column_data(series)
     
     def _compute_quality_metrics(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
@@ -337,16 +338,16 @@ class ExcelAdapter(FileAdapter):
         columns_with_nulls = 0
         
         for sheet_name, df in self.sheet_data.items():
-            if df.empty:
+            if df.height == 0:
                 empty_sheets += 1
                 continue
             
-            total_columns += len(df.columns)
-            total_rows += len(df)
+            total_columns += df.width
+            total_rows += df.height
             
             # Count columns with null values
             for column in df.columns:
-                if df[column].isnull().any():
+                if df.get_column(column).is_null().any():
                     columns_with_nulls += 1
         
         metrics.update({
@@ -367,10 +368,10 @@ class ExcelAdapter(FileAdapter):
         
         for sheet_name, df in self.sheet_data.items():
             sheet_summary = {
-                'rows': len(df),
-                'columns': len(df.columns),
-                'data_types': df.dtypes.value_counts().to_dict(),
-                'memory_usage': df.memory_usage(deep=True).sum()
+                'rows': df.height,
+                'columns': df.width,
+                'data_types': df.dtypes,
+                'memory_usage': df.estimated_size("b")
             }
             summary['sheet_summaries'][sheet_name] = sheet_summary
         
@@ -406,7 +407,7 @@ class ExcelAdapter(FileAdapter):
                 return False
             
             df = self.sheet_data[sheet_name]
-            df.to_csv(output_path, index=False)
+            df.write_csv(output_path)
             return True
         except Exception:
             return False

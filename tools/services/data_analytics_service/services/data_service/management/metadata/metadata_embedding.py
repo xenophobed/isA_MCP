@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AI-Powered Metadata Embedding Service - Step 3: Generate embeddings and store in pgvector
-Uses intelligence_service embedding_generator for advanced embedding capabilities
+AI-Powered Metadata Embedding Service - Step 3: Generate embeddings and store in Qdrant
+Uses ISA Model for unified embedding generation + Qdrant for vector storage
 """
 
 import json
@@ -13,18 +13,10 @@ from dataclasses import dataclass, asdict
 import logging
 from datetime import datetime
 
-from core.database.supabase_client import get_supabase_client
+from core.clients.qdrant_client import get_qdrant_client
+from core.clients.model_client import get_model_client
 from tools.base_service import BaseService
 from .semantic_enricher import SemanticMetadata
-
-# Import AI-powered embedding service
-try:
-    from tools.services.intelligence_service.language.embedding_generator import embed, EmbeddingGenerator
-except ImportError:
-    # Fallback for testing/development
-    embed = None
-    EmbeddingGenerator = None
-    logging.warning("Could not import intelligence_service embedding_generator - embedding features will be limited")
 
 logger = logging.getLogger(__name__)
 
@@ -54,44 +46,96 @@ class SearchResult:
     semantic_tags: List[str]
 
 class AIMetadataEmbeddingService(BaseService):
-    """Step 3: AI-powered metadata embedding generation and storage in pgvector"""
-    
+    """Step 3: AI-powered metadata embedding generation and storage in Qdrant (ISA Model)"""
+
     def __init__(self, database_source: str = "customs_trade_db"):
         super().__init__("AIMetadataEmbeddingService")
         self.database_source = database_source
-        self.supabase = get_supabase_client()
-        
-        # Initialize AI embedding service
-        if EmbeddingGenerator:
-            self.embedding_generator = EmbeddingGenerator()
-            logger.info("AI embedding generator initialized successfully")
-        else:
-            self.embedding_generator = None
-            logger.warning("AI embedding generator not available - using fallback")
-            
+
+        # Collection name: user_data (per user requirement)
+        self.collection_name = 'user_data'
+        self.vector_dimension = 1536  # text-embedding-3-small
+        self.distance_metric = 'Cosine'
+
+        # Qdrant client will be initialized asynchronously
+        self.qdrant = None
+
+        # ISA Model client will be initialized asynchronously
+        self.model_client = None
         self.embedding_cache = {}
-        
-        logger.info(f"AI Metadata Embedding Service initialized for database: {database_source}")
+
+        logger.info(f"AI Metadata Embedding Service initialized for database: {database_source} (using ISA Model + Qdrant)")
         
     async def initialize(self):
-        """Initialize the embedding storage service"""
+        """Initialize the embedding storage service, Qdrant client, and ISA Model client"""
         try:
-            # Test database connection by checking if table exists
-            await self._ensure_table()
+            # Initialize ISA Model client
+            if not self.model_client:
+                self.model_client = await get_model_client()
+                logger.info("ISA Model client initialized successfully")
+
+            # Initialize Qdrant client
+            if not self.qdrant:
+                from isa_common.qdrant_client import QdrantClient
+                self.qdrant = QdrantClient(
+                    host='isa-qdrant-grpc',
+                    port=50062,
+                    user_id=f'metadata-{self.database_source}'
+                )
+                logger.info(f"Qdrant client initialized successfully")
+
+            # Ensure collection exists
+            await self._ensure_collection()
             logger.info("Embedding storage service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize embedding storage: {e}")
             raise
-    
-    async def _ensure_table(self):
-        """Ensure the db_meta_embedding table exists"""
+
+    async def _ensure_collection(self):
+        """Ensure the Qdrant collection exists"""
         try:
-            result = self.supabase.client.schema('dev').table('db_meta_embedding').select('*').limit(1).execute()
-            logger.info("db_meta_embedding table verified")
+            # Check if collection exists
+            collections = self.qdrant.list_collections()
+
+            if self.collection_name not in collections:
+                # Create collection
+                self.qdrant.create_collection(
+                    self.collection_name,
+                    self.vector_dimension,
+                    distance=self.distance_metric
+                )
+                logger.info(f"Created Qdrant collection '{self.collection_name}'")
+
+                # Create field indexes for filtering
+                await self._create_indexes()
+            else:
+                logger.info(f"Qdrant collection '{self.collection_name}' already exists")
+
         except Exception as e:
-            logger.warning(f"db_meta_embedding table may not exist: {e}")
-            logger.info("Please run setup_metadata_embedding.sql to create the table")
-            raise
+            logger.warning(f"Failed to ensure collection: {e}")
+            # Don't raise - collection might already exist
+
+    async def _create_indexes(self):
+        """Create field indexes for filtering"""
+        try:
+            # Index for database_source filtering
+            self.qdrant.create_field_index(
+                self.collection_name,
+                'database_source',
+                'keyword'
+            )
+
+            # Index for entity_type filtering
+            self.qdrant.create_field_index(
+                self.collection_name,
+                'entity_type',
+                'keyword'
+            )
+
+            logger.info("Created field indexes for filtering")
+
+        except Exception as e:
+            logger.warning(f"Index creation failed (may already exist): {e}")
     
     async def store_semantic_metadata(
         self, 
@@ -161,59 +205,73 @@ class AIMetadataEmbeddingService(BaseService):
         
         return results
     
-    async def search_similar_entities(self, query: str, entity_type: Optional[str] = None, 
+    async def search_similar_entities(self, query: str, entity_type: Optional[str] = None,
                                     limit: int = 10, similarity_threshold: float = 0.7) -> List[SearchResult]:
         """
         Search for similar entities using embedding similarity
-        
+
         Args:
             query: Search query text
             entity_type: Optional filter by entity type
             limit: Maximum number of results
             similarity_threshold: Minimum similarity score
-            
+
         Returns:
             List of search results
         """
         try:
             # Generate embedding for query
             query_embedding = await self._generate_embedding(query)
-            
+
             if not query_embedding:
                 return []
-            
-            # Use the RPC function to search
-            result = self.supabase.rpc(
-                'match_metadata_embeddings',
-                {
-                    'query_embedding': query_embedding,
-                    'match_threshold': similarity_threshold,
-                    'match_count': limit,
-                    'entity_type_filter': entity_type,
-                    'database_filter': self.database_source,
-                    'min_confidence': 0.0
-                }
-            ).execute()
-            
+
+            # Build filter conditions for Qdrant
+            filter_conditions = {
+                'must': [
+                    {'field': 'database_source', 'match': {'keyword': self.database_source}}
+                ]
+            }
+
+            # Add entity type filter if specified
+            if entity_type:
+                filter_conditions['must'].append(
+                    {'field': 'entity_type', 'match': {'keyword': entity_type}}
+                )
+
+            # Search in Qdrant
+            with self.qdrant:
+                results = self.qdrant.search_with_filter(
+                    self.collection_name,
+                    query_embedding,
+                    filter_conditions=filter_conditions,
+                    limit=limit,
+                    with_payload=True,
+                    with_vectors=False
+                )
+
+            # Filter by similarity threshold and format results
             search_results = []
-            if result.data:
-                for row in result.data:
-                    search_result = SearchResult(
-                        entity_name=row['entity_name'],
-                        entity_type=row['entity_type'],
-                        similarity_score=row['similarity'],
-                        content=row['content'],
-                        metadata=row['metadata'],
-                        semantic_tags=row['semantic_tags']
-                    )
-                    search_results.append(search_result)
-            
+            if results:
+                for result in results:
+                    score = result.get('score', 0.0)
+                    if score >= similarity_threshold:
+                        payload = result.get('payload', {})
+                        search_result = SearchResult(
+                            entity_name=payload.get('entity_name', 'unknown'),
+                            entity_type=payload.get('entity_type', 'unknown'),
+                            similarity_score=score,
+                            content=payload.get('content', ''),
+                            metadata=payload.get('metadata', {}),
+                            semantic_tags=payload.get('semantic_tags', [])
+                        )
+                        search_results.append(search_result)
+
             return search_results
-            
+
         except Exception as e:
             logger.error(f"Failed to search similar entities: {e}")
-            # Fallback to intelligence service search when DB function is missing
-            return await self._fallback_similarity_search(query, entity_type, limit, similarity_threshold)
+            return []
     
     async def search_with_reranking(self, query: str, entity_type: Optional[str] = None, 
                                   limit: int = 10, similarity_threshold: float = 0.7,
@@ -237,37 +295,13 @@ class AIMetadataEmbeddingService(BaseService):
                 query, entity_type, limit * 2, similarity_threshold  # Get more for reranking
             )
             
-            if not initial_results or not use_reranking or not self.embedding_generator:
+            if not initial_results or not use_reranking:
                 return initial_results[:limit]
-            
-            # Use AI reranking if available
-            try:
-                from tools.services.intelligence_service.language.embedding_generator import rerank
-                
-                # Extract texts for reranking
-                documents = [result.content for result in initial_results]
-                
-                # Rerank using AI
-                reranked = await rerank(query, documents, top_k=min(limit, len(documents)))
-                
-                # Map back to SearchResult objects
-                content_to_result = {result.content: result for result in initial_results}
-                reranked_results = []
-                
-                for item in reranked:
-                    content = item["document"]
-                    if content in content_to_result:
-                        result = content_to_result[content]
-                        # Update similarity score with reranking score
-                        result.similarity_score = item["relevance_score"]
-                        reranked_results.append(result)
-                
-                logger.info(f"Reranked {len(reranked_results)} results using AI")
-                return reranked_results
-                
-            except Exception as e:
-                logger.warning(f"AI reranking failed, using similarity search results: {e}")
-                return initial_results[:limit]
+
+            # Note: ISA Model does not currently support reranking
+            # Returning top similarity results instead
+            logger.info(f"Reranking not available in ISA Model, using top {limit} similarity results")
+            return initial_results[:limit]
             
         except Exception as e:
             logger.error(f"Enhanced search failed: {e}")
@@ -322,13 +356,16 @@ class AIMetadataEmbeddingService(BaseService):
                 if dataset_name:
                     metadata_dict['dataset_name'] = dataset_name
                 
-                record_data = {
-                    'id': f"entity_{entity_name}_{self.database_source}",
+                # Generate unique integer ID for Qdrant
+                point_id_str = f"entity_{entity_name}_{self.database_source}"
+                point_id = abs(hash(point_id_str)) % (10 ** 15)  # Ensure positive 15-digit int
+
+                # Build Qdrant payload
+                payload = {
                     'entity_type': 'table',
                     'entity_name': entity_name,
                     'entity_full_name': f"table:{entity_name}",
                     'content': content,
-                    'embedding': embedding,
                     'metadata': metadata_dict,
                     'semantic_tags': [],
                     'confidence_score': confidence,
@@ -337,10 +374,18 @@ class AIMetadataEmbeddingService(BaseService):
                     'created_at': datetime.now().isoformat(),
                     'updated_at': datetime.now().isoformat()
                 }
-                
-                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
-                
-                if result.data:
+
+                # Upsert to Qdrant
+                points = [{
+                    'id': point_id,
+                    'vector': embedding,
+                    'payload': payload
+                }]
+
+                with self.qdrant:
+                    operation_id = self.qdrant.upsert_points(self.collection_name, points)
+
+                if operation_id:
                     results['stored'] += 1
                     logger.info(f"Stored entity embedding: {entity_name}")
                 else:
@@ -377,14 +422,16 @@ class AIMetadataEmbeddingService(BaseService):
                     results['failed'] += 1
                     continue
                 
-                # Store in database
-                record_data = {
-                    'id': f"tags_{entity_key.replace(':', '_').replace('.', '_')}_{self.database_source}",
+                # Generate unique integer ID for Qdrant
+                point_id_str = f"tags_{entity_key.replace(':', '_').replace('.', '_')}_{self.database_source}"
+                point_id = abs(hash(point_id_str)) % (10 ** 15)
+
+                # Build Qdrant payload
+                payload = {
                     'entity_type': 'semantic_tags',
                     'entity_name': entity_path,
                     'entity_full_name': entity_key,
                     'content': content,
-                    'embedding': embedding,
                     'metadata': {'entity_type_prefix': entity_type_prefix},
                     'semantic_tags': tags,
                     'confidence_score': 0.9,
@@ -393,10 +440,18 @@ class AIMetadataEmbeddingService(BaseService):
                     'created_at': datetime.now().isoformat(),
                     'updated_at': datetime.now().isoformat()
                 }
-                
-                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
-                
-                if result.data:
+
+                # Upsert to Qdrant
+                points = [{
+                    'id': point_id,
+                    'vector': embedding,
+                    'payload': payload
+                }]
+
+                with self.qdrant:
+                    operation_id = self.qdrant.upsert_points(self.collection_name, points)
+
+                if operation_id:
                     results['stored'] += 1
                     logger.info(f"Stored semantic tags: {entity_key}")
                 else:
@@ -430,15 +485,17 @@ class AIMetadataEmbeddingService(BaseService):
                 
                 # Generate unique ID
                 rule_id = hashlib.md5(description.encode()).hexdigest()[:16]
-                
-                # Store in database
-                record_data = {
-                    'id': f"rule_{rule_id}_{self.database_source}",
+
+                # Generate unique integer ID for Qdrant
+                point_id_str = f"rule_{rule_id}_{self.database_source}"
+                point_id = abs(hash(point_id_str)) % (10 ** 15)
+
+                # Build Qdrant payload
+                payload = {
                     'entity_type': 'business_rule',
                     'entity_name': rule_type,
                     'entity_full_name': f"rule:{rule_type}",
                     'content': content,
-                    'embedding': embedding,
                     'metadata': {
                         'tables_involved': rule.get('tables_involved', []),
                         'sql_constraint': rule.get('sql_constraint', '')
@@ -450,10 +507,18 @@ class AIMetadataEmbeddingService(BaseService):
                     'created_at': datetime.now().isoformat(),
                     'updated_at': datetime.now().isoformat()
                 }
-                
-                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
-                
-                if result.data:
+
+                # Upsert to Qdrant
+                points = [{
+                    'id': point_id,
+                    'vector': embedding,
+                    'payload': payload
+                }]
+
+                with self.qdrant:
+                    operation_id = self.qdrant.upsert_points(self.collection_name, points)
+
+                if operation_id:
                     results['stored'] += 1
                     logger.info(f"Stored business rule: {rule_type}")
                 else:
@@ -491,15 +556,17 @@ class AIMetadataEmbeddingService(BaseService):
                 
                 # Generate unique ID
                 pattern_id = hashlib.md5(description.encode()).hexdigest()[:16]
-                
-                # Store in database
-                record_data = {
-                    'id': f"pattern_{pattern_id}_{self.database_source}",
+
+                # Generate unique integer ID for Qdrant
+                point_id_str = f"pattern_{pattern_id}_{self.database_source}"
+                point_id = abs(hash(point_id_str)) % (10 ** 15)
+
+                # Build Qdrant payload
+                payload = {
                     'entity_type': 'data_pattern',
                     'entity_name': pattern_type,
                     'entity_full_name': f"pattern:{pattern_type}",
                     'content': content,
-                    'embedding': embedding,
                     'metadata': {
                         'tables_involved': pattern.get('tables_involved', []),
                         'columns_involved': pattern.get('columns_involved', [])
@@ -511,10 +578,18 @@ class AIMetadataEmbeddingService(BaseService):
                     'created_at': datetime.now().isoformat(),
                     'updated_at': datetime.now().isoformat()
                 }
-                
-                result = self.supabase.client.schema('dev').table('db_meta_embedding').upsert(record_data).execute()
-                
-                if result.data:
+
+                # Upsert to Qdrant
+                points = [{
+                    'id': point_id,
+                    'vector': embedding,
+                    'payload': payload
+                }]
+
+                with self.qdrant:
+                    operation_id = self.qdrant.upsert_points(self.collection_name, points)
+
+                if operation_id:
                     results['stored'] += 1
                     logger.info(f"Stored data pattern: {pattern_type}")
                 else:
@@ -528,142 +603,72 @@ class AIMetadataEmbeddingService(BaseService):
         return results
     
     async def _generate_embedding(self, text: str) -> Optional[List[float]]:
-        """Generate embedding for text using AI embedding service"""
+        """Generate embedding for text using ISA Model"""
         try:
             # Check cache first
             text_hash = hashlib.md5(text.encode()).hexdigest()
             if text_hash in self.embedding_cache:
                 return self.embedding_cache[text_hash]
-            
-            # Use AI embedding generator if available
-            if self.embedding_generator and embed:
-                embedding = await embed(text, model="text-embedding-3-small")
-                
-                # Cache the result
-                self.embedding_cache[text_hash] = embedding
-                return embedding
-            
-            # Fallback: Try direct import if service not initialized
-            else:
-                try:
-                    from tools.services.intelligence_service.language.embedding_generator import embed as direct_embed
-                    logger.info("Using direct intelligence service embedding import")
-                    embedding = await direct_embed(text, model="text-embedding-3-small")
-                    
-                    # Cache the result
-                    self.embedding_cache[text_hash] = embedding
-                    return embedding
-                    
-                except ImportError:
-                    logger.error("Intelligence service embedding unavailable - cannot generate embeddings")
-                    return None
-            
+
+            # Initialize client if needed
+            if not self.model_client:
+                self.model_client = await get_model_client()
+
+            # Use ISA Model for embedding generation
+            response = await self.model_client.embeddings.create(
+                input=text,
+                model="text-embedding-3-small"
+            )
+
+            embedding = response.data[0].embedding
+
+            # Cache the result
+            self.embedding_cache[text_hash] = embedding
+            return embedding
+
         except Exception as e:
             logger.error(f"Failed to generate embedding: {e}")
             return None
     
     async def _generate_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
-        """Generate embeddings for multiple texts efficiently"""
+        """Generate embeddings for multiple texts efficiently using ISA Model"""
         try:
-            if self.embedding_generator and embed:
-                # Use AI batch embedding for efficiency
-                embeddings = await embed(texts, model="text-embedding-3-small")
-                
-                # Cache results
-                for text, embedding in zip(texts, embeddings):
-                    text_hash = hashlib.md5(text.encode()).hexdigest()
-                    self.embedding_cache[text_hash] = embedding
-                
-                return embeddings
-            
-            else:
-                # Fallback: Try direct batch embedding
-                try:
-                    from tools.services.intelligence_service.language.embedding_generator import embed as direct_embed
-                    embeddings = await direct_embed(texts, model="text-embedding-3-small")
-                    
-                    # Cache results
-                    for text, embedding in zip(texts, embeddings):
-                        text_hash = hashlib.md5(text.encode()).hexdigest()
-                        self.embedding_cache[text_hash] = embedding
-                    
-                    return embeddings
-                    
-                except ImportError:
-                    # Last resort: process individually
-                    embeddings = []
-                    for text in texts:
-                        embedding = await self._generate_embedding(text)
-                        embeddings.append(embedding)
-                    return embeddings
-                
+            # Initialize client if needed
+            if not self.model_client:
+                self.model_client = await get_model_client()
+
+            # Use ISA Model for batch embedding generation
+            response = await self.model_client.embeddings.create(
+                input=texts,
+                model="text-embedding-3-small"
+            )
+
+            embeddings = [item.embedding for item in response.data]
+
+            # Cache results
+            for text, embedding in zip(texts, embeddings):
+                text_hash = hashlib.md5(text.encode()).hexdigest()
+                self.embedding_cache[text_hash] = embedding
+
+            return embeddings
+
         except Exception as e:
-            logger.error(f"Failed to generate batch embeddings: {e}")
-            return [None] * len(texts)
+            logger.error(f"Batch embedding failed: {e}, falling back to individual processing")
+            # Fallback: process individually
+            embeddings = []
+            for text in texts:
+                embedding = await self._generate_embedding(text)
+                embeddings.append(embedding)
+            return embeddings
     
     async def _fallback_similarity_search(self, query: str, entity_type: Optional[str] = None,
                                         limit: int = 10, similarity_threshold: float = 0.7) -> List[SearchResult]:
         """
-        Fallback similarity search using intelligence service search function
-        Used when the database RPC function is not available
+        Fallback similarity search - deprecated, kept for backward compatibility
+        Now just calls the main search_similar_entities which uses Qdrant
         """
-        try:
-            # Query all content from database
-            db_query = self.supabase.client.schema('dev').table('db_meta_embedding').select('*')
-            
-            # Add filters
-            if entity_type:
-                db_query = db_query.eq('entity_type', entity_type)
-            db_query = db_query.eq('database_source', self.database_source)
-            
-            result = db_query.execute()
-            
-            if not result.data:
-                return []
-            
-            # Extract content texts for search
-            candidates = []
-            content_to_row = {}
-            
-            for row in result.data:
-                content = row.get('content', '')
-                if content:
-                    candidates.append(content)
-                    content_to_row[content] = row
-            
-            if not candidates:
-                return []
-            
-            # Use intelligence service search function
-            try:
-                from tools.services.intelligence_service.language.embedding_generator import search
-                
-                # Use the actual query with intelligence service search
-                search_results_raw = await search(query, candidates, top_k=limit)
-                
-                search_results = []
-                for content, similarity_score in search_results_raw:
-                    if similarity_score >= similarity_threshold and content in content_to_row:
-                        row = content_to_row[content]
-                        search_result = SearchResult(
-                            entity_name=row['entity_name'],
-                            entity_type=row['entity_type'],
-                            similarity_score=similarity_score,
-                            content=content,
-                            metadata=row.get('metadata', {}),
-                            semantic_tags=row.get('semantic_tags', [])
-                        )
-                        search_results.append(search_result)
-                
-                return search_results
-                
-            except ImportError:
-                logger.warning("Intelligence service search not available")
-                return []
-            
-        except Exception as e:
-            logger.error(f"Fallback similarity search failed: {e}")
-            return []
+        logger.warning("_fallback_similarity_search is deprecated, using main search instead")
+        return await self.search_similar_entities(query, entity_type, limit, similarity_threshold)
     
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """Calculate cosine similarity between two vectors"""
@@ -700,20 +705,62 @@ class AIMetadataEmbeddingService(BaseService):
     async def get_metadata_stats(self) -> Dict[str, Any]:
         """Get statistics about stored metadata embeddings"""
         try:
-            result = self.supabase.rpc(
-                'get_metadata_stats', 
-                {'database_name': self.database_source}
-            ).execute()
-            
-            if result.data:
-                return {
-                    'success': True,
-                    'stats': result.data,
-                    'database_source': self.database_source
-                }
-            else:
-                return {'success': False, 'error': 'No stats available'}
-                
+            # Get collection info from Qdrant
+            with self.qdrant:
+                collection_info = self.qdrant.get_collection_info(self.collection_name)
+
+            if not collection_info:
+                return {'success': False, 'error': 'Failed to get collection info'}
+
+            # Count by entity types using scroll
+            entity_type_counts = {}
+            filter_conditions = {
+                'must': [
+                    {'field': 'database_source', 'match': {'keyword': self.database_source}}
+                ]
+            }
+
+            # Get all points for this database_source to count by type
+            offset_id = None
+            total_points = 0
+            while True:
+                with self.qdrant:
+                    result = self.qdrant.scroll(
+                        collection_name=self.collection_name,
+                        filter_conditions=filter_conditions,
+                        limit=1000,
+                        offset_id=offset_id,
+                        with_payload=True,
+                        with_vectors=False
+                    )
+
+                if not result or 'points' not in result:
+                    break
+
+                points = result['points']
+                if not points:
+                    break
+
+                # Count by entity type
+                for point in points:
+                    entity_type = point['payload'].get('entity_type', 'unknown')
+                    entity_type_counts[entity_type] = entity_type_counts.get(entity_type, 0) + 1
+                    total_points += 1
+
+                offset_id = result.get('next_offset')
+                if not offset_id:
+                    break
+
+            return {
+                'success': True,
+                'stats': {
+                    'total_points': total_points,
+                    'entity_type_counts': entity_type_counts,
+                    'collection_total': collection_info.get('points_count', 0)
+                },
+                'database_source': self.database_source
+            }
+
         except Exception as e:
             logger.error(f"Failed to get metadata stats: {e}")
             return {'success': False, 'error': str(e)}
@@ -721,22 +768,64 @@ class AIMetadataEmbeddingService(BaseService):
     async def cleanup_old_embeddings(self, days_old: int = 30) -> Dict[str, Any]:
         """Clean up old embeddings"""
         try:
-            result = self.supabase.rpc(
-                'cleanup_old_metadata_embeddings',
-                {
-                    'days_old': days_old,
-                    'database_name': self.database_source
-                }
-            ).execute()
-            
-            deleted_count = result.data if result.data else 0
-            
+            from datetime import datetime, timedelta
+
+            # Calculate cutoff date
+            cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
+
+            # Find old points by scrolling
+            filter_conditions = {
+                'must': [
+                    {'field': 'database_source', 'match': {'keyword': self.database_source}}
+                ]
+            }
+
+            old_point_ids = []
+            offset_id = None
+
+            while True:
+                with self.qdrant:
+                    result = self.qdrant.scroll(
+                        collection_name=self.collection_name,
+                        filter_conditions=filter_conditions,
+                        limit=1000,
+                        offset_id=offset_id,
+                        with_payload=True,
+                        with_vectors=False
+                    )
+
+                if not result or 'points' not in result:
+                    break
+
+                points = result['points']
+                if not points:
+                    break
+
+                # Filter by created_at date
+                for point in points:
+                    created_at = point['payload'].get('created_at', '')
+                    if created_at and created_at < cutoff_date:
+                        old_point_ids.append(point['id'])
+
+                offset_id = result.get('next_offset')
+                if not offset_id:
+                    break
+
+            # Delete old points
+            deleted_count = 0
+            if old_point_ids:
+                with self.qdrant:
+                    operation_id = self.qdrant.delete_points(self.collection_name, old_point_ids)
+                    if operation_id:
+                        deleted_count = len(old_point_ids)
+                        logger.info(f"Deleted {deleted_count} old embeddings (older than {days_old} days)")
+
             return {
                 'success': True,
                 'deleted_count': deleted_count,
                 'database_source': self.database_source
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to cleanup embeddings: {e}")
             return {'success': False, 'error': str(e)}

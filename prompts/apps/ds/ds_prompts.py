@@ -10,8 +10,8 @@ def register_ds_prompts(mcp: FastMCP):
     
     @mcp.prompt()
     def csv_analyze_prompt(
-        prompt: str,
-        csv_url: str,  
+        prompt: str = "",
+        csv_url: str = "",
         depth: str = "comprehensive"
     ) -> str:
         """

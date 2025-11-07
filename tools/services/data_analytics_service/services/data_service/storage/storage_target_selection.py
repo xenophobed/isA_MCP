@@ -3,8 +3,7 @@ Storage Target Selection Service - Step 1 of Storage Pipeline
 Analyzes data characteristics and recommends optimal storage targets
 """
 
-import pandas as pd
-import numpy as np
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from dataclasses import dataclass, field
@@ -41,17 +40,12 @@ class StorageTargetSelectionService:
             'average_duration': 0.0
         }
         
-        # Storage type scoring criteria
+        # Storage type scoring criteria (MinIO + Parquet workflow)
         self.storage_types = {
-            'duckdb': {
-                'strengths': ['analytics', 'sql_queries', 'large_datasets', 'numeric_data'],
-                'weaknesses': ['interchange', 'simple_exports'],
-                'use_cases': ['analytical_workloads', 'data_science', 'reporting']
-            },
             'parquet': {
-                'strengths': ['compression', 'columnar', 'large_files', 'analytics'],
+                'strengths': ['compression', 'columnar', 'large_files', 'analytics', 'minio_compatible'],
                 'weaknesses': ['row_updates', 'streaming'],
-                'use_cases': ['data_warehousing', 'archival', 'analytics']
+                'use_cases': ['data_warehousing', 'archival', 'analytics', 'minio_storage']
             },
             'csv': {
                 'strengths': ['compatibility', 'human_readable', 'simple', 'interchange'],
@@ -62,8 +56,8 @@ class StorageTargetSelectionService:
         
         logger.info("Storage Target Selection Service initialized")
     
-    def select_targets(self, 
-                      data: pd.DataFrame,
+    def select_targets(self,
+                      data: pl.DataFrame,
                       selection_config: Dict[str, Any]) -> TargetSelectionResult:
         """
         Analyze data and recommend storage targets
@@ -98,8 +92,8 @@ class StorageTargetSelectionService:
             duration = (datetime.now() - start_time).total_seconds()
             performance_metrics = {
                 'duration_seconds': duration,
-                'data_rows_analyzed': len(data),
-                'data_columns_analyzed': len(data.columns),
+                'data_rows_analyzed': data.height,
+                'data_columns_analyzed': data.width,
                 'storage_types_evaluated': len(self.storage_types),
                 'recommendations_generated': len(recommendations)
             }
@@ -125,15 +119,15 @@ class StorageTargetSelectionService:
                 performance_metrics={'duration_seconds': duration}
             )
     
-    def _analyze_data_characteristics(self, data: pd.DataFrame) -> Dict[str, Any]:
+    def _analyze_data_characteristics(self, data: pl.DataFrame) -> Dict[str, Any]:
         """Analyze DataFrame characteristics for storage decisions"""
         try:
             analysis = {
                 'basic_stats': {
-                    'row_count': len(data),
-                    'column_count': len(data.columns),
-                    'memory_usage_mb': data.memory_usage(deep=True).sum() / 1024 / 1024,
-                    'estimated_size_mb': data.memory_usage(deep=True).sum() / 1024 / 1024 * 1.2  # Rough estimate
+                    'row_count': data.height,
+                    'column_count': data.width,
+                    'memory_usage_mb': data.estimated_size("mb"),
+                    'estimated_size_mb': data.estimated_size("mb") * 1.2  # Rough estimate
                 },
                 'data_types': {},
                 'quality_metrics': {},
@@ -161,36 +155,37 @@ class StorageTargetSelectionService:
             total_unique = 0
             
             for col in data.columns:
-                dtype = str(data[col].dtype)
-                null_count = data[col].isnull().sum()
-                unique_count = data[col].nunique()
-                
+                col_data = data[col]
+                dtype = str(col_data.dtype)
+                null_count = col_data.null_count()
+                unique_count = col_data.n_unique()
+
                 # Store column-level info
                 analysis['data_types'][col] = {
                     'dtype': dtype,
                     'null_count': null_count,
-                    'null_percentage': (null_count / len(data)) * 100,
+                    'null_percentage': (null_count / data.height) * 100,
                     'unique_count': unique_count,
-                    'unique_percentage': (unique_count / len(data)) * 100
+                    'unique_percentage': (unique_count / data.height) * 100
                 }
-                
+
                 # Aggregate statistics
                 total_nulls += null_count
                 total_unique += unique_count
-                
+
                 # Categorize data types
-                if dtype in ['int64', 'int32', 'float64', 'float32']:
+                if col_data.dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
                     numeric_cols += 1
                     analysis['patterns']['has_numeric'] = True
-                elif 'datetime' in dtype:
+                elif col_data.dtype in [pl.Date, pl.Datetime, pl.Time, pl.Duration]:
                     datetime_cols += 1
                     analysis['patterns']['has_time_series'] = True
-                elif dtype == 'category':
+                elif col_data.dtype == pl.Categorical:
                     categorical_cols += 1
                     analysis['patterns']['has_categorical'] = True
-                elif dtype == 'object':
+                elif col_data.dtype in [pl.Utf8, pl.String]:
                     # Determine if it's categorical or text
-                    unique_ratio = unique_count / len(data)
+                    unique_ratio = unique_count / data.height
                     if unique_ratio < 0.1:  # Low cardinality suggests categorical
                         categorical_cols += 1
                         analysis['patterns']['has_categorical'] = True
@@ -199,8 +194,8 @@ class StorageTargetSelectionService:
                         analysis['patterns']['has_text'] = True
             
             # Calculate complexity indicators
-            analysis['complexity_indicators']['null_percentage'] = (total_nulls / (len(data) * len(data.columns))) * 100
-            analysis['complexity_indicators']['unique_ratio'] = total_unique / (len(data) * len(data.columns))
+            analysis['complexity_indicators']['null_percentage'] = (total_nulls / (data.height * data.width)) * 100
+            analysis['complexity_indicators']['unique_ratio'] = total_unique / (data.height * data.width)
             
             # Cardinality distribution
             analysis['complexity_indicators']['cardinality_distribution'] = {
@@ -219,31 +214,37 @@ class StorageTargetSelectionService:
             logger.error(f"Data analysis failed: {e}")
             return {'error': str(e)}
     
-    def _estimate_memory_efficiency(self, data: pd.DataFrame) -> float:
+    def _estimate_memory_efficiency(self, data: pl.DataFrame) -> float:
         """Estimate how efficiently the data can be stored"""
         try:
             # Simple heuristic based on data characteristics
             efficiency_score = 5.0  # Base score
-            
-            # Numeric data is more efficient
-            numeric_ratio = len(data.select_dtypes(include=[np.number]).columns) / len(data.columns)
+
+            # Count numeric columns
+            numeric_cols = sum(1 for col in data.columns
+                             if data[col].dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64,
+                                                   pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
+                                                   pl.Float32, pl.Float64])
+            numeric_ratio = numeric_cols / data.width
             efficiency_score += numeric_ratio * 2
-            
+
             # Categorical data with low cardinality is efficient
-            for col in data.select_dtypes(include=['object', 'category']).columns:
-                unique_ratio = data[col].nunique() / len(data)
-                if unique_ratio < 0.1:  # Low cardinality
-                    efficiency_score += 1
-                elif unique_ratio > 0.8:  # High cardinality
-                    efficiency_score -= 0.5
-            
+            for col in data.columns:
+                col_data = data[col]
+                if col_data.dtype in [pl.Utf8, pl.String, pl.Categorical]:
+                    unique_ratio = col_data.n_unique() / data.height
+                    if unique_ratio < 0.1:  # Low cardinality
+                        efficiency_score += 1
+                    elif unique_ratio > 0.8:  # High cardinality
+                        efficiency_score -= 0.5
+
             # Null values reduce efficiency
-            total_nulls = data.isnull().sum().sum()
-            null_ratio = total_nulls / (len(data) * len(data.columns))
+            total_nulls = data.null_count().sum()
+            null_ratio = total_nulls / (data.height * data.width)
             efficiency_score -= null_ratio * 2
-            
+
             return max(0, min(10, efficiency_score))
-            
+
         except Exception:
             return 5.0  # Default score
     
@@ -258,20 +259,9 @@ class StorageTargetSelectionService:
             patterns = data_analysis.get('patterns', {})
             basic_stats = data_analysis.get('basic_stats', {})
             complexity = data_analysis.get('complexity_indicators', {})
-            
-            # DuckDB scoring
-            if storage_type == 'duckdb':
-                if patterns.get('has_numeric'):
-                    score += 2
-                if basic_stats.get('row_count', 0) > 10000:
-                    score += 1.5  # Good for large datasets
-                if patterns.get('has_time_series'):
-                    score += 1  # Good for analytics
-                if complexity.get('memory_efficiency', 5) > 7:
-                    score += 1
-            
-            # Parquet scoring  
-            elif storage_type == 'parquet':
+
+            # Parquet scoring (primary storage - MinIO)
+            if storage_type == 'parquet':
                 if basic_stats.get('row_count', 0) > 100000:
                     score += 2  # Excellent for large datasets
                 if patterns.get('has_numeric'):
@@ -304,7 +294,7 @@ class StorageTargetSelectionService:
                 score -= 1
             if 'query_performance' in constraints and storage_type == 'csv':
                 score -= 1
-            if 'compatibility' in constraints and storage_type in ['duckdb', 'parquet']:
+            if 'compatibility' in constraints and storage_type == 'parquet':
                 score -= 0.5
             
             scores[storage_type] = max(0, min(10, score))
@@ -352,14 +342,7 @@ class StorageTargetSelectionService:
         patterns = data_analysis.get('patterns', {})
         basic_stats = data_analysis.get('basic_stats', {})
         
-        if storage_type == 'duckdb':
-            if patterns.get('has_numeric'):
-                reasons.append("Excellent for numeric data analytics")
-            if basic_stats.get('row_count', 0) > 10000:
-                reasons.append("Optimized for large datasets")
-            reasons.append("Supports complex SQL queries")
-        
-        elif storage_type == 'parquet':
+        if storage_type == 'parquet':
             if basic_stats.get('row_count', 0) > 100000:
                 reasons.append("Efficient columnar storage for large datasets")
             reasons.append("Excellent compression ratios")
@@ -376,18 +359,17 @@ class StorageTargetSelectionService:
     def _estimate_size_reduction(self, storage_type: str, data_analysis: Dict[str, Any]) -> float:
         """Estimate size reduction percentage"""
         reductions = {
-            'duckdb': 60,    # Good columnar compression
-            'parquet': 70,   # Excellent compression
+            'parquet': 70,   # Excellent compression (MinIO storage)
             'csv': -20       # Usually larger than memory
         }
-        
+
         base_reduction = reductions.get(storage_type, 0)
-        
+
         # Adjust based on data characteristics
         patterns = data_analysis.get('patterns', {})
-        if patterns.get('has_numeric') and storage_type in ['duckdb', 'parquet']:
+        if patterns.get('has_numeric') and storage_type == 'parquet':
             base_reduction += 10  # Numeric data compresses well
-        
+
         return base_reduction
     
     def _get_suitability_level(self, score: float) -> str:
@@ -416,9 +398,7 @@ class StorageTargetSelectionService:
             adjusted_score = rec['score']
             
             # Apply weights based on storage type strengths
-            if storage_type == 'duckdb':
-                adjusted_score *= preference_weights['performance']
-            elif storage_type == 'parquet':
+            if storage_type == 'parquet':
                 adjusted_score *= preference_weights['size_efficiency']
             elif storage_type == 'csv':
                 adjusted_score *= preference_weights['compatibility']

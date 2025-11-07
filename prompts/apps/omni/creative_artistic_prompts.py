@@ -13,7 +13,7 @@ def register_creative_artistic_prompts(mcp):
     
     @mcp.prompt("storytelling_prompt")
     async def storytelling_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

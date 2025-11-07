@@ -13,7 +13,7 @@ def register_custom_prompts(mcp):
     
     @mcp.prompt("general_content_prompt")
     async def general_content_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -72,7 +72,7 @@ Create comprehensive, well-sourced content that meets these specifications.
     
     @mcp.prompt("research_report_prompt")
     async def research_report_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

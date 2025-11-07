@@ -454,20 +454,22 @@ class ComposioMCPBridge:
 
 def register_composio_bridge(mcp):
     """Register Composio bridge with MCP server
-    
+
     Returns:
         Dict[str, Dict]: 已注册工具的元数据，用于搜索索引
     """
     try:
-        # Import the Composio service
-        from .composio_connector import ComposioService
         import os
-        
-        # Check if Composio is enabled
+
+        # Check if Composio is enabled FIRST (before any imports)
         api_key = os.environ.get("COMPOSIO_API_KEY")
         if not api_key:
-            logger.warning("Composio API key not set, skipping bridge registration")
+            logger.info("⚠️ Composio API key not set, skipping bridge registration")
             return {}
+
+        # Only import Composio service if API key is configured
+        # This avoids slow SDK import when Composio is not being used
+        from .composio_connector import ComposioService
         
         # Create service configuration
         config = {
@@ -499,25 +501,33 @@ def register_composio_bridge(mcp):
         
         # Run the async initialization and return metadata
         import asyncio
+        import concurrent.futures
+
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # We're already in an async context
-                # Create task and wait for it
-                task = asyncio.create_task(init_and_register())
-                # Use blocking wait to get the result
-                import time
-                timeout = 30
-                start_time = time.time()
-                while not task.done() and (time.time() - start_time) < timeout:
-                    time.sleep(0.1)
-                if task.done():
-                    return task.result()
-                else:
-                    logger.warning("⚠️ Composio registration timed out")
-                    return {}
+                # We're already in an async context - use thread pool to avoid blocking
+                logger.info("Running Composio registration in thread pool to avoid blocking event loop...")
+
+                def run_in_new_loop():
+                    """Run init_and_register in a new event loop in a separate thread"""
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(init_and_register())
+                    finally:
+                        new_loop.close()
+
+                # Run in thread pool with timeout
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(run_in_new_loop)
+                    try:
+                        return future.result(timeout=30)
+                    except concurrent.futures.TimeoutError:
+                        logger.warning("⚠️ Composio registration timed out after 30s")
+                        return {}
             else:
-                # Run in new event loop
+                # Run in existing event loop
                 return loop.run_until_complete(init_and_register())
         except RuntimeError:
             # No event loop, create one

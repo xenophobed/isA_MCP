@@ -13,7 +13,7 @@ def register_news_current_events_prompts(mcp):
     
     @mcp.prompt("news_analysis_prompt")
     async def news_analysis_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

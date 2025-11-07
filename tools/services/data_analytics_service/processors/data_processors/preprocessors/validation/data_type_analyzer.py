@@ -4,8 +4,8 @@ Data Type Analysis Processor
 Analyzes and infers proper data types for columns
 """
 
-import pandas as pd
-import numpy as np
+import polars as pl
+# import numpy as np  # Not needed with Polars
 from typing import Dict, List, Any, Optional, Tuple
 import re
 import logging
@@ -39,7 +39,7 @@ class DataTypeAnalyzer:
             r'^\d+\.?\d*\s?(USD|EUR|GBP|JPY)$',      # 123.45 USD
         ]
     
-    def analyze_dataframe(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def analyze_dataframe(self, df: pl.DataFrame) -> Dict[str, Any]:
         """
         Analyze data types for entire DataFrame
         
@@ -52,8 +52,8 @@ class DataTypeAnalyzer:
         try:
             analysis_result = {
                 'success': True,
-                'total_columns': len(df.columns),
-                'total_rows': len(df),
+                'total_columns': df.width,
+                'total_rows': df.height,
                 'column_analysis': {},
                 'type_summary': {},
                 'recommendations': []
@@ -61,7 +61,7 @@ class DataTypeAnalyzer:
             
             # Analyze each column
             for column in df.columns:
-                column_analysis = self._analyze_column(df[column], str(column))
+                column_analysis = self._analyze_column(df.get_column(column), str(column))
                 analysis_result['column_analysis'][str(column)] = column_analysis
             
             # Create type summary
@@ -80,20 +80,22 @@ class DataTypeAnalyzer:
             return analysis_result
             
         except Exception as e:
+            import traceback
             logger.error(f"DataFrame analysis failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 'success': False,
                 'error': str(e)
             }
     
-    def _analyze_column(self, series: pd.Series, column_name: str) -> Dict[str, Any]:
+    def _analyze_column(self, series: pl.Series, column_name: str) -> Dict[str, Any]:
         """Analyze a single column"""
         
         # Basic statistics
-        total_count = len(series)
-        null_count = series.isnull().sum()
-        non_null_series = series.dropna()
-        unique_count = non_null_series.nunique()
+        total_count = series.len()
+        null_count = series.null_count()
+        non_null_series = series.drop_nulls()
+        unique_count = non_null_series.n_unique()
         
         analysis = {
             'column_name': column_name,
@@ -102,15 +104,15 @@ class DataTypeAnalyzer:
             'null_count': null_count,
             'null_percentage': null_count / total_count if total_count > 0 else 0,
             'unique_count': unique_count,
-            'unique_percentage': unique_count / len(non_null_series) if len(non_null_series) > 0 else 0,
-            'sample_values': non_null_series.head(5).tolist() if len(non_null_series) > 0 else [],
+            'unique_percentage': unique_count / non_null_series.len() if non_null_series.len() > 0 else 0,
+            'sample_values': non_null_series.head(5).to_list() if non_null_series.len() > 0 else [],
             'suggested_type': 'object',
             'confidence': 0.0,
             'conversion_possible': False,
             'issues': []
         }
         
-        if len(non_null_series) == 0:
+        if non_null_series.len() == 0:
             analysis['suggested_type'] = 'object'
             analysis['issues'].append('All values are null')
             return analysis
@@ -135,12 +137,12 @@ class DataTypeAnalyzer:
         
         return analysis
     
-    def _score_data_types(self, series: pd.Series) -> Dict[str, float]:
+    def _score_data_types(self, series: pl.Series) -> Dict[str, float]:
         """Score how well the series fits different data types"""
         scores = {}
         
         # Convert to string for pattern matching
-        str_series = series.astype(str)
+        str_series = series.cast(pl.Utf8)
         
         # Score datetime
         datetime_score = self._score_datetime(str_series)
@@ -171,7 +173,7 @@ class DataTypeAnalyzer:
         
         return scores
     
-    def _score_datetime(self, str_series: pd.Series) -> float:
+    def _score_datetime(self, str_series: pl.Series) -> float:
         """Score how likely the series is datetime"""
         matches = 0
         total = len(str_series)
@@ -184,7 +186,7 @@ class DataTypeAnalyzer:
         
         return matches / total if total > 0 else 0
     
-    def _score_numeric(self, str_series: pd.Series) -> float:
+    def _score_numeric(self, str_series: pl.Series) -> float:
         """Score how likely the series is numeric"""
         matches = 0
         total = len(str_series)
@@ -205,7 +207,7 @@ class DataTypeAnalyzer:
         
         return matches / total if total > 0 else 0
     
-    def _score_boolean(self, str_series: pd.Series) -> float:
+    def _score_boolean(self, str_series: pl.Series) -> float:
         """Score how likely the series is boolean"""
         boolean_values = {'true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 
                          'True', 'False', 'YES', 'NO', 'Y', 'N'}
@@ -215,23 +217,23 @@ class DataTypeAnalyzer:
         
         return matches / total if total > 0 else 0
     
-    def _score_categorical(self, series: pd.Series) -> float:
+    def _score_categorical(self, series: pl.Series) -> float:
         """Score how likely the series is categorical"""
-        unique_ratio = series.nunique() / len(series) if len(series) > 0 else 0
-        
+        unique_ratio = series.n_unique() / series.len() if series.len() > 0 else 0
+
         # High uniqueness suggests not categorical
         if unique_ratio > 0.5:
             return 0
-        
+
         # Low uniqueness with reasonable number of categories
-        if unique_ratio < 0.1 and series.nunique() < 50:
+        if unique_ratio < 0.1 and series.n_unique() < 50:
             return 0.8
-        elif unique_ratio < 0.3 and series.nunique() < 20:
+        elif unique_ratio < 0.3 and series.n_unique() < 20:
             return 0.6
-        
+
         return 0
     
-    def _is_integer_like(self, str_series: pd.Series) -> bool:
+    def _is_integer_like(self, str_series: pl.Series) -> bool:
         """Check if numeric series represents integers"""
         try:
             for value in str_series.head(10):  # Check first 10 values
@@ -243,39 +245,56 @@ class DataTypeAnalyzer:
         except:
             return False
     
-    def _analyze_datetime_column(self, series: pd.Series) -> Dict[str, Any]:
+    def _analyze_datetime_column(self, series: pl.Series) -> Dict[str, Any]:
         """Analyze datetime-specific properties"""
         try:
-            # Try to convert and analyze
-            dt_series = pd.to_datetime(series, errors='coerce')
-            valid_dates = dt_series.dropna()
-            
-            if len(valid_dates) == 0:
+            # Try to convert and analyze using polars
+            try:
+                dt_series = series.str.strptime(pl.Datetime, format="%Y-%m-%d", strict=False)
+            except:
+                # Try multiple formats
+                dt_series = None
+                for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"]:
+                    try:
+                        dt_series = series.str.strptime(pl.Datetime, format=fmt, strict=False)
+                        break
+                    except:
+                        continue
+
+            if dt_series is None:
                 return {'error': 'No valid dates found'}
-            
+
+            valid_dates = dt_series.drop_nulls()
+
+            if valid_dates.len() == 0:
+                return {'error': 'No valid dates found'}
+
             return {
                 'date_range': {
-                    'min': valid_dates.min().isoformat(),
-                    'max': valid_dates.max().isoformat()
+                    'min': str(valid_dates.min()),
+                    'max': str(valid_dates.max())
                 },
-                'valid_dates': len(valid_dates),
-                'invalid_dates': len(series) - len(valid_dates),
+                'valid_dates': valid_dates.len(),
+                'invalid_dates': series.len() - valid_dates.len(),
                 'common_format': self._detect_date_format(series)
             }
         except Exception as e:
             return {'error': str(e)}
     
-    def _analyze_numeric_column(self, series: pd.Series) -> Dict[str, Any]:
+    def _analyze_numeric_column(self, series: pl.Series) -> Dict[str, Any]:
         """Analyze numeric-specific properties"""
         try:
-            # Convert to numeric
-            numeric_series = pd.to_numeric(series.astype(str).str.replace(r'[$¥€,\s]', '', regex=True), 
-                                         errors='coerce')
-            valid_numbers = numeric_series.dropna()
-            
-            if len(valid_numbers) == 0:
+            # Convert to numeric using polars
+            numeric_series = (
+                series.cast(pl.Utf8)
+                .str.replace_all(r'[$¥€,\s]', '')
+                .cast(pl.Float64, strict=False)
+            )
+            valid_numbers = numeric_series.drop_nulls()
+
+            if valid_numbers.len() == 0:
                 return {'error': 'No valid numbers found'}
-            
+
             return {
                 'range': {
                     'min': float(valid_numbers.min()),
@@ -283,28 +302,33 @@ class DataTypeAnalyzer:
                     'mean': float(valid_numbers.mean()),
                     'std': float(valid_numbers.std())
                 },
-                'valid_numbers': len(valid_numbers),
-                'invalid_numbers': len(series) - len(valid_numbers),
+                'valid_numbers': valid_numbers.len(),
+                'invalid_numbers': series.len() - valid_numbers.len(),
                 'has_currency_symbols': any('$' in str(val) or '¥' in str(val) or '€' in str(val) 
                                           for val in series.head(10))
             }
         except Exception as e:
             return {'error': str(e)}
     
-    def _analyze_categorical_column(self, series: pd.Series) -> Dict[str, Any]:
+    def _analyze_categorical_column(self, series: pl.Series) -> Dict[str, Any]:
         """Analyze categorical-specific properties"""
         value_counts = series.value_counts()
-        
+
+        # Get the counts column for distribution analysis (polars value_counts returns DataFrame)
+        counts_col = value_counts.get_column('count') if 'count' in value_counts.columns else value_counts.get_column(value_counts.columns[1])
+        count_std = float(counts_col.std()) if counts_col.len() > 1 else 0.0
+        count_mean = float(counts_col.mean())
+
         return {
             'unique_values': len(value_counts),
-            'most_common': value_counts.head(5).to_dict(),
-            'least_common': value_counts.tail(5).to_dict(),
-            'distribution_type': 'balanced' if value_counts.std() < value_counts.mean() else 'skewed'
+            'most_common': value_counts.head(5).to_dicts(),
+            'least_common': value_counts.tail(5).to_dicts(),
+            'distribution_type': 'balanced' if count_std < count_mean else 'skewed'
         }
     
-    def _detect_date_format(self, series: pd.Series) -> str:
+    def _detect_date_format(self, series: pl.Series) -> str:
         """Detect most common date format"""
-        sample = series.head(10).astype(str)
+        sample = series.head(10).cast(pl.Utf8)
         
         format_patterns = {
             'YYYY-MM-DD': r'\d{4}-\d{2}-\d{2}',

@@ -349,7 +349,7 @@ class MemoryServiceClient:
             f"/memories/session/{session_id}/context",
             params={
                 "user_id": user_id,
-                "include_summaries": include_summaries,
+                "include_summaries": str(include_summaries).lower(),
                 "max_recent_messages": max_recent_messages
             }
         )

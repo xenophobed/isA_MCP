@@ -4,7 +4,7 @@ CSV Processor
 Handles CSV file preprocessing and analysis for metadata extraction
 """
 
-import pandas as pd
+import polars as pl
 # import sqlite3  # Deprecated - using DuckDB instead
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -26,18 +26,22 @@ class CSVProcessor:
     def load_csv(self, **kwargs) -> bool:
         """Load CSV file with error handling"""
         try:
-            default_params = {
-                'encoding': 'utf-8',
-                'na_values': ['', 'NULL', 'null', 'None', 'N/A', 'n/a'],
-                'keep_default_na': True,
-                'low_memory': False
-            }
-            default_params.update(kwargs)
-            
-            self.df = pd.read_csv(self.file_path, **default_params)
+            # Map pandas-style params to polars
+            null_values = kwargs.pop('na_values', ['', 'NULL', 'null', 'None', 'N/A', 'n/a'])
+            encoding = kwargs.pop('encoding', 'utf-8')
+            # Ignore pandas-specific params
+            kwargs.pop('keep_default_na', None)
+            kwargs.pop('low_memory', None)
+
+            self.df = pl.read_csv(
+                self.file_path,
+                null_values=null_values,
+                encoding=encoding,
+                **kwargs
+            )
             logger.info(f"Successfully loaded CSV: {self.file_path.name}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to load CSV {self.file_path}: {e}")
             return False
@@ -76,53 +80,57 @@ class CSVProcessor:
         """Analyze CSV structure"""
         if self.df is None:
             return {"error": "CSV not loaded"}
-        
+
         return {
-            "total_rows": len(self.df),
-            "total_columns": len(self.df.columns),
-            "column_names": list(self.df.columns),
-            "memory_usage_mb": round(self.df.memory_usage(deep=True).sum() / (1024 * 1024), 2),
-            "has_duplicates": bool(self.df.duplicated().any()),
-            "duplicate_count": int(self.df.duplicated().sum())
+            "total_rows": self.df.height,
+            "total_columns": self.df.width,
+            "column_names": self.df.columns,
+            "memory_usage_mb": round(self.df.estimated_size("mb"), 2),
+            "has_duplicates": self.df.is_duplicated().any(),
+            "duplicate_count": self.df.is_duplicated().sum()
         }
     
     def analyze_columns(self) -> List[Dict[str, Any]]:
         """Analyze each column in detail"""
         if self.df is None:
             return []
-        
+
         columns_analysis = []
-        
+
         for idx, column_name in enumerate(self.df.columns):
             column_data = self.df[column_name]
-            
+
+            null_count = column_data.null_count()
+            unique_count = column_data.n_unique()
+            total_values = self.df.height
+
             analysis = {
                 "column_name": column_name,
                 "ordinal_position": idx + 1,
                 "data_type": str(column_data.dtype),
-                "total_values": len(column_data),
-                "null_count": int(column_data.isnull().sum()),
-                "null_percentage": round((column_data.isnull().sum() / len(column_data)) * 100, 2),
-                "unique_count": int(column_data.nunique()),
-                "unique_percentage": round((column_data.nunique() / len(column_data)) * 100, 2),
+                "total_values": total_values,
+                "null_count": null_count,
+                "null_percentage": round((null_count / total_values) * 100, 2) if total_values > 0 else 0,
+                "unique_count": unique_count,
+                "unique_percentage": round((unique_count / total_values) * 100, 2) if total_values > 0 else 0,
                 "business_type": self._infer_business_type(column_name, column_data),
                 "sample_values": self._get_sample_values(column_data)
             }
-            
+
             # Add type-specific analysis
-            if pd.api.types.is_numeric_dtype(column_data):
+            if column_data.dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
                 analysis.update(self._analyze_numeric_column(column_data))
-            elif pd.api.types.is_string_dtype(column_data) or pd.api.types.is_object_dtype(column_data):
+            elif column_data.dtype in [pl.Utf8, pl.String]:
                 analysis.update(self._analyze_text_column(column_data))
-            
+
             columns_analysis.append(analysis)
-        
+
         return columns_analysis
     
-    def _infer_business_type(self, column_name: str, column_data: pd.Series) -> str:
+    def _infer_business_type(self, column_name: str, column_data: pl.Series) -> str:
         """Infer business type from column name and data"""
         name_lower = column_name.lower()
-        
+
         if any(pattern in name_lower for pattern in ['id', '_id', 'identifier']):
             return 'identifier'
         elif any(pattern in name_lower for pattern in ['name', 'title', 'label']):
@@ -139,51 +147,54 @@ class CSVProcessor:
             return 'monetary'
         elif any(pattern in name_lower for pattern in ['quantity', 'count', 'stock']):
             return 'quantity'
-        elif pd.api.types.is_bool_dtype(column_data):
+        elif column_data.dtype == pl.Boolean:
             return 'boolean'
-        elif pd.api.types.is_numeric_dtype(column_data):
+        elif column_data.dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
             return 'numeric'
         else:
             return 'text'
     
-    def _analyze_numeric_column(self, column_data: pd.Series) -> Dict[str, Any]:
+    def _analyze_numeric_column(self, column_data: pl.Series) -> Dict[str, Any]:
         """Analyze numeric column"""
         try:
             return {
-                "min_value": float(column_data.min()) if not column_data.empty else None,
-                "max_value": float(column_data.max()) if not column_data.empty else None,
-                "mean_value": float(column_data.mean()) if not column_data.empty else None,
-                "median_value": float(column_data.median()) if not column_data.empty else None
+                "min_value": float(column_data.min()) if column_data.len() > 0 else None,
+                "max_value": float(column_data.max()) if column_data.len() > 0 else None,
+                "mean_value": float(column_data.mean()) if column_data.len() > 0 else None,
+                "median_value": float(column_data.median()) if column_data.len() > 0 else None
             }
         except Exception:
             return {}
     
-    def _analyze_text_column(self, column_data: pd.Series) -> Dict[str, Any]:
+    def _analyze_text_column(self, column_data: pl.Series) -> Dict[str, Any]:
         """Analyze text column"""
         try:
-            text_data = column_data.dropna().astype(str)
-            if text_data.empty:
+            text_data = column_data.drop_nulls().cast(pl.Utf8)
+            if text_data.len() == 0:
                 return {}
-            
+
+            str_lengths = text_data.str.len_chars()
+            value_counts = column_data.value_counts().head(3)
+
             return {
-                "avg_length": float(text_data.str.len().mean()),
-                "min_length": int(text_data.str.len().min()),
-                "max_length": int(text_data.str.len().max()),
-                "most_common": dict(column_data.value_counts().head(3))
+                "avg_length": float(str_lengths.mean()),
+                "min_length": int(str_lengths.min()),
+                "max_length": int(str_lengths.max()),
+                "most_common": {str(row[0]): int(row[1]) for row in value_counts.iter_rows()}
             }
         except Exception:
             return {}
     
-    def _get_sample_values(self, column_data: pd.Series, limit: int = 3) -> List[Any]:
+    def _get_sample_values(self, column_data: pl.Series, limit: int = 3) -> List[Any]:
         """Get sample values from column"""
         try:
-            non_null_data = column_data.dropna()
-            if non_null_data.empty:
+            non_null_data = column_data.drop_nulls()
+            if non_null_data.len() == 0:
                 return []
-            
+
             unique_values = non_null_data.unique()
-            sample_size = min(limit, len(unique_values))
-            return unique_values[:sample_size].tolist()
+            sample_size = min(limit, unique_values.len())
+            return unique_values[:sample_size].to_list()
         except Exception:
             return []
     
@@ -191,12 +202,13 @@ class CSVProcessor:
         """Analyze overall data quality"""
         if self.df is None:
             return {"error": "CSV not loaded"}
-        
-        total_cells = len(self.df) * len(self.df.columns)
-        null_cells = self.df.isnull().sum().sum()
-        
+
+        total_cells = self.df.height * self.df.width
+        # null_count() returns a DataFrame with counts per column, we need to sum them
+        null_cells = self.df.null_count().sum_horizontal()[0]  # Get scalar value
+
         overall_quality = 1.0 - (null_cells / total_cells) if total_cells > 0 else 0.0
-        
+
         return {
             "overall_quality_score": round(overall_quality, 3),
             "completeness_percentage": round((1 - null_cells / total_cells) * 100, 2) if total_cells > 0 else 0,
@@ -237,9 +249,9 @@ class CSVProcessor:
         """Get sample data from CSV"""
         if self.df is None:
             return []
-        
+
         sample_df = self.df.head(limit)
-        return sample_df.to_dict('records')
+        return sample_df.to_dicts()
     
     def save_to_sqlite(self, table_name: Optional[str] = None, if_exists: str = 'replace') -> Dict[str, Any]:
         """
@@ -267,7 +279,7 @@ class CSVProcessor:
             "success": True,
             "csv_path": str(self.file_path),
             "table_name": table_name,
-            "row_count": len(self.df),
+            "row_count": self.df.height,
             "columns": [{"name": col, "type": str(self.df[col].dtype)} for col in self.df.columns],
             "note": "Use DuckDB to query this CSV directly: SELECT * FROM 'path/to/file.csv'"
         }
@@ -291,13 +303,13 @@ class CSVProcessor:
             "database_type": "duckdb",
             "tables": [{
                 "table_name": table_name,
-                "record_count": len(self.df),
+                "record_count": self.df.height,
                 "columns": [
                     {
                         "column_name": col,
                         "data_type": str(self.df[col].dtype),
                         "ordinal_position": idx,
-                        "is_nullable": bool(self.df[col].isnull().any()),
+                        "is_nullable": bool(self.df[col].null_count() > 0),
                         "column_default": None,
                         "is_primary_key": False
                     }

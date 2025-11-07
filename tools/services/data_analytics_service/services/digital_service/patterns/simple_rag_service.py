@@ -174,6 +174,7 @@ class SimpleRAGService(BaseRAGService):
                     'chunk_id': chunk_data['id'],
                     'start_pos': chunk_data['start_pos'],
                     'end_pos': chunk_data['end_pos'],
+                    'content_type': request.content_type,  # ✅ 添加 content_type 以支持过滤搜索
                     'stored_at': datetime.now().isoformat(),
                     **(request.metadata or {})
                 }
@@ -202,17 +203,27 @@ class SimpleRAGService(BaseRAGService):
                 else:
                     self.logger.error(f"  ✗ Qdrant client not available! Cannot store chunk {i+1}")
 
+            # 准备返回的 metadata（包含 AI 生成的照片元数据）
+            result_metadata = {
+                'chunks_processed': stored_count,
+                'total_chunks': len(chunks),
+                'content_length': len(request.content),
+                'content_type': request.content_type,
+                'text_length': len(text_content)
+            }
+
+            # 如果是 image 类型，添加 AI 生成的元数据到返回结果
+            if request.content_type == 'image' and request.metadata:
+                ai_metadata = {k: v for k, v in request.metadata.items() if k.startswith('ai_')}
+                if ai_metadata:
+                    result_metadata['ai_metadata'] = ai_metadata
+                    self.logger.info(f"✓ Returning AI metadata: {list(ai_metadata.keys())}")
+
             result = RAGResult(
                 success=True,
                 content=f"Stored {stored_count}/{len(chunks)} chunks",
                 sources=[],
-                metadata={
-                    'chunks_processed': stored_count,
-                    'total_chunks': len(chunks),
-                    'content_length': len(request.content),
-                    'content_type': request.content_type,
-                    'text_length': len(text_content)
-                },
+                metadata=result_metadata,
                 mode_used=RAGMode.SIMPLE,
                 processing_time=time.time() - start_time
             )

@@ -270,8 +270,6 @@ def register_memory_tools(mcp: FastMCP):
 
     # ========== CORE SEARCH TOOLS ==========
 
-    # NOTE: This tool uses an endpoint that doesn't exist yet on the memory service
-    # Kept as placeholder for future implementation
     @mcp.tool()
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.LOW)
@@ -284,15 +282,14 @@ def register_memory_tools(mcp: FastMCP):
     ) -> str:
         """Search across memory types using semantic similarity
 
-        NOTE: This endpoint is not yet implemented on the memory service.
-        This tool is a placeholder for future functionality.
-        Use type-specific search tools instead: search_facts_by_subject, search_episodes_by_event_type
+        Universal search endpoint that can search across all memory types or specific ones.
+        If memory_types is not specified, searches all types (factual, episodic, semantic, procedural, working, session).
 
         Args:
             user_id: User identifier
             query: Search query
-            memory_types: Optional list of memory types to search
-            top_k: Maximum number of results
+            memory_types: Optional list of memory types to search (e.g., ["factual", "semantic"])
+            top_k: Maximum number of results per type
             similarity_threshold: Minimum similarity score (0.0-1.0), default 0.4
         """
         try:
@@ -391,8 +388,6 @@ def register_memory_tools(mcp: FastMCP):
 
     # ========== SEMANTIC MEMORY SEARCH TOOLS ==========
 
-    # NOTE: This tool uses an endpoint that doesn't exist yet on the memory service
-    # Kept as placeholder for future implementation
     @mcp.tool()
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.LOW)
@@ -401,10 +396,12 @@ def register_memory_tools(mcp: FastMCP):
         category: str,
         limit: int = 10
     ) -> str:
-        """Search concepts by category
+        """Search semantic concepts by category
 
-        NOTE: This endpoint is not yet implemented on the memory service.
-        This tool is a placeholder for future functionality.
+        Args:
+            user_id: User identifier
+            category: Category to search (e.g., "technology", "science", "business")
+            limit: Maximum number of results (1-100, default 10)
         """
         try:
             client = get_memory_client()

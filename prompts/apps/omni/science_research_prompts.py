@@ -13,7 +13,7 @@ def register_science_research_prompts(mcp):
     
     @mcp.prompt("research_paper_prompt")
     async def research_paper_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

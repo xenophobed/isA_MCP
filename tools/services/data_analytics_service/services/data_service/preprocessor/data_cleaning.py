@@ -7,7 +7,7 @@ Handles data cleaning and standardization using processors
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
-import pandas as pd
+import polars as pl
 
 # Import processors for data cleaning
 from ....processors.data_processors.preprocessors.cleaning.column_standardizer import ColumnStandardizer
@@ -35,7 +35,7 @@ class DataCleaningService:
         
         logger.info("Data Cleaning Service initialized")
     
-    def clean_dataframe(self, df: pd.DataFrame, 
+    def clean_dataframe(self, df: pl.DataFrame,
                        validation_results: Dict[str, Any],
                        target_hint: Optional[str] = None,
                        cleaning_options: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -54,7 +54,7 @@ class DataCleaningService:
         start_time = datetime.now()
         
         try:
-            logger.info(f"Cleaning DataFrame: {df.shape[0]} rows, {df.shape[1]} columns")
+            logger.info(f"Cleaning DataFrame: {df.height} rows, {df.width} columns")
             
             # Default cleaning options
             options = cleaning_options or {}
@@ -67,10 +67,10 @@ class DataCleaningService:
                 'duplicate_threshold': 0.9  # Remove duplicates if >90% are duplicates
             }
             default_options.update(options)
-            
-            original_shape = df.shape
+
+            original_shape = (df.height, df.width)
             cleaning_log = []
-            
+
             # Step 3.1: Standardize column names using processor
             if default_options['standardize_columns']:
                 standardized_df, column_mapping = self.column_standardizer.standardize_columns(
@@ -78,7 +78,7 @@ class DataCleaningService:
                 )
                 cleaning_log.append(f"Standardized {len([k for k, v in column_mapping.items() if k != v])} column names")
             else:
-                standardized_df = df.copy()
+                standardized_df = df.clone()
                 column_mapping = {col: col for col in df.columns}
             
             # Step 3.2: Handle missing values
@@ -108,7 +108,7 @@ class DataCleaningService:
             
             # Calculate cleaning time
             cleaning_duration = (datetime.now() - start_time).total_seconds()
-            final_shape = standardized_df.shape
+            final_shape = (standardized_df.height, standardized_df.width)
             
             # Generate cleaning summary
             cleaning_summary = self._generate_cleaning_summary(
@@ -141,57 +141,60 @@ class DataCleaningService:
                 'step': 'general_error'
             }
     
-    def _handle_missing_values(self, df: pd.DataFrame, validation_results: Dict[str, Any], 
-                              null_threshold: float) -> Tuple[pd.DataFrame, List[str]]:
+    def _handle_missing_values(self, df: pl.DataFrame, validation_results: Dict[str, Any],
+                              null_threshold: float) -> Tuple[pl.DataFrame, List[str]]:
         """Handle missing values in DataFrame"""
-        result_df = df.copy()
+        result_df = df.clone()
         log = []
-        
+
         try:
             # Get quality assessment from validation results
             quality_assessment = validation_results.get('quality_assessment', {})
             column_quality = quality_assessment.get('column_quality', {})
-            
+
             # Strategy 1: Drop columns with excessive nulls
             columns_to_drop = []
             for col in result_df.columns:
-                null_percentage = result_df[col].isnull().sum() / len(result_df)
+                null_percentage = result_df.get_column(col).null_count() / result_df.height
                 if null_percentage > null_threshold:
                     columns_to_drop.append(col)
-            
+
             if columns_to_drop:
-                result_df = result_df.drop(columns=columns_to_drop)
+                result_df = result_df.drop(columns_to_drop)
                 log.append(f"Dropped {len(columns_to_drop)} columns with >{null_threshold*100}% nulls: {columns_to_drop}")
             
             # Strategy 2: Handle remaining nulls by column type
             for col in result_df.columns:
-                if result_df[col].isnull().any():
-                    col_dtype = result_df[col].dtype
-                    null_count = result_df[col].isnull().sum()
-                    
-                    if pd.api.types.is_numeric_dtype(col_dtype):
+                col_series = result_df.get_column(col)
+                if col_series.null_count() > 0:
+                    col_dtype = col_series.dtype
+                    null_count = col_series.null_count()
+
+                    # Check if numeric type
+                    if col_dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]:
                         # For numeric: fill with median
-                        median_val = result_df[col].median()
-                        result_df[col] = result_df[col].fillna(median_val)
+                        median_val = col_series.median()
+                        result_df = result_df.with_columns(pl.col(col).fill_null(median_val))
                         log.append(f"Filled {null_count} nulls in '{col}' with median: {median_val}")
-                    
-                    elif pd.api.types.is_categorical_dtype(col_dtype) or result_df[col].nunique() < 20:
+
+                    elif col_dtype == pl.Categorical or col_series.n_unique() < 20:
                         # For categorical: fill with mode
-                        mode_val = result_df[col].mode()
-                        if len(mode_val) > 0:
-                            result_df[col] = result_df[col].fillna(mode_val[0])
-                            log.append(f"Filled {null_count} nulls in '{col}' with mode: {mode_val[0]}")
+                        mode_series = col_series.drop_nulls().mode()
+                        if mode_series.len() > 0:
+                            mode_val = mode_series[0]
+                            result_df = result_df.with_columns(pl.col(col).fill_null(mode_val))
+                            log.append(f"Filled {null_count} nulls in '{col}' with mode: {mode_val}")
                         else:
-                            result_df[col] = result_df[col].fillna('Unknown')
+                            result_df = result_df.with_columns(pl.col(col).fill_null('Unknown'))
                             log.append(f"Filled {null_count} nulls in '{col}' with 'Unknown'")
-                    
+
                     else:
                         # For text: fill with 'Unknown' or forward fill
-                        if null_count / len(result_df) < 0.1:  # Low null percentage
-                            result_df[col] = result_df[col].fillna(method='ffill').fillna('Unknown')
+                        if null_count / result_df.height < 0.1:  # Low null percentage
+                            result_df = result_df.with_columns(pl.col(col).forward_fill().fill_null('Unknown'))
                             log.append(f"Forward filled {null_count} nulls in '{col}'")
                         else:
-                            result_df[col] = result_df[col].fillna('Unknown')
+                            result_df = result_df.with_columns(pl.col(col).fill_null('Unknown'))
                             log.append(f"Filled {null_count} nulls in '{col}' with 'Unknown'")
         
         except Exception as e:
@@ -199,20 +202,20 @@ class DataCleaningService:
         
         return result_df, log
     
-    def _handle_duplicates(self, df: pd.DataFrame, duplicate_threshold: float) -> Tuple[pd.DataFrame, List[str]]:
+    def _handle_duplicates(self, df: pl.DataFrame, duplicate_threshold: float) -> Tuple[pl.DataFrame, List[str]]:
         """Handle duplicate rows in DataFrame"""
-        result_df = df.copy()
+        result_df = df.clone()
         log = []
-        
+
         try:
-            duplicate_count = result_df.duplicated().sum()
-            duplicate_percentage = duplicate_count / len(result_df)
-            
+            duplicate_count = result_df.is_duplicated().sum()
+            duplicate_percentage = duplicate_count / result_df.height
+
             if duplicate_percentage > 0:
                 if duplicate_percentage >= duplicate_threshold:
                     log.append(f"Warning: High duplicate percentage ({duplicate_percentage:.1%}), keeping only unique rows")
-                
-                result_df = result_df.drop_duplicates()
+
+                result_df = result_df.unique()
                 log.append(f"Removed {duplicate_count} duplicate rows ({duplicate_percentage:.1%})")
         
         except Exception as e:
@@ -220,9 +223,9 @@ class DataCleaningService:
         
         return result_df, log
     
-    def _apply_type_conversions(self, df: pd.DataFrame, validation_results: Dict[str, Any]) -> Tuple[pd.DataFrame, List[str]]:
+    def _apply_type_conversions(self, df: pl.DataFrame, validation_results: Dict[str, Any]) -> Tuple[pl.DataFrame, List[str]]:
         """Apply recommended data type conversions"""
-        result_df = df.copy()
+        result_df = df.clone()
         log = []
         
         try:
@@ -236,34 +239,44 @@ class DataCleaningService:
                 
                 suggested_type = analysis.get('suggested_type')
                 confidence = analysis.get('confidence', 0)
-                current_type = str(result_df[col_name].dtype)
+                current_type = str(result_df.get_column(col_name).dtype)
                 
                 # Only convert if confidence is high and types are different
                 if confidence > 0.8 and suggested_type != current_type:
                     try:
                         if suggested_type == 'datetime':
-                            result_df[col_name] = pd.to_datetime(result_df[col_name], errors='coerce')
+                            result_df = result_df.with_columns(
+                                pl.col(col_name).str.to_datetime(strict=False)
+                            )
                             log.append(f"Converted '{col_name}' to datetime")
                         
                         elif suggested_type == 'int64':
-                            # Clean numeric data first
-                            cleaned = result_df[col_name].astype(str).str.replace(r'[$��,\s]', '', regex=True)
-                            result_df[col_name] = pd.to_numeric(cleaned, errors='coerce').astype('Int64')
+                            # Clean numeric data first and convert
+                            result_df = result_df.with_columns(
+                                pl.col(col_name).cast(pl.Utf8).str.replace_all(r'[$��,\s]', '').cast(pl.Int64, strict=False)
+                            )
                             log.append(f"Converted '{col_name}' to integer")
                         
                         elif suggested_type == 'float64':
-                            cleaned = result_df[col_name].astype(str).str.replace(r'[$��,\s]', '', regex=True)
-                            result_df[col_name] = pd.to_numeric(cleaned, errors='coerce')
+                            result_df = result_df.with_columns(
+                                pl.col(col_name).cast(pl.Utf8).str.replace_all(r'[$��,\s]', '').cast(pl.Float64, strict=False)
+                            )
                             log.append(f"Converted '{col_name}' to float")
                         
                         elif suggested_type == 'bool':
-                            bool_map = {'true': True, 'false': False, 'yes': True, 'no': False, 
-                                      '1': True, '0': False, 'y': True, 'n': False}
-                            result_df[col_name] = result_df[col_name].astype(str).str.lower().map(bool_map)
+                            # Map string values to boolean
+                            result_df = result_df.with_columns(
+                                pl.col(col_name).cast(pl.Utf8).str.to_lowercase().replace({
+                                    'true': True, 'false': False, 'yes': True, 'no': False,
+                                    '1': True, '0': False, 'y': True, 'n': False
+                                })
+                            )
                             log.append(f"Converted '{col_name}' to boolean")
                         
                         elif suggested_type == 'category':
-                            result_df[col_name] = result_df[col_name].astype('category')
+                            result_df = result_df.with_columns(
+                                pl.col(col_name).cast(pl.Categorical)
+                            )
                             log.append(f"Converted '{col_name}' to category")
                             
                     except Exception as e:
@@ -274,49 +287,49 @@ class DataCleaningService:
         
         return result_df, log
     
-    def _final_cleanup(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+    def _final_cleanup(self, df: pl.DataFrame) -> Tuple[pl.DataFrame, List[str]]:
         """Final cleanup and optimization"""
-        result_df = df.copy()
+        result_df = df.clone()
         log = []
         
         try:
             # Clean string columns
-            string_columns = result_df.select_dtypes(include=['object']).columns
+            string_columns = [col for col in result_df.columns if result_df.get_column(col).dtype == pl.Utf8]
             for col in string_columns:
-                if result_df[col].dtype == 'object':
+                if result_df.get_column(col).dtype == pl.Utf8:
                     # Strip whitespace
-                    original_unique = result_df[col].nunique()
-                    result_df[col] = result_df[col].astype(str).str.strip()
-                    new_unique = result_df[col].nunique()
+                    original_unique = result_df.get_column(col).n_unique()
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.Utf8).str.strip_chars())
+                    new_unique = result_df.get_column(col).n_unique()
                     
                     if original_unique != new_unique:
                         log.append(f"Cleaned whitespace in '{col}': {original_unique} � {new_unique} unique values")
             
             # Optimize memory usage
-            original_memory = result_df.memory_usage(deep=True).sum() / (1024 * 1024)
+            original_memory = result_df.estimated_size('mb')
             
             # Convert appropriate int64 to smaller types
-            for col in result_df.select_dtypes(include=['int64']).columns:
-                col_min = result_df[col].min()
-                col_max = result_df[col].max()
+            for col in [c for c in result_df.columns if result_df.get_column(c).dtype == pl.Int64]:
+                col_min = result_df.get_column(col).min()
+                col_max = result_df.get_column(col).max()
                 
-                if pd.isna(col_min) or pd.isna(col_max):
+                if col_min is None or col_max is None:
                     continue
                 
                 if col_min >= 0 and col_max < 255:
-                    result_df[col] = result_df[col].astype('uint8')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.UInt8))
                 elif col_min >= -128 and col_max < 127:
-                    result_df[col] = result_df[col].astype('int8')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.Int8))
                 elif col_min >= 0 and col_max < 65535:
-                    result_df[col] = result_df[col].astype('uint16')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.UInt16))
                 elif col_min >= -32768 and col_max < 32767:
-                    result_df[col] = result_df[col].astype('int16')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.Int16))
                 elif col_min >= 0 and col_max < 4294967295:
-                    result_df[col] = result_df[col].astype('uint32')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.UInt32))
                 elif col_min >= -2147483648 and col_max < 2147483647:
-                    result_df[col] = result_df[col].astype('int32')
+                    result_df = result_df.with_columns(pl.col(col).cast(pl.Int32))
             
-            new_memory = result_df.memory_usage(deep=True).sum() / (1024 * 1024)
+            new_memory = result_df.estimated_size('mb')
             if original_memory != new_memory:
                 log.append(f"Optimized memory usage: {original_memory:.1f}MB � {new_memory:.1f}MB")
         

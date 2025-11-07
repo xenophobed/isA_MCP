@@ -13,7 +13,7 @@ def register_business_commerce_prompts(mcp):
     
     @mcp.prompt("market_analysis_prompt")
     async def market_analysis_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -75,7 +75,7 @@ Create a professional market analysis that meets investment-grade standards.
     
     @mcp.prompt("business_strategy_prompt")
     async def business_strategy_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -138,7 +138,7 @@ Create a professional business strategy document that meets consulting standards
     
     @mcp.prompt("financial_analysis_prompt")
     async def financial_analysis_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

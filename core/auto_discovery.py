@@ -431,13 +431,16 @@ class AutoDiscoverySystem:
             except Exception as e:
                 logger.error(f"  ❌ Failed to register resources from {python_file.name}: {e}")
         
-        # Register Composio Bridge if available
+        # Register Composio Bridge if available (lazy loaded for performance)
         composio_tools_metadata = {}
         try:
-            logger.info("🌉 Attempting to register Composio Bridge...")
+            logger.info("🌉 Checking Composio Bridge availability...")
+            # Import is fast now - actual SDK loading is deferred until connect()
             from tools.services.composio_service.composio_mcp_bridge import register_composio_bridge
+
+            # This will check API key and skip quickly if not configured
             composio_tools_metadata = register_composio_bridge(mcp)
-            
+
             # 将 Composio 工具元数据加入索引
             if composio_tools_metadata:
                 logger.info(f"  📊 Indexing {len(composio_tools_metadata)} Composio tools for search...")
@@ -451,10 +454,11 @@ class AutoDiscoverySystem:
                         "docstring": tool_meta.get("description", "")
                     }
                 logger.info(f"  ✅ Indexed {len(composio_tools_metadata)} Composio tools for search")
-            
-            logger.info("  ✅ Composio Bridge integration registered")
+                logger.info("  ✅ Composio Bridge integration registered")
+            else:
+                logger.info("  ⏭️ Composio Bridge skipped (not configured)")
         except ImportError as e:
-            logger.info("  ⚠️ Composio Bridge not available (this is normal if not configured)")
+            logger.info("  ⚠️ Composio Bridge not available (module not found)")
         except Exception as e:
             logger.error(f"  ❌ Failed to register Composio Bridge: {e}")
         

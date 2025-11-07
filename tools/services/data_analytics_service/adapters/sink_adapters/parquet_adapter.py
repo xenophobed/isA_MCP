@@ -4,7 +4,7 @@ Parquet Sink Adapter
 Stores data TO Parquet files in MinIO object storage for efficient columnar storage
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional
 import logging
 from pathlib import Path
@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 
 from .base_sink_adapter import BaseSinkAdapter
-from core.minio_client import get_minio_client
+from core.clients.minio_client import get_minio_client
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +64,20 @@ class ParquetSinkAdapter(BaseSinkAdapter):
                 bucket_name = destination
                 base_path = ""
             
-            # Ensure bucket exists
-            if not self.minio_client.ensure_bucket_exists(bucket_name):
-                return False
-            
+            # Ensure bucket exists (isa-common MinIOClient API)
+            if not self.minio_client.bucket_exists(bucket_name):
+                if not self.minio_client.create_bucket(bucket_name):
+                    logger.error(f"Failed to create bucket: {bucket_name}")
+                    return False
+
             # Store connection info
+            health_status = self.minio_client.health_check(detailed=False)
             self.storage_info = {
                 'bucket_name': bucket_name,
                 'base_path': base_path,
                 'storage_type': 'parquet_minio',
                 'pyarrow_available': self.pyarrow_available,
-                'minio_available': self.minio_client.is_available(),
+                'minio_available': health_status is not None if health_status else False,
                 'user_id': kwargs.get('user_id', 'default_user')
             }
             
@@ -90,7 +93,7 @@ class ParquetSinkAdapter(BaseSinkAdapter):
         # MinIO client is managed globally
         return True
     
-    def store_dataframe(self, df: pd.DataFrame, 
+    def store_dataframe(self, df: pl.DataFrame,
                        destination: str,
                        table_name: Optional[str] = None,
                        storage_options: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -145,13 +148,14 @@ class ParquetSinkAdapter(BaseSinkAdapter):
                     'error': 'Failed to convert DataFrame to Parquet'
                 }
             
-            # Upload parquet to MinIO
+            # Upload parquet to MinIO (isa-common MinIOClient API)
             bucket_name = self.storage_info['bucket_name']
-            parquet_uploaded = self.minio_client.upload_data(
-                data=parquet_bytes,
-                object_name=paths['parquet_path'],
+            parquet_uploaded = self.minio_client.put_object(
                 bucket_name=bucket_name,
-                content_type='application/octet-stream'
+                object_key=paths['parquet_path'],
+                data=parquet_bytes,
+                size=len(parquet_bytes),
+                metadata={'content_type': 'application/octet-stream'}
             )
             
             if not parquet_uploaded:
@@ -165,12 +169,13 @@ class ParquetSinkAdapter(BaseSinkAdapter):
             if include_metadata:
                 metadata = self._extract_dataframe_metadata(df, user_id, dataset_name, storage_id)
                 metadata_bytes = self._metadata_to_json_bytes(metadata)
-                
-                metadata_uploaded = self.minio_client.upload_data(
-                    data=metadata_bytes,
-                    object_name=paths['metadata_path'],
+
+                metadata_uploaded = self.minio_client.put_object(
                     bucket_name=bucket_name,
-                    content_type='application/json'
+                    object_key=paths['metadata_path'],
+                    data=metadata_bytes,
+                    size=len(metadata_bytes),
+                    metadata={'content_type': 'application/json'}
                 )
                 
                 if metadata_uploaded:
@@ -252,65 +257,74 @@ class ParquetSinkAdapter(BaseSinkAdapter):
             'metadata_path': f"{full_path}/{filename_base}_metadata.json"
         }
     
-    def _dataframe_to_parquet_bytes(self, df: pd.DataFrame, compression: str) -> Optional[bytes]:
+    def _dataframe_to_parquet_bytes(self, df: pl.DataFrame, compression: str) -> Optional[bytes]:
         """Convert DataFrame to Parquet bytes with compression"""
         try:
             buffer = io.BytesIO()
-            
-            # Configure parquet options
-            parquet_options = {
-                'compression': compression,
-                'index': False,  # Don't store DataFrame index
-                'engine': 'pyarrow' if self.pyarrow_available else 'auto'
+
+            # Map compression format (Polars uses slightly different names)
+            compression_map = {
+                'snappy': 'snappy',
+                'gzip': 'gzip',
+                'lz4': 'lz4',
+                'zstd': 'zstd',
+                'brotli': 'brotli',
+                'uncompressed': 'uncompressed'
             }
-            
-            # Write to buffer
-            df.to_parquet(buffer, **parquet_options)
+            polars_compression = compression_map.get(compression.lower(), 'snappy')
+
+            # Write to buffer using Polars
+            df.write_parquet(buffer, compression=polars_compression)
             parquet_bytes = buffer.getvalue()
             buffer.close()
-            
+
             logger.debug(f"Converted DataFrame to Parquet: {len(parquet_bytes)} bytes with {compression} compression")
             return parquet_bytes
-            
+
         except Exception as e:
             logger.error(f"Failed to convert DataFrame to Parquet: {e}")
             return None
     
-    def _extract_dataframe_metadata(self, df: pd.DataFrame, user_id: str, dataset_name: str, storage_id: str) -> Dict[str, Any]:
+    def _extract_dataframe_metadata(self, df: pl.DataFrame, user_id: str, dataset_name: str, storage_id: str) -> Dict[str, Any]:
         """Extract comprehensive metadata from DataFrame"""
+        # Get numeric, string, and datetime columns
+        numeric_columns = [col for col, dtype in df.schema.items() if dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64, pl.Float32, pl.Float64]]
+        string_columns = [col for col, dtype in df.schema.items() if dtype in [pl.Utf8, pl.Categorical]]
+        datetime_columns = [col for col, dtype in df.schema.items() if dtype in [pl.Date, pl.Datetime, pl.Time, pl.Duration]]
+
         metadata = {
             'storage_id': storage_id,
             'dataset_name': dataset_name,
             'user_id': user_id,
             'created_at': datetime.now().isoformat(),
             'shape': {
-                'rows': len(df),
-                'columns': len(df.columns)
+                'rows': df.height,
+                'columns': df.width
             },
             'columns': {
                 col: {
                     'dtype': str(df[col].dtype),
-                    'null_count': int(df[col].isnull().sum()),
-                    'unique_count': int(df[col].nunique()),
-                    'sample_values': df[col].dropna().head(3).tolist() if not df[col].empty else []
+                    'null_count': int(df[col].null_count()),
+                    'unique_count': int(df[col].n_unique()),
+                    'sample_values': df[col].drop_nulls().head(3).to_list() if df[col].len() > 0 else []
                 } for col in df.columns
             },
             'data_types': {
-                'numeric_columns': df.select_dtypes(include=['number']).columns.tolist(),
-                'categorical_columns': df.select_dtypes(include=['object', 'category']).columns.tolist(),
-                'datetime_columns': df.select_dtypes(include=['datetime']).columns.tolist()
+                'numeric_columns': numeric_columns,
+                'categorical_columns': string_columns,
+                'datetime_columns': datetime_columns
             },
             'statistics': {
-                'total_null_values': int(df.isnull().sum().sum()),
-                'duplicate_rows': int(df.duplicated().sum()),
-                'memory_usage_mb': round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+                'total_null_values': sum(df.null_count().row(0)),  # polars null_count returns DataFrame
+                'duplicate_rows': int(df.is_duplicated().sum()),
+                'memory_usage_mb': round(df.estimated_size('mb'), 2)
             },
             'storage_config': {
                 'storage_type': 'parquet_minio',
                 'bucket_name': self.storage_info['bucket_name']
             }
         }
-        
+
         return metadata
     
     def _metadata_to_json_bytes(self, metadata: Dict[str, Any]) -> bytes:
@@ -333,36 +347,36 @@ class ParquetSinkAdapter(BaseSinkAdapter):
         """Generate presigned URLs for accessing stored files"""
         urls = {}
         
-        # Generate URL for parquet file
-        parquet_url = self.minio_client.get_presigned_url(
-            object_name=paths['parquet_path'],
+        # Generate URL for parquet file (isa-common MinIOClient API)
+        parquet_url = self.minio_client.generate_presigned_url(
             bucket_name=bucket_name,
-            expires_in_seconds=3600  # 1 hour
+            object_key=paths['parquet_path'],
+            expiry_seconds=3600  # 1 hour
         )
         if parquet_url:
             urls['parquet'] = parquet_url
         
         # Generate URL for metadata if exists
         if 'metadata_path' in paths:
-            metadata_url = self.minio_client.get_presigned_url(
-                object_name=paths['metadata_path'],
+            metadata_url = self.minio_client.generate_presigned_url(
                 bucket_name=bucket_name,
-                expires_in_seconds=3600
+                object_key=paths['metadata_path'],
+                expiry_seconds=3600
             )
             if metadata_url:
                 urls['metadata'] = metadata_url
         
         return urls
     
-    def _calculate_compression_ratio(self, df: pd.DataFrame, parquet_bytes: bytes) -> float:
+    def _calculate_compression_ratio(self, df: pl.DataFrame, parquet_bytes: bytes) -> float:
         """Calculate compression ratio compared to CSV"""
         try:
             # Estimate CSV size (rough approximation)
-            csv_buffer = io.StringIO()
-            df.to_csv(csv_buffer, index=False)
-            csv_size = len(csv_buffer.getvalue().encode('utf-8'))
+            csv_buffer = io.BytesIO()
+            df.write_csv(csv_buffer)
+            csv_size = len(csv_buffer.getvalue())
             csv_buffer.close()
-            
+
             if csv_size > 0:
                 return round(len(parquet_bytes) / csv_size, 3)
             else:
@@ -370,36 +384,36 @@ class ParquetSinkAdapter(BaseSinkAdapter):
         except:
             return 0.0
     
-    def read_parquet(self, object_path: str, bucket_name: Optional[str] = None, **kwargs) -> pd.DataFrame:
+    def read_parquet(self, object_path: str, bucket_name: Optional[str] = None, **kwargs) -> pl.DataFrame:
         """
         Read Parquet file from MinIO back to DataFrame
-        
+
         Args:
             object_path: MinIO object path to Parquet file
             bucket_name: Bucket name (uses configured bucket if None)
             **kwargs: Additional read options
-            
+
         Returns:
             DataFrame with loaded data
         """
         try:
             bucket = bucket_name or self.storage_info.get('bucket_name')
             parquet_bytes = self.minio_client.download_data(object_path, bucket)
-            
+
             if not parquet_bytes:
                 logger.error(f"Failed to download parquet from MinIO: {object_path}")
-                return pd.DataFrame()
-            
+                return pl.DataFrame()
+
             buffer = io.BytesIO(parquet_bytes)
-            df = pd.read_parquet(buffer, **kwargs)
+            df = pl.read_parquet(buffer, **kwargs)
             buffer.close()
-            
-            logger.info(f"Loaded DataFrame from MinIO: {df.shape} from {object_path}")
+
+            logger.info(f"Loaded DataFrame from MinIO: ({df.height}, {df.width}) from {object_path}")
             return df
-            
+
         except Exception as e:
             logger.error(f"Failed to read Parquet file from MinIO: {e}")
-            return pd.DataFrame()
+            return pl.DataFrame()
     
     def list_parquet_objects(self, prefix: Optional[str] = None, bucket_name: Optional[str] = None) -> List[Dict[str, Any]]:
         """List all Parquet objects in MinIO bucket with metadata"""

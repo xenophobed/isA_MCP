@@ -13,7 +13,7 @@ def register_technology_innovation_prompts(mcp):
     
     @mcp.prompt("tech_review_prompt")
     async def tech_review_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -76,7 +76,7 @@ Create a professional technology review that supports informed decision-making.
     
     @mcp.prompt("implementation_guide_prompt")
     async def implementation_guide_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

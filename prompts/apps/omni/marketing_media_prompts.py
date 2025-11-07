@@ -13,7 +13,7 @@ def register_marketing_media_prompts(mcp):
     
     @mcp.prompt("campaign_strategy_prompt")
     async def campaign_strategy_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""
@@ -76,7 +76,7 @@ Create a strategic marketing campaign that drives measurable business results.
     
     @mcp.prompt("content_marketing_prompt")
     async def content_marketing_prompt(
-        subject: str,
+        subject: str = "",
         depth: str = "deep",
         reference_urls: str = "",
         reference_text: str = ""

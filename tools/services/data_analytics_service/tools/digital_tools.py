@@ -46,6 +46,11 @@ def register_digital_tools(mcp: FastMCP):
         content_type: str = "text",
         metadata: dict = None,
         options: dict = None,
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> Dict[str, Any]:
         """
@@ -78,15 +83,41 @@ def register_digital_tools(mcp: FastMCP):
             # Store PDF with multimodal processing
             store_knowledge(user_id="user1", content="/path/to/document.pdf", content_type="pdf",
                           options={"enable_vlm_analysis": True, "enable_minio_upload": True, "max_pages": 14})
+
+            # Advanced: Provide operation_id for SSE monitoring
+            import uuid
+            op_id = str(uuid.uuid4())
+
+            # Start storage with custom operation_id
+            storage_task = asyncio.create_task(
+                store_knowledge(user_id="user1", content="...", content_type="text", operation_id=op_id)
+            )
+
+            # Concurrently monitor progress via SSE
+            await stream_progress(op_id)
+
+            # Get result
+            result = await storage_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await digital_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "content_type": content_type,
-                "operation": "store_knowledge"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await digital_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "content_type": content_type,
+                    "operation": "store_knowledge"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await digital_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "content_type": content_type,
+                    "operation": "store_knowledge"
+                }
+            )
 
         try:
             metadata = metadata or {}
@@ -426,14 +457,51 @@ def register_digital_tools(mcp: FastMCP):
                     }
 
             # Handle content type filtering
-            elif content_types == ["image"]:
-                # Image-only search
-                result = await digital_tool.analytics_service.search_images(
-                    user_id, query, top_k, enable_rerank, search_mode
+            elif content_types == ["image"] or content_type == "image":
+                # Image-only search - Use RAG Factory
+                from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
+                from tools.services.data_analytics_service.services.digital_service.base.rag_models import RAGRetrieveRequest
+
+                logger.info(f"🔍 Image search using RAG service: user_id={user_id}, query={query}")
+                rag_mode = search_options.get('rag_mode', 'simple')
+                rag_service = get_rag_service(mode=rag_mode, config=search_options)
+
+                # Create RAGRetrieveRequest with filter for image content
+                retrieve_request = RAGRetrieveRequest(
+                    query=query,
+                    user_id=user_id,
+                    top_k=top_k,
+                    filters={"content_type": "image"}
                 )
+                rag_result = await rag_service.retrieve(retrieve_request)
+                logger.info(f"📊 RAG result: success={rag_result.success}, results={len(rag_result.sources) if rag_result.sources else 0}")
+
+                # Convert RAGResult format to standard search format
+                if rag_result.success:
+                    search_results = []
+                    for item in rag_result.sources:
+                        # Convert RAGSource Pydantic model to dict
+                        item_dict = item.dict() if hasattr(item, 'dict') else item
+                        search_results.append({
+                            'text': item_dict.get('text'),
+                            'relevance_score': item_dict.get('similarity_score', item_dict.get('score', 0.0)),
+                            'metadata': item_dict.get('metadata', {}),
+                            'content_type': 'image'
+                        })
+                    result = {
+                        'success': True,
+                        'search_results': search_results,
+                        'total_results': len(search_results),
+                        'search_method': f'{rag_mode}_rag_image',
+                        'query': query,
+                        'metadata': rag_result.metadata if rag_result.metadata else {}
+                    }
+                else:
+                    result = {'success': False, 'error': rag_result.error or 'Image search failed'}
             elif content_types == ["text"]:
                 # Text-only search - Use RAG Factory
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
+                from tools.services.data_analytics_service.services.digital_service.base.rag_models import RAGRetrieveRequest
 
                 logger.info(f"🔍 Text search using RAG service: user_id={user_id}, query={query}")
                 rag_mode = search_options.get('rag_mode', 'simple')
@@ -472,6 +540,7 @@ def register_digital_tools(mcp: FastMCP):
             else:
                 # Mixed search (default) - Use RAG Factory for all content
                 from tools.services.data_analytics_service.services.digital_service.rag_factory import get_rag_service
+                from tools.services.data_analytics_service.services.digital_service.base.rag_models import RAGRetrieveRequest
 
                 logger.info(f"🔍 Mixed search using RAG service: user_id={user_id}, query={query}")
                 rag_mode = search_options.get('rag_mode', 'simple')
@@ -582,6 +651,11 @@ def register_digital_tools(mcp: FastMCP):
         user_id: str,
         query: str,
         response_options: dict = None,
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> Dict[str, Any]:
         """
@@ -634,15 +708,41 @@ def register_digital_tools(mcp: FastMCP):
             # PDF-aware RAG with image references
             knowledge_response(user_id="user1", query="How to create new customer in CRM?",
                              response_options={"use_pdf_context": True, "context_limit": 5})
+
+            # Advanced: Provide operation_id for SSE monitoring
+            import uuid
+            op_id = str(uuid.uuid4())
+
+            # Start response generation with custom operation_id
+            response_task = asyncio.create_task(
+                knowledge_response(user_id="user1", query="What is AI?", operation_id=op_id)
+            )
+
+            # Concurrently monitor progress via SSE
+            await stream_progress(op_id)
+
+            # Get result
+            result = await response_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await digital_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "query": query[:100],  # Truncate for metadata
-                "operation": "knowledge_response"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await digital_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "query": query[:100],  # Truncate for metadata
+                    "operation": "knowledge_response"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await digital_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "query": query[:100],
+                    "operation": "knowledge_response"
+                }
+            )
 
         try:
             response_options = response_options or {}

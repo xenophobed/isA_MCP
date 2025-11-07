@@ -110,6 +110,11 @@ def register_data_tools(mcp: FastMCP):
         source_path: str,
         dataset_name: str = None,
         storage_options: dict = None,
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> str:
         """
@@ -138,23 +143,48 @@ def register_data_tools(mcp: FastMCP):
             - metadata_stored: Whether metadata was successfully stored
             - metadata_embeddings: Number of embeddings created
             
-        Example:
+        Examples:
+            # Basic usage
             >>> result = await data_ingest(
             ...     user_id="user123",
             ...     source_path="/path/to/sales.csv",
             ...     dataset_name="monthly_sales"
             ... )
             >>> # Returns: {"status": "success", "data": {...}}
+
+            # Advanced: Provide operation_id for SSE monitoring
+            >>> import uuid
+            >>> op_id = str(uuid.uuid4())
+            >>> # Start ingestion with custom operation_id
+            >>> ingest_task = asyncio.create_task(
+            ...     data_ingest(user_id="user123", source_path="/path/to/data.csv", operation_id=op_id)
+            ... )
+            >>> # Concurrently monitor progress via SSE
+            >>> await stream_progress(op_id)
+            >>> # Get result
+            >>> result = await ingest_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await data_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "source_path": source_path,
-                "dataset_name": dataset_name or "auto",
-                "operation": "data_ingest"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await data_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "source_path": source_path,
+                    "dataset_name": dataset_name or "auto",
+                    "operation": "data_ingest"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await data_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "source_path": source_path,
+                    "dataset_name": dataset_name or "auto",
+                    "operation": "data_ingest"
+                }
+            )
 
         try:
             from pathlib import Path
@@ -187,12 +217,17 @@ def register_data_tools(mcp: FastMCP):
             pipeline_result = await preprocessor.process_data_source(source_path)
             
             if not pipeline_result.success:
-                await data_tool.log_error(ctx, f"Preprocessing failed: {pipeline_result.error_message}")
-                return data_tool.create_response(
-                    "error", "data_ingest", 
-                    {"user_id": user_id},
-                    f"Preprocessing failed: {str(pipeline_result.error_message)}"
-                )
+                error_msg = f"Preprocessing failed: {str(pipeline_result.error_message)}"
+                await data_tool.log_error(ctx, error_msg)
+                await data_tool.fail_progress_operation(operation_id, error_msg)
+                error_response = {
+                    "status": "error",
+                    "action": "data_ingest",
+                    "error": error_msg,
+                    "data": {"user_id": str(user_id)},
+                    "timestamp": datetime.now().isoformat()
+                }
+                return json.dumps(error_response, ensure_ascii=False)
             
             # Report data statistics
             await data_tool.progress_reporter.report_data_stats(
@@ -206,12 +241,17 @@ def register_data_tools(mcp: FastMCP):
             # Step 2: Get cleaned dataframe
             cleaned_df = preprocessor.get_cleaned_data(pipeline_result.pipeline_id)
             if cleaned_df is None:
-                await data_tool.log_error(ctx, "No cleaned dataframe available")
-                return data_tool.create_response(
-                    "error", "data_ingest",
-                    {"user_id": user_id},
-                    "No cleaned dataframe available"
-                )
+                error_msg = "No cleaned dataframe available"
+                await data_tool.log_error(ctx, error_msg)
+                await data_tool.fail_progress_operation(operation_id, error_msg)
+                error_response = {
+                    "status": "error",
+                    "action": "data_ingest",
+                    "error": error_msg,
+                    "data": {"user_id": str(user_id)},
+                    "timestamp": datetime.now().isoformat()
+                }
+                return json.dumps(error_response, ensure_ascii=False)
             
             # Step 3: Store to MinIO Parquet using professional storage service
             await data_tool.log_info(ctx, f"Storing data to MinIO Parquet: {dataset_name}")
@@ -224,12 +264,12 @@ def register_data_tools(mcp: FastMCP):
             
             try:
                 # Use professional storage service client
-                from core.storage_client import get_storage_client
+                from core.clients.storage_client import get_storage_client
                 import io
                 
                 # Convert DataFrame to parquet bytes
                 parquet_buffer = io.BytesIO()
-                cleaned_df.to_parquet(parquet_buffer, index=False)
+                cleaned_df.write_parquet(parquet_buffer)
                 parquet_data = parquet_buffer.getvalue()
                 
                 # Upload via professional storage service
@@ -266,11 +306,16 @@ def register_data_tools(mcp: FastMCP):
                 storage_result = await storage_service.store_data(cleaned_df, storage_spec)
                 
                 if not storage_result.success:
-                    return data_tool.create_response(
-                        "error", "data_ingest",
-                        {"user_id": user_id},
-                        f"Both storage methods failed: {str(storage_result.errors)}"
-                    )
+                    error_msg = f"Both storage methods failed: {str(storage_result.errors)}"
+                    await data_tool.fail_progress_operation(operation_id, error_msg)
+                    error_response = {
+                        "status": "error",
+                        "action": "data_ingest",
+                        "error": error_msg,
+                        "data": {"user_id": str(user_id)},
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    return json.dumps(error_response, ensure_ascii=False)
                 
                 storage_success = storage_result.success
             
@@ -522,20 +567,26 @@ def register_data_tools(mcp: FastMCP):
                         "total_duration": float(result.total_duration),
                         "message": f"Pipeline {pipeline_id} status retrieved"
                     }
-                    
-                    return data_tool.create_response(
-                        "success", "get_pipeline_status", 
-                        status_data
-                    )
+
+                    response = {
+                        "status": "success",
+                        "action": "get_pipeline_status",
+                        "data": status_data,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    return json.dumps(response, ensure_ascii=False)
                 else:
-                    return data_tool.create_response(
-                        "error", "get_pipeline_status",
-                        {"user_id": str(user_id)},
-                        f"Pipeline {pipeline_id} not found"
-                    )
+                    error_response = {
+                        "status": "error",
+                        "action": "get_pipeline_status",
+                        "error": f"Pipeline {pipeline_id} not found",
+                        "data": {"user_id": str(user_id)},
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    return json.dumps(error_response, ensure_ascii=False)
             else:
                 stats = preprocessor_service.get_pipeline_statistics()
-                
+
                 # Convert stats to clean format
                 stats_data = {
                     "success": True,
@@ -546,23 +597,34 @@ def register_data_tools(mcp: FastMCP):
                     "average_quality_score": float(stats.get('average_quality_score', 0.0)),
                     "message": f"Pipeline statistics for user {user_id}"
                 }
-                
-                return data_tool.create_response(
-                    "success", "get_pipeline_status", 
-                    stats_data
-                )
-                
+
+                response = {
+                    "status": "success",
+                    "action": "get_pipeline_status",
+                    "data": stats_data,
+                    "timestamp": datetime.now().isoformat()
+                }
+                return json.dumps(response, ensure_ascii=False)
+
         except Exception as e:
-            return data_tool.create_response(
-                "error", "get_pipeline_status",
-                {"user_id": str(user_id)},
-                f"Failed to get pipeline status: {str(e)}"
-            )
+            error_response = {
+                "status": "error",
+                "action": "get_pipeline_status",
+                "error": f"Failed to get pipeline status: {str(e)}",
+                "data": {"user_id": str(user_id)},
+                "timestamp": datetime.now().isoformat()
+            }
+            return json.dumps(error_response, ensure_ascii=False)
 
     @mcp.tool()
     async def data_search(
-        user_id: str, 
+        user_id: str,
         search_query: str = None,
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> str:
         """
@@ -583,21 +645,45 @@ def register_data_tools(mcp: FastMCP):
             - search_results: List of similar entities with similarity scores
             - recommendations: Suggested next actions
             
-        Example:
+        Examples:
+            # Basic usage
             >>> result = await data_search(
             ...     user_id="user123",
             ...     search_query="customer sales by region"
             ... )
             >>> # Returns top N most similar entities
+
+            # Advanced: Provide operation_id for SSE monitoring
+            >>> import uuid
+            >>> op_id = str(uuid.uuid4())
+            >>> # Start search with custom operation_id
+            >>> search_task = asyncio.create_task(
+            ...     data_search(user_id="user123", search_query="sales data", operation_id=op_id)
+            ... )
+            >>> # Concurrently monitor progress via SSE
+            >>> await stream_progress(op_id)
+            >>> # Get result
+            >>> result = await search_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await data_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "search_query": search_query or "all_datasets",
-                "operation": "data_search"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await data_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "search_query": search_query or "all_datasets",
+                    "operation": "data_search"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await data_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "search_query": search_query or "all_datasets",
+                    "operation": "data_search"
+                }
+            )
 
         try:
             from tools.services.data_analytics_service.services.data_service.management.metadata.metadata_embedding import get_embedding_service
@@ -757,6 +843,11 @@ def register_data_tools(mcp: FastMCP):
         natural_language_query: str,
         include_visualization: bool = True,
         include_analytics: bool = False,
+
+        # Progress monitoring (optional)
+        operation_id: Optional[str] = None,
+
+        # Context (will be injected by FastMCP)
         ctx: Optional[Context] = None
     ) -> str:
         """
@@ -794,22 +885,46 @@ def register_data_tools(mcp: FastMCP):
             - visualization: Chart specification (if requested)
             - total_execution_time: Complete query execution time
             
-        Example:
+        Examples:
+            # Basic usage
             >>> result = await data_query(
             ...     user_id="user123",
             ...     natural_language_query="total sales amount by region",
             ...     include_visualization=True
             ... )
             >>> # Returns: {"status": "success", "data": {actual_sales_data...}}
+
+            # Advanced: Provide operation_id for SSE monitoring
+            >>> import uuid
+            >>> op_id = str(uuid.uuid4())
+            >>> # Start query with custom operation_id
+            >>> query_task = asyncio.create_task(
+            ...     data_query(user_id="user123", natural_language_query="total sales", operation_id=op_id)
+            ... )
+            >>> # Concurrently monitor progress via SSE
+            >>> await stream_progress(op_id)
+            >>> # Get result
+            >>> result = await query_task
         """
-        # Create progress operation at start (NEW WAY)
-        operation_id = await data_tool.create_progress_operation(
-            metadata={
-                "user_id": user_id,
-                "query": natural_language_query[:100],
-                "operation": "data_query"
-            }
-        )
+        # Create or use provided progress operation
+        if not operation_id:
+            operation_id = await data_tool.create_progress_operation(
+                metadata={
+                    "user_id": user_id,
+                    "query": natural_language_query[:100],
+                    "operation": "data_query"
+                }
+            )
+        else:
+            # Use client-provided operation_id
+            await data_tool.create_progress_operation(
+                operation_id=operation_id,
+                metadata={
+                    "user_id": user_id,
+                    "query": natural_language_query[:100],
+                    "operation": "data_query"
+                }
+            )
 
         try:
             # Stage 1: Query Analysis
@@ -825,10 +940,10 @@ def register_data_tools(mcp: FastMCP):
             # Import available services
             from tools.services.data_analytics_service.services.data_service.search.sql_query_service import SQLQueryService
             from tools.services.data_analytics_service.services.data_service.visualization.data_visualization import DataVisualizationService
-            from tools.services.data_analytics_service.services.data_service.analytics.data_eda import DataEDAService
+            # DataEDAService imported later if needed (requires pandas)
             from tools.services.data_analytics_service.services.data_service.management.metadata.metadata_embedding import get_embedding_service
             from tools.services.data_analytics_service.services.data_service.management.metadata.semantic_enricher import SemanticMetadata
-            from core.database.supabase_client import get_supabase_client
+            from isa_model.core.database.supabase_client import get_supabase_client
             
             result = {
                 "success": False,
@@ -853,10 +968,14 @@ def register_data_tools(mcp: FastMCP):
                 has_data = False
             
             if not has_data:
-                return data_tool.create_response(
-                    "error", "data_query", result,
-                    "No datasets found. Please use data_ingest first."
-                )
+                error_response = {
+                    "status": "error",
+                    "action": "data_query",
+                    "error": "No datasets found. Please use data_ingest first.",
+                    "data": result,
+                    "timestamp": datetime.now().isoformat()
+                }
+                return json.dumps(error_response, ensure_ascii=False)
             
             result["services_used"].append("embedding_service")
             result["execution_times"]["metadata_check"] = (datetime.now() - service_start).total_seconds()
@@ -890,10 +1009,14 @@ def register_data_tools(mcp: FastMCP):
                 })
             
             if not search_results:
-                return data_tool.create_response(
-                    "error", "data_query", result,
-                    f"No relevant data found for query: '{natural_language_query}'"
-                )
+                error_response = {
+                    "status": "error",
+                    "action": "data_query",
+                    "error": f"No relevant data found for query: '{natural_language_query}'",
+                    "data": result,
+                    "timestamp": datetime.now().isoformat()
+                }
+                return json.dumps(error_response, ensure_ascii=False)
             
             # Step 2.5: Extract storage path from search results - prioritize dataset names
             storage_path = None
@@ -967,7 +1090,7 @@ def register_data_tools(mcp: FastMCP):
                     if not storage_path:
                         logger.info(f"No storage path in metadata, trying professional storage service for user {user_id}")
                         try:
-                            from core.storage_client import get_storage_client
+                            from core.clients.storage_client import get_storage_client
                             storage_client = await get_storage_client()
                             
                             # Get user's analytics files
@@ -993,8 +1116,8 @@ def register_data_tools(mcp: FastMCP):
                     # Fallback to searching analytics-data bucket
                     if not storage_path:
                         logger.warning(f"Trying analytics-data bucket search for {table_name}")
-                        from core.minio_client import MinIOClient
-                        minio_client = MinIOClient()
+                        from core.clients.minio_client import get_minio_client
+                        minio_client = get_minio_client()
                         minio = minio_client.get_client()
                         
                         # Search for files matching the dataset pattern
@@ -1036,11 +1159,11 @@ def register_data_tools(mcp: FastMCP):
             try:
                 import tempfile
                 import os
-                from core.minio_client import MinIOClient
+                from core.clients.minio_client import get_minio_client
                 from resources.dbs.duckdb import get_duckdb_service, AccessLevel, ConnectionConfig, SecurityConfig
                 
                 # Get MinIO client
-                minio_client = MinIOClient()
+                minio_client = get_minio_client()
                 minio = minio_client.get_client()
                 
                 if not minio:
@@ -1146,10 +1269,10 @@ def register_data_tools(mcp: FastMCP):
                 logger.info(f"STEP3: Executing SQL: {sql}")
                 
                 # Execute query using professional DuckDB service
-                df = duckdb_service.execute_query_df(sql, access_level=AccessLevel.READ_ONLY)
-                
-                # Convert to list of dicts
-                data_rows = df.to_dict('records')
+                df = duckdb_service.execute_query_df(sql, access_level=AccessLevel.READ_ONLY, framework='polars')
+
+                # Convert to list of dicts (Polars API)
+                data_rows = df.to_dicts()
                 column_names = list(df.columns)
                 
                 # Cleanup temp file
@@ -1344,17 +1467,19 @@ def register_data_tools(mcp: FastMCP):
             analytics_insights = None
             if include_analytics and execution_result.data:
                 service_start = datetime.now()
-                
+
                 try:
                     import tempfile
-                    import pandas as pd
-                    
+                    import polars as pl
+                    # Import DataEDAService only if needed (requires pandas)
+                    from tools.services.data_analytics_service.services.data_service.analytics.data_eda import DataEDAService
+
                     # Create temporary CSV for EDA
-                    df = pd.DataFrame(execution_result.data)
+                    df = pl.DataFrame(execution_result.data)
                     with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as temp_file:
-                        df.to_csv(temp_file.name, index=False)
+                        df.write_csv(temp_file.name)
                         temp_path = temp_file.name
-                    
+
                     # Run EDA analysis
                     eda_service = DataEDAService(file_path=temp_path)
                     analytics_insights = eda_service.get_quick_insights()

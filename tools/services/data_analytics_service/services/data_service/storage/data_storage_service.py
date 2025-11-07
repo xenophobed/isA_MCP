@@ -3,7 +3,7 @@ Data Storage Service Suite
 Main orchestrator for data storage operations following 3-step pipeline pattern
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Any, Optional, Union
 import logging
 from dataclasses import dataclass, field
@@ -69,8 +69,8 @@ class DataStorageService:
         
         logger.info("Data Storage Service initialized")
     
-    async def store_data(self, 
-                  data: pd.DataFrame,
+    async def store_data(self,
+                  data: pl.DataFrame,
                   storage_spec: Dict[str, Any],
                   config: Optional[StorageConfig] = None) -> StorageResult:
         """
@@ -88,14 +88,14 @@ class DataStorageService:
         config = config or self.config
         
         try:
-            logger.info(f"Starting storage pipeline for data shape: {data.shape}")
+            logger.info(f"Starting storage pipeline for data shape: {(data.height, data.width)}")
             
             # Initialize result
             result = StorageResult(
                 success=False,
                 metadata={
                     'start_time': start_time,
-                    'input_shape': data.shape,
+                    'input_shape': (data.height, data.width),
                     'input_columns': list(data.columns),
                     'storage_spec': storage_spec
                 }
@@ -288,7 +288,7 @@ class DataStorageService:
         return result
     
     async def store_multiple_targets(self, 
-                              data: pd.DataFrame,
+                              data: pl.DataFrame,
                               target_configs: List[Dict[str, Any]]) -> Dict[str, StorageResult]:
         """Store data in multiple storage targets simultaneously"""
         results = {}
@@ -307,7 +307,7 @@ class DataStorageService:
         
         return results
     
-    def get_storage_recommendations(self, data: pd.DataFrame, preferences: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_storage_recommendations(self, data: pl.DataFrame, preferences: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get storage recommendations without actually storing data"""
         try:
             selection_config = {'user_preferences': preferences} if preferences else {}

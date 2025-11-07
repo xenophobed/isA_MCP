@@ -8,7 +8,7 @@ import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
-import pandas as pd
+import polars as pl
 
 # Import adapters for different data sources
 from ....adapters.file_adapters.csv_adapter import CSVAdapter
@@ -114,15 +114,15 @@ class DataLoadingService:
                 'format_info': format_info,
                 'metadata_result': metadata_result,
                 'dataframe': df,
-                'shape': df.shape,
+                'shape': (df.height, df.width),
                 'columns': list(df.columns),
-                'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()},
+                'dtypes': {col: str(dtype) for col, dtype in zip(df.columns, df.dtypes)},
                 'loading_duration': loading_duration,
                 'adapter_used': adapter.__class__.__name__,
-                'memory_usage_mb': df.memory_usage(deep=True).sum() / (1024 * 1024)
+                'memory_usage_mb': df.estimated_size('mb')
             }
             
-            logger.info(f"Data loaded successfully: {df.shape[0]} rows, {df.shape[1]} columns")
+            logger.info(f"Data loaded successfully: {df.height} rows, {df.width} columns")
             return result
             
         except Exception as e:
@@ -155,16 +155,15 @@ class DataLoadingService:
             delimiter = format_info.get('delimiter', ',')
             
             if detected_format in ['csv', 'tsv', 'text']:
-                df = pd.read_csv(
+                df = pl.read_csv(
                     source_path,
                     encoding=encoding,
-                    delimiter=delimiter,
-                    na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A'],
-                    keep_default_na=True,
-                    low_memory=False  # Prevent dtype guessing issues
+                    separator=delimiter,
+                    null_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A'],
+                    infer_schema_length=10000  # Better schema inference
                 )
             elif detected_format == 'excel':
-                df = pd.read_excel(source_path, na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A'])
+                df = pl.read_excel(source_path, read_options={"null_values": ['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A']})
             elif detected_format == 'duckdb':
                 # Handle DuckDB using the enterprise DuckDB service
                 try:
@@ -205,7 +204,7 @@ class DataLoadingService:
                             sample_size = min(5000, main_table[1])
                             df = duckdb_service.execute_query_df(
                                 f"SELECT * FROM {table_name} LIMIT {sample_size}",
-                                framework='pandas',
+                                framework='polars',
                                 access_level=AccessLevel.READ_ONLY
                             )
                             
@@ -221,10 +220,10 @@ class DataLoadingService:
                     return {'success': False, 'error': f'DuckDB enterprise service error: {str(e)}'}
             else:
                 # Fallback to CSV
-                df = pd.read_csv(source_path, encoding='utf-8')
-            
+                df = pl.read_csv(source_path, encoding='utf-8')
+
             # Basic validation
-            if df.empty:
+            if df.height == 0:
                 return {
                     'success': False,
                     'error': 'Loaded DataFrame is empty'

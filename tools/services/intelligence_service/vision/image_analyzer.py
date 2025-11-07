@@ -82,8 +82,8 @@ class ImageAnalyzer:
 
                 processing_time = asyncio.get_event_loop().time() - start_time
 
-                # Extract description from response
-                description = vision_response.choices[0].message.content
+                # Extract description from response (using ISA Model .text attribute)
+                description = vision_response.text
 
                 result = {
                     "success": True,

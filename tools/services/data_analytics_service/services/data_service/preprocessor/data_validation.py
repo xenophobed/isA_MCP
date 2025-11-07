@@ -7,7 +7,7 @@ Handles data validation and type analysis using processors
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-import pandas as pd
+import polars as pl
 
 # Import processors for data validation
 from ....processors.data_processors.preprocessors.validation.data_type_analyzer import DataTypeAnalyzer
@@ -34,7 +34,7 @@ class DataValidationService:
         
         logger.info("Data Validation Service initialized")
     
-    def validate_dataframe(self, df: pd.DataFrame, source_info: Dict[str, Any] = None) -> Dict[str, Any]:
+    def validate_dataframe(self, df: pl.DataFrame, source_info: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Comprehensive DataFrame validation
         
@@ -48,7 +48,7 @@ class DataValidationService:
         start_time = datetime.now()
         
         try:
-            logger.info(f"Validating DataFrame: {df.shape[0]} rows, {df.shape[1]} columns")
+            logger.info(f"Validating DataFrame: {df.height} rows, {df.width} columns")
             
             # Step 2.1: Basic structure validation
             structure_validation = self._validate_structure(df)
@@ -79,7 +79,7 @@ class DataValidationService:
             result = {
                 'success': True,
                 'validation_duration': validation_duration,
-                'dataframe_shape': df.shape,
+                'dataframe_shape': (df.height, df.width),
                 'source_info': source_info or {},
                 'structure_validation': structure_validation,
                 'type_analysis': type_analysis,
@@ -102,7 +102,7 @@ class DataValidationService:
                 'step': 'general_error'
             }
     
-    def _validate_structure(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _validate_structure(self, df: pl.DataFrame) -> Dict[str, Any]:
         """Validate basic DataFrame structure"""
         validation = {
             'valid': True,
@@ -113,34 +113,34 @@ class DataValidationService:
         
         try:
             # Check 1: Empty DataFrame
-            if df.empty:
+            if df.height == 0:
                 validation['valid'] = False
                 validation['errors'].append('DataFrame is empty')
                 return validation
-            
+
             # Check 2: Column names
             unnamed_cols = [col for col in df.columns if str(col).startswith('Unnamed:')]
             if unnamed_cols:
                 validation['warnings'].append(f'{len(unnamed_cols)} unnamed columns detected')
-            
+
             # Check 3: Duplicate column names
-            duplicate_cols = df.columns[df.columns.duplicated()].tolist()
+            duplicate_cols = [col for col, count in zip(*df.columns, [df.columns.count(c) for c in df.columns]) if count > 1]
             if duplicate_cols:
                 validation['warnings'].append(f'Duplicate column names: {duplicate_cols}')
-            
+
             # Check 4: Size validation
-            total_cells = df.size
+            total_cells = df.height * df.width
             if total_cells > 10_000_000:  # 10M cells
                 validation['warnings'].append(f'Large dataset: {total_cells:,} cells')
-            
+
             # Metrics
             validation['metrics'] = {
-                'total_rows': len(df),
-                'total_columns': len(df.columns),
+                'total_rows': df.height,
+                'total_columns': df.width,
                 'total_cells': total_cells,
                 'unnamed_columns': len(unnamed_cols),
                 'duplicate_columns': len(duplicate_cols),
-                'memory_usage_mb': df.memory_usage(deep=True).sum() / (1024 * 1024)
+                'memory_usage_mb': df.estimated_size('mb')
             }
             
         except Exception as e:
@@ -149,7 +149,7 @@ class DataValidationService:
         
         return validation
     
-    def _assess_data_quality(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _assess_data_quality(self, df: pl.DataFrame) -> Dict[str, Any]:
         """Assess overall data quality"""
         quality_assessment = {
             'overall_score': 0.0,
@@ -162,32 +162,32 @@ class DataValidationService:
         }
         
         try:
-            total_cells = df.size
+            total_cells = df.height * df.width
             if total_cells == 0:
                 return quality_assessment
-            
+
             # Completeness: measure null values
-            null_count = df.isnull().sum().sum()
+            null_count = df.null_count().sum_horizontal()[0]
             completeness_score = 1 - (null_count / total_cells)
             quality_assessment['completeness_score'] = completeness_score
-            
+
             # Consistency: measure duplicate rows
-            duplicate_count = df.duplicated().sum()
-            consistency_score = 1 - (duplicate_count / len(df)) if len(df) > 0 else 0
+            duplicate_count = df.is_duplicated().sum()
+            consistency_score = 1 - (duplicate_count / df.height) if df.height > 0 else 0
             quality_assessment['consistency_score'] = consistency_score
             
             # Validity: measure data type coherence per column
             validity_scores = []
             
             for col in df.columns:
-                col_quality = self._assess_column_quality(df[col], str(col))
+                col_quality = self._assess_column_quality(df.get_column(col), str(col))
                 quality_assessment['column_quality'][str(col)] = col_quality
                 validity_scores.append(col_quality['validity_score'])
-                
+
                 # Add column-specific issues
                 if col_quality['null_percentage'] > 30:
                     quality_assessment['issues'].append(f"High null percentage in '{col}': {col_quality['null_percentage']:.1f}%")
-                
+
                 if col_quality['validity_score'] < 0.7:
                     quality_assessment['issues'].append(f"Low data validity in '{col}': {col_quality['validity_score']:.2f}")
             
@@ -216,28 +216,28 @@ class DataValidationService:
         
         return quality_assessment
     
-    def _assess_column_quality(self, series: pd.Series, column_name: str) -> Dict[str, Any]:
+    def _assess_column_quality(self, series: pl.Series, column_name: str) -> Dict[str, Any]:
         """Assess quality of individual column"""
         col_quality = {
             'column_name': column_name,
             'data_type': str(series.dtype),
-            'null_count': series.isnull().sum(),
+            'null_count': series.null_count(),
             'null_percentage': 0.0,
             'unique_count': 0,
             'unique_percentage': 0.0,
             'validity_score': 0.0,
             'issues': []
         }
-        
+
         try:
-            total_count = len(series)
-            null_count = series.isnull().sum()
-            non_null_series = series.dropna()
-            
+            total_count = series.len()
+            null_count = series.null_count()
+            non_null_series = series.drop_nulls()
+
             # Calculate percentages
             col_quality['null_percentage'] = (null_count / total_count * 100) if total_count > 0 else 0
-            col_quality['unique_count'] = non_null_series.nunique()
-            col_quality['unique_percentage'] = (col_quality['unique_count'] / len(non_null_series) * 100) if len(non_null_series) > 0 else 0
+            col_quality['unique_count'] = non_null_series.n_unique()
+            col_quality['unique_percentage'] = (col_quality['unique_count'] / non_null_series.len() * 100) if non_null_series.len() > 0 else 0
             
             # Calculate validity score based on data consistency
             validity_score = 1.0
@@ -249,15 +249,15 @@ class DataValidationService:
                 validity_score *= 0.8
             
             # Check for data type consistency
-            if len(non_null_series) > 0:
-                # For object columns, check if values are consistent
-                if series.dtype == 'object':
+            if non_null_series.len() > 0:
+                # For string columns, check if values are consistent
+                if series.dtype == pl.Utf8:
                     # Sample some values to check consistency
-                    sample_size = min(100, len(non_null_series))
-                    sample = non_null_series.sample(sample_size) if len(non_null_series) >= sample_size else non_null_series
-                    
+                    sample_size = min(100, non_null_series.len())
+                    sample = non_null_series.sample(n=sample_size) if non_null_series.len() >= sample_size else non_null_series
+
                     # Check if all values are strings
-                    string_ratio = sum(isinstance(val, str) for val in sample) / len(sample)
+                    string_ratio = sum(isinstance(val, str) for val in sample.to_list()) / sample.len()
                     validity_score *= string_ratio
             
             col_quality['validity_score'] = round(validity_score, 3)
@@ -274,7 +274,7 @@ class DataValidationService:
         
         return col_quality
     
-    def _check_data_consistency(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _check_data_consistency(self, df: pl.DataFrame) -> Dict[str, Any]:
         """Check data consistency across columns"""
         consistency_checks = {
             'consistent': True,
@@ -289,7 +289,8 @@ class DataValidationService:
                                if any(id_word in str(col).lower() for id_word in ['id', 'key', 'code'])]
             
             for col in potential_id_cols:
-                if df[col].nunique() != len(df.dropna(subset=[col])):
+                non_null_df = df.filter(pl.col(col).is_not_null())
+                if df.get_column(col).n_unique() != non_null_df.height:
                     consistency_checks['issues'].append(f"ID column '{col}' has duplicate values")
                     consistency_checks['consistent'] = False
                 consistency_checks['checks_performed'].append(f"ID uniqueness check for '{col}'")
@@ -300,15 +301,16 @@ class DataValidationService:
             
             for col in date_cols:
                 try:
-                    pd.to_datetime(df[col], errors='coerce')
+                    # Try parsing as datetime in Polars
+                    df.get_column(col).str.to_datetime(strict=False)
                     consistency_checks['checks_performed'].append(f"Date format check for '{col}'")
                 except:
                     consistency_checks['warnings'].append(f"Date column '{col}' may have format issues")
-            
+
             # Check 3: Numeric columns should not have text values (if not object type)
-            numeric_cols = df.select_dtypes(include=['number']).columns
+            numeric_cols = [col for col in df.columns if df.get_column(col).dtype in [pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.Float32, pl.Float64]]
             for col in numeric_cols:
-                if df[col].dtype in ['int64', 'float64'] and df[col].isnull().sum() < len(df):
+                if df.get_column(col).null_count() < df.height:
                     consistency_checks['checks_performed'].append(f"Numeric consistency check for '{col}'")
             
         except Exception as e:

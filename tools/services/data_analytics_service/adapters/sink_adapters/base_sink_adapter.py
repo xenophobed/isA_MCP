@@ -6,7 +6,7 @@ Abstract base class for all data sink adapters
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
-import pandas as pd
+import polars as pl
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class BaseSinkAdapter(ABC):
         self.storage_info = {}
         
     @abstractmethod
-    def store_dataframe(self, df: pd.DataFrame, 
+    def store_dataframe(self, df: pl.DataFrame,
                        destination: str,
                        table_name: Optional[str] = None,
                        storage_options: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -69,7 +69,7 @@ class BaseSinkAdapter(ABC):
         """
         pass
     
-    def validate_dataframe(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def validate_dataframe(self, df: pl.DataFrame) -> Dict[str, Any]:
         """
         Validate DataFrame before storage
         
@@ -86,8 +86,8 @@ class BaseSinkAdapter(ABC):
         }
         
         try:
-            # Check if DataFrame is empty
-            if df.empty:
+            # Check if DataFrame is empty (polars API)
+            if df.is_empty():
                 validation['valid'] = False
                 validation['errors'].append('DataFrame is empty')
                 return validation
@@ -104,13 +104,15 @@ class BaseSinkAdapter(ABC):
             if problematic_cols:
                 validation['warnings'].extend(problematic_cols)
             
-            # Check data types
-            object_cols = df.select_dtypes(include=['object']).columns
-            if len(object_cols) > len(df.columns) * 0.8:
-                validation['warnings'].append('High percentage of object columns - consider type conversion')
-            
-            # Check memory usage
-            memory_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+            # Check data types (polars API)
+            # Count string/object columns
+            object_col_count = sum(1 for dtype in df.dtypes if dtype == pl.Utf8 or dtype == pl.Object)
+            if object_col_count > len(df.columns) * 0.8:
+                validation['warnings'].append('High percentage of string/object columns - consider type conversion')
+
+            # Check memory usage (polars API)
+            memory_bytes = df.estimated_size()
+            memory_mb = memory_bytes / (1024 * 1024)
             if memory_mb > 1000:  # 1GB threshold
                 validation['warnings'].append(f'Large DataFrame: {memory_mb:.1f} MB')
             

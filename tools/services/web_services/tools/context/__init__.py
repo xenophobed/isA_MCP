@@ -2,10 +2,13 @@
 
 from .search_progress_context import WebSearchProgressReporter, SearchOperationDetector
 from .automation_progress_context import WebAutomationProgressReporter, AutomationOperationDetector
+from .crawl_progress_context import WebCrawlProgressReporter, CrawlOperationDetector
 
 __all__ = [
-    "WebSearchProgressReporter", 
+    "WebSearchProgressReporter",
     "SearchOperationDetector",
     "WebAutomationProgressReporter",
-    "AutomationOperationDetector"
+    "AutomationOperationDetector",
+    "WebCrawlProgressReporter",
+    "CrawlOperationDetector"
 ]

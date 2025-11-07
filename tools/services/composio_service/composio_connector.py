@@ -18,21 +18,37 @@ os.environ.setdefault("COMPOSIO_TELEMETRY", "false")
 
 logger = logging.getLogger(__name__)
 
-# Optional Composio SDK import with graceful fallback
-COMPOSIO_AVAILABLE = False
-try:
-    from composio import Composio
+# Lazy import - don't import Composio SDK at module level
+# This speeds up initial MCP service startup
+Composio = None
+ComposioSDKError = Exception
+COMPOSIO_AVAILABLE = None  # None = not checked yet, True/False = checked
+
+
+def _ensure_composio_imported():
+    """Lazy import of Composio SDK to speed up startup"""
+    global Composio, ComposioSDKError, COMPOSIO_AVAILABLE
+
+    # If already checked, return cached result
+    if COMPOSIO_AVAILABLE is not None:
+        return COMPOSIO_AVAILABLE
+
     try:
-        from composio.exceptions import ComposioAPIError as ComposioSDKError
-    except ImportError:
-        # Fallback for different exception locations
-        ComposioSDKError = Exception
-    COMPOSIO_AVAILABLE = True
-    logger.info("Composio SDK is available")
-except ImportError as e:
-    logger.warning(f"Composio SDK not available: {e}. Install with: pip install composio-core")
-    Composio = None
-    ComposioSDKError = Exception
+        from composio import Composio as _Composio
+        Composio = _Composio
+        try:
+            from composio.exceptions import ComposioAPIError as _ComposioSDKError
+            ComposioSDKError = _ComposioSDKError
+        except ImportError:
+            # Fallback for different exception locations
+            ComposioSDKError = Exception
+        COMPOSIO_AVAILABLE = True
+        logger.info("Composio SDK is available")
+        return True
+    except ImportError as e:
+        logger.warning(f"Composio SDK not available: {e}. Install with: pip install composio-core")
+        COMPOSIO_AVAILABLE = False
+        return False
 
 class ComposioService(BaseService):
     """Composio 300+ application integration service"""
@@ -55,7 +71,8 @@ class ComposioService(BaseService):
     
     async def connect(self) -> bool:
         """Connect to Composio service"""
-        if not COMPOSIO_AVAILABLE:
+        # Lazy import Composio SDK only when needed
+        if not _ensure_composio_imported():
             error_msg = "Composio SDK not available. Install with: pip install composio-core"
             logger.error(error_msg)
             return False

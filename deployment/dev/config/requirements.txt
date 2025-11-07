@@ -53,7 +53,7 @@ python-logging-loki>=0.3.1
 prometheus-client>=0.19.0
 
 # Service Discovery (optional for local dev)
-python-consul>=1.1.0
+python-consul2>=0.1.5
 
 # Composio - for integrating 300+ apps (Gmail, GitHub, Slack, etc.)
 composio>=0.9.0

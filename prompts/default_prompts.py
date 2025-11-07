@@ -10,7 +10,7 @@ def register_default_prompts(mcp: FastMCP):
     
     @mcp.prompt()
     def default_reason_prompt(
-        user_message: str,
+        user_message: str = "",
         memory: str = "",
         tools: str = "",
         resources: str = ""
@@ -91,7 +91,7 @@ Remember: You're the brain showing how you think. The response node will format 
 
     @mcp.prompt()
     def rag_reason_prompt(
-        user_message: str,
+        user_message: str = "",
         memory: str = "",
         tools: str = "",
         resources: str = "",
@@ -301,7 +301,7 @@ Remember: You are the final response to the user. When you have rich information
 
     @mcp.prompt()
     def default_review_prompt(
-        user_message: str,
+        user_message: str = "",
         execution_results: str = "",
         conversation_summary: str = "",
         memory: str = "",
