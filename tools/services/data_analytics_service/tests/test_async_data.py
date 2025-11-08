@@ -17,11 +17,12 @@ Expected Outcome:
 """
 
 import asyncio
-import aiohttp
 import json
-from datetime import datetime
-import tempfile
 import os
+import tempfile
+from datetime import datetime
+
+import aiohttp
 
 
 class AsyncDataClient:
@@ -38,10 +39,7 @@ class AsyncDataClient:
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
-            }
+            "params": {"name": tool_name, "arguments": arguments},
         }
 
         async with aiohttp.ClientSession() as session:
@@ -50,8 +48,8 @@ class AsyncDataClient:
                 json=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "Accept": "application/json, text/event-stream"
-                }
+                    "Accept": "application/json, text/event-stream",
+                },
             ) as response:
                 response_text = await response.text()
 
@@ -61,30 +59,40 @@ class AsyncDataClient:
 
                 # Handle SSE format (data: {...})
                 if "data: " in response_text:
-                    lines = response_text.strip().split('\n')
+                    lines = response_text.strip().split("\n")
                     result_data = None
 
                     # Parse all SSE messages and find the last one with result
                     for line in lines:
-                        if line.startswith('data: '):
+                        if line.startswith("data: "):
                             try:
                                 data = json.loads(line[6:])
                                 # Look for result field (tool response)
                                 if "result" in data:
                                     result = data["result"]
-                                    if "content" in result and len(result["content"]) > 0:
+                                    if (
+                                        "content" in result
+                                        and len(result["content"]) > 0
+                                    ):
                                         content = result["content"][0]
                                         if content.get("type") == "text":
                                             try:
-                                                result_data = json.loads(content["text"])
+                                                result_data = json.loads(
+                                                    content["text"]
+                                                )
                                             except json.JSONDecodeError:
-                                                result_data = {"text": content["text"], "status": "unknown"}
+                                                result_data = {
+                                                    "text": content["text"],
+                                                    "status": "unknown",
+                                                }
                             except json.JSONDecodeError:
                                 continue
 
                     if result_data:
                         if debug:
-                            print(f"[DEBUG] Parsed response: {json.dumps(result_data, indent=2)[:300]}")
+                            print(
+                                f"[DEBUG] Parsed response: {json.dumps(result_data, indent=2)[:300]}"
+                            )
                         return result_data
 
                     if debug:
@@ -94,7 +102,9 @@ class AsyncDataClient:
                 # Handle plain JSON
                 parsed = json.loads(response_text)
                 if debug:
-                    print(f"[DEBUG] Plain JSON response: {json.dumps(parsed, indent=2)[:200]}")
+                    print(
+                        f"[DEBUG] Plain JSON response: {json.dumps(parsed, indent=2)[:200]}"
+                    )
                 return parsed
 
     async def stream_progress_with_httpx(self, operation_id: str):
@@ -110,46 +120,52 @@ class AsyncDataClient:
             print(f"[SSE] Connecting to SSE stream: {stream_url}\n")
 
             async with httpx.AsyncClient(timeout=300.0) as client:
-                async with client.stream('GET', stream_url) as response:
+                async with client.stream("GET", stream_url) as response:
                     if response.status_code != 200:
-                        print(f"[ERROR] SSE connection failed: HTTP {response.status_code}")
+                        print(
+                            f"[ERROR] SSE connection failed: HTTP {response.status_code}"
+                        )
                         return progress_updates
 
                     event_type = None
 
                     async for line in response.aiter_lines():
-                        if line.startswith('event:'):
-                            event_type = line.split(':', 1)[1].strip()
+                        if line.startswith("event:"):
+                            event_type = line.split(":", 1)[1].strip()
 
-                        elif line.startswith('data:'):
-                            data_str = line.split(':', 1)[1].strip()
+                        elif line.startswith("data:"):
+                            data_str = line.split(":", 1)[1].strip()
                             try:
                                 data = json.loads(data_str)
                             except json.JSONDecodeError:
                                 continue
 
-                            if event_type == 'progress':
-                                progress = data.get('progress', 0)
-                                message = data.get('message', '')
-                                status = data.get('status', '')
-                                current = data.get('current', 0)
-                                total = data.get('total', 0)
+                            if event_type == "progress":
+                                progress = data.get("progress", 0)
+                                message = data.get("message", "")
+                                status = data.get("status", "")
+                                current = data.get("current", 0)
+                                total = data.get("total", 0)
 
                                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                                print(f"  [{timestamp}] {progress:5.1f}% | Stage {current}/{total} | {message} [{status}]")
+                                print(
+                                    f"  [{timestamp}] {progress:5.1f}% | Stage {current}/{total} | {message} [{status}]"
+                                )
 
-                                progress_updates.append({
-                                    "timestamp": timestamp,
-                                    "progress": progress,
-                                    "message": message,
-                                    "status": status
-                                })
+                                progress_updates.append(
+                                    {
+                                        "timestamp": timestamp,
+                                        "progress": progress,
+                                        "message": message,
+                                        "status": status,
+                                    }
+                                )
 
-                            elif event_type == 'done':
+                            elif event_type == "done":
                                 print(f"\n[SUCCESS] Task completed!")
                                 return progress_updates
 
-                            elif event_type == 'error':
+                            elif event_type == "error":
                                 print(f"\n[ERROR] Task failed: {data.get('error')}")
                                 return progress_updates
 
@@ -182,12 +198,17 @@ Individual,Europe,Consulting,4,3200.00,2024-01-22
     # So we use /app/tmp which IS part of the bind mount
     # File is at: isA_MCP/tools/services/data_analytics_service/tests/test_async_data.py
     # Need 5 dirname calls to get to project root
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-    test_dir = os.path.join(project_root, 'tmp', 'test_data')
+    project_root = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
+    )
+    test_dir = os.path.join(project_root, "tmp", "test_data")
     os.makedirs(test_dir, exist_ok=True)
 
     # Create CSV file in accessible directory
     import uuid
+
     filename = f"test_sales_{uuid.uuid4().hex[:8]}.csv"
     host_path = os.path.join(test_dir, filename)
 
@@ -196,7 +217,7 @@ Individual,Europe,Consulting,4,3200.00,2024-01-22
     # Docker: /app/tmp/test_data/file.csv
     docker_path = f"/app/tmp/test_data/{filename}"
 
-    with open(host_path, 'w') as f:
+    with open(host_path, "w") as f:
         f.write(test_data)
 
     print(f"Created test CSV:")
@@ -230,6 +251,7 @@ async def test_async_data_ingest():
 
     # Generate custom operation_id for monitoring
     import uuid
+
     operation_id = str(uuid.uuid4())
 
     print(f"Dataset Name: sales_data_test")
@@ -242,12 +264,16 @@ async def test_async_data_ingest():
         print("[STEP 1] Starting data ingestion with custom operation_id...\n")
 
         ingest_task = asyncio.create_task(
-            client.call_tool("data_ingest", {
-                "user_id": "test_user",
-                "source_path": csv_path,
-                "dataset_name": "sales_data_test",
-                "operation_id": operation_id
-            }, debug=True)
+            client.call_tool(
+                "data_ingest",
+                {
+                    "user_id": "test_user",
+                    "source_path": csv_path,
+                    "dataset_name": "sales_data_test",
+                    "operation_id": operation_id,
+                },
+                debug=True,
+            )
         )
 
         # Wait for operation to be created in Redis (increased wait time)
@@ -274,8 +300,8 @@ async def test_async_data_ingest():
         print("=" * 80)
         print()
 
-        if result.get('status') == 'success':
-            result_data = result.get('data', {})
+        if result.get("status") == "success":
+            result_data = result.get("data", {})
 
             print(f"[SUCCESS] Data ingestion completed successfully!")
             print(f"   Success: {result_data.get('success', False)}")
@@ -283,9 +309,13 @@ async def test_async_data_ingest():
             print(f"   Dataset Name: {result_data.get('dataset_name', 'N/A')}")
             print(f"   Rows Processed: {result_data.get('rows_processed', 0)}")
             print(f"   Columns Processed: {result_data.get('columns_processed', 0)}")
-            print(f"   Data Quality Score: {result_data.get('data_quality_score', 0):.2f}")
+            print(
+                f"   Data Quality Score: {result_data.get('data_quality_score', 0):.2f}"
+            )
             print(f"   Metadata Stored: {result_data.get('metadata_stored', False)}")
-            print(f"   Metadata Embeddings: {result_data.get('metadata_embeddings', 0)}")
+            print(
+                f"   Metadata Embeddings: {result_data.get('metadata_embeddings', 0)}"
+            )
             print(f"   Operation ID: {result_data.get('operation_id', 'N/A')}")
 
         else:
@@ -298,12 +328,18 @@ async def test_async_data_ingest():
         print()
 
         if len(progress_updates) > 0:
-            print(f"[SUCCESS] HTTP client received {len(progress_updates)} real-time progress updates!")
-            print(f"   This proves the async background task approach works for data tools.")
+            print(
+                f"[SUCCESS] HTTP client received {len(progress_updates)} real-time progress updates!"
+            )
+            print(
+                f"   This proves the async background task approach works for data tools."
+            )
             print()
             print(f"   Progress Timeline:")
             for i, update in enumerate(progress_updates, 1):
-                print(f"      {i}. [{update['timestamp']}] {update['progress']:.1f}% - {update['message']}")
+                print(
+                    f"      {i}. [{update['timestamp']}] {update['progress']:.1f}% - {update['message']}"
+                )
         else:
             print(f"[WARNING] No progress updates received.")
             print(f"   Possible reasons:")
@@ -314,17 +350,26 @@ async def test_async_data_ingest():
     except Exception as e:
         print(f"\n[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         # Cleanup test CSV file
         # csv_path is Docker path like /app/cache/test_data/file.csv
         # Need to convert to host path for deletion
         try:
-            if csv_path.startswith('/app/'):
+            if csv_path.startswith("/app/"):
                 # Convert Docker path to host path (need 5 dirname calls to get to project root)
                 # e.g., /app/tmp/test_data/file.csv → /Users/.../isA_MCP/tmp/test_data/file.csv
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-                host_path = os.path.join(project_root, csv_path[5:])  # Remove '/app/' prefix
+                project_root = os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        )
+                    )
+                )
+                host_path = os.path.join(
+                    project_root, csv_path[5:]
+                )  # Remove '/app/' prefix
                 os.unlink(host_path)
                 print(f"\n[CLEANUP] Removed test CSV: {host_path}")
             else:
@@ -356,6 +401,7 @@ async def test_async_data_query():
 
     # Generate custom operation_id for monitoring
     import uuid
+
     operation_id = str(uuid.uuid4())
 
     print(f"Query: '{query}'")
@@ -368,13 +414,17 @@ async def test_async_data_query():
         print("[STEP 1] Starting data query with custom operation_id...\n")
 
         query_task = asyncio.create_task(
-            client.call_tool("data_query", {
-                "user_id": "test_user",
-                "natural_language_query": query,
-                "include_visualization": True,
-                "include_analytics": False,
-                "operation_id": operation_id
-            }, debug=True)
+            client.call_tool(
+                "data_query",
+                {
+                    "user_id": "test_user",
+                    "natural_language_query": query,
+                    "include_visualization": True,
+                    "include_analytics": False,
+                    "operation_id": operation_id,
+                },
+                debug=True,
+            )
         )
 
         # Wait for operation to be created in Redis (increased wait time)
@@ -401,8 +451,8 @@ async def test_async_data_query():
         print("=" * 80)
         print()
 
-        if result.get('status') == 'success':
-            result_data = result.get('data', {})
+        if result.get("status") == "success":
+            result_data = result.get("data", {})
 
             print(f"[SUCCESS] Data query completed successfully!")
             print(f"   Success: {result_data.get('success', False)}")
@@ -410,19 +460,21 @@ async def test_async_data_query():
             print(f"   Columns Returned: {result_data.get('columns_returned', 0)}")
             print(f"   Data Source: {result_data.get('data_source', 'N/A')}")
             print(f"   SQL Executed: {result_data.get('sql_executed', 'N/A')[:100]}...")
-            print(f"   Services Used: {', '.join(result_data.get('services_used', []))}")
+            print(
+                f"   Services Used: {', '.join(result_data.get('services_used', []))}"
+            )
             print(f"   Operation ID: {result_data.get('operation_id', 'N/A')}")
 
             # Show query data preview
-            query_data = result_data.get('query_data', {})
+            query_data = result_data.get("query_data", {})
             if query_data:
-                data_rows = query_data.get('data', [])
+                data_rows = query_data.get("data", [])
                 print(f"\n   [DATA] Preview (first 3 rows):")
                 for i, row in enumerate(data_rows[:3], 1):
                     print(f"      {i}. {row}")
 
             # Show visualization info
-            if result_data.get('visualization_ready'):
+            if result_data.get("visualization_ready"):
                 print(f"\n   [VISUALIZATION] Chart spec generated")
 
         else:
@@ -435,12 +487,16 @@ async def test_async_data_query():
         print()
 
         if len(progress_updates) > 0:
-            print(f"[SUCCESS] HTTP client received {len(progress_updates)} real-time query progress updates!")
+            print(
+                f"[SUCCESS] HTTP client received {len(progress_updates)} real-time query progress updates!"
+            )
             print(f"   This proves the async query pipeline works with SSE monitoring.")
             print()
             print(f"   Query Progress Timeline:")
             for i, update in enumerate(progress_updates, 1):
-                print(f"      {i}. [{update['timestamp']}] {update['progress']:.1f}% - {update['message']}")
+                print(
+                    f"      {i}. [{update['timestamp']}] {update['progress']:.1f}% - {update['message']}"
+                )
         else:
             print(f"[WARNING] No progress updates received.")
             print(f"   Possible reasons:")
@@ -451,6 +507,7 @@ async def test_async_data_query():
     except Exception as e:
         print(f"\n[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -474,16 +531,19 @@ async def test_complete_flow():
     try:
         # Step 1: Ingest
         print("[STEP 1] Ingesting data...")
-        ingest_result = await client.call_tool("data_ingest", {
-            "user_id": "test_user_flow",
-            "source_path": csv_path,
-            "dataset_name": "sales_data_flow"
-        })
+        ingest_result = await client.call_tool(
+            "data_ingest",
+            {
+                "user_id": "test_user_flow",
+                "source_path": csv_path,
+                "dataset_name": "sales_data_flow",
+            },
+        )
 
-        if ingest_result.get('status') == 'success':
-            result_data = ingest_result.get('data', {})
-            rows = result_data.get('rows_processed', 0)
-            cols = result_data.get('columns_processed', 0)
+        if ingest_result.get("status") == "success":
+            result_data = ingest_result.get("data", {})
+            rows = result_data.get("rows_processed", 0)
+            cols = result_data.get("columns_processed", 0)
             print(f"   [SUCCESS] Ingested {rows} rows, {cols} columns")
         else:
             print(f"   [ERROR] Ingestion failed: {ingest_result.get('error')}")
@@ -494,14 +554,13 @@ async def test_complete_flow():
 
         # Step 2: Search
         print("\n[STEP 2] Searching data...")
-        search_result = await client.call_tool("data_search", {
-            "user_id": "test_user_flow",
-            "search_query": "sales"
-        })
+        search_result = await client.call_tool(
+            "data_search", {"user_id": "test_user_flow", "search_query": "sales"}
+        )
 
-        if search_result.get('status') == 'success':
-            result_data = search_result.get('data', {})
-            total = result_data.get('database_summary', {}).get('total_embeddings', 0)
+        if search_result.get("status") == "success":
+            result_data = search_result.get("data", {})
+            total = result_data.get("database_summary", {}).get("total_embeddings", 0)
             print(f"   [SUCCESS] Found {total} metadata embeddings")
         else:
             print(f"   [ERROR] Search failed: {search_result.get('error')}")
@@ -509,21 +568,24 @@ async def test_complete_flow():
 
         # Step 3: Query data
         print("\n[STEP 3] Querying data...")
-        query_result = await client.call_tool("data_query", {
-            "user_id": "test_user_flow",
-            "natural_language_query": "total sales by region",
-            "include_visualization": True
-        })
+        query_result = await client.call_tool(
+            "data_query",
+            {
+                "user_id": "test_user_flow",
+                "natural_language_query": "total sales by region",
+                "include_visualization": True,
+            },
+        )
 
-        if query_result.get('status') == 'success':
-            result_data = query_result.get('data', {})
-            rows = result_data.get('rows_returned', 0)
+        if query_result.get("status") == "success":
+            result_data = query_result.get("data", {})
+            rows = result_data.get("rows_returned", 0)
             print(f"   [SUCCESS] Query returned {rows} rows")
 
             # Show data preview
-            query_data = result_data.get('query_data', {})
+            query_data = result_data.get("query_data", {})
             if query_data:
-                data_rows = query_data.get('data', [])
+                data_rows = query_data.get("data", [])
                 print(f"\n   [DATA] Results:")
                 for i, row in enumerate(data_rows, 1):
                     print(f"      {i}. {row}")
@@ -535,17 +597,26 @@ async def test_complete_flow():
     except Exception as e:
         print(f"\n[ERROR] Complete flow test failed: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         # Cleanup test CSV file
         # csv_path is Docker path like /app/cache/test_data/file.csv
         # Need to convert to host path for deletion
         try:
-            if csv_path.startswith('/app/'):
+            if csv_path.startswith("/app/"):
                 # Convert Docker path to host path (need 5 dirname calls to get to project root)
                 # e.g., /app/tmp/test_data/file.csv → /Users/.../isA_MCP/tmp/test_data/file.csv
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-                host_path = os.path.join(project_root, csv_path[5:])  # Remove '/app/' prefix
+                project_root = os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        )
+                    )
+                )
+                host_path = os.path.join(
+                    project_root, csv_path[5:]
+                )  # Remove '/app/' prefix
                 os.unlink(host_path)
                 print(f"\n[CLEANUP] Removed test CSV: {host_path}")
             else:
@@ -584,9 +655,9 @@ async def main():
     except Exception as e:
         print(f"\n[ERROR] Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-i

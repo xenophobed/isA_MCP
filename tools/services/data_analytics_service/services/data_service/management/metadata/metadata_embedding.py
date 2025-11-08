@@ -833,11 +833,14 @@ class AIMetadataEmbeddingService(BaseService):
 # Global instance cache - store per database_source
 _embedding_services = {}
 
-def get_embedding_service(database_source: str = "customs_trade_db") -> AIMetadataEmbeddingService:
-    """Get AI metadata embedding service instance - cached per database_source"""
+async def get_embedding_service(database_source: str = "customs_trade_db") -> AIMetadataEmbeddingService:
+    """Get AI metadata embedding service instance - cached per database_source with auto-initialization"""
     global _embedding_services
     if database_source not in _embedding_services:
-        _embedding_services[database_source] = AIMetadataEmbeddingService(database_source)
+        service = AIMetadataEmbeddingService(database_source)
+        # Initialize Qdrant and Model clients
+        await service.initialize()
+        _embedding_services[database_source] = service
     return _embedding_services[database_source]
 
 # Backward compatibility
