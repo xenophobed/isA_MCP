@@ -43,7 +43,7 @@ class SearchService:
     def __init__(self):
         """Initialize search service"""
         from services.vector_service import VectorRepository
-        from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
+        from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
         from services.tool_service.tool_repository import ToolRepository
         from services.prompt_service.prompt_repository import PromptRepository
         from services.resource_service.resource_repository import ResourceRepository

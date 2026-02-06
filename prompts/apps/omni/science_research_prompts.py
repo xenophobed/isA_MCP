@@ -97,7 +97,7 @@ Create rigorous scientific analysis that meets academic publication standards an
         
         return prompt_template.strip()
 
-    logger.info("Science & Research 🔬 prompts registered successfully")
+    logger.debug("Science & Research 🔬 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

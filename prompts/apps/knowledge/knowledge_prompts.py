@@ -57,7 +57,7 @@ def register_knowledge_prompts(mcp: FastMCP):
 
 Focus on extracting maximum value from the document content while maintaining clarity and practical utility."""
 
-    print("Knowledge management prompts registered successfully")
+    # Registration complete (debug-level event)
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

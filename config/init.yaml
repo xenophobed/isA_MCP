@@ -1,0 +1,286 @@
+# =============================================================================
+# Service Initialization Configuration - MCP Service
+# =============================================================================
+# This file defines initialization requirements for the MCP service and
+# its infrastructure dependencies. Used by agents to:
+# - Generate initialization scripts
+# - Create health check endpoints
+# - Configure service dependencies
+#
+# Regenerate initialization scripts with:
+#   python -m scripts.generate_init
+# =============================================================================
+
+# =============================================================================
+# MCP Service Configuration
+# =============================================================================
+mcp_service:
+  port: 8081
+  internal_port: 8300
+  k8s_service: "mcp"
+  description: "Model Context Protocol service for AI tools, prompts, and resources"
+  depends_on:
+    - postgres_grpc
+    - qdrant
+    - redis
+  initialization:
+    type: "mcp_server"
+    components:
+      # Auto-discovered components
+      tools_path: "tools/"
+      prompts_path: "prompts/"
+      resources_path: "resources/"
+      # Registration settings
+      auto_discovery: true
+      consul_registration: true
+  health_check:
+    endpoint: "/health"
+    checks:
+      - database_connection
+      - vector_store_connection
+      - cache_connection
+
+# =============================================================================
+# Infrastructure Dependencies Initialization
+# =============================================================================
+infrastructure_init:
+  # PostgreSQL Schema for MCP
+  postgres_grpc:
+    port: 50061
+    k8s_service: "isa-postgres-grpc"
+    description: "PostgreSQL gRPC gateway for MCP data"
+    depends_on:
+      - postgres
+    initialization:
+      type: "database_schemas"
+      schemas:
+        - mcp
+      tables:
+        # Tool execution logging
+        - name: "tool_executions"
+          schema: "mcp"
+          description: "Log of tool executions for analytics"
+          columns:
+            - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+            - "tool_name VARCHAR(255) NOT NULL"
+            - "user_id UUID"
+            - "input_hash VARCHAR(64)"
+            - "execution_time_ms INTEGER"
+            - "success BOOLEAN"
+            - "error_message TEXT"
+            - "created_at TIMESTAMPTZ DEFAULT NOW()"
+          indexes:
+            - "CREATE INDEX idx_tool_exec_name ON mcp.tool_executions(tool_name)"
+            - "CREATE INDEX idx_tool_exec_user ON mcp.tool_executions(user_id)"
+            - "CREATE INDEX idx_tool_exec_created ON mcp.tool_executions(created_at)"
+
+        # Prompt templates storage
+        - name: "prompt_templates"
+          schema: "mcp"
+          description: "Custom prompt templates"
+          columns:
+            - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+            - "name VARCHAR(255) NOT NULL UNIQUE"
+            - "description TEXT"
+            - "template TEXT NOT NULL"
+            - "variables JSONB DEFAULT '[]'"
+            - "version INTEGER DEFAULT 1"
+            - "is_active BOOLEAN DEFAULT true"
+            - "created_at TIMESTAMPTZ DEFAULT NOW()"
+            - "updated_at TIMESTAMPTZ DEFAULT NOW()"
+          indexes:
+            - "CREATE INDEX idx_prompt_name ON mcp.prompt_templates(name)"
+            - "CREATE INDEX idx_prompt_active ON mcp.prompt_templates(is_active)"
+
+        # Resource cache metadata
+        - name: "resource_cache"
+          schema: "mcp"
+          description: "Cached resource metadata"
+          columns:
+            - "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+            - "resource_uri VARCHAR(512) NOT NULL UNIQUE"
+            - "resource_type VARCHAR(100)"
+            - "content_hash VARCHAR(64)"
+            - "metadata JSONB DEFAULT '{}'"
+            - "last_accessed TIMESTAMPTZ DEFAULT NOW()"
+            - "expires_at TIMESTAMPTZ"
+          indexes:
+            - "CREATE INDEX idx_resource_uri ON mcp.resource_cache(resource_uri)"
+            - "CREATE INDEX idx_resource_expires ON mcp.resource_cache(expires_at)"
+
+      extensions:
+        - pgvector
+        - uuid-ossp
+    health_check:
+      endpoint: "/health"
+      query: "SELECT 1 FROM mcp.tool_executions LIMIT 1"
+
+  # Qdrant Vector Collections for MCP
+  qdrant:
+    http: 6333
+    grpc: 6334
+    k8s_service: "qdrant"
+    description: "Qdrant vector database for MCP embeddings"
+    initialization:
+      type: "vector_collections"
+      collections:
+        # Tool embeddings for semantic search
+        - name: "mcp_tool_embeddings"
+          description: "Tool description embeddings for semantic tool discovery"
+          vector_size: 1536  # OpenAI ada-002
+          distance: "Cosine"
+          on_disk: false
+          payload_schema:
+            tool_name: "keyword"
+            category: "keyword"
+            description: "text"
+
+        # Prompt embeddings
+        - name: "mcp_prompt_embeddings"
+          description: "Prompt template embeddings for similarity search"
+          vector_size: 1536
+          distance: "Cosine"
+          on_disk: false
+          payload_schema:
+            prompt_name: "keyword"
+            template_hash: "keyword"
+
+        # Document embeddings for RAG
+        - name: "mcp_document_embeddings"
+          description: "Document chunk embeddings for RAG queries"
+          vector_size: 1536
+          distance: "Cosine"
+          on_disk: true  # Larger collection, use disk
+          payload_schema:
+            document_id: "keyword"
+            chunk_index: "integer"
+            source: "keyword"
+            content: "text"
+
+        # Code embeddings
+        - name: "mcp_code_embeddings"
+          description: "Code snippet embeddings for code search"
+          vector_size: 1536
+          distance: "Cosine"
+          on_disk: true
+          payload_schema:
+            file_path: "keyword"
+            language: "keyword"
+            function_name: "keyword"
+
+    health_check:
+      endpoint: "/readyz"
+      check: "collections_info"
+
+  # Redis Cache Configuration for MCP
+  redis:
+    port: 6379
+    k8s_service: "redis"
+    description: "Redis cache for MCP"
+    depends_on: []
+    initialization:
+      type: "redis_config"
+      config:
+        maxmemory_policy: "allkeys-lru"
+      key_prefixes:
+        - "mcp:tool:"       # Tool response cache
+        - "mcp:prompt:"     # Prompt cache
+        - "mcp:resource:"   # Resource cache
+        - "mcp:embedding:"  # Embedding cache
+        - "mcp:session:"    # Session state
+        - "mcp:rate:"       # Rate limiting
+    health_check:
+      endpoint: "/health"
+      command: "PING"
+
+  # MinIO Buckets for MCP
+  minio:
+    port: 9000
+    k8s_service: "minio"
+    description: "MinIO storage for MCP resources"
+    initialization:
+      type: "s3_buckets"
+      buckets:
+        - name: "mcp-resources"
+          description: "MCP resource files (documents, data)"
+          versioning: true
+
+        - name: "mcp-cache"
+          description: "MCP cache storage"
+          lifecycle:
+            enabled: true
+            expiration_days: 30
+
+        - name: "mcp-exports"
+          description: "Exported data and reports"
+          lifecycle:
+            enabled: true
+            expiration_days: 90
+    health_check:
+      endpoint: "/minio/health/live"
+      check: "list_buckets"
+
+# =============================================================================
+# Startup Order
+# =============================================================================
+startup_order:
+  - tier: 1
+    description: "Core Infrastructure"
+    services:
+      - postgres
+      - redis
+      - qdrant
+      - minio
+
+  - tier: 2
+    description: "gRPC Gateways"
+    services:
+      - postgres_grpc
+      - redis_grpc
+      - qdrant_grpc
+      - minio_grpc
+
+  - tier: 3
+    description: "MCP Service"
+    services:
+      - mcp
+
+# =============================================================================
+# Health Check Configuration
+# =============================================================================
+health_checks:
+  default_timeout_seconds: 5
+  default_interval_seconds: 30
+  default_failure_threshold: 3
+  default_success_threshold: 1
+
+  mcp_specific:
+    # Additional MCP health checks
+    tool_discovery:
+      description: "Verify tools are discovered and registered"
+      check: "count_registered_tools > 0"
+    prompt_discovery:
+      description: "Verify prompts are discovered"
+      check: "count_registered_prompts > 0"
+    resource_discovery:
+      description: "Verify resources are discovered"
+      check: "count_registered_resources > 0"
+
+# =============================================================================
+# Auto-Discovery Configuration
+# =============================================================================
+auto_discovery:
+  enabled: true
+  scan_interval_seconds: 300  # Re-scan every 5 minutes
+  paths:
+    tools: "tools/"
+    prompts: "prompts/"
+    resources: "resources/"
+  patterns:
+    tools: "*.py"
+    prompts: "*.py"
+    resources: "*.py"
+  exclude:
+    - "__pycache__"
+    - "*.pyc"
+    - "base_*.py"  # Base classes are not registered directly

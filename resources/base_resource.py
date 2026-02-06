@@ -16,7 +16,6 @@ class BaseResource:
     
     def __init__(self):
         self._security_manager = None
-        self._supabase = None
         self.registered_resources = []
     
     @property
@@ -30,14 +29,7 @@ class BaseResource:
                 # 返回一个mock安全管理器，避免注册失败
                 self._security_manager = MockSecurityManager()
         return self._security_manager
-    
-    @property
-    def supabase(self):
-        """延迟初始化Supabase客户端"""
-        if self._supabase is None:
-            self._supabase = get_supabase_client()
-        return self._supabase
-    
+
     def register_resource(self, mcp, uri: str, func: Callable, 
                          security_level: SecurityLevel = SecurityLevel.LOW,
                          **kwargs):
@@ -73,7 +65,7 @@ class BaseResource:
             'security_level': security_level.name
         })
         
-        logger.info(f"✅ Registered resource: {uri}")
+        logger.debug(f"Registered resource: {uri}")
         return resource_func
     
     def create_success_response(self, data: Any, uri: str = None) -> str:
@@ -180,7 +172,7 @@ def create_simple_resource_registration(register_func_name: str = "register_reso
             try:
                 instance = resource_class()
                 instance.register_all_resources(mcp)
-                logger.info(f"✅ {resource_class.__name__} resources registered successfully")
+                logger.debug(f"{resource_class.__name__} resources registered")
             except Exception as e:
                 logger.error(f"❌ Failed to register {resource_class.__name__}: {e}")
                 raise

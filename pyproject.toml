@@ -3,52 +3,86 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "isa-mcp-cli"
+name = "isa-mcp"
 version = "1.0.0"
-description = "ISA MCP CLI - Comprehensive command-line interface for MCP server with RAG capabilities"
+description = "isA MCP - AI-powered Model Context Protocol management CLI and client library"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "ISA Team", email = "info@isa-mcp.com"}
 ]
-keywords = ["mcp", "cli", "rag", "knowledge", "ai", "llm"]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "claude",
+    "skills",
+    "remotion",
+    "video",
+    "tools",
+    "agents"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
 ]
 
 dependencies = [
-    "aiohttp>=3.8.0",
-    "rich>=13.0.0",
-    "prompt-toolkit>=3.0.0",
+    "aiohttp>=3.9.0",
+    "httpx>=0.26.0",
+    "click>=8.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "black>=22.0.0",
-    "mypy>=0.990",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+full = [
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/yourusername/isA_MCP"
-Documentation = "https://github.com/yourusername/isA_MCP/blob/main/README.md"
-Repository = "https://github.com/yourusername/isA_MCP"
-Issues = "https://github.com/yourusername/isA_MCP/issues"
-
 [project.scripts]
-isa_mcp_cli = "utils.mcp_cli:cli_entry_point"
+isa_mcp = "isa_mcp.cli:main"
+isa-mcp = "isa_mcp.cli:main"
 
-[tool.setuptools]
-packages = ["utils"]
+[project.urls]
+Homepage = "https://github.com/isa-agent/mcp"
+Repository = "https://github.com/isa-agent/mcp"
+Documentation = "https://github.com/isa-agent/mcp#readme"
+"Bug Tracker" = "https://github.com/isa-agent/mcp/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["isa_mcp*", "services*", "tools*", "resources*", "core*"]
 
 [tool.setuptools.package-data]
-utils = ["*.py"]
+"isa_mcp" = ["**/*.py"]
+"isa_mcp.cli" = ["*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true

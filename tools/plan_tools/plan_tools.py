@@ -18,7 +18,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 from tools.base_tool import BaseTool
-from tools.services.intelligence_service.language.text_generator import generate
+from tools.intelligent_tools.language.text_generator import generate
 from tools.plan_tools.plan_state_manager import create_state_manager, PlanStateManager
 import logging
 
@@ -43,20 +43,33 @@ class EnhancedAutonomousPlanner(BaseTool):
         self.current_plan_id: Optional[str] = None
 
     def _validate_plan_data(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate plan structure"""
-        required_fields = ["execution_mode", "tasks"]
-        for field in required_fields:
-            if field not in plan_data:
-                raise ValueError(f"Missing required field: {field}")
+        """Validate and normalize plan structure with sensible defaults"""
+        # Provide defaults for missing top-level fields
+        if "execution_mode" not in plan_data:
+            plan_data["execution_mode"] = "sequential"
+            logger.info("Added default execution_mode: sequential")
+
+        if "tasks" not in plan_data:
+            plan_data["tasks"] = []
+            logger.warning("No tasks found in plan, using empty list")
 
         if not isinstance(plan_data["tasks"], list):
-            raise ValueError("tasks must be a list")
+            logger.warning(f"tasks is not a list, converting: {type(plan_data['tasks'])}")
+            plan_data["tasks"] = [plan_data["tasks"]] if plan_data["tasks"] else []
 
-        for task in plan_data["tasks"]:
-            required_task_fields = ["id", "title", "description", "tools"]
-            for field in required_task_fields:
-                if field not in task:
-                    raise ValueError(f"Task {task.get('id', '?')} missing field: {field}")
+        # Validate and normalize each task
+        for i, task in enumerate(plan_data["tasks"]):
+            # Provide defaults for missing task fields
+            if "id" not in task:
+                task["id"] = i + 1
+            if "title" not in task:
+                task["title"] = f"Task {task['id']}"
+            if "description" not in task:
+                task["description"] = task.get("title", f"Execute task {task['id']}")
+            if "tools" not in task:
+                task["tools"] = []
+            if "status" not in task:
+                task["status"] = "pending"
 
         return plan_data
 
@@ -780,8 +793,8 @@ def register_plan_tools(mcp: FastMCP):
     @mcp.tool()
     async def create_execution_plan(
         guidance: str,
-        available_tools: str,  # JSON string or comma-separated list
-        request: str,
+        request: str = "",
+        available_tools: str = "",  # JSON string or comma-separated list (optional)
         plan_id: str = None
     ) -> Dict[str, Any]:
         """
@@ -798,22 +811,27 @@ def register_plan_tools(mcp: FastMCP):
         Category: planning
 
         Args:
-            guidance: Task guidance and instructions
-            available_tools: List of available tools (JSON array or comma-separated)
-            request: Task request
+            guidance: Task guidance and instructions (can include the full request details)
+            request: Task request (optional - can be extracted from guidance if not provided)
+            available_tools: List of available tools (JSON array or comma-separated, optional)
             plan_id: Optional plan ID (auto-generated if not provided)
         """
+        # Use guidance as request if request is empty
+        actual_request = request if request else guidance[:200]
+
         # Parse tool list
-        try:
-            if available_tools.startswith('['):
-                tools_list = json.loads(available_tools)
-            else:
-                tools_list = [tool.strip() for tool in available_tools.split(',')]
-        except:
-            tools_list = [available_tools]
+        tools_list = []
+        if available_tools:
+            try:
+                if available_tools.startswith('['):
+                    tools_list = json.loads(available_tools)
+                else:
+                    tools_list = [tool.strip() for tool in available_tools.split(',') if tool.strip()]
+            except:
+                tools_list = [available_tools] if available_tools else []
 
         return await planner.create_execution_plan(
-            guidance, tools_list, request, plan_id
+            guidance, tools_list, actual_request, plan_id
         )
 
     @mcp.tool()
@@ -1026,6 +1044,4 @@ def register_plan_tools(mcp: FastMCP):
                 f"Failed to list active plans: {str(e)}"
             )
 
-    print("🤖 Enhanced execution planning tools registered successfully")
-    print("   ✅ State persistence enabled")
-    print(f"   💾 Storage backend: {type(planner.state_manager).__name__}")
+    logger.debug(f"Plan tools registered with {type(planner.state_manager).__name__} backend")

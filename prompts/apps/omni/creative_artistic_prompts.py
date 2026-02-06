@@ -90,7 +90,7 @@ Create compelling storytelling that engages readers and delivers emotional reson
         
         return prompt_template.strip()
 
-    logger.info("Creative & Artistic 🎨 prompts registered successfully")
+    logger.debug("Creative & Artistic 🎨 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

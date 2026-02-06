@@ -389,7 +389,7 @@ Design an irresistibly cute sticker that spreads joy and positivity.
         
         return prompt_template.strip()
 
-    logger.info("Dream 🎨 prompts registered successfully")
+    logger.debug("Dream 🎨 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+  namespace: isa-cloud-staging
+  labels:
+    app: mcp
+    tier: applications
+data:
+  # System Configuration
+  ENV: "staging"
+  PYTHONPATH: "/app"
+  PYTHONUNBUFFERED: "1"
+  DEBUG: "true"
+  DB_SCHEMA: "dev"
+
+  # Consul Service Discovery
+  CONSUL_HOST: "consul-agent.isa-cloud-staging.svc.cluster.local"
+  CONSUL_PORT: "8500"
+  CONSUL_ENABLED: "true"
+
+  # Service Configuration
+  SERVICE_NAME: "mcp_service"
+  SERVICE_HOST: "mcp.isa-cloud-staging.svc.cluster.local"
+  MCP_PORT: "8081"
+
+  # Logging Configuration
+  LOG_LEVEL: "INFO"
+  ENABLE_STRUCTURED_LOGGING: "false"
+  UVICORN_ACCESS_LOG_LEVEL: "WARNING"
+  HEALTH_CHECK_LOG_LEVEL: "WARNING"
+
+  # Authentication
+  MCP_API_KEY: "mcp_vyL0yjEgrBP2q6YkuKDqU0wTAia1nkYJzpN_W_JB2jg"
+  REQUIRE_MCP_AUTH: "true"
+
+  # Startup Optimization
+  LAZY_LOAD_AI_SELECTORS: "true"
+  LAZY_LOAD_EXTERNAL_SERVICES: "true"
+  UVICORN_RELOAD: "false"
+
+  # External API Keys
+  BRAVE_TOKEN: "BSANDoKskExmx1Dx43o_Hua_tOicfTo"
+  COMPOSIO_API_KEY: "p6btli2ifpa2l2wfdpo5uo"
+  COMPOSIO_TELEMETRY: "false"
+  COMPOSIO_CACHE_DIR: "/app/cache"
+
+  # Infrastructure Services (gRPC) - Kubernetes DNS Names
+  # PostgreSQL Database Service
+  POSTGRES_GRPC_HOST: "postgres-grpc.isa-cloud-staging.svc.cluster.local"
+  POSTGRES_GRPC_PORT: "50061"
+
+  # Qdrant Vector Database Service
+  QDRANT_GRPC_HOST: "qdrant-grpc.isa-cloud-staging.svc.cluster.local"
+  QDRANT_GRPC_PORT: "50062"
+  QDRANT_URL: "http://qdrant-grpc.isa-cloud-staging.svc.cluster.local:50062"
+
+  # Redis Cache Service
+  REDIS_GRPC_HOST: "redis-grpc.isa-cloud-staging.svc.cluster.local"
+  REDIS_GRPC_PORT: "50055"
+  REDIS_HOST: "redis-grpc.isa-cloud-staging.svc.cluster.local"
+  REDIS_PORT: "50055"
+  REDIS_DB: "0"
+
+  # Neo4j Graph Database Service
+  NEO4J_GRPC_HOST: "neo4j-grpc.isa-cloud-staging.svc.cluster.local"
+  NEO4J_GRPC_PORT: "50063"
+
+  # DuckDB Analytics Service
+  DUCKDB_GRPC_HOST: "duckdb-grpc.isa-cloud-staging.svc.cluster.local"
+  DUCKDB_GRPC_PORT: "50052"
+
+  # NATS Messaging Service
+  NATS_GRPC_HOST: "nats-grpc.isa-cloud-staging.svc.cluster.local"
+  NATS_GRPC_PORT: "50056"
+  NATS_URL: "nats://nats-grpc.isa-cloud-staging.svc.cluster.local:50056"
+
+  # MQTT Messaging Service
+  MQTT_GRPC_HOST: "mqtt-grpc.isa-cloud-staging.svc.cluster.local"
+  MQTT_GRPC_PORT: "50053"
+  MQTT_BROKER: "mqtt-grpc.isa-cloud-staging.svc.cluster.local"
+  MQTT_PORT: "50053"
+
+  # Loki Logging Service
+  LOKI_ENABLED: "false"
+  LOKI_GRPC_HOST: "loki-grpc.isa-cloud-staging.svc.cluster.local"
+  LOKI_GRPC_PORT: "50054"
+  LOKI_HOST: "loki-grpc.isa-cloud-staging.svc.cluster.local"
+  LOKI_PORT: "50054"
+  ENVIRONMENT: "staging"
+
+  # MinIO Object Storage Service
+  MINIO_GRPC_HOST: "minio-grpc.isa-cloud-staging.svc.cluster.local"
+  MINIO_GRPC_PORT: "50051"
+  MINIO_ENDPOINT: "minio-grpc.isa-cloud-staging.svc.cluster.local:50051"
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin"
+  MINIO_SECURE: "false"
+
+  # Business Services (HTTP/REST) - All in user service
+  BUSINESS_SERVICE_HOST: "user.isa-cloud-staging.svc.cluster.local"
+
+  # Authentication & Authorization Services
+  AUTH_SERVICE_URL: "http://account.isa-cloud-staging.svc.cluster.local:8000"
+  AUTH_SERVICE_PORT: "8000"
+  ACCOUNT_SERVICE_URL: "http://account.isa-cloud-staging.svc.cluster.local:8000"
+  ACCOUNT_SERVICE_PORT: "8000"
+  SESSION_SERVICE_URL: "http://session.isa-cloud-staging.svc.cluster.local:8000"
+  SESSION_SERVICE_PORT: "8000"
+  AUTHORIZATION_SERVICE_URL: "http://authorization.isa-cloud-staging.svc.cluster.local:8000"
+  AUTHORIZATION_SERVICE_PORT: "8000"
+
+  # Other Business Services
+  AUDIT_SERVICE_URL: "http://audit.isa-cloud-staging.svc.cluster.local:8000"
+  NOTIFICATION_SERVICE_URL: "http://notification.isa-cloud-staging.svc.cluster.local:8000"
+  PAYMENT_SERVICE_URL: "http://payment.isa-cloud-staging.svc.cluster.local:8000"
+  WALLET_SERVICE_URL: "http://wallet.isa-cloud-staging.svc.cluster.local:8000"
+  STORAGE_SERVICE_URL: "http://storage.isa-cloud-staging.svc.cluster.local:8000"
+  ORDER_SERVICE_URL: "http://order.isa-cloud-staging.svc.cluster.local:8000"
+  TASK_SERVICE_URL: "http://task.isa-cloud-staging.svc.cluster.local:8000"
+  ORGANIZATION_SERVICE_URL: "http://organization.isa-cloud-staging.svc.cluster.local:8000"
+  INVITATION_SERVICE_URL: "http://invitation.isa-cloud-staging.svc.cluster.local:8000"
+  VAULT_SERVICE_URL: "http://vault.isa-cloud-staging.svc.cluster.local:8000"
+  PRODUCT_SERVICE_URL: "http://product.isa-cloud-staging.svc.cluster.local:8000"
+  BILLING_SERVICE_URL: "http://billing.isa-cloud-staging.svc.cluster.local:8000"
+  CALENDAR_SERVICE_URL: "http://calendar.isa-cloud-staging.svc.cluster.local:8000"
+  WEATHER_SERVICE_URL: "http://weather.isa-cloud-staging.svc.cluster.local:8000"
+  ALBUM_SERVICE_URL: "http://album.isa-cloud-staging.svc.cluster.local:8000"
+  DEVICE_SERVICE_URL: "http://device.isa-cloud-staging.svc.cluster.local:8000"
+  OTA_SERVICE_URL: "http://ota.isa-cloud-staging.svc.cluster.local:8000"
+  MEDIA_SERVICE_URL: "http://media.isa-cloud-staging.svc.cluster.local:8000"
+  TELEMETRY_SERVICE_URL: "http://telemetry.isa-cloud-staging.svc.cluster.local:8000"
+  EVENT_SERVICE_URL: "http://event.isa-cloud-staging.svc.cluster.local:8000"
+
+  # ISA Model Service
+  ISA_SERVICE_URL: "http://model.isa-cloud-staging.svc.cluster.local:8082"
+  ISA_API_URL: "http://model.isa-cloud-staging.svc.cluster.local:8082"
+
+  # Web Service (Search & Web Automation)
+  WEB_SERVICE_NAME: "web_service"
+  WEB_SERVICE_URL: "http://web.isa-cloud-staging.svc.cluster.local:8083"
+  WEB_FALLBACK_HOST: "web.isa-cloud-staging.svc.cluster.local"
+  WEB_FALLBACK_PORT: "8083"

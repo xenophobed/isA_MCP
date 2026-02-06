@@ -248,7 +248,7 @@ Transform "{query}" into comprehensive social intelligence that captures communi
 
 Transform "{query}" into comprehensive web intelligence that provides thorough, reliable, and well-sourced information for informed understanding and decision-making."""
 
-    print("Hunt application prompts registered successfully")
+    # Registration complete (debug-level event)
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

@@ -230,4 +230,4 @@ def register_guardrail_resources(mcp: FastMCP):
             "usage": "Example of guardrail checking process"
         }, indent=2)
     
-    print("🛡️ Guardrail resources registered successfully")
+    # Registration complete

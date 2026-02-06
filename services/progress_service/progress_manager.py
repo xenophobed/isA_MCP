@@ -90,12 +90,12 @@ class ProgressManager:
                 port=self.redis_port,
                 user_id='progress-manager'
             )
-            logger.info(f"ProgressManager initialized with RedisClient at {self.redis_host}:{self.redis_port}")
+            logger.debug(f"ProgressManager initialized with RedisClient at {self.redis_host}:{self.redis_port}")
         else:
             # Use in-memory fallback
             self.redis = None
             self._memory_store = {}
-            logger.warning("Using in-memory storage (Redis not available)")
+            logger.debug("ProgressManager using in-memory storage (Redis not available)")
 
     async def start_operation(
         self,

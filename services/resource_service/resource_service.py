@@ -88,7 +88,7 @@ class ResourceService:
             raise RuntimeError("Failed to update resource")
 
         updated_resource = await self.repository.get_resource_by_id(resource_id)
-        logger.info(f"Updated resource: {resource['uri']}")
+        logger.debug(f"Updated resource: {resource['uri']}")
         return updated_resource
 
     async def delete_resource(self, resource_identifier: Any) -> bool:

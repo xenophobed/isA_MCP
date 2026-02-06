@@ -96,6 +96,19 @@ class ToolService:
             offset=offset
         )
 
+    async def get_default_tools(self) -> List[Dict[str, Any]]:
+        """
+        Get default tools (meta-tools always available in agent context).
+
+        Returns tools marked with is_default=True, typically:
+        - discover, get_tool_schema, execute (gateway tools)
+        - list_skills, list_prompts, get_prompt, list_resources, read_resource
+
+        Returns:
+            List of default tool data
+        """
+        return await self.repository.get_default_tools()
+
     async def update_tool(
         self,
         tool_identifier: Any,
@@ -135,7 +148,7 @@ class ToolService:
 
         # Return updated tool
         updated_tool = await self.repository.get_tool_by_id(tool_id)
-        logger.info(f"Updated tool: {tool['name']}")
+        logger.debug(f"Updated tool: {tool['name']}")
         return updated_tool
 
     async def delete_tool(self, tool_identifier: Any) -> bool:

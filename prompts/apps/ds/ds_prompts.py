@@ -59,7 +59,7 @@ def register_ds_prompts(mcp: FastMCP):
 
 Please ensure the analysis results are statistically rigorous while maintaining business relevance and actionability. Focus on insights that directly support decision-making."""
 
-    print("Data science prompts registered successfully")
+    # Registration complete (debug-level event)
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

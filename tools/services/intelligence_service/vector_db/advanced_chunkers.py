@@ -111,7 +111,7 @@ class TopicChunker(BaseChunker):
         embeddings = None
         if self.config.use_embeddings:
             try:
-                from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
+                from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
                 embedder = EmbeddingGenerator()
                 embeddings = await embedder.embed_batch(
                     sentences,

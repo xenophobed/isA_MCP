@@ -80,7 +80,7 @@ Create an evidence-based wellness guide that promotes safe and effective health 
         
         return prompt_template.strip()
 
-    logger.info("Health & Wellness ⚕️ prompts registered successfully")
+    logger.debug("Health & Wellness ⚕️ prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

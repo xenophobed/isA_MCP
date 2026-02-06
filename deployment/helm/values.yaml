@@ -1,0 +1,37 @@
+# =============================================================================
+# MCP Service - Base Helm Values
+# =============================================================================
+# Minimal base values. Use environment-specific files for deployment:
+#
+#   # Staging
+#   helm upgrade --install mcp-service \
+#     ~/Documents/Fun/isA/isA_Cloud/deployments/charts/isa-service \
+#     -f deployment/helm/values-staging.yaml \
+#     -n isa-cloud-staging
+#
+#   # Production
+#   helm upgrade --install mcp-service \
+#     ~/Documents/Fun/isA/isA_Cloud/deployments/charts/isa-service \
+#     -f deployment/helm/values-production.yaml \
+#     -n isa-cloud-production
+# =============================================================================
+
+name: mcp-service
+
+image:
+  repository: isa/mcp-service
+  tag: latest
+  pullPolicy: Always
+
+port: 8081
+
+health:
+  path: /health
+  initialDelaySeconds: 40
+  periodSeconds: 10
+
+service:
+  type: ClusterIP
+
+consul:
+  enabled: true

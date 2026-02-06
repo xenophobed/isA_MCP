@@ -1,0 +1,26 @@
+{
+  "_comment": "Golden expected outputs for LLM tests. DO NOT MODIFY without approval.",
+  "text_generation": {
+    "simple_prompt": {
+      "input": "Hello, world!",
+      "expected_tokens": 4,
+      "expected_response_contains": ["Hello", "world"]
+    },
+    "empty_input": {
+      "input": "",
+      "expected_tokens": 0
+    }
+  },
+  "summarization": {
+    "short_text": {
+      "input": "The quick brown fox jumps over the lazy dog.",
+      "expected_summary_max_words": 10
+    }
+  },
+  "model_defaults": {
+    "text": "gpt-4",
+    "embedding": "text-embedding-3-small",
+    "vision": "gpt-4-vision-preview",
+    "audio": "whisper-1"
+  }
+}

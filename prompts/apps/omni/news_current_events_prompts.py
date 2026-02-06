@@ -89,7 +89,7 @@ Create balanced, well-researched news analysis that informs and provides context
         
         return prompt_template.strip()
 
-    logger.info("News & Current Events 📰 prompts registered successfully")
+    logger.debug("News & Current Events 📰 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

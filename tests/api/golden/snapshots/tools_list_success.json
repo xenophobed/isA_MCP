@@ -1,0 +1,22 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "example_tool",
+        "description": "An example tool for snapshot reference",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "Input parameter"
+            }
+          },
+          "required": ["input"]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "prompts": [
+      {
+        "name": "example_prompt",
+        "description": "An example prompt for snapshot reference",
+        "arguments": [
+          {
+            "name": "input",
+            "description": "Input parameter",
+            "required": true
+          }
+        ]
+      }
+    ]
+  }
+}

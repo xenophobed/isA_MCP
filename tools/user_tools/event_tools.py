@@ -16,7 +16,6 @@ Integrates with:
 
 Architecture:
 - Uses ServiceConfig for service URL configuration
-- Uses ConsulServiceDiscovery for dynamic service discovery
 - Supports service orchestration for complex workflows
 """
 
@@ -35,7 +34,6 @@ from tools.base_tool import BaseTool
 from core.security import SecurityLevel
 from core.logging import get_logger
 from core.config.service_config import ServiceConfig
-from core.consul_discovery import ConsulServiceDiscovery, discover_service
 
 logger = get_logger(__name__)
 
@@ -157,7 +155,7 @@ class EventTools(BaseTool):
             annotations=ToolAnnotations(readOnlyHint=True)
         )
 
-        logger.info(f"Registered {len(self.registered_tools)} event management tools")
+        logger.debug(f"Registered {len(self.registered_tools)} event management tools")
 
     # ========================================================================
     # Price Alert Implementation
@@ -653,5 +651,5 @@ def register_event_tools(mcp):
     """
     tool = EventTools()
     tool.register_tools(mcp)
-    logger.info(f" Event management tools registered successfully")
+    logger.debug(f" Event management tools registered successfully")
     return tool

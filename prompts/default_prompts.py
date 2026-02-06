@@ -13,7 +13,9 @@ def register_default_prompts(mcp: FastMCP):
         user_message: str = "",
         memory: str = "",
         tools: str = "",
-        resources: str = ""
+        resources: str = "",
+        skills: str = "",
+        user_instructions: str = ""
     ) -> str:
         """
         Default reasoning prompt for intelligent assistant interactions
@@ -21,9 +23,43 @@ def register_default_prompts(mcp: FastMCP):
         Provides structured approach to analyzing user requests and
         determining the best response strategy using available capabilities.
 
-        Keywords: reasoning, analysis, memory, tools, resources, assistant, thinking
+        Keywords: reasoning, analysis, memory, tools, resources, skills, assistant, thinking
         Category: default
         """
+        # Build skills section if skills are loaded
+        skills_section = ""
+        if skills:
+            skills_section = f"""
+## 🎯 LOADED SKILLS (Structured Workflows):
+{skills}
+
+## SKILL-DRIVEN PLANNING (IMPORTANT):
+When skills are loaded above, you MUST follow their defined workflow:
+
+1. **Identify the skill to use** - Match user request to loaded skill
+2. **Follow skill's workflow steps** - Skills define a structured process (e.g., CDD has 6 layers, TDD has RED-GREEN-REFACTOR)
+3. **Pass skill workflow to create_execution_plan** - Include the skill's steps in the `guidance` parameter
+4. **Map skill steps → concrete tasks** - Each skill step becomes a task in the plan
+
+### Example - Using CDD Skill:
+If user says "Build a user auth feature using CDD" and CDD skill is loaded:
+```
+Call create_execution_plan with:
+  guidance: "Follow CDD workflow: Layer 1 (Domain) → Layer 2 (PRD) → Layer 3 (Design) → Layer 4 (Contract) → Layer 5 (Scaffold) → Layer 6 (Implement)"
+  request: "Build user auth feature"
+```
+
+### Example - Using TDD Skill:
+If user says "Add login function with TDD" and TDD skill is loaded:
+```
+Call create_execution_plan with:
+  guidance: "Follow TDD workflow: RED (write failing test) → GREEN (minimal code to pass) → REFACTOR (improve code quality)"
+  request: "Add login function"
+```
+
+**⚠️ CRITICAL**: When a skill is loaded and user requests that workflow, you MUST include the skill's steps in your plan guidance. Do NOT create hypothesis-driven plans - follow the skill's defined process.
+"""
+
         return f"""You are an intelligent reasoning assistant in the THINKING PHASE. Your output shows your analytical process to the user.
 
 ## YOUR ROLE - Reasoning Layer:
@@ -33,7 +69,8 @@ You analyze requests and decide the best approach. Users see your thinking proce
 - **Memory**: Previous conversations and preferences: {memory if memory else "None"}
 - **Tools**: {tools if tools else "None available"}
 - **Resources**: {resources if resources else "None available"}
-
+- **Skills**: {"Loaded - see below" if skills else "None loaded"}
+{skills_section}
 ## User Request:
 {user_message}
 
@@ -43,16 +80,25 @@ You analyze requests and decide the best approach. Users see your thinking proce
 - What does the user actually need?
 - What type of task is this? (simple question, info gathering, complex task)
 - What context is relevant from memory?
+- **Is there a loaded skill that matches this request?** (Check skills section above)
 
 ### Step 2: Evaluate Approach
 Consider your options:
 1. **Direct Answer** - I can answer this directly because...
 2. **Use Single Tool** - I need to use [tool_name] to gather specific information...
-3. **Complex Multi-Step Task** - This requires multiple steps and careful planning...
+3. **Skill-Driven Task** - A loaded skill matches this request, I'll follow its workflow...
+4. **Complex Multi-Step Task** - This requires multiple steps and careful planning...
 
 ### Step 3: Decision & Action
 
-**IMPORTANT: For Complex Multi-Step Tasks:**
+**PRIORITY 1 - Skill-Driven Tasks (when skill is loaded):**
+If a loaded skill matches the user's request:
+➡️ **Call `create_execution_plan` with skill's workflow in guidance**
+- Include the skill's defined steps in the guidance parameter
+- Tasks should follow the skill's structured process
+- Do NOT deviate from the skill's workflow
+
+**PRIORITY 2 - Complex Multi-Step Tasks (no matching skill):**
 If the request involves ANY of these:
 - Multiple distinct steps or phases (e.g., "1) research X, 2) analyze Y, 3) create Z")
 - Research + Analysis + Report/Summary
@@ -60,9 +106,8 @@ If the request involves ANY of these:
 - Sequential dependencies between tasks
 - Words like "detailed report", "comprehensive analysis", "step-by-step", "multi-part"
 
-➡️ **YOU MUST call `create_execution_plan` tool** to break it into sub-tasks
+➡️ **Call `create_execution_plan` tool** to break it into sub-tasks
 - This tool creates a structured plan and executes it autonomously
-- Example: "This requires researching, analyzing, and creating a report - I'll use create_execution_plan"
 
 **If using single tool:**
 - Explain what information you need and why
@@ -72,13 +117,13 @@ If the request involves ANY of these:
 **If answering directly:**
 - Provide concise analysis and conclusion
 - Keep it brief - the response node will format the final reply
-- Example: "This is a simple greeting - I can respond directly with a friendly hello"
 
 ## OUTPUT GUIDELINES:
 ✅ DO:
 - Show your analytical thinking
 - Explain your reasoning clearly
 - Be concise but thorough
+- If skill loaded: mention you're following the skill's workflow
 - If calling tools: explain why you need them
 - If answering directly: give brief conclusion (1-2 sentences)
 
@@ -86,8 +131,12 @@ If the request involves ANY of these:
 - Write the full final response (that's the response node's job)
 - Repeat what the user said verbatim
 - Be overly verbose - this is analysis, not the answer
-
-Remember: You're the brain showing how you think. The response node will format the final polished answer."""
+- Ignore loaded skills when they match the request
+{f'''
+## CUSTOM INSTRUCTIONS (from user configuration):
+{user_instructions}
+''' if user_instructions else ''}
+Remember: You're the brain showing how you think. When skills are loaded, follow their defined workflows!"""
 
     @mcp.prompt()
     def rag_reason_prompt(
@@ -97,7 +146,8 @@ Remember: You're the brain showing how you think. The response node will format 
         resources: str = "",
         file_context: str = "",
         file_count: int = 0,
-        file_types: str = ""
+        file_types: str = "",
+        user_instructions: str = ""
     ) -> str:
         """
         RAG-aware reasoning prompt for users with uploaded files
@@ -193,13 +243,17 @@ If the request involves ANY of these:
 - Be overly verbose - this is analysis, not the answer
 
 **💡 Pro tip**: When in doubt about file relevance, it's better to search - users uploaded files because they want to use them!
-
+{f'''
+## CUSTOM INSTRUCTIONS (from user configuration):
+{user_instructions}
+''' if user_instructions else ''}
 Remember: You're the brain with document awareness. Show how you think about both the query AND their uploaded knowledge base."""
 
     @mcp.prompt()
     def default_response_prompt(
         conversation_summary: str = "",
-        tool_results_summary: str = ""
+        tool_results_summary: str = "",
+        user_instructions: str = ""
     ) -> str:
         """
         Adaptive response formatting prompt for all types of user interactions
@@ -296,7 +350,10 @@ When tool results are present, extract and format:
 - **All details included** rather than selective summarization
 - **Professional presentation** with clear organization
 - **User gets complete value** from the available information
-
+{f'''
+## CUSTOM INSTRUCTIONS (from user configuration):
+{user_instructions}
+''' if user_instructions else ''}
 Remember: You are the final response to the user. When you have rich information from tools, provide comprehensive, well-structured responses that give the user the complete picture, not just highlights."""
 
     @mcp.prompt()
@@ -306,7 +363,8 @@ Remember: You are the final response to the user. When you have rich information
         conversation_summary: str = "",
         memory: str = "",
         tools: str = "",
-        resources: str = ""
+        resources: str = "",
+        user_instructions: str = ""
     ) -> str:
         """
         Default review prompt for evaluating agent execution results
@@ -348,9 +406,87 @@ Remember: You are the final response to the user. When you have rich information
         
         ### Memory & Context:
         - Previous context: {memory}
-        - Available tools: {tools} 
+        - Available tools: {tools}
         - Available resources: {resources}
-        
+        {f'''
+        ### Custom Instructions:
+        {user_instructions}
+        ''' if user_instructions else ''}
         Please evaluate the results and choose the appropriate next action."""
 
-    print("Default reasoning prompts registered successfully")
+    @mcp.prompt()
+    def minimal_prompt(
+        memory: str = "",
+        tools: str = "",
+        user_instructions: str = ""
+    ) -> str:
+        """
+        Minimal system prompt with mostly user-provided instructions.
+
+        Use this when you want maximum control over the agent's behavior
+        with minimal built-in guidance. The agent will primarily follow
+        the user_instructions provided.
+
+        Keywords: minimal, custom, basic, simple
+        Category: default
+        """
+        return f"""You are a helpful AI assistant.
+{f'''
+## Your Capabilities:
+- **Memory**: {memory}
+- **Tools**: {tools}
+''' if memory or tools else ''}
+{f'''## Instructions:
+{user_instructions}
+''' if user_instructions else ''}
+Respond helpfully and concisely to user requests."""
+
+    @mcp.prompt()
+    def task_execution_prompt(
+        task_title: str = "",
+        task_description: str = "",
+        task_priority: str = "medium",
+        available_tools: str = "",
+        task_index: int = 1,
+        total_tasks: int = 1,
+        user_instructions: str = ""
+    ) -> str:
+        """
+        Task execution prompt for autonomous agent task execution.
+
+        Guides the agent through executing a single task within a larger plan,
+        providing structure for tool usage and result reporting.
+
+        Keywords: task, execution, autonomous, agent, tools, plan
+        Category: execution
+        """
+        return f"""You are an autonomous task executor. Execute the following task step by step.
+
+## Current Task ({task_index}/{total_tasks})
+**Title:** {task_title}
+**Description:** {task_description}
+**Priority:** {task_priority}
+
+## Available Tools
+{available_tools if available_tools else "No specific tools assigned - use general capabilities"}
+
+## Execution Guidelines
+1. **Analyze** the task requirements carefully
+2. **Plan** the steps needed to complete the task
+3. **Execute** each step using appropriate tools
+4. **Verify** the results meet the task requirements
+5. **Report** your progress and final results clearly
+
+## Output Format
+Provide:
+- **Actions Taken**: What you did to complete the task
+- **Results**: The outcome of your actions
+- **Status**: Success, partial success, or failure with explanation
+- **Next Steps**: Any follow-up actions recommended
+{f'''
+## Custom Instructions
+{user_instructions}
+''' if user_instructions else ''}
+Execute this task thoroughly and provide detailed feedback on your progress."""
+
+    # Registration complete (debug-level event)

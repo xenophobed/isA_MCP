@@ -18,7 +18,7 @@ class AuthorizationServiceClient:
         if base_url is None:
             from core.config import get_settings
             settings = get_settings()
-            base_url = settings.authz_service_url or "http://localhost:8203"
+            base_url = settings.authorization_service_url or "http://localhost:8203"
         self.base_url = base_url.rstrip("/")
         self.session = None
     

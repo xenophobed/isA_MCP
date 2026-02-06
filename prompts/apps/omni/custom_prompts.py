@@ -132,7 +132,7 @@ Create a professional research report that meets academic standards.
         
         return prompt_template.strip()
 
-    logger.info("Custom ⚡ prompts registered successfully")
+    logger.debug("Custom ⚡ prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

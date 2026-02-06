@@ -49,20 +49,20 @@ def register_memory_tools(mcp: FastMCP):
                 importance_score=importance_score
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_factual_memory",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing factual memory: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_factual_memory",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -88,20 +88,20 @@ def register_memory_tools(mcp: FastMCP):
                 importance_score=importance_score
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_episodic_memory",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing episodic memory: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_episodic_memory",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -127,20 +127,20 @@ def register_memory_tools(mcp: FastMCP):
                 importance_score=importance_score
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_semantic_memory",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing semantic memory: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_semantic_memory",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -166,20 +166,20 @@ def register_memory_tools(mcp: FastMCP):
                 importance_score=importance_score
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_procedural_memory",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing procedural memory: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_procedural_memory",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -208,20 +208,20 @@ def register_memory_tools(mcp: FastMCP):
                 importance_score=importance_score
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_working_memory",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing working memory: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_working_memory",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -253,20 +253,20 @@ def register_memory_tools(mcp: FastMCP):
                 role=role
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="store_session_message",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error storing session message: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="store_session_message",
                 data={"user_id": user_id, "session_id": session_id},
                 error_message=str(e)
-            )
+            ))
 
     # ========== CORE SEARCH TOOLS ==========
 
@@ -277,8 +277,8 @@ def register_memory_tools(mcp: FastMCP):
         user_id: str,
         query: str,
         memory_types: Optional[List[str]] = None,
-        top_k: int = 10,
-        similarity_threshold: float = 0.4
+        limit: int = 10,
+        similarity_threshold: float = 0.15
     ) -> str:
         """Search across memory types using semantic similarity
 
@@ -289,8 +289,8 @@ def register_memory_tools(mcp: FastMCP):
             user_id: User identifier
             query: Search query
             memory_types: Optional list of memory types to search (e.g., ["factual", "semantic"])
-            top_k: Maximum number of results per type
-            similarity_threshold: Minimum similarity score (0.0-1.0), default 0.4
+            limit: Maximum number of results per type
+            similarity_threshold: Minimum similarity score (0.0-1.0), default 0.15
         """
         try:
             client = get_memory_client()
@@ -299,24 +299,24 @@ def register_memory_tools(mcp: FastMCP):
                 user_id=user_id,
                 query=query,
                 memory_types=memory_types,
-                top_k=top_k,
+                limit=limit,
                 similarity_threshold=similarity_threshold
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="search_memories",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error searching memories: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="search_memories",
                 data={"user_id": user_id, "query": query},
                 error_message=str(e)
-            )
+            ))
 
     # ========== FACTUAL MEMORY SEARCH TOOLS ==========
 
@@ -334,20 +334,20 @@ def register_memory_tools(mcp: FastMCP):
 
             result = await client.search_facts_by_subject(user_id, subject, limit)
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="search_facts_by_subject",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error searching facts by subject: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="search_facts_by_subject",
                 data={"user_id": user_id, "subject": subject},
                 error_message=str(e)
-            )
+            ))
 
     # ========== EPISODIC MEMORY SEARCH TOOLS ==========
 
@@ -371,20 +371,20 @@ def register_memory_tools(mcp: FastMCP):
 
             result = await client.search_episodes_by_event_type(user_id, event_type, limit)
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="search_episodes_by_event_type",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error searching episodes by event type: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="search_episodes_by_event_type",
                 data={"user_id": user_id, "event_type": event_type},
                 error_message=str(e)
-            )
+            ))
 
     # ========== SEMANTIC MEMORY SEARCH TOOLS ==========
 
@@ -408,20 +408,20 @@ def register_memory_tools(mcp: FastMCP):
 
             result = await client.search_concepts_by_category(user_id, category, limit)
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="search_concepts_by_category",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error searching concepts by category: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="search_concepts_by_category",
                 data={"user_id": user_id, "category": category},
                 error_message=str(e)
-            )
+            ))
 
     # ========== SESSION MEMORY TOOLS ==========
 
@@ -445,20 +445,20 @@ def register_memory_tools(mcp: FastMCP):
                 max_recent_messages=max_recent_messages
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="get_session_context",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error getting session context: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="get_session_context",
                 data={"user_id": user_id, "session_id": session_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -480,20 +480,20 @@ def register_memory_tools(mcp: FastMCP):
                 compression_level=compression_level
             )
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success" if result.get("success") else "error",
                 action="summarize_session",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error summarizing session: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="summarize_session",
                 data={"user_id": user_id, "session_id": session_id},
                 error_message=str(e)
-            )
+            ))
 
     # ========== WORKING MEMORY TOOLS ==========
 
@@ -509,20 +509,20 @@ def register_memory_tools(mcp: FastMCP):
 
             result = await client.get_active_working_memories(user_id)
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="get_active_working_memories",
                 data=result
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error getting active working memories: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="get_active_working_memories",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     # ========== UTILITY TOOLS ==========
 
@@ -538,20 +538,20 @@ def register_memory_tools(mcp: FastMCP):
 
             stats = await client.get_memory_statistics(user_id)
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="get_memory_statistics",
                 data=stats
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error getting memory statistics: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="get_memory_statistics",
                 data={"user_id": user_id},
                 error_message=str(e)
-            )
+            ))
 
     @mcp.tool()
     @security_manager.security_check
@@ -564,17 +564,17 @@ def register_memory_tools(mcp: FastMCP):
 
             health = await client.health_check()
 
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="success",
                 action="memory_health_check",
                 data=health
-            )
+            ))
 
         except Exception as e:
             logger.error(f"Error checking memory service health: {e}")
-            return tools.create_response(
+            return json.dumps(tools.create_response(
                 status="error",
                 action="memory_health_check",
                 data={},
                 error_message=str(e)
-            )
+            ))

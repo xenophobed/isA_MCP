@@ -82,7 +82,7 @@ Create a practical productivity guide that delivers measurable improvement in ef
         
         return prompt_template.strip()
 
-    logger.info("Lifestyle & Personal 🌟 prompts registered successfully")
+    logger.debug("Lifestyle & Personal 🌟 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

@@ -2,8 +2,6 @@
 """
 Smart MCP Server with FAST Hot Reload
 Following MCP best practices for uvicorn --reload compatibility
-
-🎯 Now with incremental sync optimization - only syncs changed tools!
 """
 
 import os
@@ -53,34 +51,102 @@ class SmartMCPServer:
         self.startup_time = datetime.now()
         self.reload_count = int(os.getenv('SERVER_RELOAD_COUNT', '0'))
         self.mcp = None
+        self.internal_mcp = None  # Internal MCP with all tools (for meta_tools_only mode)
 
         # Services
         self.sync_service = None
         self.search_service = None
         self.consul_registry = None
 
-    async def initialize(self):
-        """Initialize MCP with tools/prompts/resources"""
-        logger.info("🚀 Initializing Smart MCP Server...")
+    async def initialize(self, skip_sync: bool = False, meta_tools_only: bool = False):
+        """Initialize MCP with tools/prompts/resources
 
-        # Create FastMCP instance with stateless_http=True
-        # Note: We use ProgressManager for progress tracking, so Context is not needed
-        # This allows simple HTTP calls without session management
-        self.mcp = FastMCP("Smart MCP Server", stateless_http=True)
+        Args:
+            skip_sync: If True, skip sync services and Consul registration.
+                      Use for stdio mode where only tool execution is needed,
+                      not search functionality. Makes startup ~3x faster.
+            meta_tools_only: If True, only expose 8 meta-tools (discover, get_tool_schema,
+                            execute, list_skills). The 89+ underlying tools are hidden
+                            but accessible via the execute meta-tool.
+        """
+        import time as _time
+        _startup_start = _time.monotonic()
 
-        # Auto-discover and register ALL capabilities
-        # This runs BEFORE creating the app (MCP best practice!)
-        auto_discovery = AutoDiscoverySystem()
-        await auto_discovery.auto_register_with_mcp(self.mcp)
+        mode_label = "stdio fast" if skip_sync else "HTTP full"
+        if meta_tools_only:
+            mode_label += " + meta-tools-only"
+        logger.info(f"isA MCP Server starting ({mode_label} mode)...")
+
+        if meta_tools_only:
+            # ===================================================================
+            # META-TOOLS ONLY MODE
+            # ===================================================================
+            # Create two MCP instances:
+            # 1. internal_mcp: Has all 89 tools (hidden from Claude, used by execute)
+            # 2. mcp: Only has 8 meta-tools (visible to Claude)
+            # ===================================================================
+
+            # Step 1: Create internal MCP with all tools
+            logger.debug("Creating internal MCP with all tools...")
+            self.internal_mcp = FastMCP("Internal MCP", stateless_http=True)
+            auto_discovery = AutoDiscoverySystem()
+            await auto_discovery.auto_register_with_mcp(self.internal_mcp)
+
+            internal_tools = await self.internal_mcp.list_tools()
+            logger.debug(f"  Internal MCP: {len(internal_tools)} tools registered")
+
+            # Step 2: Create external MCP with only meta-tools
+            logger.debug("Creating external MCP with meta-tools only...")
+            self.mcp = FastMCP("Smart MCP Server", stateless_http=True)
+
+            # Register only the meta-tools, passing internal_mcp for tool execution
+            from tools.meta_tools.discovery_tools import register_discovery_tools
+            register_discovery_tools(self.mcp, internal_mcp=self.internal_mcp)
+
+            # Register aggregator tools for external MCP server management
+            logger.debug("Initializing Aggregator Service for external MCP servers...")
+            try:
+                from services.aggregator_service import create_aggregator_service
+                from tools.meta_tools.aggregator_tools import register_aggregator_tools
+
+                self.aggregator_service = await create_aggregator_service(enable_classification=True)
+                register_aggregator_tools(self.mcp, self.aggregator_service)
+                logger.debug("  Aggregator tools registered")
+            except Exception as e:
+                logger.debug(f"  Aggregator service not available: {e}")
+                self.aggregator_service = None
+
+            external_tools = await self.mcp.list_tools()
+            logger.info(f"  Meta-tools: {len(external_tools)} visible, {len(internal_tools)} hidden")
+
+        else:
+            # ===================================================================
+            # NORMAL MODE - All tools visible
+            # ===================================================================
+            # Create FastMCP instance with stateless_http=True
+            # Note: We use ProgressManager for progress tracking, so Context is not needed
+            # This allows simple HTTP calls without session management
+            self.mcp = FastMCP("Smart MCP Server", stateless_http=True)
+
+            # Auto-discover and register ALL capabilities
+            # This runs BEFORE creating the app (MCP best practice!)
+            auto_discovery = AutoDiscoverySystem()
+            await auto_discovery.auto_register_with_mcp(self.mcp)
 
         # Get counts
         tools = await self.mcp.list_tools()
         prompts = await self.mcp.list_prompts()
         resources = await self.mcp.list_resources()
 
-        logger.info(f"✅ Registered {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
+        logger.info(f"  Registered: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
 
-        # Consul service registration
+        # Skip Consul and sync for stdio mode (not needed, saves ~3 seconds)
+        if skip_sync:
+            _elapsed = _time.monotonic() - _startup_start
+            logger.info(f"Server ready ({_elapsed:.1f}s) | stdio mode")
+            return self.mcp
+
+        # Consul service registration (HTTP mode only)
         if settings.consul.enabled:
             try:
                 from isa_common.consul_client import ConsulRegistry
@@ -102,31 +168,39 @@ class SmartMCPServer:
                     consul_port=settings.consul.port,
                     tags=SERVICE_METADATA['tags'],
                     meta=consul_meta,
-                    health_check_type='http'
+                    health_check_type='ttl'  # Use TTL for reliable health checks in K8s
                 )
                 self.consul_registry.register()
-                logger.info(f"✅ Service registered with Consul: {route_meta.get('route_count', 0)} routes")
+                self.consul_registry.start_maintenance()  # Start background TTL heartbeat
+                logger.info(f"  Consul: {route_meta.get('route_count', 0)} routes registered")
             except Exception as e:
                 logger.warning(f"Failed to register with Consul: {e}")
                 self.consul_registry = None
 
-        # Initialize services (Qdrant-based semantic search)
-        logger.info("🔄 Initializing sync and search services...")
+        # Initialize services (Qdrant-based semantic search) - HTTP mode only
+        logger.debug("Initializing sync and search services...")
         from services.sync_service.sync_service import SyncService
-        from services.search_service.search_service import SearchService
+        from services.search_service.hierarchical_search_service import HierarchicalSearchService
 
-        self.sync_service = SyncService(mcp_server=self.mcp)
-        self.search_service = SearchService()
+        # IMPORTANT: In meta_tools_only mode, sync from internal_mcp (all tools)
+        # not from self.mcp (which only has 8 meta-tools)
+        sync_mcp = self.internal_mcp if self.internal_mcp else self.mcp
+        self.sync_service = SyncService(mcp_server=sync_mcp)
+        self.search_service = HierarchicalSearchService()  # Uses lazy initialization
 
         await self.sync_service.initialize()
-        await self.search_service.initialize()
+        # Note: HierarchicalSearchService uses lazy initialization, no initialize() needed
 
-        # Run initial sync (增量同步，只同步变化的)
-        logger.info("🔄 Running initial sync from MCP Server to PostgreSQL + Qdrant...")
+        # Run initial sync
+        logger.debug("Running initial sync from MCP Server to PostgreSQL + Qdrant...")
         sync_result = await self.sync_service.sync_all()
-        logger.info(f"✅ Sync completed: {sync_result['total_synced']} synced, {sync_result['total_failed']} failed")
+        logger.info(f"  Sync: {sync_result.get('total_synced', 0)} updated, {sync_result.get('total_skipped', 0)} skipped, {sync_result.get('total_failed', 0)} failed")
 
-        logger.info("✅ Smart MCP Server initialized")
+        _elapsed = _time.monotonic() - _startup_start
+        host = "0.0.0.0"
+        port = settings.port if hasattr(settings, 'port') else 8081
+        reload_info = "hot reload enabled" if not skip_sync else ""
+        logger.info(f"Server ready ({_elapsed:.1f}s) | http://{host}:{port} | {reload_info}".rstrip(" | "))
         return self.mcp
 
     async def get_server_info(self):
@@ -151,11 +225,12 @@ async def lifespan(app):
     """Lifespan handler for async initialization"""
     global smart_server, mcp
 
-    logger.info("🔥 Starting MCP Server with HOT RELOAD enabled...")
+    logger.debug("Starting MCP Server lifespan...")
 
     # Initialize server (tools, prompts, resources, embeddings)
+    # Use meta_tools_only from config if enabled
     smart_server = SmartMCPServer()
-    mcp = await smart_server.initialize()
+    mcp = await smart_server.initialize(meta_tools_only=settings.meta_tools_only)
 
     # Store in app state
     app.state.smart_server = smart_server
@@ -166,11 +241,7 @@ async def lifespan(app):
     temp_mcp._tool_manager = mcp._tool_manager
     temp_mcp._prompt_manager = mcp._prompt_manager
     temp_mcp._resource_manager = mcp._resource_manager
-    logger.info("✅ Updated MCP endpoint with real tools/prompts/resources")
-
-    port = int(os.getenv("SERVICE_PORT", "8081"))
-    logger.info(f"✅ MCP Server ready at http://0.0.0.0:{port}/mcp/")
-    logger.info("🔥 HOT RELOAD: Edit tools/prompts/resources and save - auto-reloads!")
+    logger.debug("Updated MCP endpoint with real tools/prompts/resources")
 
     # CRITICAL: Start MCP session manager (required for streamable HTTP!)
     # This is the official way according to MCP docs
@@ -179,17 +250,17 @@ async def lifespan(app):
             yield  # Server runs here
         finally:
             # Cleanup
-            logger.info("🛑 Shutting down...")
+            logger.info("Shutting down...")
 
             # Consul deregistration
             if smart_server and smart_server.consul_registry:
                 try:
                     smart_server.consul_registry.deregister()
-                    logger.info("✅ Service deregistered from Consul")
+                    logger.debug("Service deregistered from Consul")
                 except Exception as e:
                     logger.error(f"Failed to deregister from Consul: {e}")
 
-            logger.info("✅ Shutdown complete")
+            logger.info("Shutdown complete")
 
 # ==============================================================================
 # CREATE MCP APP AT MODULE LEVEL (Required for uvicorn --reload!)
@@ -223,7 +294,7 @@ app.add_middleware(
 from core.auth.middleware import add_mcp_unified_auth_middleware
 auth_config = {
     "auth_service_url": settings.auth_service_url or "http://localhost:8000",
-    "authz_service_url": settings.authz_service_url or "http://localhost:8203",
+    "authorization_service_url": settings.authorization_service_url or "http://localhost:8203",
     "require_auth": settings.require_auth
 }
 add_mcp_unified_auth_middleware(app, auth_config)
@@ -245,7 +316,7 @@ async def health_check(request):
     server_info = await smart_server.get_server_info()
 
     return JSONResponse({
-        "status": "healthy ✅ HOT RELOAD IS WORKING PERFECTLY!",
+        "status": "healthy",
         "service": "Smart MCP Server",
         "uptime": uptime_str,
         "reload_count": smart_server.reload_count,
@@ -253,69 +324,76 @@ async def health_check(request):
     })
 
 async def search_endpoint(request):
-    """New Qdrant-based semantic search endpoint"""
+    """Hierarchical semantic search endpoint - Skill-based two-stage search"""
     if request.method == "OPTIONS":
         return JSONResponse({})
 
     try:
-        logger.info(f"🌐 [/search] Endpoint called")
+        logger.info(f"[/search] Endpoint called")
         body = await request.body()
         data = json.loads(body) if body else {}
         query = data.get("query", "")
         item_type = data.get("type")  # Optional: 'tool', 'prompt', 'resource'
         limit = data.get("limit", 10)
 
-        logger.info(f"🌐 [/search] Request: query='{query}', type={item_type}, limit={limit}")
+        # Hierarchical search parameters
+        skill_limit = data.get("skill_limit", 3)
+        skill_threshold = data.get("skill_threshold", 0.4)
+        tool_threshold = data.get("score_threshold", 0.3)  # Backward compatible param name
+        include_schemas = data.get("include_schemas", True)
+        strategy = data.get("strategy", "hierarchical")  # hierarchical/direct/hybrid
+
+        logger.info(f"[/search] Request: query='{query}', type={item_type}, limit={limit}, strategy={strategy}")
 
         if not query or not smart_server:
-            logger.error(f"❌ [/search] Invalid request: query={query}, smart_server={smart_server is not None}")
+            logger.error(f"[/search] Invalid request: query={query}, smart_server={smart_server is not None}")
             return JSONResponse({"status": "error", "message": "Invalid request"})
 
-        # Use search service
+        # Use hierarchical search service
         if smart_server.search_service:
-            logger.info(f"🌐 [/search] Calling SearchService...")
-            results = await smart_server.search_service.search(
+            logger.info(f"[/search] Calling HierarchicalSearchService...")
+            result = await smart_server.search_service.search(
                 query=query,
                 item_type=item_type,
                 limit=limit,
-                score_threshold=data.get("score_threshold", 0.3)
+                skill_limit=skill_limit,
+                skill_threshold=skill_threshold,
+                tool_threshold=tool_threshold,
+                include_schemas=include_schemas,
+                strategy=strategy
             )
-            logger.info(f"🌐 [/search] SearchService returned {len(results)} results")
+            logger.info(f"[/search] HierarchicalSearchService returned {len(result.tools)} tools via {len(result.matched_skills)} skills")
 
-            # Convert protobuf Struct to dict for JSON serialization
-            from google.protobuf.json_format import MessageToDict
+            # Use the service's to_dict method for consistent serialization
+            response_data = smart_server.search_service.to_dict(result)
+            response_data["status"] = "success"
 
-            def safe_serialize(obj):
-                """Convert protobuf Struct to dict, handle None"""
-                if obj is None:
-                    return None
-                if hasattr(obj, 'DESCRIPTOR'):  # It's a protobuf message
-                    return MessageToDict(obj, preserving_proto_field_name=True)
-                return obj
+            # Add backward-compatible fields
+            response_data["count"] = len(result.tools)
+            response_data["results"] = [
+                {
+                    "id": t.id,
+                    "type": t.type,
+                    "name": t.name,
+                    "description": t.description,
+                    "score": t.score,
+                    "db_id": t.db_id,
+                    "inputSchema": t.input_schema,
+                    "outputSchema": t.output_schema,
+                    "annotations": t.annotations,
+                    "skill_ids": t.skill_ids,
+                    "primary_skill_id": t.primary_skill_id
+                }
+                for t in result.tools
+            ]
 
-            return JSONResponse({
-                "status": "success",
-                "query": query,
-                "count": len(results),
-                "results": [
-                    {
-                        "id": r.id,
-                        "type": r.type,
-                        "name": r.name,
-                        "description": r.description,
-                        "score": r.score,
-                        "db_id": r.db_id,
-                        # Include schema fields for tool calling (converted to dict)
-                        "inputSchema": safe_serialize(r.inputSchema),
-                        "outputSchema": safe_serialize(r.outputSchema),
-                        "annotations": safe_serialize(r.annotations)
-                    }
-                    for r in results
-                ]
-            })
+            return JSONResponse(response_data)
 
         return JSONResponse({"status": "error", "message": "Search service not ready"})
 
+    except ValueError as e:
+        logger.warning(f"Search validation error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=400)
     except Exception as e:
         logger.error(f"Search error: {e}")
         return JSONResponse({"status": "error", "message": str(e)})
@@ -361,7 +439,7 @@ async def progress_stream_endpoint(request):
     async def event_generator():
         """Generate SSE events for progress updates"""
         try:
-            logger.info(f"📡 Starting SSE stream for operation: {operation_id}")
+            logger.info(f"Starting SSE stream for operation: {operation_id}")
 
             while True:
                 # Get current progress
@@ -380,7 +458,7 @@ async def progress_stream_endpoint(request):
 
                 # Check if completed/failed/cancelled
                 if progress.status in ["completed", "failed", "cancelled"]:
-                    logger.info(f"📡 SSE stream ending: {operation_id} status={progress.status}")
+                    logger.info(f"SSE stream ending: {operation_id} status={progress.status}")
 
                     # Send completion event
                     yield f"event: done\ndata: {{\"status\": \"{progress.status}\"}}\n\n"
@@ -404,34 +482,526 @@ async def progress_stream_endpoint(request):
     )
 
 
+# ==============================================================================
+# SKILL API ENDPOINTS (/api/v1/skills/*)
+# ==============================================================================
+
+async def skills_list_endpoint(request):
+    """GET /api/v1/skills - List all skill categories"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        # Parse query parameters
+        is_active = request.query_params.get("is_active", "true").lower() == "true"
+        parent_domain = request.query_params.get("parent_domain")
+        limit = int(request.query_params.get("limit", 50))
+        offset = int(request.query_params.get("offset", 0))
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        skills = await service.list_skills(
+            is_active=is_active,
+            parent_domain=parent_domain,
+            limit=limit,
+            offset=offset
+        )
+
+        return JSONResponse(skills)
+
+    except Exception as e:
+        logger.error(f"List skills error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_create_endpoint(request):
+    """POST /api/v1/skills - Create a skill category"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        body = await request.body()
+        data = json.loads(body) if body else {}
+
+        # Validate required fields
+        if not data.get("id") or not data.get("name") or not data.get("description"):
+            return JSONResponse(
+                {"detail": "id, name, and description are required"},
+                status_code=422
+            )
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        result = await service.create_skill_category(data)
+
+        if result is None:
+            return JSONResponse({"detail": "Skill already exists"}, status_code=409)
+
+        return JSONResponse(result, status_code=201)
+
+    except Exception as e:
+        logger.error(f"Create skill error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_get_endpoint(request):
+    """GET /api/v1/skills/{skill_id} - Get skill by ID"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        skill_id = request.path_params.get("skill_id")
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        skill = await service.get_skill(skill_id)
+
+        if skill is None:
+            return JSONResponse({"detail": "Skill not found"}, status_code=404)
+
+        return JSONResponse(skill)
+
+    except Exception as e:
+        logger.error(f"Get skill error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_delete_endpoint(request):
+    """DELETE /api/v1/skills/{skill_id} - Delete skill"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        skill_id = request.path_params.get("skill_id")
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        success = await service.delete_skill_category(skill_id)
+
+        if not success:
+            return JSONResponse({"detail": "Skill not found"}, status_code=404)
+
+        return JSONResponse({"status": "deleted"})
+
+    except Exception as e:
+        logger.error(f"Delete skill error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_tools_endpoint(request):
+    """GET /api/v1/skills/{skill_id}/tools - Get tools in skill"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        skill_id = request.path_params.get("skill_id")
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        # First verify skill exists
+        skill = await service.get_skill(skill_id)
+        if skill is None:
+            return JSONResponse({"detail": "Skill not found"}, status_code=404)
+
+        tools = await service.get_tools_by_skill(skill_id)
+        return JSONResponse(tools)
+
+    except Exception as e:
+        logger.error(f"Get tools in skill error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_classify_endpoint(request):
+    """POST /api/v1/skills/classify - Classify a tool into skills"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        body = await request.body()
+        data = json.loads(body) if body else {}
+
+        # Validate required fields
+        if not data.get("tool_id") or not data.get("tool_name") or not data.get("tool_description"):
+            return JSONResponse(
+                {"detail": "tool_id, tool_name, and tool_description are required"},
+                status_code=422
+            )
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        result = await service.classify_tool(
+            tool_id=data["tool_id"],
+            tool_name=data["tool_name"],
+            tool_description=data["tool_description"],
+            force_reclassify=data.get("force_reclassify", False)
+        )
+
+        # Convert datetime to ISO string for JSON serialization
+        if result.get("classification_timestamp"):
+            result["classification_timestamp"] = result["classification_timestamp"].isoformat()
+
+        return JSONResponse(result)
+
+    except Exception as e:
+        logger.error(f"Classify tool error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def skills_suggestions_endpoint(request):
+    """GET /api/v1/skills/suggestions - List pending skill suggestions"""
+    try:
+        from services.skill_service import SkillService
+        from services.skill_service.skill_repository import SkillRepository
+
+        repo = SkillRepository(
+            host=settings.infrastructure.postgres_grpc_host,
+            port=settings.infrastructure.postgres_grpc_port
+        )
+        service = SkillService(repository=repo)
+
+        suggestions = await service.list_pending_suggestions()
+        return JSONResponse(suggestions)
+
+    except Exception as e:
+        logger.error(f"List suggestions error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+# ==============================================================================
+# SEARCH API ENDPOINTS (/api/v1/search/*)
+# ==============================================================================
+
+async def api_search_endpoint(request):
+    """POST /api/v1/search - Hierarchical search"""
+    if request.method == "OPTIONS":
+        return JSONResponse({})
+
+    try:
+        body = await request.body()
+        data = json.loads(body) if body else {}
+
+        query = data.get("query", "")
+        if not query or not query.strip():
+            return JSONResponse({"detail": "query is required"}, status_code=422)
+        if len(query) > 1000:
+            return JSONResponse({"detail": "query cannot exceed 1000 characters"}, status_code=422)
+
+        # Validate parameters
+        limit = data.get("limit", 10)
+        if limit > 50:
+            return JSONResponse({"detail": "limit cannot exceed 50"}, status_code=422)
+
+        skill_threshold = data.get("skill_threshold", 0.4)
+        tool_threshold = data.get("tool_threshold", 0.3)
+        if skill_threshold < 0 or skill_threshold > 1:
+            return JSONResponse({"detail": "skill_threshold must be between 0 and 1"}, status_code=422)
+        if tool_threshold < 0 or tool_threshold > 1:
+            return JSONResponse({"detail": "tool_threshold must be between 0 and 1"}, status_code=422)
+
+        strategy = data.get("strategy", "hierarchical")
+        if strategy not in ["hierarchical", "direct", "hybrid"]:
+            return JSONResponse({"detail": "strategy must be hierarchical, direct, or hybrid"}, status_code=422)
+
+        item_type = data.get("item_type")
+        if item_type and item_type not in ["tool", "prompt", "resource"]:
+            return JSONResponse({"detail": "item_type must be tool, prompt, or resource"}, status_code=422)
+
+        if not smart_server or not smart_server.search_service:
+            return JSONResponse({"detail": "Search service not ready"}, status_code=503)
+
+        result = await smart_server.search_service.search(
+            query=query,
+            item_type=item_type,
+            limit=limit,
+            skill_limit=data.get("skill_limit", 3),
+            skill_threshold=skill_threshold,
+            tool_threshold=tool_threshold,
+            include_schemas=data.get("include_schemas", True),
+            strategy=strategy
+        )
+
+        return JSONResponse(smart_server.search_service.to_dict(result))
+
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=422)
+    except Exception as e:
+        logger.error(f"API search error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def search_skills_endpoint(request):
+    """GET /api/v1/search/skills - Search skills only"""
+    try:
+        query = request.query_params.get("query", "")
+        if not query:
+            return JSONResponse({"detail": "query is required"}, status_code=422)
+
+        limit = int(request.query_params.get("limit", 5))
+        threshold = float(request.query_params.get("threshold", 0.4))
+
+        if not smart_server or not smart_server.search_service:
+            return JSONResponse({"detail": "Search service not ready"}, status_code=503)
+
+        skills = await smart_server.search_service.search_skills_only(
+            query=query,
+            limit=limit,
+            threshold=threshold
+        )
+
+        return JSONResponse([
+            {
+                "id": s.id,
+                "name": s.name,
+                "description": s.description,
+                "score": s.score,
+                "tool_count": s.tool_count
+            }
+            for s in skills
+        ])
+
+    except Exception as e:
+        logger.error(f"Search skills error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def search_tools_endpoint(request):
+    """GET /api/v1/search/tools - Search tools only"""
+    try:
+        query = request.query_params.get("query", "")
+        if not query:
+            return JSONResponse({"detail": "query is required"}, status_code=422)
+
+        limit = int(request.query_params.get("limit", 10))
+        threshold = float(request.query_params.get("threshold", 0.3))
+        item_type = request.query_params.get("item_type")
+        skill_ids_param = request.query_params.get("skill_ids")
+        skill_ids = skill_ids_param.split(",") if skill_ids_param else None
+
+        if not smart_server or not smart_server.search_service:
+            return JSONResponse({"detail": "Search service not ready"}, status_code=503)
+
+        tools = await smart_server.search_service.search_tools_only(
+            query=query,
+            skill_ids=skill_ids,
+            item_type=item_type,
+            limit=limit,
+            threshold=threshold
+        )
+
+        return JSONResponse([
+            {
+                "id": t.id,
+                "db_id": t.db_id,
+                "type": t.type,
+                "name": t.name,
+                "description": t.description,
+                "score": t.score,
+                "skill_ids": t.skill_ids,
+                "primary_skill_id": t.primary_skill_id
+            }
+            for t in tools
+        ])
+
+    except Exception as e:
+        logger.error(f"Search tools error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+def _serialize_tool(tool: dict) -> dict:
+    """Serialize tool dict for JSON response, converting datetime fields."""
+    from datetime import datetime
+    result = {}
+    for key, value in tool.items():
+        if isinstance(value, datetime):
+            result[key] = value.isoformat()
+        else:
+            result[key] = value
+    return result
+
+
+async def get_default_tools_endpoint(request):
+    """GET /api/v1/tools/defaults - Get default tools (meta-tools)
+
+    Returns tools marked with is_default=True in the database.
+    These are the gateway tools always available in agent context:
+    - discover, get_tool_schema, execute
+    - list_skills, list_prompts, get_prompt, list_resources, read_resource
+    """
+    try:
+        if not smart_server or not smart_server.sync_service:
+            return JSONResponse({"detail": "Tool service not ready"}, status_code=503)
+
+        tool_service = smart_server.sync_service.tool_service
+        default_tools = await tool_service.get_default_tools()
+
+        # Serialize datetime fields for JSON response
+        serialized_tools = [_serialize_tool(t) for t in default_tools]
+
+        return JSONResponse({
+            "tools": serialized_tools,
+            "count": len(serialized_tools)
+        })
+
+    except Exception as e:
+        logger.error(f"Get default tools error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+# ==============================================================================
+# ROUTE REGISTRATION
+# ==============================================================================
+
 # Register routes
 app.router.routes.append(Route("/health", health_check))
 # /discover endpoint removed - use /search instead
-app.router.routes.append(Route("/search", search_endpoint, methods=["POST", "OPTIONS"]))  # NEW!
-app.router.routes.append(Route("/sync", sync_endpoint, methods=["POST", "OPTIONS"]))  # NEW!
-app.router.routes.append(Route("/progress/{operation_id}/stream", progress_stream_endpoint, methods=["GET"]))  # SSE Progress Stream
+app.router.routes.append(Route("/search", search_endpoint, methods=["POST", "OPTIONS"]))  # Legacy
+app.router.routes.append(Route("/sync", sync_endpoint, methods=["POST", "OPTIONS"]))
+app.router.routes.append(Route("/progress/{operation_id}/stream", progress_stream_endpoint, methods=["GET"]))
+
+# Skill API endpoints
+app.router.routes.append(Route("/api/v1/skills", skills_list_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/skills", skills_create_endpoint, methods=["POST"]))
+app.router.routes.append(Route("/api/v1/skills/classify", skills_classify_endpoint, methods=["POST"]))
+app.router.routes.append(Route("/api/v1/skills/suggestions", skills_suggestions_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/skills/{skill_id}", skills_get_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/skills/{skill_id}", skills_delete_endpoint, methods=["DELETE"]))
+app.router.routes.append(Route("/api/v1/skills/{skill_id}/tools", skills_tools_endpoint, methods=["GET"]))
+
+# Search API endpoints
+app.router.routes.append(Route("/api/v1/search", api_search_endpoint, methods=["POST", "OPTIONS"]))
+app.router.routes.append(Route("/api/v1/search/skills", search_skills_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/search/tools", search_tools_endpoint, methods=["GET"]))
+
+# Tools API endpoints
+app.router.routes.append(Route("/api/v1/tools/defaults", get_default_tools_endpoint, methods=["GET"]))
 
 # ==============================================================================
 # DIRECT EXECUTION (for testing)
 # ==============================================================================
 
+async def run_stdio(meta_tools_only: bool = False):
+    """Run as stdio MCP server (for Claude Code / isA_Vibe integration)
+
+    This mode allows isA_MCP to be used directly by Claude Code SDK
+    without needing an HTTP wrapper.
+
+    OPTIMIZATION: Uses skip_sync=True to skip PostgreSQL/Qdrant sync,
+    reducing startup time from ~5s to ~2s. Claude SDK doesn't need
+    our search functionality - it has its own tool selection.
+
+    Args:
+        meta_tools_only: If True, only expose 8 meta-tools. Claude must use
+                        discover() -> get_tool_schema() -> execute() workflow.
+
+    Usage:
+        python main.py --stdio                    # All tools visible
+        python main.py --stdio --meta-tools-only  # Only meta-tools visible
+
+    In isA_Vibe MCP config:
+        "isa_mcp": {
+            "command": "python",
+            "args": ["/path/to/isA_MCP/main.py", "--stdio", "--meta-tools-only"],
+        }
+    """
+    global smart_server, mcp
+
+    mode_desc = "meta-tools-only" if meta_tools_only else "all-tools"
+    logger.info(f"Starting isA_MCP in stdio mode ({mode_desc})...")
+
+    # Initialize with skip_sync=True for fast startup (~2s instead of ~5s)
+    # Sync services not needed for stdio - Claude SDK has its own tool selection
+    smart_server = SmartMCPServer()
+    mcp = await smart_server.initialize(skip_sync=True, meta_tools_only=meta_tools_only)
+
+    tools = await mcp.list_tools()
+    prompts = await mcp.list_prompts()
+    resources = await mcp.list_resources()
+
+    if meta_tools_only and smart_server.internal_mcp:
+        internal_tools = await smart_server.internal_mcp.list_tools()
+        logger.info(f"isA_MCP stdio ready: {len(tools)} meta-tools visible, {len(internal_tools)} hidden")
+    else:
+        logger.info(f"isA_MCP stdio ready: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
+
+    # Run stdio server - this blocks until stdin closes
+    # FastMCP provides run_stdio_async() for stdio transport
+    await mcp.run_stdio_async()
+
+    # Cleanup on exit
+    if smart_server and smart_server.consul_registry:
+        try:
+            smart_server.consul_registry.deregister()
+            logger.debug("Service deregistered from Consul")
+        except Exception as e:
+            logger.error(f"Failed to deregister from Consul: {e}")
+
+    logger.info("stdio server shutdown complete")
+
+
 def main():
-    """Run server directly (for testing without supervisor)"""
+    """Run server directly (for testing without supervisor)
+
+    Modes:
+        --stdio                   Run as stdio MCP server (for Claude Code / SDK integration)
+        --meta-tools-only         Only expose 8 meta-tools (discover, execute, etc.)
+        (default)                 Run as HTTP server with hot reload
+
+    Examples:
+        python main.py                              # HTTP mode, all tools
+        python main.py --stdio                      # stdio mode, all tools
+        python main.py --stdio --meta-tools-only   # stdio mode, only meta-tools
+        META_TOOLS_ONLY=true python main.py        # HTTP mode, only meta-tools
+    """
     import uvicorn
     import argparse
+    import asyncio
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", "-p", type=int, default=8081)
+    parser = argparse.ArgumentParser(description="isA_MCP Server")
+    parser.add_argument("--port", "-p", type=int, default=8081, help="HTTP server port")
+    parser.add_argument("--stdio", action="store_true", help="Run as stdio MCP server (for Claude Code integration)")
+    parser.add_argument("--meta-tools-only", action="store_true", help="Only expose 8 meta-tools (discover, get_tool_schema, execute, list_skills)")
     args = parser.parse_args()
 
-    # Run with uvicorn and --reload
-    uvicorn.run(
-        "main_hotreload_proposal:app",
-        host="0.0.0.0",
-        port=args.port,
-        reload=True,  # Enable hot reload
-        log_level="info"
-    )
+    if args.stdio:
+        # stdio mode for Claude Code / isA_Vibe SDK integration
+        # Use CLI flag or fall back to config setting
+        meta_tools_only = args.meta_tools_only or settings.meta_tools_only
+        asyncio.run(run_stdio(meta_tools_only=meta_tools_only))
+    else:
+        # HTTP mode with hot reload (existing behavior)
+        # meta_tools_only is controlled by META_TOOLS_ONLY env var (in settings)
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=args.port,
+            reload=True,  # Enable hot reload
+            log_level="info"
+        )
+
 
 if __name__ == "__main__":
     main()

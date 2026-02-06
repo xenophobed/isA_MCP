@@ -112,7 +112,9 @@ class MemoryServiceClient:
     ) -> Dict[str, Any]:
         """Make HTTP request with retry logic"""
         base_url = await self._get_service_url()
-        url = f"{base_url}{endpoint}"
+        # Add /api/v1 prefix for non-health endpoints
+        api_endpoint = endpoint if endpoint == "/health" else f"/api/v1{endpoint}"
+        url = f"{base_url}{api_endpoint}"
         session = await self._get_session()
 
         last_error = None
@@ -276,14 +278,14 @@ class MemoryServiceClient:
         user_id: str,
         query: str,
         memory_types: Optional[List[str]] = None,
-        top_k: int = 10,
-        similarity_threshold: float = 0.4
+        limit: int = 10,
+        similarity_threshold: float = 0.15
     ) -> Dict[str, Any]:
         """Search across memory types using semantic similarity"""
         params = {
             "user_id": user_id,
             "query": query,
-            "top_k": top_k,
+            "limit": limit,
             "similarity_threshold": similarity_threshold
         }
         if memory_types:

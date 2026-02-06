@@ -1,0 +1,184 @@
+# =============================================================================
+# MCP Service - PRODUCTION Helm Values
+# =============================================================================
+# Deploy to production:
+#   helm upgrade --install mcp-service \
+#     ~/Documents/Fun/isA/isA_Cloud/deployments/charts/isa-service \
+#     -f deployment/helm/values-production.yaml \
+#     -n isa-cloud-production
+# =============================================================================
+
+name: mcp-service
+namespace: isa-cloud-production
+
+image:
+  registry: harbor.isa.io
+  repository: isa/mcp-service
+  tag: latest
+  pullPolicy: Always
+
+port: 8081
+replicas: 2
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "500m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+health:
+  path: /health
+  initialDelaySeconds: 40
+  periodSeconds: 10
+
+service:
+  type: ClusterIP
+
+consul:
+  enabled: true
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+env:
+  # --- System ---
+  - name: ENV
+    value: "production"
+  - name: PYTHONPATH
+    value: "/app"
+  - name: PYTHONUNBUFFERED
+    value: "1"
+  - name: DEBUG
+    value: "false"
+
+  # --- Service ---
+  - name: SERVICE_NAME
+    value: "mcp_service"
+  - name: MCP_PORT
+    value: "8081"
+
+  # --- Logging ---
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: ENABLE_STRUCTURED_LOGGING
+    value: "true"
+
+  # --- Auth ---
+  - name: REQUIRE_MCP_AUTH
+    value: "true"
+  - name: MCP_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: api-key
+
+  # --- Consul ---
+  - name: CONSUL_HOST
+    value: "consul-server.isa-cloud-production.svc.cluster.local"
+  - name: CONSUL_PORT
+    value: "8500"
+  - name: CONSUL_ENABLED
+    value: "true"
+
+  # --- PostgreSQL (native asyncpg - 5432) ---
+  - name: POSTGRES_HOST
+    value: "postgresql.isa-cloud-production.svc.cluster.local"
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: POSTGRES_DB
+    value: "isa_platform"
+  - name: POSTGRES_USER
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: postgres-user
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: postgres-password
+
+  # --- Redis (native - 6379) ---
+  - name: REDIS_HOST
+    value: "redis-master.isa-cloud-production.svc.cluster.local"
+  - name: REDIS_PORT
+    value: "6379"
+  - name: REDIS_DB
+    value: "0"
+  - name: REDIS_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: redis-password
+
+  # --- Qdrant (native HTTP - 6333) ---
+  - name: QDRANT_HOST
+    value: "qdrant.isa-cloud-production.svc.cluster.local"
+  - name: QDRANT_PORT
+    value: "6333"
+
+  # --- Neo4j (native bolt - 7687) ---
+  - name: NEO4J_HOST
+    value: "neo4j.isa-cloud-production.svc.cluster.local"
+  - name: NEO4J_PORT
+    value: "7687"
+  - name: NEO4J_USER
+    value: "neo4j"
+  - name: NEO4J_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: neo4j-password
+
+  # --- NATS (native - 4222) ---
+  - name: NATS_HOST
+    value: "nats.isa-cloud-production.svc.cluster.local"
+  - name: NATS_PORT
+    value: "4222"
+
+  # --- MinIO (S3 - 9000) ---
+  - name: MINIO_HOST
+    value: "minio.isa-cloud-production.svc.cluster.local"
+  - name: MINIO_PORT
+    value: "9000"
+  - name: MINIO_SECURE
+    value: "true"
+  - name: MINIO_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: minio-access-key
+  - name: MINIO_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: minio-secret-key
+
+  # --- External APIs ---
+  - name: COMPOSIO_TELEMETRY
+    value: "false"
+  - name: COMPOSIO_CACHE_DIR
+    value: "/app/cache"
+  - name: COMPOSIO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: composio-api-key
+  - name: BRAVE_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: mcp-secrets
+        key: brave-token
+
+  # --- ISA Services ---
+  - name: ISA_MODEL_URL
+    value: "http://model-service.isa-cloud-production.svc.cluster.local:8082"

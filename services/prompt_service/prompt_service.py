@@ -84,7 +84,7 @@ class PromptService:
             raise RuntimeError("Failed to update prompt")
 
         updated_prompt = await self.repository.get_prompt_by_id(prompt_id)
-        logger.info(f"Updated prompt: {prompt['name']}")
+        logger.debug(f"Updated prompt: {prompt['name']}")
         return updated_prompt
 
     async def delete_prompt(self, prompt_identifier: Any) -> bool:

@@ -9,49 +9,49 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Import and re-export isa-common PostgresClient
+# Import and re-export isa-common clients (both sync and async)
 try:
-    from isa_common.postgres_client import PostgresClient
-    from isa_common.consul_client import ConsulRegistry
+    from isa_common import PostgresClient, AsyncPostgresClient, ConsulRegistry
 
     logger.info("✅ isa-common PostgreSQL client loaded")
 
-    __all__ = ['PostgresClient', 'ConsulRegistry', 'get_postgres_client']
+    __all__ = ['PostgresClient', 'AsyncPostgresClient', 'ConsulRegistry', 'get_postgres_client']
 
 except ImportError as e:
     logger.error(f"❌ Failed to import isa-common PostgreSQL client: {e}")
-    logger.error("   Install with: pip install -e /path/to/isA_Cloud/isA_common")
+    logger.error("   Install with: pip install isa-common>=0.2.0")
 
     PostgresClient = None
+    AsyncPostgresClient = None
     ConsulRegistry = None
 
     __all__ = []
 
 
 # Global instance
-_postgres_client: Optional[PostgresClient] = None
+_postgres_client: Optional[AsyncPostgresClient] = None
 
 
-async def get_postgres_client() -> PostgresClient:
+async def get_postgres_client() -> AsyncPostgresClient:
     """
-    Get global PostgreSQL client instance with lazy initialization
+    Get global AsyncPostgresClient instance with lazy initialization
 
     Returns:
-        PostgresClient instance
+        AsyncPostgresClient instance
 
     Raises:
         ImportError: If isa-common is not installed
     """
     global _postgres_client
 
-    if PostgresClient is None:
+    if AsyncPostgresClient is None:
         raise ImportError(
             "isa-common PostgreSQL client not available. "
-            "Install with: pip install -e /path/to/isA_Cloud/isA_common"
+            "Install with: pip install isa-common>=0.2.0"
         )
 
     if _postgres_client is None:
-        _postgres_client = PostgresClient()
-        logger.info("✅ PostgreSQL client initialized")
+        _postgres_client = AsyncPostgresClient()
+        logger.info("✅ AsyncPostgresClient initialized")
 
     return _postgres_client

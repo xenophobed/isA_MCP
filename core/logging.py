@@ -264,8 +264,9 @@ def setup_logging(
         root_logger.removeHandler(handler)
 
     # Console handler (always enabled for local dev and debugging)
+    # CRITICAL: Use stderr, not stdout! stdout is reserved for MCP protocol in stdio mode
     if enable_console:
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setLevel(numeric_level)
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
@@ -323,15 +324,15 @@ def setup_logging(
 
                         self._success_count += 1
 
-                        # Debug: log first few successful pushes
+                        # Debug: log first few successful pushes (use stderr to not corrupt MCP stdio)
                         if self._success_count <= 2:
-                            print(f"[LOKI_DEBUG] Successfully pushed log to Loki: {log_entry[:80]}", flush=True)
+                            print(f"[LOKI_DEBUG] Successfully pushed log to Loki: {log_entry[:80]}", file=sys.stderr, flush=True)
 
                     except Exception as e:
                         # Graceful degradation - don't fail the application
                         self._error_count += 1
                         if self._error_count <= 3:
-                            print(f"[LOKI_ERROR] Failed to push log to Loki: {e}", flush=True)
+                            print(f"[LOKI_ERROR] Failed to push log to Loki: {e}", file=sys.stderr, flush=True)
 
                 def close(self):
                     """Clean up Loki client connection"""
@@ -370,16 +371,59 @@ def setup_logging(
             root_logger.addHandler(loki_handler)
 
             # Log successful Loki integration
-            root_logger.info(f"✅ Centralized logging enabled | loki={loki_host}:{loki_port} via gRPC")
+            root_logger.info(f"Centralized logging enabled | loki={loki_host}:{loki_port} via gRPC")
 
         except ImportError as e:
             # isa_common not installed
-            root_logger.warning(f"⚠️  Could not setup Loki handler: {e}")
-            root_logger.warning(f"⚠️  Please install isa-common: pip install isa-common")
+            root_logger.warning(f"Could not setup Loki handler: {e}")
+            root_logger.warning(f"Please install isa-common: pip install isa-common")
         except Exception as e:
             # Loki unavailable or other error - don't fail the app
-            root_logger.warning(f"⚠️  Could not connect to Loki at {loki_host}:{loki_port}: {e}")
-            root_logger.info("📝 Logging to console only")
+            root_logger.warning(f"Could not connect to Loki at {loki_host}:{loki_port}: {e}")
+            root_logger.info("Logging to console only")
+
+    # Silence verbose third-party loggers
+    # These libraries output excessive DEBUG/INFO logs that clutter the console
+    noisy_loggers = [
+        # HTTP/Network libraries
+        "urllib3",
+        "urllib3.connectionpool",
+        "httpx",
+        "httpcore",
+        "aiohttp",
+        "requests",
+        # MCP SDK internals
+        "mcp.server.lowlevel.server",
+        "mcp.server.lowlevel",
+        "mcp.server",
+        "mcp.server.fastmcp",
+        "mcp.server.fastmcp.tools.tool_manager",
+        "mcp.server.fastmcp.resources.resource_manager",
+        # Async/IO
+        "asyncio",
+        "watchfiles",
+        # HTTP/2 internals
+        "hpack",
+        "h2",
+        "h11",
+        # External model config (verbose during init)
+        "isa_model.core.config.config_manager",
+        # isa_common client initialization (verbose during startup)
+        "isa_common.postgresql",
+        "isa_common.redis",
+        "isa_common.qdrant",
+        "isa_common.consul_client",
+    ]
+    for logger_name in noisy_loggers:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    # MCP SDK tool/resource managers emit "already exists" warnings during
+    # normal registration (e.g. duplicate skill resources). Suppress at ERROR.
+    for mgr_logger in [
+        "mcp.server.fastmcp.tools.tool_manager",
+        "mcp.server.fastmcp.resources.resource_manager",
+    ]:
+        logging.getLogger(mgr_logger).setLevel(logging.ERROR)
 
     # File handler with rotation (optional, mainly for local dev backup)
     # In production with Loki, file logging is optional

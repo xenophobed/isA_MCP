@@ -15,7 +15,7 @@ from datetime import datetime
 
 from .base_vector_db import BaseVectorDB, SearchResult, VectorSearchConfig, SearchMode, RankingMethod
 from .vector_db_factory import create_vector_db
-from tools.services.intelligence_service.language.embedding_generator import embedding_generator
+from tools.intelligent_tools.language.embedding_generator import embedding_generator
 
 logger = logging.getLogger(__name__)
 

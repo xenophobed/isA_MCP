@@ -138,7 +138,7 @@ Create a practical implementation guide that ensures successful deployment.
         
         return prompt_template.strip()
 
-    logger.info("Technology & Innovation 💻 prompts registered successfully")
+    logger.debug("Technology & Innovation 💻 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

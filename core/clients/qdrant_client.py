@@ -9,36 +9,36 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-# Import and re-export isa-common QdrantClient
+# Import and re-export isa-common clients (both sync and async)
 try:
-    from isa_common.qdrant_client import QdrantClient
-    from isa_common.consul_client import ConsulRegistry
+    from isa_common import QdrantClient, AsyncQdrantClient, ConsulRegistry
 
     logger.info("✅ isa-common Qdrant gRPC client loaded")
 
-    __all__ = ['QdrantClient', 'ConsulRegistry', 'get_qdrant_client']
+    __all__ = ['QdrantClient', 'AsyncQdrantClient', 'ConsulRegistry', 'get_qdrant_client']
 
 except ImportError as e:
     logger.error(f"❌ Failed to import isa-common Qdrant client: {e}")
-    logger.error("   Install with: pip install -e /path/to/isA_Cloud/isA_common")
+    logger.error("   Install with: pip install isa-common>=0.2.0")
 
     QdrantClient = None
+    AsyncQdrantClient = None
     ConsulRegistry = None
 
     __all__ = []
 
 
 # Global instance
-_qdrant_client: Optional[QdrantClient] = None
+_qdrant_client: Optional[AsyncQdrantClient] = None
 
 
-def get_qdrant_client(
+async def get_qdrant_client(
     collection_name: str = "user_knowledge",
     vector_dimension: int = 1536,
     config: Optional[Dict[str, Any]] = None
-) -> QdrantClient:
+) -> AsyncQdrantClient:
     """
-    Get global Qdrant client instance with lazy initialization
+    Get global AsyncQdrantClient instance with lazy initialization
 
     Args:
         collection_name: Qdrant collection name (default: "user_knowledge")
@@ -49,23 +49,23 @@ def get_qdrant_client(
             - distance_metric: 'Cosine', 'Euclid', 'Dot', 'Manhattan' (default: 'Cosine')
 
     Returns:
-        QdrantClient instance
+        AsyncQdrantClient instance
 
     Raises:
         ImportError: If isa-common is not installed
 
     Example:
-        >>> client = get_qdrant_client()
-        >>> client.create_collection("my_collection", vector_size=1536)
-        >>> client.upsert(collection_name="my_collection", points=[...])
-        >>> results = client.search(collection_name="my_collection", query_vector=[...])
+        >>> client = await get_qdrant_client()
+        >>> await client.create_collection("my_collection", vector_size=1536)
+        >>> await client.upsert_points(collection_name="my_collection", points=[...])
+        >>> results = await client.search(collection_name="my_collection", query_vector=[...])
     """
     global _qdrant_client
 
-    if QdrantClient is None:
+    if AsyncQdrantClient is None:
         raise ImportError(
             "isa-common Qdrant client not available. "
-            "Install with: pip install -e /path/to/isA_Cloud/isA_common"
+            "Install with: pip install isa-common>=0.2.0"
         )
 
     if _qdrant_client is None:
@@ -78,7 +78,7 @@ def get_qdrant_client(
         if config:
             default_config.update(config)
 
-        _qdrant_client = QdrantClient(config=default_config)
-        logger.info(f"✅ Qdrant client initialized (collection: {collection_name}, dim: {vector_dimension})")
+        _qdrant_client = AsyncQdrantClient(config=default_config)
+        logger.info(f"✅ AsyncQdrantClient initialized (collection: {collection_name}, dim: {vector_dimension})")
 
     return _qdrant_client

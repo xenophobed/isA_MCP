@@ -171,13 +171,120 @@ class BaseTool:
                 "(progress, HIL, streaming) will be limited."
             )
     
-    @property
-    def isa_client(self):
-        """延迟初始化ISA客户端"""
+    async def get_isa_client(self):
+        """异步获取ISA客户端"""
         if self._isa_client is None:
-            from core.isa_client_factory import get_isa_client
-            self._isa_client = get_isa_client()
+            from core.clients.model_client import get_isa_client
+            self._isa_client = await get_isa_client()
         return self._isa_client
+
+    async def _invoke_isa_model(
+        self,
+        client,
+        input_data: Union[str, List[Dict], Dict],
+        task: str,
+        service_type: str,
+        parameters: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        适配器：将旧的invoke API转换为新的OpenAI兼容API
+
+        Args:
+            client: AsyncISAModel instance
+            input_data: 输入数据
+            task: 任务类型 ("chat", "embed", "generate_image", etc.)
+            service_type: 服务类型 ("text", "embedding", "image")
+            parameters: 额外参数
+
+        Returns:
+            统一格式: {'success': bool, 'result': Any, 'billing': {}, 'metadata': {}}
+        """
+        params = parameters or {}
+
+        try:
+            # 根据service_type和task映射到新API
+            if service_type == "text" and task == "chat":
+                # Text generation - chat.completions
+                messages = input_data if isinstance(input_data, list) else [
+                    {"role": "user", "content": str(input_data)}
+                ]
+
+                response = await client.chat.completions.create(
+                    model=params.get('model', 'gpt-4o-mini'),
+                    messages=messages,
+                    **{k: v for k, v in params.items() if k != 'model'}
+                )
+
+                return {
+                    'success': True,
+                    'result': response.choices[0].message.content,
+                    'billing': {
+                        'model': response.model,
+                        'provider': 'openai',
+                        'input_tokens': response.usage.prompt_tokens if response.usage else 0,
+                        'output_tokens': response.usage.completion_tokens if response.usage else 0,
+                        'cost_usd': 0.0  # 需要计算
+                    },
+                    'metadata': {
+                        'finish_reason': response.choices[0].finish_reason
+                    }
+                }
+
+            elif service_type == "embedding" and task == "embed":
+                # Embeddings
+                response = await client.embeddings.create(
+                    input=str(input_data),
+                    model=params.get('model', 'text-embedding-3-small')
+                )
+
+                return {
+                    'success': True,
+                    'result': response.data[0].embedding,
+                    'billing': {
+                        'model': response.model,
+                        'provider': 'openai',
+                        'input_tokens': response.usage.total_tokens if response.usage else 0,
+                        'cost_usd': 0.0
+                    },
+                    'metadata': {}
+                }
+
+            elif service_type == "image" and task == "generate_image":
+                # Image generation
+                response = await client.images.generate(
+                    prompt=str(input_data),
+                    model=params.get('model', 'dall-e-3'),
+                    n=params.get('n', 1),
+                    size=params.get('size', '1024x1024')
+                )
+
+                return {
+                    'success': True,
+                    'result': response.data[0].url if response.data else None,
+                    'billing': {
+                        'model': params.get('model', 'dall-e-3'),
+                        'provider': 'openai',
+                        'cost_usd': 0.0
+                    },
+                    'metadata': {
+                        'revised_prompt': response.data[0].revised_prompt if response.data else None
+                    }
+                }
+
+            else:
+                raise NotImplementedError(
+                    f"Task '{task}' with service_type '{service_type}' not yet mapped to new API"
+                )
+
+        except Exception as e:
+            logger.error(f"ISA model invocation failed: {e}")
+            return {
+                'success': False,
+                'result': None,
+                'error': str(e),
+                'billing': {},
+                'metadata': {}
+            }
     
     @property
     def security_manager(self):
@@ -282,12 +389,16 @@ class BaseTool:
             result_data: 仅返回结果数据，billing通过事件发布
         """
         try:
-            # 调用ISA客户端
-            isa_response = await self.isa_client.invoke(
+            # 获取ISA客户端
+            client = await self.get_isa_client()
+
+            # 使用适配器调用新API
+            isa_response = await self._invoke_isa_model(
+                client=client,
                 input_data=input_data,
                 task=task,
                 service_type=service_type,
-                parameters=parameters or {}
+                parameters=parameters
             )
 
             # 提取结果
@@ -1422,7 +1533,7 @@ class BaseTool:
             param_type_str = str(param.annotation)
             if 'Context' in param_type_str:
                 has_context_param = True
-                logger.info(f"🎯 Tool '{func.__name__}' has Context parameter: {param_name}: {param_type_str}")
+                logger.debug(f"Tool '{func.__name__}' has Context parameter: {param_name}: {param_type_str}")
                 break
 
         if not has_context_param:
@@ -1523,7 +1634,7 @@ class BaseTool:
                 period=rate_limit_period,
                 per_user=True
             )(wrapped_func)
-            logger.info(
+            logger.debug(
                 f"Applied rate limit to '{func.__name__}': "
                 f"{rate_limit_calls} calls per {rate_limit_period}s"
             )
@@ -1531,7 +1642,7 @@ class BaseTool:
         # Apply security level if specified
         if security_level is not None:
             wrapped_func = self.security_manager.require_authorization(security_level)(wrapped_func)
-            logger.info(f"Registered tool '{func.__name__}' with security level: {security_level.name}")
+            logger.debug(f"Registered tool '{func.__name__}' with security level: {security_level.name}")
         else:
             wrapped_func = self.security_manager.security_check(wrapped_func)
 
@@ -1551,7 +1662,7 @@ class BaseTool:
 
             wrapped_func.__annotations__ = clean_annotations
             if has_context_param:
-                logger.info(f"🎯 Cleaned Context annotations for '{func.__name__}' to enable injection")
+                logger.debug(f"Cleaned Context annotations for '{func.__name__}' to enable injection")
 
         # Register with MCP (use FastMCP defaults: structured_output=True)
         # FastMCP will automatically inject Context when ctx parameter is in signature

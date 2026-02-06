@@ -82,7 +82,7 @@ Create a strategic career guide that accelerates professional growth and advance
         
         return prompt_template.strip()
 
-    logger.info("Professional & Career 👔 prompts registered successfully")
+    logger.debug("Professional & Career 👔 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

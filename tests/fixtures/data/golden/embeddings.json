@@ -1,0 +1,25 @@
+{
+  "_comment": "Golden expected outputs for embedding tests. DO NOT MODIFY without approval.",
+  "embedding_dimensions": {
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536
+  },
+  "similarity_thresholds": {
+    "identical_texts": 0.99,
+    "similar_texts": 0.7,
+    "unrelated_texts": 0.3
+  },
+  "test_cases": [
+    {
+      "text": "Hello world",
+      "expected_dimension": 1536,
+      "expected_norm_range": [0.9, 1.1]
+    },
+    {
+      "text": "",
+      "expected_dimension": 1536,
+      "expected_behavior": "zero_vector_or_error"
+    }
+  ]
+}

@@ -137,7 +137,7 @@ Create structured course material that supports effective teaching and learning.
         
         return prompt_template.strip()
 
-    logger.info("Education & Learning 📚 prompts registered successfully")
+    logger.debug("Education & Learning 📚 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

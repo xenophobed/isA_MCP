@@ -158,7 +158,7 @@ class HILExampleTool(BaseTool):
             annotations=ToolAnnotations(readOnlyHint=True)
         )
 
-        logger.info(f"Registered {len(self.registered_tools)} HIL example tools")
+        logger.debug(f"Registered {len(self.registered_tools)} HIL example tools")
 
     # =========================================================================
     # Scenario 1: Authorization implementations

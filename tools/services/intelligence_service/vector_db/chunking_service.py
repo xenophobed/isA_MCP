@@ -726,7 +726,7 @@ class SemanticChunker(BaseChunker):
     async def _get_embedding_generator(self):
         """Lazy load embedding generator"""
         if self.embedding_generator is None:
-            from tools.services.intelligence_service.language.embedding_generator import EmbeddingGenerator
+            from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
             self.embedding_generator = EmbeddingGenerator()
         return self.embedding_generator
     
@@ -866,8 +866,8 @@ class TokenChunker(BaseChunker):
         try:
             import tiktoken
             self.tokenizer = tiktoken.get_encoding(self.config.tokenizer or "cl100k_base")
-        except ImportError:
-            logger.warning("tiktoken not available. Install with: pip install tiktoken")
+        except (ImportError, ModuleNotFoundError):
+            logger.info("tiktoken not available - using character-based approximation for token chunking")
             self.tokenizer = None
     
     async def chunk(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> List[Chunk]:

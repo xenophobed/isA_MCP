@@ -59,11 +59,9 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         }
         
         if self.require_auth:
-            logger.info("✅ MCP Unified Auth Middleware enabled")
-            logger.info(f"🔐 Auth Service: {self.auth_service.auth_service_url}")
-            logger.info(f"🛡️ Authorization Service: {self.auth_service.authz_service_url}")
+            logger.info(f"  Auth: enabled ({self.auth_service.auth_service_url}, {self.auth_service.authorization_service_url})")
         else:
-            logger.info("🔓 MCP authentication disabled - open access mode")
+            logger.info("  Auth: open access (disabled)")
     
     def _get_auth_setting(self) -> bool:
         """获取认证设置"""
@@ -252,5 +250,5 @@ def add_mcp_unified_auth_middleware(app, config: Optional[Dict[str, Any]] = None
     # 添加中间件
     app.add_middleware(MCPUnifiedAuthMiddleware, config=config)
     
-    logger.info("🔐 MCP Unified Auth Middleware added to application")
+    logger.debug("MCP Unified Auth Middleware added to application")
     return True

@@ -292,4 +292,4 @@ def register_symbolic_model_resources(mcp: FastMCP):
             "usage": "Include this context in prompts for symbolic reasoning"
         }, indent=2)
     
-    print("🧠 Symbolic model resources registered successfully")
+    # Registration complete

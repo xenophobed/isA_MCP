@@ -48,7 +48,7 @@ class DigitalKnowledgeResources:
             'embedding_collection'
         }
         
-        logger.info("Digital Knowledge Resources initialized")
+        logger.debug("Digital Knowledge Resources initialized")
     
     async def register_knowledge_item(self,
                                     knowledge_id: str,
@@ -736,7 +736,7 @@ def register_digital_resource(mcp):
             "usage": "Reference these types when working with knowledge resources"
         }, indent=2)
     
-    logger.info(f"✅ Registered digital knowledge resources")
+    logger.debug("Registered digital knowledge resources")
 
 
 # Export for auto-discovery

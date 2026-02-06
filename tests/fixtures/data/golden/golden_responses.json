@@ -1,0 +1,94 @@
+{
+  "_description": "Golden response data for characterization tests - DO NOT MODIFY without approval",
+
+  "embeddings": {
+    "description": "Expected embedding dimensions and characteristics",
+    "default_model": "text-embedding-3-small",
+    "default_dimension": 1536,
+    "sample_embedding_prefix": [0.1, 0.1, 0.1, 0.1, 0.1],
+    "zero_embedding_prefix": [0.0, 0.0, 0.0, 0.0, 0.0]
+  },
+
+  "llm_responses": {
+    "description": "Expected LLM response structures",
+    "default_model": "gpt-4.1-nano",
+    "default_temperature": 0.7,
+    "playwright_temperature": 0.3,
+    "sample_response": "Generated response text"
+  },
+
+  "vision_responses": {
+    "description": "Expected vision analysis response structures",
+    "default_model": "gpt-4.1-nano",
+    "default_provider": "openai",
+    "sample_response": {
+      "response": "This is a description of the image",
+      "model_used": "gpt-4.1-nano",
+      "processing_time": 1.5,
+      "success": true,
+      "error": null
+    }
+  },
+
+  "audio_responses": {
+    "description": "Expected audio analysis response structures",
+    "sample_transcription": {
+      "success": true,
+      "data": {
+        "transcript": "This is the transcribed text",
+        "language": "en",
+        "confidence": 0.8,
+        "duration": 10.5,
+        "processing_time": 2.0,
+        "model_used": "default"
+      },
+      "cost_usd": 0.001
+    }
+  },
+
+  "search_results": {
+    "description": "Expected search result structures",
+    "default_score_threshold_tools": 0.3,
+    "default_score_threshold_prompts": 0.5,
+    "default_score_threshold_resources": 0.5,
+    "sample_tool_result": {
+      "id": "tool_1",
+      "type": "tool",
+      "name": "test_tool",
+      "description": "A test tool",
+      "score": 0.95,
+      "db_id": 42,
+      "metadata": {},
+      "inputSchema": {"type": "object", "properties": {}},
+      "outputSchema": null,
+      "annotations": null
+    }
+  },
+
+  "tool_service": {
+    "description": "Expected tool service behavior",
+    "required_fields": ["name"],
+    "immutable_fields": ["id", "created_at", "updated_at"],
+    "default_category": "utility",
+    "default_is_active": true
+  },
+
+  "prompt_service": {
+    "description": "Expected prompt service behavior",
+    "required_fields": ["name"],
+    "default_version": 1
+  },
+
+  "resource_service": {
+    "description": "Expected resource service behavior",
+    "required_fields": ["uri", "name"],
+    "default_is_public": false
+  },
+
+  "vector_service": {
+    "description": "Expected vector service behavior",
+    "collection_name": "mcp_unified_search",
+    "vector_dimension": 1536,
+    "distance_metric": "cosine"
+  }
+}

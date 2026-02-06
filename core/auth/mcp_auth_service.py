@@ -75,9 +75,9 @@ class MCPAuthService:
             settings.auth_service_url or 
             "http://localhost:8000"
         )
-        self.authz_service_url = (
-            self.config.get("authz_service_url") or 
-            settings.authz_service_url or 
+        self.authorization_service_url = (
+            self.config.get("authorization_service_url") or
+            settings.authorization_service_url or
             "http://localhost:8203"
         )
         
@@ -85,9 +85,7 @@ class MCPAuthService:
         self._auth_client = None
         self._authz_client = None
         
-        logger.info("MCP Auth Service initialized")
-        logger.info(f"Auth Service: {self.auth_service_url}")
-        logger.info(f"Authorization Service: {self.authz_service_url}")
+        logger.debug(f"MCP Auth Service initialized (auth={self.auth_service_url}, authz={self.authorization_service_url})")
     
     @property
     def auth_client(self):
@@ -102,7 +100,7 @@ class MCPAuthService:
         """懒加载授权客户端"""
         if self._authz_client is None:
             from .authorization_client import AuthorizationServiceClient
-            self._authz_client = AuthorizationServiceClient(self.authz_service_url)
+            self._authz_client = AuthorizationServiceClient(self.authorization_service_url)
         return self._authz_client
     
     async def authenticate_token(self, token: str) -> UserContext:

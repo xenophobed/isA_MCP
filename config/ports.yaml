@@ -1,0 +1,147 @@
+# =============================================================================
+# Port Configuration - Single Point of Truth for MCP Service
+# =============================================================================
+# This file is the ONLY source of truth for port configuration for:
+# - deployment/k8s/*.yaml (Kubernetes manifests)
+# - deployment/environments/*.env (environment files)
+# - tests/ (test configuration)
+#
+# Architecture:
+#   External Traffic -> APISIX Gateway -> Consul -> MCP Service
+# =============================================================================
+
+# Kubernetes Namespace Configuration
+kubernetes:
+  staging_namespace: "isa-cloud-staging"
+  production_namespace: "isa-cloud-prod"
+  default_namespace: "isa-cloud-staging"
+
+# Host Configuration (can be overridden by environment)
+hosts:
+  default: "localhost"
+  k8s_cluster: "kubernetes.default.svc"
+
+# =============================================================================
+# MCP Service Configuration
+# =============================================================================
+mcp_service:
+  port: 8081
+  internal_port: 8300  # For direct service access in tests
+  k8s_service: "mcp"
+  description: "Model Context Protocol service"
+  repo: "isA_MCP"
+
+# =============================================================================
+# Infrastructure Dependencies (services MCP connects to)
+# =============================================================================
+infrastructure:
+  # Database (via gRPC gateway)
+  postgres_grpc:
+    port: 50061
+    k8s_service: "isa-postgres-grpc"
+    description: "PostgreSQL gRPC gateway"
+
+  # Vector Database (direct connection)
+  qdrant:
+    http: 6333
+    grpc: 6334
+    k8s_service: "qdrant"
+    description: "Qdrant vector database"
+
+  # Qdrant gRPC Gateway
+  qdrant_grpc:
+    port: 50062
+    k8s_service: "qdrant-grpc"
+    description: "Qdrant gRPC gateway"
+
+  # Cache (direct connection)
+  redis:
+    port: 6379
+    k8s_service: "redis"
+    description: "Redis cache"
+
+  # Redis gRPC Gateway
+  redis_grpc:
+    port: 50063
+    k8s_service: "redis-grpc"
+    description: "Redis gRPC gateway"
+
+  # Object Storage
+  minio:
+    api: 9000
+    console: 9001
+    k8s_service: "minio"
+    description: "MinIO S3-compatible storage"
+
+  # MinIO gRPC Gateway
+  minio_grpc:
+    port: 50051
+    k8s_service: "minio-grpc"
+    description: "MinIO gRPC gateway"
+
+# =============================================================================
+# Service Discovery (Consul)
+# =============================================================================
+service_discovery:
+  consul:
+    http: 8500
+    dns: 8600
+    k8s_service: "consul"
+    description: "Service discovery and KV store"
+
+# =============================================================================
+# API Gateway (APISIX) - MCP exposed through gateway
+# =============================================================================
+gateway:
+  apisix:
+    http: 80
+    https: 443
+    k8s_service: "apisix-gateway"
+    description: "API Gateway - dynamic routing via Consul"
+
+# =============================================================================
+# Related Platform Services (MCP may call these)
+# =============================================================================
+platform:
+  agent:
+    port: 8080
+    k8s_service: "agent"
+    description: "isA Agent service"
+
+  model:
+    port: 8082
+    k8s_service: "model"
+    description: "Model service"
+
+# =============================================================================
+# Observability (for logging and metrics)
+# =============================================================================
+observability:
+  loki:
+    port: 3100
+    k8s_service: "loki"
+    description: "Loki log aggregation"
+
+  grafana:
+    port: 3000
+    k8s_service: "grafana"
+    description: "Grafana dashboards"
+
+# =============================================================================
+# Port Ranges Summary (for MCP context)
+# =============================================================================
+# Port          | Service
+# --------------|----------------------------------
+# 8081          | MCP Service (external via gateway)
+# 8300          | MCP Service (internal/test access)
+# 50061         | PostgreSQL gRPC gateway
+# 50062         | Qdrant gRPC gateway
+# 50063         | Redis gRPC gateway
+# 50051         | MinIO gRPC gateway
+# 6333-6334     | Qdrant (direct)
+# 6379          | Redis (direct)
+# 9000          | MinIO (direct)
+# 8500          | Consul
+# 3000          | Grafana
+# 3100          | Loki
+# =============================================================================

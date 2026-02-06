@@ -199,7 +199,7 @@ Create a professional financial analysis that meets investment-grade standards.
         
         return prompt_template.strip()
 
-    logger.info("Business & Commerce 💼 prompts registered successfully")
+    logger.debug("Business & Commerce 💼 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

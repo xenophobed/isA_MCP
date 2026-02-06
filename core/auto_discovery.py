@@ -147,7 +147,7 @@ class AutoDiscoverySystem:
 
     def discover_tools(self) -> Dict[str, Dict[str, Any]]:
         """Auto-discover all tools in tools directory using multiple approaches"""
-        logger.info(f"🔍 Discovering tools in {self.tools_dir}")
+        logger.debug(f"Discovering tools in {self.tools_dir}")
         
         tools = {}
         
@@ -156,14 +156,18 @@ class AutoDiscoverySystem:
             return tools
         
         # Approach 1: Try AST-based discovery for top-level tools
-        logger.info(f"🔍 Using AST discovery for top-level tools...")
+        logger.debug("Using AST discovery for top-level tools...")
         for python_file in self.tools_dir.rglob("*.py"):
             if python_file.name.startswith("__"):
                 continue
-            
+
+            # Skip test files
+            if python_file.name.startswith("test_") or "/tests/" in str(python_file):
+                continue
+
             # CRITICAL: Skip ML models to prevent mutex lock issues
             if any(ml_path in str(python_file) for ml_path in ["ml_models", "deep_learning", "sota_models", "real_sota"]):
-                logger.warning(f"⚠️ Skipping ML module {python_file.name} to prevent mutex lock")
+                logger.debug(f"Skipping ML module {python_file.name} to prevent mutex lock")
                 continue
                 
             # logger.info(f"  📄 Scanning {python_file.name}")  # 减少冷余日志
@@ -174,14 +178,14 @@ class AutoDiscoverySystem:
                 tools[tool_name] = func_info
                 # logger.info(f"    🔧 Found tool: {tool_name}")  # 减少冷余日志
         
-        logger.info(f"✅ Discovered {len(tools)} tools total")
+        logger.debug(f"Discovered {len(tools)} tools total")
         
         self.discovered_tools = tools
         return tools
 
     def discover_prompts(self) -> Dict[str, Dict[str, Any]]:
         """Auto-discover all prompts in prompts directory"""
-        logger.info(f"🔍 Discovering prompts in {self.prompts_dir}")
+        logger.debug(f"Discovering prompts in {self.prompts_dir}")
         
         prompts = {}
         
@@ -223,18 +227,18 @@ class AutoDiscoverySystem:
                                     "keywords": keywords[:10],  # Limit to 10 keywords
                                     "type": "prompt"
                                 }
-                                logger.info(f"    📝 Found prompt: {attr_name}")
+                                logger.debug(f"    Found prompt: {attr_name}")
             
             except Exception as e:
                 logger.error(f"Error processing prompts file {python_file}: {e}")
         
-        logger.info(f"✅ Discovered {len(prompts)} prompts")
+        logger.debug(f"Discovered {len(prompts)} prompts")
         self.discovered_prompts = prompts
         return prompts
 
     def discover_resources(self) -> Dict[str, Dict[str, Any]]:
         """Auto-discover all resources in resources directory"""
-        logger.info(f"🔍 Discovering resources in {self.resources_dir}")
+        logger.debug(f"Discovering resources in {self.resources_dir}")
         
         resources = {}
         
@@ -275,7 +279,7 @@ class AutoDiscoverySystem:
             except Exception as e:
                 logger.error(f"Error processing resources file {python_file}: {e}")
         
-        logger.info(f"✅ Discovered {len(resources)} resources")
+        logger.debug(f"Discovered {len(resources)} resources")
         self.discovered_resources = resources
         return resources
 
@@ -283,15 +287,15 @@ class AutoDiscoverySystem:
         """Automatically register all discovered items with MCP server"""
         config = config or {}
 
-        logger.info("🚀 Auto-registering all discovered items with MCP server")
+        logger.debug("Auto-registering all discovered items with MCP server")
 
         # Initialize security manager FIRST (required by some tools)
         try:
             from core.security import initialize_security
             initialize_security()
-            logger.info("✅ Security manager initialized")
+            logger.info("  Security: initialized")
         except Exception as e:
-            logger.warning(f"⚠️ Failed to initialize security manager: {e}")
+            logger.warning(f"Failed to initialize security manager: {e}")
 
         # Register tools from tool modules
         registered_count = 0
@@ -301,17 +305,25 @@ class AutoDiscoverySystem:
         for python_file in self.tools_dir.rglob("*.py"):
             if python_file.name.startswith("__"):
                 continue
-                
+
+            # Skip test files
+            if python_file.name.startswith("test_") or "/tests/" in str(python_file):
+                continue
+
+            # Skip aggregator_tools.py (requires aggregator_service arg, registered separately)
+            if python_file.name == "aggregator_tools.py":
+                continue
+
             # Skip service files, utility files, and disabled directories, BUT include *_tools.py files
             if any(skip in str(python_file) for skip in ["__pycache__", "disabled"]):
                 continue
             # Skip services directory UNLESS it's a *_tools.py file
             if "services" in str(python_file) and not python_file.name.endswith("_tools.py"):
                 continue
-            
+
             # CRITICAL: Skip ML models to prevent mutex lock issues
             if any(ml_path in str(python_file) for ml_path in ["ml_models", "deep_learning", "sota_models", "real_sota"]):
-                logger.warning(f"⚠️ Skipping ML module {python_file.name} to prevent mutex lock")
+                logger.debug(f"Skipping ML module {python_file.name} to prevent mutex lock")
                 continue
             # Skip client folder but not client_interaction_tools.py
             if "/client" in str(python_file) and "client_interaction_tools.py" not in str(python_file):
@@ -327,7 +339,7 @@ class AutoDiscoverySystem:
                 # Try proper module import first (preserves package structure)
                 try:
                     module = importlib.import_module(module_path)
-                    logger.debug(f"  📦 Loaded {module_path} as package module")
+                    logger.debug(f"  Loaded {module_path} as package module")
                 except (ImportError, ModuleNotFoundError):
                     # Fallback to file-based import
                     logger.debug(f"  📄 Fallback to file-based import for {module_name}")
@@ -346,17 +358,17 @@ class AutoDiscoverySystem:
                     register_func(mcp)
                     registered_count += 1
                     tool_files_processed.add(python_file.name)
-                    logger.info(f"  ✅ Registered tools from {module_name}")
+                    logger.debug(f"  Registered tools from {module_name}")
                 else:
                     # Check if file has any @mcp.tool decorated functions
                     has_tools = self._check_for_mcp_tools(python_file)
                     if has_tools:
-                        logger.warning(f"  ⚠️ {module_name} has tools but no register function")
+                        logger.debug(f"  {module_name} has tools but no register function")
                     else:
-                        logger.debug(f"  ⏭️ Skipping {module_name} (no tools found)")
+                        logger.debug(f"  Skipping {module_name} (no tools found)")
 
             except Exception as e:
-                logger.error(f"  ❌ Failed to register tools from {python_file.name}: {e}")
+                logger.error(f"  Failed to register tools from {python_file.name}: {e}")
         
         # Register prompts from prompt modules
         prompt_files_processed = set()
@@ -381,10 +393,10 @@ class AutoDiscoverySystem:
                         # Call the register function with MCP instance
                         register_func(mcp)
                         prompt_files_processed.add(python_file.name)
-                        logger.info(f"  ✅ Registered prompts from {module_name}")
+                        logger.debug(f"  Registered prompts from {module_name}")
             
             except Exception as e:
-                logger.error(f"  ❌ Failed to register prompts from {python_file.name}: {e}")
+                logger.error(f"  Failed to register prompts from {python_file.name}: {e}")
         
         # Register resources from resource modules
         resource_files_processed = set()
@@ -426,15 +438,15 @@ class AutoDiscoverySystem:
                             register_func(mcp)
                         
                         resource_files_processed.add(python_file.name)
-                        logger.info(f"  ✅ Registered resources from {module_name}")
+                        logger.debug(f"  Registered resources from {module_name}")
             
             except Exception as e:
-                logger.error(f"  ❌ Failed to register resources from {python_file.name}: {e}")
+                logger.error(f"  Failed to register resources from {python_file.name}: {e}")
         
         # Register Composio Bridge if available (lazy loaded for performance)
         composio_tools_metadata = {}
         try:
-            logger.info("🌉 Checking Composio Bridge availability...")
+            logger.debug("Checking Composio Bridge availability...")
             # Import is fast now - actual SDK loading is deferred until connect()
             from tools.services.composio_service.composio_mcp_bridge import register_composio_bridge
 
@@ -443,7 +455,7 @@ class AutoDiscoverySystem:
 
             # 将 Composio 工具元数据加入索引
             if composio_tools_metadata:
-                logger.info(f"  📊 Indexing {len(composio_tools_metadata)} Composio tools for search...")
+                logger.debug(f"  Indexing {len(composio_tools_metadata)} Composio tools for search...")
                 for tool_name, tool_meta in composio_tools_metadata.items():
                     self.discovered_tools[tool_name] = {
                         "name": tool_name,
@@ -453,32 +465,26 @@ class AutoDiscoverySystem:
                         "source": "composio_dynamic",
                         "docstring": tool_meta.get("description", "")
                     }
-                logger.info(f"  ✅ Indexed {len(composio_tools_metadata)} Composio tools for search")
-                logger.info("  ✅ Composio Bridge integration registered")
+                logger.info(f"  Composio Bridge: {len(composio_tools_metadata)} tools indexed")
             else:
-                logger.info("  ⏭️ Composio Bridge skipped (not configured)")
+                logger.debug("  Composio Bridge skipped (not configured)")
         except ImportError as e:
-            logger.info("  ⚠️ Composio Bridge not available (module not found)")
+            logger.debug("  Composio Bridge not available (module not found)")
         except Exception as e:
-            logger.error(f"  ❌ Failed to register Composio Bridge: {e}")
+            logger.error(f"  Failed to register Composio Bridge: {e}")
         
         # Also discover for metadata purposes
         self.discover_tools()
         self.discover_prompts() 
         self.discover_resources()
         
-        logger.info(f"🎉 Auto-registration complete:")
-        logger.info(f"  🔧 Tool modules: {registered_count}")
-        logger.info(f"  📝 Prompt modules: {len(prompt_files_processed)}")
-        logger.info(f"  📊 Resource modules: {len(resource_files_processed)}")
-        logger.info(f"📁 Files processed:")
-        logger.info(f"  Tools: {list(tool_files_processed)}")
-        logger.info(f"  Prompts: {list(prompt_files_processed)}")
-        logger.info(f"  Resources: {list(resource_files_processed)}")
-        logger.info(f"📊 Discovery summary:")
-        logger.info(f"  🔧 Tools discovered: {len(self.discovered_tools)}")
-        logger.info(f"  📝 Prompts: {len(self.discovered_prompts)}")
-        logger.info(f"  📊 Resources: {len(self.discovered_resources)}")
+        # Compact summary at INFO level
+        logger.info(f"  Discovery: {registered_count} tool modules, {len(prompt_files_processed)} prompt modules, {len(resource_files_processed)} resource modules")
+
+        # Detailed file lists at DEBUG level
+        logger.debug(f"Tools: {list(tool_files_processed)}")
+        logger.debug(f"Prompts: {list(prompt_files_processed)}")
+        logger.debug(f"Resources: {list(resource_files_processed)}")
     
     def _check_for_mcp_tools(self, file_path: Path) -> bool:
         """Check if a file contains @mcp.tool decorated functions"""

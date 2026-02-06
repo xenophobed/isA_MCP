@@ -103,7 +103,7 @@ async def batch_register_composio_apps():
         # 存储
         'googledrive', 'dropbox', 'onedrive', 'box',
         # AI & 数据
-        'openai', 'anthropic', 'pinecone', 'supabase',
+        'openai', 'anthropic', 'pinecone',
         # 社交媒体
         'twitter', 'linkedin', 'facebook', 'instagram'
     ]

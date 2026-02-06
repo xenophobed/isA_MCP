@@ -138,7 +138,7 @@ Create a content marketing strategy that builds audience engagement and drives b
         
         return prompt_template.strip()
 
-    logger.info("Marketing & Media 📢 prompts registered successfully")
+    logger.debug("Marketing & Media 📢 prompts registered successfully")
 
 # For compatibility with auto-discovery  
 def register_prompts(mcp):

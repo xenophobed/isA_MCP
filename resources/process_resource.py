@@ -384,11 +384,11 @@ def register_process_resource(mcp: FastMCP):
                     "status": "valid"
                 })
 
-        logger.info(f"✅ Process validation: {len([r for r in validation_results if r['status'] == 'valid'])}/{len(STANDARD_PROCESSES)} valid")
+        logger.debug(f"Process validation: {len([r for r in validation_results if r['status'] == 'valid'])}/{len(STANDARD_PROCESSES)} valid")
         if any(r['status'] == 'warning' for r in validation_results):
             for result in validation_results:
                 if result['status'] == 'warning':
-                    logger.warning(f"⚠️ Process '{result['process']}' references missing tools: {result['missing_tools']}")
+                    logger.debug(f"Process '{result['process']}' references missing tools: {result['missing_tools']}")
 
         return validation_results
 
@@ -480,7 +480,7 @@ def register_process_resource(mcp: FastMCP):
             "available_domains": list(set(p["domain"] for p in STANDARD_PROCESSES.values()))
         }, indent=2, ensure_ascii=False)
 
-    logger.info(f"✅ Registered {len(STANDARD_PROCESSES)} standard process resources")
+    logger.debug(f"Registered {len(STANDARD_PROCESSES)} standard process resources")
 
 
 # Export for use in planning tools

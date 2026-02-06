@@ -74,7 +74,7 @@ class InMemoryStateStore(PlanStateManager):
         self.plans: Dict[str, Dict[str, Any]] = {}
         self.execution_history: Dict[str, List[Dict[str, Any]]] = {}
         self.branches: Dict[str, List[Dict[str, Any]]] = {}
-        logger.info("📦 InMemoryStateStore initialized (data will not persist on restart)")
+        logger.debug("InMemoryStateStore initialized (no persistence)")
 
     def save_plan(self, plan_id: str, plan_data: Dict[str, Any]) -> bool:
         """Save plan to memory"""
@@ -221,7 +221,7 @@ class InMemoryStateStore(PlanStateManager):
 
 
 class RedisStateStore(PlanStateManager):
-    """Redis-backed implementation using isa-common RedisClient"""
+    """Redis-backed implementation using native redis-py"""
 
     def __init__(self, redis_host: str = None, redis_port: int = None, user_id: str = "mcp-planner"):
         """
@@ -229,27 +229,24 @@ class RedisStateStore(PlanStateManager):
 
         Args:
             redis_host: Redis service host (default from env or localhost)
-            redis_port: Redis service port (default from env or 50055)
-            user_id: User ID for Redis operations
+            redis_port: Redis native port (default from env or 6379)
+            user_id: User ID for Redis operations (used as key prefix)
         """
         try:
-            # Import isa-common RedisClient
-            from isa_common.redis_client import RedisClient
+            import redis
 
             host = redis_host or os.getenv("REDIS_HOST", "localhost")
-            port = redis_port or int(os.getenv("REDIS_PORT", "50055"))
+            port = redis_port or int(os.getenv("REDIS_PORT", "6379"))
 
-            self.redis = RedisClient(host=host, port=port, user_id=user_id)
+            self.redis = redis.Redis(host=host, port=port, decode_responses=True)
+            self.user_id = user_id
 
             # Test connection
-            health = self.redis.health_check()
-            if health and health.get('healthy'):
-                logger.info(f"✅ RedisStateStore connected to Redis at {host}:{port}")
-            else:
-                raise Exception("Redis health check failed")
+            self.redis.ping()
+            logger.info(f"✅ RedisStateStore connected to Redis at {host}:{port}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize RedisStateStore: {e}")
+            logger.debug(f"Failed to initialize RedisStateStore: {e}")
             raise
 
     def _plan_key(self, plan_id: str) -> str:
@@ -270,9 +267,9 @@ class RedisStateStore(PlanStateManager):
             plan_data['plan_id'] = plan_id
             plan_data['last_updated'] = datetime.utcnow().isoformat()
 
-            # Save as JSON string
+            # Save as JSON string with 24h TTL
             plan_json = json.dumps(plan_data, ensure_ascii=False)
-            result = self.redis.set(self._plan_key(plan_id), plan_json, ttl_seconds=86400)  # 24h TTL
+            result = self.redis.set(self._plan_key(plan_id), plan_json, ex=86400)
 
             if result:
                 # Add creation event
@@ -426,7 +423,7 @@ class RedisStateStore(PlanStateManager):
         """List all active plan IDs in Redis"""
         try:
             # Use Redis KEYS to find all plan keys
-            plan_keys = self.redis.list_keys("plan:*")
+            plan_keys = self.redis.keys("plan:*")
             if not plan_keys:
                 return []
 
@@ -483,11 +480,11 @@ def create_state_manager(prefer_redis: bool = True, **kwargs) -> PlanStateManage
         try:
             # Try to create Redis store
             redis_store = RedisStateStore(**kwargs)
-            logger.info("🎯 Using RedisStateStore for plan persistence")
+            logger.debug("Using RedisStateStore for plan persistence")
             return redis_store
         except Exception as e:
-            logger.warning(f"Redis unavailable, falling back to InMemory: {e}")
+            logger.debug(f"Redis unavailable, falling back to InMemory: {e}")
 
     # Fallback to in-memory
-    logger.info("🎯 Using InMemoryStateStore (no persistence)")
+    logger.debug("Using InMemoryStateStore (no persistence)")
     return InMemoryStateStore()

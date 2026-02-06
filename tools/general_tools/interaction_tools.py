@@ -237,7 +237,7 @@ def register_client_interaction_tools(mcp):
             logger.error(f"Response formatting failed: {e}")
             return json.dumps(error_result)
 
-    logger.info("Client interaction tools registered successfully")
+    logger.debug("Client interaction tools registered successfully")
 
 # For backwards compatibility - this function name might be expected by auto-discovery
 def register_interaction_tools(mcp):

@@ -31,7 +31,7 @@ FUNCTIONALITY:
 DEPENDENCIES:
     - python-dotenv: Environment variable management
     - PyJWT: JSON Web Token handling
-    - supabase: Database client and operations
+    - asyncpg: PostgreSQL database client
     - FastAPI/Starlette: Web framework components
     - logging: Standard logging infrastructure
 

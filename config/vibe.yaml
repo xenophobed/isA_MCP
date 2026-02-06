@@ -1,0 +1,140 @@
+# =============================================================================
+# Vibe Configuration - Project Metadata for AI-SDLC
+# =============================================================================
+# This file is the entry point for isA_Vibe to understand project structure.
+# All isA projects should have this file at config/vibe.yaml
+# =============================================================================
+
+project:
+  name: isA_MCP
+  type: python_mcp               # MCP (Model Context Protocol) server
+  version: "0.1.0"
+  description: "MCP service for AI tool orchestration and resource management"
+
+# =============================================================================
+# Source Code Configuration
+# =============================================================================
+source:
+  root: services                 # Main source folder for services
+  pattern: "{component}_service" # Services follow _service pattern
+
+  # Components with their design patterns
+  # Pattern types: repository_service, cache_service, vector_service, facade_service, synchronizer_service
+  components:
+    progress:
+      pattern: cache_service           # Redis-based state management (Fowler: Unit of Work)
+      description: "Track progress for long-running operations"
+      infrastructure: [redis]
+    prompt:
+      pattern: repository_service      # PostgreSQL CRUD (Fowler: Repository + Service Layer)
+      description: "MCP prompt registry and management"
+      infrastructure: [postgres]
+    resource:
+      pattern: repository_service      # PostgreSQL CRUD
+      description: "MCP resource registry and management"
+      infrastructure: [postgres]
+    search:
+      pattern: facade_service          # Aggregates multiple services (GoF: Facade + EIP: Aggregator)
+      description: "Unified search across prompts, tools, resources"
+      infrastructure: []
+    skill:
+      pattern: repository_service      # PostgreSQL CRUD
+      description: "Skill composition and management"
+      infrastructure: [postgres]
+    sync:
+      pattern: synchronizer_service    # ETL/Data sync (EIP: Data Synchronizer)
+      description: "Sync MCP data from source APIs to PostgreSQL/Qdrant"
+      infrastructure: [postgres, qdrant]
+    tool:
+      pattern: repository_service      # PostgreSQL CRUD
+      description: "MCP tool registry and management"
+      infrastructure: [postgres]
+    vector:
+      pattern: vector_service          # Qdrant operations (GoF: Adapter + Repository)
+      description: "Vector embeddings and semantic search"
+      infrastructure: [qdrant]
+
+  # MCP Content Components (symlinked from root folders)
+  # Pattern: mcp_component (GoF: Template Method + Factory)
+  mcp_components:
+    mcp_prompts:
+      path: prompts                    # Actual path (symlinked as services/mcp_prompts)
+      pattern: mcp_component           # Template Method pattern
+      base_class: base_prompt.py
+      description: "MCP prompt definitions"
+      modules:
+        - default_prompts
+        - shopify_prompts
+    mcp_resources:
+      path: resources                  # Actual path (symlinked as services/mcp_resources)
+      pattern: mcp_component           # Template Method pattern
+      base_class: base_resource.py
+      description: "MCP resource definitions"
+      modules:
+        - data_analytics_resource
+        - digital_resource
+        - graph_knowledge_resources
+        - guardrail_resources
+        - process_resource
+        - symbolic_model_resources
+    mcp_tools:
+      path: tools                      # Actual path (symlinked as services/mcp_tools)
+      pattern: mcp_component           # Template Method pattern
+      base_class: base_tool.py
+      description: "MCP tool definitions"
+      subdirectories:
+        - data_tools
+        - example_tools
+        - general_tools
+        - intelligent_tools
+        - memory_tools
+        - plan_tools
+        - user_tools
+        - web_tools
+        - services/intelligence_service
+
+# =============================================================================
+# Config Files Used
+# =============================================================================
+config:
+  ports: false          # Does not use ports.yaml (single service)
+  dependencies: false   # Uses requirements.txt instead
+  init: false           # No complex infrastructure init
+
+# =============================================================================
+# CDD (Contract-Driven Development) Paths
+# =============================================================================
+cdd:
+  docs_path: docs
+  domain_path: docs/domain          # Layer 1: Domain context
+  prd_path: docs/prd                # Layer 2: PRD specification
+  design_path: docs/design          # Layer 3: Design document
+  contracts_path: tests/contracts   # Layer 4-6: Data/Logic/System contracts
+  contract_pattern: "{component}"
+
+# =============================================================================
+# TDD (Test-Driven Development) Paths
+# =============================================================================
+tdd:
+  tests_path: tests
+  test_layers:
+    unit: tests/unit                # Layer 1: Unit tests
+    component: tests/component      # Layer 2: Component tests
+    integration: tests/integration  # Layer 3: Integration tests
+    api: tests/api                  # Layer 4: API tests
+    smoke: tests/smoke              # Layer 5: Smoke tests
+  test_pattern: "{component}"
+
+# =============================================================================
+# MCP-Specific Configuration
+# =============================================================================
+mcp:
+  server_type: "stdio"              # stdio | sse | websocket
+  resources:
+    - data_analytics_resource
+    - digital_resource
+    - graph_knowledge_resources
+    - guardrail_resources
+    - process_resource
+    - symbolic_model_resources
+  prompts_path: prompts

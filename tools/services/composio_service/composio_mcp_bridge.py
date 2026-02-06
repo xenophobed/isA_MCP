@@ -464,7 +464,7 @@ def register_composio_bridge(mcp):
         # Check if Composio is enabled FIRST (before any imports)
         api_key = os.environ.get("COMPOSIO_API_KEY")
         if not api_key:
-            logger.info("⚠️ Composio API key not set, skipping bridge registration")
+            logger.debug("Composio API key not set, skipping bridge registration")
             return {}
 
         # Only import Composio service if API key is configured

@@ -184,7 +184,7 @@ class BasicExampleTools(BaseTool):
             annotations=ToolAnnotations(readOnlyHint=True)
         )
 
-        logger.info(f"Registered {len(self.registered_tools)} basic example tools")
+        logger.debug(f"Registered {len(self.registered_tools)} basic example tools")
 
     # ========================================================================
     # Calculator Implementation
@@ -423,5 +423,5 @@ def register_basic_example_tools(mcp):
     """
     tool = BasicExampleTools()
     tool.register_tools(mcp)
-    logger.info(f"✅ Basic example tools registered successfully")
+    logger.debug(f"✅ Basic example tools registered successfully")
     return tool

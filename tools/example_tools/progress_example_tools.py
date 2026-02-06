@@ -78,7 +78,7 @@ class ProgressTools(BaseTool):
             security_level=SecurityLevel.LOW
         )
 
-        logger.info(f"Registered {len(self.registered_tools)} progress tracking tools")
+        logger.debug(f"Registered {len(self.registered_tools)} progress tracking tools")
 
     # ========================================================================
     # Tool Implementations
@@ -433,5 +433,5 @@ def register_progress_example_tools(mcp):
     """
     tool = ProgressTools()
     tool.register_tools(mcp)
-    logger.info(f"✅ Progress tracking example tools registered successfully")
+    logger.debug(f"✅ Progress tracking example tools registered successfully")
     return tool
