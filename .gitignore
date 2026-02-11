@@ -72,6 +72,10 @@ deployment/aws/.env.aws
 auth_config.json
 api_keys.txt
 credentials.json
+kaggle.json
+
+# Benchmarks
+.benchmarks/
 
 # ============================================
 # 数据文件 - 不适合Git

@@ -16,7 +16,7 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
     Get gRPC client for specified service
 
     Args:
-        service_name: Name of service ('minio', 'loki', etc.)
+        service_name: Name of service ('minio', etc.)
         host: Service host (optional, uses Consul discovery if not provided)
         port: Service port (optional, uses Consul discovery if not provided)
         user_id: User ID for client session
@@ -64,11 +64,6 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
             import traceback
             traceback.print_exc()
             return None
-
-    elif service_name == 'loki':
-        # TODO: Implement Loki client
-        logger.error(f"Loki client not yet implemented")
-        return None
 
     else:
         logger.error(f"Unknown service: {service_name}")

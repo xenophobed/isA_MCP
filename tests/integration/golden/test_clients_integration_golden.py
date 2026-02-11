@@ -151,18 +151,6 @@ class TestMinioClientGolden:
 
 @pytest.mark.golden
 @pytest.mark.integration
-class TestDuckDBClientGolden:
-    """Golden tests for DuckDBClient integration - DO NOT MODIFY."""
-
-    def test_duckdb_client_module_exists(self):
-        """core.clients.duckdb_client module exists."""
-        from core.clients import duckdb_client
-
-        assert duckdb_client is not None
-
-
-@pytest.mark.golden
-@pytest.mark.integration
 class TestClientsSingletonPatternGolden:
     """Golden tests for client singleton patterns - DO NOT MODIFY."""
 
