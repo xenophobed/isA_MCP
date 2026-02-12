@@ -53,12 +53,15 @@ class ServerRegistry:
         name = config["name"]
 
         # Check for duplicate name (scoped: global or within same org)
+        new_org = config.get("org_id")
+        new_is_global = config.get("is_global", not bool(new_org))
         existing = await self.get_by_name(name)
         if existing:
-            # Allow same name in different orgs
             existing_org = existing.get("org_id")
-            new_org = config.get("org_id")
-            if existing_org == new_org or existing.get("is_global", True):
+            existing_is_global = existing.get("is_global", True)
+            # Block if: both global, or both in the same org
+            if (new_is_global and existing_is_global) or \
+               (new_org and existing_org and new_org == existing_org):
                 raise ValueError(f"Server already exists: {name}")
 
         server_id = str(uuid.uuid4())
@@ -357,11 +360,13 @@ class ServerRegistry:
             params = []
             param_idx = 1
 
-            # Tenant filter: only applied when org_id is provided (pre-migration safe)
+            # Tenant filter: show global + org's own; without org_id show global only
             if org_id:
                 conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
                 params.append(org_id)
                 param_idx += 1
+            else:
+                conditions.append("is_global = TRUE")
 
             if status:
                 status_value = status.value if isinstance(status, ServerStatus) else status

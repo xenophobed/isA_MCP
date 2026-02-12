@@ -114,11 +114,13 @@ class ToolRepository:
             params = []
             param_idx = 1
 
-            # Tenant filter: only applied when org_id is provided (pre-migration safe)
+            # Tenant filter: show global + org's own; without org_id show global only
             if org_id:
                 where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
                 params.append(org_id)
                 param_idx += 1
+            else:
+                where_clauses.append("is_global = TRUE")
 
             if category is not None:
                 where_clauses.append(f"category = ${param_idx}")
@@ -444,12 +446,13 @@ class ToolRepository:
             params = []
             param_idx = 1
 
-            # Tenant filter: only applied when org_id is provided (pre-migration safe)
-            tenant_clause = ""
+            # Tenant filter: show global + org's own; without org_id show global only
             if org_id:
                 tenant_clause = f"AND (is_global = TRUE OR org_id = ${param_idx})"
                 params.append(org_id)
                 param_idx += 1
+            else:
+                tenant_clause = "AND is_global = TRUE"
 
             query_pattern = f"%{query}%"
             params.append(query_pattern)
@@ -514,11 +517,13 @@ class ToolRepository:
             params = []
             param_idx = 1
 
-            # Tenant filter: only applied when org_id is provided (pre-migration safe)
+            # Tenant filter: show global + org's own; without org_id show global only
             if org_id:
                 where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
                 params.append(org_id)
                 param_idx += 1
+            else:
+                where_clauses.append("is_global = TRUE")
 
             if server_id is not None:
                 where_clauses.append(f"source_server_id = ${param_idx}")

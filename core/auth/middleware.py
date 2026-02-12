@@ -149,6 +149,11 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         """中间件主处理方法"""
         path = request.url.path
         
+        # Always extract X-Organization-Id header (even when auth is bypassed)
+        org_header = request.headers.get("X-Organization-Id", "").strip()
+        if org_header:
+            request.state.organization_id = org_header
+
         # 检查是否需要认证
         if not self.require_auth or self._should_bypass_auth(path):
             logger.debug(f"🔓 Bypassing auth for: {path}")
