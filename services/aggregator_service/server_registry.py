@@ -52,10 +52,14 @@ class ServerRegistry:
         """
         name = config["name"]
 
-        # Check for duplicate name
+        # Check for duplicate name (scoped: global or within same org)
         existing = await self.get_by_name(name)
         if existing:
-            raise ValueError(f"Server already exists: {name}")
+            # Allow same name in different orgs
+            existing_org = existing.get("org_id")
+            new_org = config.get("org_id")
+            if existing_org == new_org or existing.get("is_global", True):
+                raise ValueError(f"Server already exists: {name}")
 
         server_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -78,6 +82,9 @@ class ServerRegistry:
             "registered_at": now,
             "connected_at": None,
             "last_health_check": None,
+            # Multi-tenant fields
+            "org_id": config.get("org_id"),
+            "is_global": config.get("is_global", True),
         }
 
         if self._db_pool:
@@ -115,8 +122,9 @@ class ServerRegistry:
                 INSERT INTO mcp.external_servers (
                     id, name, description, transport_type, connection_config,
                     health_check_url, status, tool_count, error_message,
-                    registered_at, connected_at, last_health_check
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    registered_at, connected_at, last_health_check,
+                    org_id, is_global
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
                 """,
                 server["id"],
                 server["name"],
@@ -130,6 +138,8 @@ class ServerRegistry:
                 server["registered_at"],
                 server.get("connected_at"),
                 server.get("last_health_check"),
+                server.get("org_id"),
+                server.get("is_global", True),
             )
 
     async def get(self, server_id: str) -> Optional[Dict[str, Any]]:
@@ -283,38 +293,59 @@ class ServerRegistry:
             )
             return "DELETE 1" in result
 
-    async def list(self, status: ServerStatus = None) -> List[Dict[str, Any]]:
+    async def list(self, status: ServerStatus = None, org_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        List all servers with optional status filter.
+        List all servers with optional status and org filter.
 
         Args:
             status: Optional status filter
+            org_id: Optional organization ID for tenant filtering
 
         Returns:
             List of server records
         """
         if self._db_pool:
-            return await self._list_servers_db(status)
+            return await self._list_servers_db(status, org_id=org_id)
 
         results = []
         for server in self._servers.values():
-            if status is None or server["status"] == status:
-                results.append(server)
+            if status is not None and server["status"] != status:
+                continue
+            # In-memory tenant filter
+            if org_id:
+                if not (server.get("is_global", True) or server.get("org_id") == org_id):
+                    continue
+            else:
+                if not server.get("is_global", True):
+                    continue
+            results.append(server)
         return results
 
-    async def _list_servers_db(self, status: Optional[ServerStatus]) -> List[Dict[str, Any]]:
-        """List servers from database."""
+    async def _list_servers_db(self, status: Optional[ServerStatus], org_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List servers from database with tenant filtering."""
         async with self._db_pool.acquire() as conn:
+            conditions = []
+            params = []
+            param_idx = 1
+
+            # Tenant filter
+            if org_id:
+                conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                conditions.append("(is_global = TRUE OR is_global IS NULL)")
+
             if status:
                 status_value = status.value if isinstance(status, ServerStatus) else status
-                rows = await conn.fetch(
-                    "SELECT * FROM mcp.external_servers WHERE status = $1 ORDER BY name",
-                    status_value
-                )
-            else:
-                rows = await conn.fetch(
-                    "SELECT * FROM mcp.external_servers ORDER BY name"
-                )
+                conditions.append(f"status = ${param_idx}")
+                params.append(status_value)
+                param_idx += 1
+
+            where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
+            query = f"SELECT * FROM mcp.external_servers {where_sql} ORDER BY name"
+
+            rows = await conn.fetch(query, *params)
             return [self._row_to_server(row) for row in rows]
 
     async def update_status(
@@ -408,4 +439,6 @@ class ServerRegistry:
             "registered_at": row["registered_at"],
             "connected_at": row.get("connected_at"),
             "last_health_check": row.get("last_health_check"),
+            "org_id": str(row["org_id"]) if row.get("org_id") else None,
+            "is_global": row.get("is_global", True),
         }

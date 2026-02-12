@@ -65,13 +65,22 @@ class PromptRepository:
         is_active: Optional[bool] = True,
         tags: Optional[List[str]] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List prompts with optional filters"""
         try:
             where_clauses = []
             params = []
             param_idx = 1
+
+            # Tenant filter
+            if org_id:
+                where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                where_clauses.append("(is_global = TRUE OR is_global IS NULL)")
 
             if category is not None:
                 where_clauses.append(f"category = ${param_idx}")
@@ -137,6 +146,9 @@ class PromptRepository:
                 'skill_ids': skill_ids,
                 'primary_skill_id': prompt_data.get('primary_skill_id'),
                 'is_classified': prompt_data.get('is_classified', False),
+                # Multi-tenant fields
+                'org_id': prompt_data.get('org_id'),
+                'is_global': prompt_data.get('is_global', True),
             }
 
             async with self.db:
@@ -305,7 +317,8 @@ class PromptRepository:
         self,
         server_id: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         List external prompts with optional filters.
@@ -314,6 +327,7 @@ class PromptRepository:
             server_id: Filter by source server UUID
             limit: Maximum results
             offset: Pagination offset
+            org_id: Organization ID for tenant filtering
 
         Returns:
             List of external prompts
@@ -322,6 +336,14 @@ class PromptRepository:
             where_clauses = ["is_external = TRUE", "is_active = TRUE"]
             params = []
             param_idx = 1
+
+            # Tenant filter
+            if org_id:
+                where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                where_clauses.append("(is_global = TRUE OR is_global IS NULL)")
 
             if server_id is not None:
                 where_clauses.append(f"source_server_id = ${param_idx}")

@@ -435,17 +435,18 @@ class AggregatorService:
             ]
         }
 
-    async def list_servers(self, status: ServerStatus = None) -> List[Dict[str, Any]]:
+    async def list_servers(self, status: ServerStatus = None, org_id: str = None) -> List[Dict[str, Any]]:
         """
         List registered servers.
 
         Args:
             status: Optional status filter
+            org_id: Optional organization ID for tenant filtering
 
         Returns:
             List of server records
         """
-        return await self._registry.list(status=status)
+        return await self._registry.list(status=status, org_id=org_id)
 
     async def get_server(self, server_id: str) -> Optional[Dict[str, Any]]:
         """

@@ -95,6 +95,10 @@ class VectorRepository:
             # Index for active status filtering
             await self.client.create_field_index(self.collection_name, "is_active", "keyword")
 
+            # Multi-tenant indexes
+            await self.client.create_field_index(self.collection_name, "org_id", "keyword")
+            await self.client.create_field_index(self.collection_name, "is_global", "keyword")
+
             logger.info("Created field indexes for filtering")
 
         except Exception as e:
@@ -146,6 +150,11 @@ class VectorRepository:
 
             # Add metadata if provided
             if metadata:
+                # Promote org_id and is_global to top-level payload for Qdrant filtering
+                if "org_id" in metadata:
+                    payload["org_id"] = metadata.pop("org_id")
+                if "is_global" in metadata:
+                    payload["is_global"] = metadata.pop("is_global")
                 payload["metadata"] = metadata
 
             # Compute unique point ID using type offset to prevent collisions

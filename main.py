@@ -315,6 +315,7 @@ add_mcp_unified_auth_middleware(app, auth_config)
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 import json
+from core.auth.org_context import get_org_id
 
 async def health_check(request):
     """Health check endpoint"""
@@ -744,6 +745,7 @@ async def api_search_endpoint(request):
         if not smart_server or not smart_server.search_service:
             return JSONResponse({"detail": "Search service not ready"}, status_code=503)
 
+        org_id = get_org_id(request)
         result = await smart_server.search_service.search(
             query=query,
             item_type=item_type,
@@ -752,7 +754,8 @@ async def api_search_endpoint(request):
             skill_threshold=skill_threshold,
             tool_threshold=tool_threshold,
             include_schemas=data.get("include_schemas", True),
-            strategy=strategy
+            strategy=strategy,
+            org_id=org_id
         )
 
         return JSONResponse(smart_server.search_service.to_dict(result))
@@ -914,7 +917,8 @@ async def aggregator_list_servers_endpoint(request):
             from tests.contracts.aggregator.data_contract import ServerStatus
             status_filter = ServerStatus(status_filter)
 
-        servers = await smart_server.aggregator_service.list_servers(status=status_filter)
+        org_id = get_org_id(request)
+        servers = await smart_server.aggregator_service.list_servers(status=status_filter, org_id=org_id)
         return JSONResponse([_serialize_server(s) for s in servers])
 
     except Exception as e:
@@ -936,6 +940,14 @@ async def aggregator_register_server_endpoint(request):
                 {"detail": "name and transport_type are required"},
                 status_code=422
             )
+
+        # Inject org_id from auth context into server config
+        org_id = get_org_id(request)
+        if org_id:
+            data["org_id"] = org_id
+            data["is_global"] = False  # Org-scoped server
+        else:
+            data.setdefault("is_global", True)
 
         server = await smart_server.aggregator_service.register_server(data)
         return JSONResponse(_serialize_server(server), status_code=201)

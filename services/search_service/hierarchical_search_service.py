@@ -193,7 +193,8 @@ class HierarchicalSearchService:
         skill_threshold: float = 0.4,
         tool_threshold: float = 0.3,
         include_schemas: bool = True,
-        strategy: str = "hierarchical"
+        strategy: str = "hierarchical",
+        org_id: Optional[str] = None
     ) -> HierarchicalSearchResult:
         """
         Perform hierarchical search.
@@ -263,7 +264,8 @@ class HierarchicalSearchService:
                 skill_ids=skill_ids_used,
                 item_type=item_type,
                 limit=limit * 2,  # Fetch more to account for filtering
-                threshold=tool_threshold
+                threshold=tool_threshold,
+                org_id=org_id
             )
             tool_search_time = (time.time() - tool_start) * 1000
 
@@ -394,7 +396,8 @@ class HierarchicalSearchService:
         skill_ids: Optional[List[str]],
         item_type: Optional[str],
         limit: int,
-        threshold: float
+        threshold: float,
+        org_id: Optional[str] = None
     ) -> List[ToolMatch]:
         """
         Search the tools collection with optional skill filter (Stage 2).
@@ -405,6 +408,7 @@ class HierarchicalSearchService:
             item_type: Item type filter (tool/prompt/resource)
             limit: Maximum results
             threshold: Minimum similarity score
+            org_id: Organization ID for tenant filtering
 
         Returns:
             List of matched tools
@@ -436,6 +440,15 @@ class HierarchicalSearchService:
                 "field": "is_active",
                 "match": {"boolean": True}
             })
+
+            # Multi-tenant filter: global items + org-scoped items
+            if org_id:
+                filter_conditions["must"].append({
+                    "should": [
+                        {"field": "is_global", "match": {"boolean": True}},
+                        {"field": "org_id", "match": {"keyword": org_id}}
+                    ]
+                })
 
             # Get client (uses injected mock in tests)
             client = await self._get_qdrant_client()

@@ -133,6 +133,10 @@ class ToolAggregator:
         description = tool_data.get("description", "")
         input_schema = tool_data.get("inputSchema", {})
 
+        # Propagate org_id from server to tool (org-scoped servers → org-scoped tools)
+        server_org_id = server.get("org_id")
+        is_global = server.get("is_global", True)
+
         # Store in PostgreSQL (if repo available)
         tool_id = None
         if self._tool_repo:
@@ -142,6 +146,8 @@ class ToolAggregator:
                 input_schema=input_schema,
                 source_server_id=server["id"],
                 original_name=original_name,
+                org_id=server_org_id,
+                is_global=is_global,
             )
         else:
             # No storage - use hash as pseudo-ID for in-memory operation
@@ -163,7 +169,9 @@ class ToolAggregator:
                     "source_server_name": server["name"],
                     "original_name": original_name,
                     "is_external": True,
-                    "is_classified": False
+                    "is_classified": False,
+                    "org_id": server_org_id,
+                    "is_global": is_global,
                 }
             )
 
@@ -180,6 +188,8 @@ class ToolAggregator:
             "source_server_name": server["name"],
             "is_external": True,
             "is_classified": False,
+            "org_id": server_org_id,
+            "is_global": is_global,
         }
 
     def namespace_tool(self, tool_name: str, server_name: str) -> str:

@@ -340,6 +340,8 @@ class SyncService:
                                 metadata={
                                     "category": tool_data.get("category"),
                                     "has_schema": bool(tool_data.get("input_schema")),
+                                    "org_id": db_record.get("org_id"),
+                                    "is_global": db_record.get("is_global", True),
                                 },
                             )
                             if success:
@@ -669,6 +671,10 @@ class SyncService:
                                 embedding=embedding,
                                 db_id=db_record["id"],
                                 is_active=True,
+                                metadata={
+                                    "org_id": db_record.get("org_id"),
+                                    "is_global": db_record.get("is_global", True),
+                                },
                             )
                             if success:
                                 synced += 1
@@ -909,6 +915,7 @@ class SyncService:
                                 metadata={
                                     "resource_type": resource_data.get("resource_type"),
                                     "uri": resource_data.get("uri"),
+                                    "org_id": db_record.get("org_id"),
                                 },
                             )
                             if success:

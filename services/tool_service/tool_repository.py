@@ -96,11 +96,12 @@ class ToolRepository:
         category: Optional[str] = None,
         is_active: Optional[bool] = True,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List tools with optional filters (cached)"""
         cache = get_cache()
-        cache_key = f"list:{category}:{is_active}:{limit}:{offset}"
+        cache_key = f"list:{org_id}:{category}:{is_active}:{limit}:{offset}"
 
         # Try cache first
         cached = await cache.get('tool_list', cache_key)
@@ -112,6 +113,14 @@ class ToolRepository:
             where_clauses = []
             params = []
             param_idx = 1
+
+            # Tenant filter: global items + org-specific items
+            if org_id:
+                where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                where_clauses.append("(is_global = TRUE OR is_global IS NULL)")
 
             if category is not None:
                 where_clauses.append(f"category = ${param_idx}")
@@ -209,6 +218,9 @@ class ToolRepository:
                 'is_classified': tool_data.get('is_classified', False),
                 'skill_ids': skill_ids if isinstance(skill_ids, list) else [],
                 'primary_skill_id': tool_data.get('primary_skill_id'),
+                # Multi-tenant fields
+                'org_id': tool_data.get('org_id'),
+                'is_global': tool_data.get('is_global', True),
             }
 
             async with self.db:
@@ -232,7 +244,9 @@ class ToolRepository:
         description: str,
         input_schema: Dict[str, Any],
         source_server_id: str,
-        original_name: str
+        original_name: str,
+        org_id: Optional[str] = None,
+        is_global: bool = True
     ) -> Optional[int]:
         """
         Create an external tool from an MCP server.
@@ -243,6 +257,8 @@ class ToolRepository:
             input_schema: Tool input JSON schema
             source_server_id: UUID of the source external server
             original_name: Original tool name before namespacing
+            org_id: Organization ID for org-scoped tools
+            is_global: Whether this tool is globally visible
 
         Returns:
             Tool ID if created, None on failure
@@ -253,7 +269,9 @@ class ToolRepository:
             description=description,
             input_schema=input_schema,
             source_server_id=source_server_id,
-            original_name=original_name
+            original_name=original_name,
+            org_id=org_id,
+            is_global=is_global
         )
 
     async def upsert_external_tool(
@@ -262,7 +280,9 @@ class ToolRepository:
         description: str,
         input_schema: Dict[str, Any],
         source_server_id: str,
-        original_name: str
+        original_name: str,
+        org_id: Optional[str] = None,
+        is_global: bool = True
     ) -> Optional[int]:
         """
         Upsert an external tool - insert or update if exists.
@@ -275,6 +295,8 @@ class ToolRepository:
             input_schema: Tool input JSON schema
             source_server_id: UUID of the source external server
             original_name: Original tool name before namespacing
+            org_id: Organization ID for org-scoped tools
+            is_global: Whether this tool is globally visible
 
         Returns:
             Tool ID if created/updated, None on failure
@@ -284,20 +306,23 @@ class ToolRepository:
 
             sql = f"""
                 INSERT INTO {self.schema}.{self.table}
-                (name, description, input_schema, source_server_id, original_name, is_external, is_classified, is_active)
-                VALUES ($1, $2, $3::jsonb, $4, $5, TRUE, FALSE, TRUE)
+                (name, description, input_schema, source_server_id, original_name, is_external, is_classified, is_active, org_id, is_global)
+                VALUES ($1, $2, $3::jsonb, $4, $5, TRUE, FALSE, TRUE, $6, $7)
                 ON CONFLICT (name) DO UPDATE SET
                     description = EXCLUDED.description,
                     input_schema = EXCLUDED.input_schema,
                     source_server_id = EXCLUDED.source_server_id,
                     original_name = EXCLUDED.original_name,
+                    org_id = EXCLUDED.org_id,
+                    is_global = EXCLUDED.is_global,
                     updated_at = NOW()
                 RETURNING id
             """
 
             async with self.db:
                 results = await self.db.query(sql, params=[
-                    name, description, input_schema_json, source_server_id, original_name
+                    name, description, input_schema_json, source_server_id, original_name,
+                    org_id, is_global
                 ])
 
             if results and len(results) > 0:
@@ -407,10 +432,10 @@ class ToolRepository:
             logger.error(f"Failed to get tool statistics for {tool_id}: {e}")
             return None
 
-    async def search_tools(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def search_tools(self, query: str, limit: int = 10, org_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Search tools by name or description (cached)"""
         cache = get_cache()
-        cache_key = f"search:{query}:{limit}"
+        cache_key = f"search:{org_id}:{query}:{limit}"
 
         # Try cache first (short TTL for search)
         cached = await cache.get('search', cache_key)
@@ -418,23 +443,38 @@ class ToolRepository:
             return cached
 
         try:
+            params = []
+            param_idx = 1
+
+            # Tenant filter
+            if org_id:
+                tenant_clause = f"AND (is_global = TRUE OR org_id = ${param_idx})"
+                params.append(org_id)
+                param_idx += 1
+            else:
+                tenant_clause = "AND (is_global = TRUE OR is_global IS NULL)"
+
+            query_pattern = f"%{query}%"
+            params.append(query_pattern)
+            pattern_param = f"${param_idx}"
+
             sql = f"""
                 SELECT * FROM {self.schema}.{self.table}
                 WHERE
-                    (name ILIKE $1 OR description ILIKE $1)
+                    (name ILIKE {pattern_param} OR description ILIKE {pattern_param})
                     AND is_active = TRUE
+                    {tenant_clause}
                 ORDER BY
                     CASE
-                        WHEN name ILIKE $1 THEN 1
+                        WHEN name ILIKE {pattern_param} THEN 1
                         ELSE 2
                     END,
                     call_count DESC
                 LIMIT {limit}
             """
 
-            query_pattern = f"%{query}%"
             async with self.db:
-                results = await self.db.query(sql, params=[query_pattern])
+                results = await self.db.query(sql, params=params)
 
             results = results or []
 
@@ -456,7 +496,8 @@ class ToolRepository:
         server_id: Optional[str] = None,
         is_classified: Optional[bool] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         List external tools with optional filters.
@@ -466,6 +507,7 @@ class ToolRepository:
             is_classified: Filter by classification status
             limit: Maximum results
             offset: Pagination offset
+            org_id: Organization ID for tenant filtering
 
         Returns:
             List of external tools
@@ -474,6 +516,14 @@ class ToolRepository:
             where_clauses = ["is_external = TRUE", "is_active = TRUE"]
             params = []
             param_idx = 1
+
+            # Tenant filter
+            if org_id:
+                where_clauses.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                where_clauses.append("(is_global = TRUE OR is_global IS NULL)")
 
             if server_id is not None:
                 where_clauses.append(f"source_server_id = ${param_idx}")

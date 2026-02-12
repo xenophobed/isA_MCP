@@ -223,6 +223,11 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         request.state.organization_id = user_context.organization_id
         request.state.subscription_tier = user_context.subscription_tier.value
         request.state.permissions = await self.auth_service.get_user_permissions(user_context)
+
+        # Allow X-Organization-Id header to override JWT org for multi-org users
+        org_header = request.headers.get("X-Organization-Id", "").strip()
+        if org_header:
+            request.state.organization_id = org_header
         
         # 继续处理请求
         response = await call_next(request)

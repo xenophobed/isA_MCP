@@ -67,13 +67,21 @@ class ResourceRepository:
         owner_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
+        org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List resources with filters"""
         try:
             where_clauses = []
             params = []
             param_idx = 1
+
+            # Tenant filter: public resources OR org-scoped OR owned by user
+            if org_id:
+                where_clauses.append(f"(is_public = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            # When no org_id, show public resources only (backward compatible)
 
             if resource_type is not None:
                 where_clauses.append(f"resource_type = ${param_idx}")
@@ -152,6 +160,8 @@ class ResourceRepository:
                 'skill_ids': skill_ids,
                 'primary_skill_id': resource_data.get('primary_skill_id'),
                 'is_classified': resource_data.get('is_classified', False),
+                # Multi-tenant field
+                'org_id': resource_data.get('org_id'),
             }
 
             async with self.db:
