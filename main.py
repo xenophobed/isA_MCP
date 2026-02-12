@@ -57,6 +57,7 @@ class SmartMCPServer:
         self.sync_service = None
         self.search_service = None
         self.consul_registry = None
+        self.aggregator_service = None
 
     async def initialize(self, skip_sync: bool = False, meta_tools_only: bool = False):
         """Initialize MCP with tools/prompts/resources
@@ -132,6 +133,16 @@ class SmartMCPServer:
             # This runs BEFORE creating the app (MCP best practice!)
             auto_discovery = AutoDiscoverySystem()
             await auto_discovery.auto_register_with_mcp(self.mcp)
+
+            # Initialize aggregator service for external MCP server management
+            logger.debug("Initializing Aggregator Service for external MCP servers...")
+            try:
+                from services.aggregator_service import create_aggregator_service
+                self.aggregator_service = await create_aggregator_service(enable_classification=True)
+                logger.debug("  Aggregator service initialized")
+            except Exception as e:
+                logger.debug(f"  Aggregator service not available: {e}")
+                self.aggregator_service = None
 
         # Get counts
         tools = await self.mcp.list_tools()
@@ -511,7 +522,7 @@ async def skills_list_endpoint(request):
             offset=offset
         )
 
-        return JSONResponse(skills)
+        return JSONResponse([_serialize_record(s) for s in skills])
 
     except Exception as e:
         logger.error(f"List skills error: {e}")
@@ -545,7 +556,7 @@ async def skills_create_endpoint(request):
         if result is None:
             return JSONResponse({"detail": "Skill already exists"}, status_code=409)
 
-        return JSONResponse(result, status_code=201)
+        return JSONResponse(_serialize_record(result), status_code=201)
 
     except Exception as e:
         logger.error(f"Create skill error: {e}")
@@ -571,7 +582,7 @@ async def skills_get_endpoint(request):
         if skill is None:
             return JSONResponse({"detail": "Skill not found"}, status_code=404)
 
-        return JSONResponse(skill)
+        return JSONResponse(_serialize_record(skill))
 
     except Exception as e:
         logger.error(f"Get skill error: {e}")
@@ -624,7 +635,7 @@ async def skills_tools_endpoint(request):
             return JSONResponse({"detail": "Skill not found"}, status_code=404)
 
         tools = await service.get_tools_by_skill(skill_id)
-        return JSONResponse(tools)
+        return JSONResponse([_serialize_record(t) for t in tools])
 
     except Exception as e:
         logger.error(f"Get tools in skill error: {e}")
@@ -684,7 +695,7 @@ async def skills_suggestions_endpoint(request):
         service = SkillService(repository=repo)
 
         suggestions = await service.list_pending_suggestions()
-        return JSONResponse(suggestions)
+        return JSONResponse([_serialize_record(s) for s in suggestions])
 
     except Exception as e:
         logger.error(f"List suggestions error: {e}")
@@ -831,16 +842,28 @@ async def search_tools_endpoint(request):
         return JSONResponse({"detail": str(e)}, status_code=500)
 
 
-def _serialize_tool(tool: dict) -> dict:
-    """Serialize tool dict for JSON response, converting datetime fields."""
-    from datetime import datetime
+def _serialize_record(record: dict) -> dict:
+    """Serialize a database record for JSON response, converting datetime/Decimal fields."""
+    from datetime import datetime, date
+    from decimal import Decimal
     result = {}
-    for key, value in tool.items():
+    for key, value in record.items():
         if isinstance(value, datetime):
             result[key] = value.isoformat()
+        elif isinstance(value, date):
+            result[key] = value.isoformat()
+        elif isinstance(value, Decimal):
+            result[key] = float(value)
+        elif hasattr(value, 'value'):  # Enum
+            result[key] = value.value
         else:
             result[key] = value
     return result
+
+
+def _serialize_tool(tool: dict) -> dict:
+    """Serialize tool dict for JSON response."""
+    return _serialize_record(tool)
 
 
 async def get_default_tools_endpoint(request):
@@ -872,6 +895,158 @@ async def get_default_tools_endpoint(request):
 
 
 # ==============================================================================
+# AGGREGATOR API ENDPOINTS (/api/v1/aggregator/*)
+# ==============================================================================
+
+def _serialize_server(server: dict) -> dict:
+    """Serialize server dict for JSON response."""
+    return _serialize_record(server)
+
+
+async def aggregator_list_servers_endpoint(request):
+    """GET /api/v1/aggregator/servers - List registered MCP servers"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            from tests.contracts.aggregator.data_contract import ServerStatus
+            status_filter = ServerStatus(status_filter)
+
+        servers = await smart_server.aggregator_service.list_servers(status=status_filter)
+        return JSONResponse([_serialize_server(s) for s in servers])
+
+    except Exception as e:
+        logger.error(f"List servers error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_register_server_endpoint(request):
+    """POST /api/v1/aggregator/servers - Register a new MCP server"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        body = await request.body()
+        data = json.loads(body) if body else {}
+
+        if not data.get("name") or not data.get("transport_type"):
+            return JSONResponse(
+                {"detail": "name and transport_type are required"},
+                status_code=422
+            )
+
+        server = await smart_server.aggregator_service.register_server(data)
+        return JSONResponse(_serialize_server(server), status_code=201)
+
+    except Exception as e:
+        logger.error(f"Register server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_get_server_endpoint(request):
+    """GET /api/v1/aggregator/servers/{server_id} - Get server details"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        server_id = request.path_params.get("server_id")
+        server = await smart_server.aggregator_service.get_server(server_id)
+
+        if server is None:
+            return JSONResponse({"detail": "Server not found"}, status_code=404)
+
+        return JSONResponse(_serialize_server(server))
+
+    except Exception as e:
+        logger.error(f"Get server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_remove_server_endpoint(request):
+    """DELETE /api/v1/aggregator/servers/{server_id} - Remove a server"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        server_id = request.path_params.get("server_id")
+        await smart_server.aggregator_service.remove_server(server_id)
+        return JSONResponse({"status": "removed"})
+
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=404)
+    except Exception as e:
+        logger.error(f"Remove server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_connect_server_endpoint(request):
+    """POST /api/v1/aggregator/servers/{server_id}/connect - Connect to a server"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        server_id = request.path_params.get("server_id")
+        success = await smart_server.aggregator_service.connect_server(server_id)
+        return JSONResponse({"status": "connected" if success else "failed", "success": success})
+
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=404)
+    except Exception as e:
+        logger.error(f"Connect server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_disconnect_server_endpoint(request):
+    """POST /api/v1/aggregator/servers/{server_id}/disconnect - Disconnect from a server"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        server_id = request.path_params.get("server_id")
+        success = await smart_server.aggregator_service.disconnect_server(server_id)
+        return JSONResponse({"status": "disconnected" if success else "failed", "success": success})
+
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=404)
+    except Exception as e:
+        logger.error(f"Disconnect server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_refresh_server_endpoint(request):
+    """POST /api/v1/aggregator/servers/{server_id}/refresh - Re-discover tools"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        server_id = request.path_params.get("server_id")
+        tools = await smart_server.aggregator_service.discover_tools(server_id)
+        return JSONResponse({"tools_discovered": len(tools)})
+
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=404)
+    except Exception as e:
+        logger.error(f"Refresh server error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+async def aggregator_health_endpoint(request):
+    """GET /api/v1/aggregator/health - Aggregator state overview"""
+    try:
+        if not smart_server or not smart_server.aggregator_service:
+            return JSONResponse({"detail": "Aggregator service not available"}, status_code=503)
+
+        state = await smart_server.aggregator_service.get_state()
+        return JSONResponse(state)
+
+    except Exception as e:
+        logger.error(f"Aggregator health error: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+
+
+# ==============================================================================
 # ROUTE REGISTRATION
 # ==============================================================================
 
@@ -898,6 +1073,16 @@ app.router.routes.append(Route("/api/v1/search/tools", search_tools_endpoint, me
 
 # Tools API endpoints
 app.router.routes.append(Route("/api/v1/tools/defaults", get_default_tools_endpoint, methods=["GET"]))
+
+# Aggregator API endpoints
+app.router.routes.append(Route("/api/v1/aggregator/servers", aggregator_list_servers_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers", aggregator_register_server_endpoint, methods=["POST"]))
+app.router.routes.append(Route("/api/v1/aggregator/health", aggregator_health_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}", aggregator_get_server_endpoint, methods=["GET"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}", aggregator_remove_server_endpoint, methods=["DELETE"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/connect", aggregator_connect_server_endpoint, methods=["POST"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/disconnect", aggregator_disconnect_server_endpoint, methods=["POST"]))
+app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/refresh", aggregator_refresh_server_endpoint, methods=["POST"]))
 
 # ==============================================================================
 # DIRECT EXECUTION (for testing)
