@@ -117,30 +117,59 @@ class ServerRegistry:
         connection_config_json = json.dumps(server["connection_config"])
 
         async with self._db_pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO mcp.external_servers (
-                    id, name, description, transport_type, connection_config,
-                    health_check_url, status, tool_count, error_message,
-                    registered_at, connected_at, last_health_check,
-                    org_id, is_global
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                """,
-                server["id"],
-                server["name"],
-                server.get("description"),
-                transport_type,
-                connection_config_json,
-                server.get("health_check_url"),
-                status,
-                server.get("tool_count", 0),
-                server.get("error_message"),
-                server["registered_at"],
-                server.get("connected_at"),
-                server.get("last_health_check"),
-                server.get("org_id"),
-                server.get("is_global", True),
-            )
+            # Check if tenant columns exist (migration may not have run yet)
+            has_tenant = await conn.fetchval(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_schema = 'mcp' AND table_name = 'external_servers' AND column_name = 'is_global'"
+            ) > 0
+
+            if has_tenant:
+                await conn.execute(
+                    """
+                    INSERT INTO mcp.external_servers (
+                        id, name, description, transport_type, connection_config,
+                        health_check_url, status, tool_count, error_message,
+                        registered_at, connected_at, last_health_check,
+                        org_id, is_global
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    """,
+                    server["id"],
+                    server["name"],
+                    server.get("description"),
+                    transport_type,
+                    connection_config_json,
+                    server.get("health_check_url"),
+                    status,
+                    server.get("tool_count", 0),
+                    server.get("error_message"),
+                    server["registered_at"],
+                    server.get("connected_at"),
+                    server.get("last_health_check"),
+                    server.get("org_id"),
+                    server.get("is_global", True),
+                )
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO mcp.external_servers (
+                        id, name, description, transport_type, connection_config,
+                        health_check_url, status, tool_count, error_message,
+                        registered_at, connected_at, last_health_check
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    """,
+                    server["id"],
+                    server["name"],
+                    server.get("description"),
+                    transport_type,
+                    connection_config_json,
+                    server.get("health_check_url"),
+                    status,
+                    server.get("tool_count", 0),
+                    server.get("error_message"),
+                    server["registered_at"],
+                    server.get("connected_at"),
+                    server.get("last_health_check"),
+                )
 
     async def get(self, server_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -328,13 +357,11 @@ class ServerRegistry:
             params = []
             param_idx = 1
 
-            # Tenant filter
+            # Tenant filter: only applied when org_id is provided (pre-migration safe)
             if org_id:
                 conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
                 params.append(org_id)
                 param_idx += 1
-            else:
-                conditions.append("(is_global = TRUE OR is_global IS NULL)")
 
             if status:
                 status_value = status.value if isinstance(status, ServerStatus) else status
@@ -440,5 +467,5 @@ class ServerRegistry:
             "connected_at": row.get("connected_at"),
             "last_health_check": row.get("last_health_check"),
             "org_id": str(row["org_id"]) if row.get("org_id") else None,
-            "is_global": row.get("is_global", True),
+            "is_global": row.get("is_global") if row.get("is_global") is not None else True,
         }
