@@ -190,6 +190,14 @@ The OCR extractor supports multiple languages through the ISA SuryaOCR model. Co
 - `ja`: Japanese
 - `ko`: Korean
 
+## Rich Metadata Support
+
+The OCR extractor preserves and generates metadata alongside extracted text:
+
+- **Custom metadata**: Preserved from source (source, author, category)
+- **Auto-generated metadata**: Added during extraction (strategy, position, created_at)
+- **Content-specific metadata**: For structured documents (section_title, section_level for markdown)
+
 ## Output Format
 
 ### Text Results Structure
