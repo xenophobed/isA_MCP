@@ -3,6 +3,7 @@ TDD TESTS - API Tools Endpoint Tests
 
 Tests for the MCP tools/list and tools/call endpoints.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -36,19 +37,16 @@ class TestToolsListAPI:
                     {
                         "name": "test_tool",
                         "description": "A test tool",
-                        "inputSchema": {"type": "object", "properties": {}}
+                        "inputSchema": {"type": "object", "properties": {}},
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         data = response.json()
 
@@ -76,19 +74,16 @@ class TestToolsListAPI:
                     {
                         "name": "test_tool",
                         "description": "A test tool",
-                        "inputSchema": {"type": "object"}
+                        "inputSchema": {"type": "object"},
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         data = response.json()
         tools = data["result"]["tools"]
@@ -109,21 +104,12 @@ class TestToolsListAPI:
         """
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {
-                "tools": []
-            }
-        }
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"tools": []}}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         data = response.json()
         assert data["result"]["tools"] == []
@@ -154,23 +140,21 @@ class TestToolsCallAPI:
             "jsonrpc": "2.0",
             "id": 1,
             "result": {
-                "content": [
-                    {"type": "text", "text": "Tool executed successfully"}
-                ],
-                "isError": False
-            }
+                "content": [{"type": "text", "text": "Tool executed successfully"}],
+                "isError": False,
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "test_tool",
-                "arguments": {"input": "test"}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "test_tool", "arguments": {"input": "test"}},
+            },
+        )
 
         data = response.json()
 
@@ -191,22 +175,19 @@ class TestToolsCallAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Tool not found: nonexistent_tool"
-            }
+            "error": {"code": -32602, "message": "Tool not found: nonexistent_tool"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "nonexistent_tool",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "nonexistent_tool", "arguments": {}},
+            },
+        )
 
         data = response.json()
 
@@ -227,22 +208,19 @@ class TestToolsCallAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Invalid params: required field missing"
-            }
+            "error": {"code": -32602, "message": "Invalid params: required field missing"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "test_tool",
-                "arguments": {}  # Missing required fields
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "test_tool", "arguments": {}},  # Missing required fields
+            },
+        )
 
         data = response.json()
 
@@ -261,22 +239,19 @@ class TestToolsCallAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "content": [{"type": "text", "text": "Success"}],
-                "isError": False
-            }
+            "result": {"content": [{"type": "text", "text": "Success"}], "isError": False},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "test_tool",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "test_tool", "arguments": {}},
+            },
+        )
 
         data = response.json()
 
@@ -298,14 +273,8 @@ class TestToolsAPIGolden:
             "jsonrpc": "2.0",
             "id": "integer",
             "result": {
-                "tools": [
-                    {
-                        "name": "string",
-                        "description": "string",
-                        "inputSchema": "object"
-                    }
-                ]
-            }
+                "tools": [{"name": "string", "description": "string", "inputSchema": "object"}]
+            },
         }
 
         # Verify schema structure
@@ -320,12 +289,7 @@ class TestToolsAPIGolden:
         expected_schema = {
             "jsonrpc": "2.0",
             "id": "integer",
-            "result": {
-                "content": [
-                    {"type": "string", "text": "string"}
-                ],
-                "isError": "boolean"
-            }
+            "result": {"content": [{"type": "string", "text": "string"}], "isError": "boolean"},
         }
 
         assert "result" in expected_schema
@@ -339,10 +303,7 @@ class TestToolsAPIGolden:
         expected_schema = {
             "jsonrpc": "2.0",
             "id": "integer",
-            "error": {
-                "code": "integer",
-                "message": "string"
-            }
+            "error": {"code": "integer", "message": "string"},
         }
 
         assert "error" in expected_schema

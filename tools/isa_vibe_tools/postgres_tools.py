@@ -22,6 +22,7 @@ from tools.base_tool import BaseTool
 # Optional isa_common import
 try:
     from isa_common import AsyncPostgresClient
+
     POSTGRES_CLIENT_AVAILABLE = True
 except ImportError:
     POSTGRES_CLIENT_AVAILABLE = False
@@ -39,11 +40,7 @@ async def get_client() -> "AsyncPostgresClient":
     """Get connected PostgreSQL client."""
     if not POSTGRES_CLIENT_AVAILABLE:
         raise ImportError("isa_common not installed. Install with: pip install isa_common")
-    client = AsyncPostgresClient(
-        host=POSTGRES_HOST,
-        port=POSTGRES_PORT,
-        user_id="mcp_agent"
-    )
+    client = AsyncPostgresClient(host=POSTGRES_HOST, port=POSTGRES_PORT, user_id="mcp_agent")
     await client.__aenter__()
     return client
 
@@ -53,9 +50,7 @@ def register_postgres_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def postgres_query(
-        sql: str,
-        params: Optional[List[str]] = None,
-        schema: str = "public"
+        sql: str, params: Optional[List[str]] = None, schema: str = "public"
     ) -> dict:
         """Execute a read-only SQL query against PostgreSQL
 
@@ -76,7 +71,7 @@ def register_postgres_tools(mcp: FastMCP):
                     status="error",
                     action="postgres_query",
                     data={"sql": sql[:100]},
-                    error_message="Only SELECT queries are allowed for safety. Use SELECT, WITH, or information_schema queries."
+                    error_message="Only SELECT queries are allowed for safety. Use SELECT, WITH, or information_schema queries.",
                 )
 
             client = await get_client()
@@ -88,13 +83,16 @@ def register_postgres_tools(mcp: FastMCP):
                     status="error",
                     action="postgres_query",
                     data={"sql": sql[:100]},
-                    error_message="Query returned no results or failed"
+                    error_message="Query returned no results or failed",
                 )
 
             return tools.create_response(
                 status="success",
                 action="postgres_query",
-                data={"results": result, "row_count": len(result) if isinstance(result, list) else 1}
+                data={
+                    "results": result,
+                    "row_count": len(result) if isinstance(result, list) else 1,
+                },
             )
 
         except Exception as e:
@@ -103,7 +101,7 @@ def register_postgres_tools(mcp: FastMCP):
                 status="error",
                 action="postgres_query",
                 data={"sql": sql[:100]},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -142,17 +140,13 @@ def register_postgres_tools(mcp: FastMCP):
                     status="error",
                     action="postgres_get_schema",
                     data={"table_name": table_name, "schema": schema},
-                    error_message=f"Table '{table_name}' not found in schema '{schema}'"
+                    error_message=f"Table '{table_name}' not found in schema '{schema}'",
                 )
 
             return tools.create_response(
                 status="success",
                 action="postgres_get_schema",
-                data={
-                    "table": table_name,
-                    "schema": schema,
-                    "columns": result
-                }
+                data={"table": table_name, "schema": schema, "columns": result},
             )
 
         except Exception as e:
@@ -161,7 +155,7 @@ def register_postgres_tools(mcp: FastMCP):
                 status="error",
                 action="postgres_get_schema",
                 data={"table_name": table_name, "schema": schema},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -197,8 +191,8 @@ def register_postgres_tools(mcp: FastMCP):
                 data={
                     "schema": schema,
                     "tables": result or [],
-                    "count": len(result) if result else 0
-                }
+                    "count": len(result) if result else 0,
+                },
             )
 
         except Exception as e:
@@ -207,7 +201,7 @@ def register_postgres_tools(mcp: FastMCP):
                 status="error",
                 action="postgres_list_tables",
                 data={"schema": schema},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -244,8 +238,8 @@ def register_postgres_tools(mcp: FastMCP):
                     "table": table_name,
                     "schema": schema,
                     "indexes": result or [],
-                    "count": len(result) if result else 0
-                }
+                    "count": len(result) if result else 0,
+                },
             )
 
         except Exception as e:
@@ -254,7 +248,7 @@ def register_postgres_tools(mcp: FastMCP):
                 status="error",
                 action="postgres_get_indexes",
                 data={"table_name": table_name, "schema": schema},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -301,8 +295,8 @@ def register_postgres_tools(mcp: FastMCP):
                     "table": table_name,
                     "schema": schema,
                     "foreign_keys": result or [],
-                    "count": len(result) if result else 0
-                }
+                    "count": len(result) if result else 0,
+                },
             )
 
         except Exception as e:
@@ -311,7 +305,7 @@ def register_postgres_tools(mcp: FastMCP):
                 status="error",
                 action="postgres_get_foreign_keys",
                 data={"table_name": table_name, "schema": schema},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -332,16 +326,13 @@ def register_postgres_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="postgres_health_check",
-                data=health or {"error": "Health check failed"}
+                data=health or {"error": "Health check failed"},
             )
 
         except Exception as e:
             logger.error(f"Error in postgres_health_check: {e}")
             return tools.create_response(
-                status="error",
-                action="postgres_health_check",
-                data={},
-                error_message=str(e)
+                status="error", action="postgres_health_check", data={}, error_message=str(e)
             )
         finally:
             if client:

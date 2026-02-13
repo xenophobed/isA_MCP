@@ -30,8 +30,9 @@ class PlanStateManager(ABC):
         pass
 
     @abstractmethod
-    def update_task_status(self, plan_id: str, task_id: int, status: str,
-                          result: Optional[Dict[str, Any]] = None) -> bool:
+    def update_task_status(
+        self, plan_id: str, task_id: int, status: str, result: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Update status of a specific task"""
         pass
 
@@ -46,8 +47,9 @@ class PlanStateManager(ABC):
         pass
 
     @abstractmethod
-    def create_branch(self, parent_plan_id: str, branch_id: str,
-                     branch_data: Dict[str, Any]) -> bool:
+    def create_branch(
+        self, parent_plan_id: str, branch_id: str, branch_data: Dict[str, Any]
+    ) -> bool:
         """Create a branch from existing plan"""
         pass
 
@@ -79,8 +81,8 @@ class InMemoryStateStore(PlanStateManager):
     def save_plan(self, plan_id: str, plan_data: Dict[str, Any]) -> bool:
         """Save plan to memory"""
         try:
-            plan_data['plan_id'] = plan_id
-            plan_data['last_updated'] = datetime.utcnow().isoformat()
+            plan_data["plan_id"] = plan_id
+            plan_data["last_updated"] = datetime.utcnow().isoformat()
             self.plans[plan_id] = plan_data
 
             # Initialize history if not exists
@@ -88,11 +90,14 @@ class InMemoryStateStore(PlanStateManager):
                 self.execution_history[plan_id] = []
 
             # Add creation event
-            self.add_execution_event(plan_id, {
-                'event_type': 'plan_created',
-                'timestamp': datetime.utcnow().isoformat(),
-                'data': {'total_tasks': plan_data.get('total_tasks', 0)}
-            })
+            self.add_execution_event(
+                plan_id,
+                {
+                    "event_type": "plan_created",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {"total_tasks": plan_data.get("total_tasks", 0)},
+                },
+            )
 
             logger.info(f"✅ Plan saved to memory: {plan_id}")
             return True
@@ -109,8 +114,9 @@ class InMemoryStateStore(PlanStateManager):
             logger.warning(f"Plan not found in memory: {plan_id}")
         return plan
 
-    def update_task_status(self, plan_id: str, task_id: int, status: str,
-                          result: Optional[Dict[str, Any]] = None) -> bool:
+    def update_task_status(
+        self, plan_id: str, task_id: int, status: str, result: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Update task status in memory"""
         try:
             plan = self.plans.get(plan_id)
@@ -119,28 +125,27 @@ class InMemoryStateStore(PlanStateManager):
                 return False
 
             # Find and update task
-            tasks = plan.get('tasks', [])
+            tasks = plan.get("tasks", [])
             for task in tasks:
-                if task.get('id') == task_id:
-                    task['status'] = status
-                    task['last_updated'] = datetime.utcnow().isoformat()
+                if task.get("id") == task_id:
+                    task["status"] = status
+                    task["last_updated"] = datetime.utcnow().isoformat()
                     if result:
-                        task['result'] = result
+                        task["result"] = result
                     break
 
             # Update plan timestamp
-            plan['last_updated'] = datetime.utcnow().isoformat()
+            plan["last_updated"] = datetime.utcnow().isoformat()
 
             # Add event
-            self.add_execution_event(plan_id, {
-                'event_type': 'task_status_updated',
-                'timestamp': datetime.utcnow().isoformat(),
-                'data': {
-                    'task_id': task_id,
-                    'status': status,
-                    'result': result
-                }
-            })
+            self.add_execution_event(
+                plan_id,
+                {
+                    "event_type": "task_status_updated",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {"task_id": task_id, "status": status, "result": result},
+                },
+            )
 
             logger.info(f"✅ Task {task_id} status updated to '{status}' in plan {plan_id}")
             return True
@@ -154,8 +159,8 @@ class InMemoryStateStore(PlanStateManager):
             if plan_id not in self.execution_history:
                 self.execution_history[plan_id] = []
 
-            event['event_id'] = str(uuid.uuid4())
-            event['timestamp'] = event.get('timestamp', datetime.utcnow().isoformat())
+            event["event_id"] = str(uuid.uuid4())
+            event["timestamp"] = event.get("timestamp", datetime.utcnow().isoformat())
             self.execution_history[plan_id].append(event)
             return True
         except Exception as e:
@@ -166,28 +171,32 @@ class InMemoryStateStore(PlanStateManager):
         """Get execution history from memory"""
         return self.execution_history.get(plan_id, [])
 
-    def create_branch(self, parent_plan_id: str, branch_id: str,
-                     branch_data: Dict[str, Any]) -> bool:
+    def create_branch(
+        self, parent_plan_id: str, branch_id: str, branch_data: Dict[str, Any]
+    ) -> bool:
         """Create branch in memory"""
         try:
             if parent_plan_id not in self.branches:
                 self.branches[parent_plan_id] = []
 
-            branch_data['branch_id'] = branch_id
-            branch_data['parent_plan_id'] = parent_plan_id
-            branch_data['created_at'] = datetime.utcnow().isoformat()
+            branch_data["branch_id"] = branch_id
+            branch_data["parent_plan_id"] = parent_plan_id
+            branch_data["created_at"] = datetime.utcnow().isoformat()
 
             self.branches[parent_plan_id].append(branch_data)
 
             # Add event to parent plan
-            self.add_execution_event(parent_plan_id, {
-                'event_type': 'branch_created',
-                'timestamp': datetime.utcnow().isoformat(),
-                'data': {
-                    'branch_id': branch_id,
-                    'branch_from_task': branch_data.get('branch_from_task')
-                }
-            })
+            self.add_execution_event(
+                parent_plan_id,
+                {
+                    "event_type": "branch_created",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "branch_id": branch_id,
+                        "branch_from_task": branch_data.get("branch_from_task"),
+                    },
+                },
+            )
 
             logger.info(f"✅ Branch {branch_id} created from plan {parent_plan_id}")
             return True
@@ -223,7 +232,9 @@ class InMemoryStateStore(PlanStateManager):
 class RedisStateStore(PlanStateManager):
     """Redis-backed implementation using native redis-py"""
 
-    def __init__(self, redis_host: str = None, redis_port: int = None, user_id: str = "mcp-planner"):
+    def __init__(
+        self, redis_host: str = None, redis_port: int = None, user_id: str = "mcp-planner"
+    ):
         """
         Initialize Redis state store
 
@@ -264,8 +275,8 @@ class RedisStateStore(PlanStateManager):
     def save_plan(self, plan_id: str, plan_data: Dict[str, Any]) -> bool:
         """Save plan to Redis"""
         try:
-            plan_data['plan_id'] = plan_id
-            plan_data['last_updated'] = datetime.utcnow().isoformat()
+            plan_data["plan_id"] = plan_id
+            plan_data["last_updated"] = datetime.utcnow().isoformat()
 
             # Save as JSON string with 24h TTL
             plan_json = json.dumps(plan_data, ensure_ascii=False)
@@ -273,11 +284,14 @@ class RedisStateStore(PlanStateManager):
 
             if result:
                 # Add creation event
-                self.add_execution_event(plan_id, {
-                    'event_type': 'plan_created',
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'data': {'total_tasks': plan_data.get('total_tasks', 0)}
-                })
+                self.add_execution_event(
+                    plan_id,
+                    {
+                        "event_type": "plan_created",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": {"total_tasks": plan_data.get("total_tasks", 0)},
+                    },
+                )
                 logger.info(f"✅ Plan saved to Redis: {plan_id}")
                 return True
             return False
@@ -299,8 +313,9 @@ class RedisStateStore(PlanStateManager):
             logger.error(f"Failed to get plan from Redis: {e}")
             return None
 
-    def update_task_status(self, plan_id: str, task_id: int, status: str,
-                          result: Optional[Dict[str, Any]] = None) -> bool:
+    def update_task_status(
+        self, plan_id: str, task_id: int, status: str, result: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Update task status in Redis"""
         try:
             plan = self.get_plan(plan_id)
@@ -309,31 +324,30 @@ class RedisStateStore(PlanStateManager):
                 return False
 
             # Find and update task
-            tasks = plan.get('tasks', [])
+            tasks = plan.get("tasks", [])
             for task in tasks:
-                if task.get('id') == task_id:
-                    task['status'] = status
-                    task['last_updated'] = datetime.utcnow().isoformat()
+                if task.get("id") == task_id:
+                    task["status"] = status
+                    task["last_updated"] = datetime.utcnow().isoformat()
                     if result:
-                        task['result'] = result
+                        task["result"] = result
                     break
 
             # Update plan timestamp
-            plan['last_updated'] = datetime.utcnow().isoformat()
+            plan["last_updated"] = datetime.utcnow().isoformat()
 
             # Save updated plan
             self.save_plan(plan_id, plan)
 
             # Add event
-            self.add_execution_event(plan_id, {
-                'event_type': 'task_status_updated',
-                'timestamp': datetime.utcnow().isoformat(),
-                'data': {
-                    'task_id': task_id,
-                    'status': status,
-                    'result': result
-                }
-            })
+            self.add_execution_event(
+                plan_id,
+                {
+                    "event_type": "task_status_updated",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {"task_id": task_id, "status": status, "result": result},
+                },
+            )
 
             logger.info(f"✅ Task {task_id} status updated to '{status}' in Redis plan {plan_id}")
             return True
@@ -344,8 +358,8 @@ class RedisStateStore(PlanStateManager):
     def add_execution_event(self, plan_id: str, event: Dict[str, Any]) -> bool:
         """Add execution event to Redis list"""
         try:
-            event['event_id'] = str(uuid.uuid4())
-            event['timestamp'] = event.get('timestamp', datetime.utcnow().isoformat())
+            event["event_id"] = str(uuid.uuid4())
+            event["timestamp"] = event.get("timestamp", datetime.utcnow().isoformat())
             event_json = json.dumps(event, ensure_ascii=False)
 
             # Use Redis RPUSH to append to list
@@ -373,13 +387,14 @@ class RedisStateStore(PlanStateManager):
             logger.error(f"Failed to get execution history from Redis: {e}")
             return []
 
-    def create_branch(self, parent_plan_id: str, branch_id: str,
-                     branch_data: Dict[str, Any]) -> bool:
+    def create_branch(
+        self, parent_plan_id: str, branch_id: str, branch_data: Dict[str, Any]
+    ) -> bool:
         """Create branch in Redis"""
         try:
-            branch_data['branch_id'] = branch_id
-            branch_data['parent_plan_id'] = parent_plan_id
-            branch_data['created_at'] = datetime.utcnow().isoformat()
+            branch_data["branch_id"] = branch_id
+            branch_data["parent_plan_id"] = parent_plan_id
+            branch_data["created_at"] = datetime.utcnow().isoformat()
 
             branch_json = json.dumps(branch_data, ensure_ascii=False)
 
@@ -391,14 +406,17 @@ class RedisStateStore(PlanStateManager):
 
             if result:
                 # Add event to parent plan
-                self.add_execution_event(parent_plan_id, {
-                    'event_type': 'branch_created',
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'data': {
-                        'branch_id': branch_id,
-                        'branch_from_task': branch_data.get('branch_from_task')
-                    }
-                })
+                self.add_execution_event(
+                    parent_plan_id,
+                    {
+                        "event_type": "branch_created",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": {
+                            "branch_id": branch_id,
+                            "branch_from_task": branch_data.get("branch_from_task"),
+                        },
+                    },
+                )
                 logger.info(f"✅ Branch {branch_id} created in Redis from plan {parent_plan_id}")
                 return True
             return False

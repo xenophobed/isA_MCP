@@ -38,7 +38,7 @@ def register_file_tools(mcp: FastMCP):
         file_path: str,
         offset: Optional[int] = None,
         limit: Optional[int] = None,
-        encoding: str = "utf-8"
+        encoding: str = "utf-8",
     ) -> Dict[str, Any]:
         """
         Read a file from the local filesystem.
@@ -82,7 +82,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "read_file",
                     "error": f"File not found: {file_path}",
                     "error_code": "FILE_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Validate it's a file, not a directory
@@ -92,7 +92,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "read_file",
                     "error": f"Path is a directory, not a file: {file_path}. Use ls_directory instead.",
                     "error_code": "IS_DIRECTORY",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Check file size
@@ -103,7 +103,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "read_file",
                     "error": f"File too large ({file_size} bytes). Maximum: {MAX_FILE_SIZE} bytes.",
                     "error_code": "FILE_TOO_LARGE",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Determine file type
@@ -111,10 +111,11 @@ def register_file_tools(mcp: FastMCP):
             mime_type = mime_type or "application/octet-stream"
 
             # Handle binary/image files
-            if mime_type.startswith("image/") or mime_type in [
-                "application/pdf",
-                "application/octet-stream"
-            ] or not _is_text_file(path):
+            if (
+                mime_type.startswith("image/")
+                or mime_type in ["application/pdf", "application/octet-stream"]
+                or not _is_text_file(path)
+            ):
                 with open(path, "rb") as f:
                     content = base64.b64encode(f.read()).decode("ascii")
 
@@ -129,9 +130,9 @@ def register_file_tools(mcp: FastMCP):
                         "content_type": content_type,
                         "mime_type": mime_type,
                         "file_size": file_size,
-                        "encoding": "base64"
+                        "encoding": "base64",
                     },
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Handle text files
@@ -173,9 +174,9 @@ def register_file_tools(mcp: FastMCP):
                     "lines_read": end_line - start_line,
                     "offset": start_line + 1,
                     "truncated": truncated,
-                    "encoding": encoding
+                    "encoding": encoding,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except PermissionError:
@@ -184,7 +185,7 @@ def register_file_tools(mcp: FastMCP):
                 "action": "read_file",
                 "error": f"Permission denied: {file_path}",
                 "error_code": "PERMISSION_DENIED",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except UnicodeDecodeError as e:
             return {
@@ -192,7 +193,7 @@ def register_file_tools(mcp: FastMCP):
                 "action": "read_file",
                 "error": f"Encoding error: {e}. Try specifying a different encoding.",
                 "error_code": "ENCODING_ERROR",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"read_file failed: {e}", exc_info=True)
@@ -200,15 +201,12 @@ def register_file_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "read_file",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
     async def write_file(
-        file_path: str,
-        content: str,
-        create_directories: bool = True,
-        encoding: str = "utf-8"
+        file_path: str, content: str, create_directories: bool = True, encoding: str = "utf-8"
     ) -> Dict[str, Any]:
         """
         Write content to a file on the local filesystem.
@@ -245,7 +243,7 @@ def register_file_tools(mcp: FastMCP):
                         "action": "write_file",
                         "error": f"Cannot write to sensitive system path: {sensitive}",
                         "error_code": "SENSITIVE_PATH",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
 
             # Check if file exists (for created flag)
@@ -260,7 +258,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "write_file",
                     "error": f"Parent directory does not exist: {path.parent}",
                     "error_code": "DIRECTORY_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Write the file
@@ -268,7 +266,9 @@ def register_file_tools(mcp: FastMCP):
                 f.write(content)
 
             bytes_written = path.stat().st_size
-            lines_written = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+            lines_written = content.count("\n") + (
+                1 if content and not content.endswith("\n") else 0
+            )
 
             logger.info(f"write_file: {file_path} ({bytes_written} bytes)")
 
@@ -279,9 +279,9 @@ def register_file_tools(mcp: FastMCP):
                     "file_path": str(path.absolute()),
                     "bytes_written": bytes_written,
                     "lines_written": lines_written,
-                    "created": not file_existed
+                    "created": not file_existed,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except PermissionError:
@@ -290,7 +290,7 @@ def register_file_tools(mcp: FastMCP):
                 "action": "write_file",
                 "error": f"Permission denied: {file_path}",
                 "error_code": "PERMISSION_DENIED",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"write_file failed: {e}", exc_info=True)
@@ -298,15 +298,12 @@ def register_file_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "write_file",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
     async def edit_file(
-        file_path: str,
-        old_string: str,
-        new_string: str,
-        replace_all: bool = False
+        file_path: str, old_string: str, new_string: str, replace_all: bool = False
     ) -> Dict[str, Any]:
         """
         Perform exact string replacement in a file.
@@ -341,7 +338,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "edit_file",
                     "error": f"File not found: {file_path}",
                     "error_code": "FILE_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Validate old_string != new_string
@@ -351,7 +348,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "edit_file",
                     "error": "old_string and new_string must be different",
                     "error_code": "SAME_STRING",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Read current content
@@ -367,9 +364,10 @@ def register_file_tools(mcp: FastMCP):
                     "error_code": "STRING_NOT_FOUND",
                     "data": {
                         "file_path": str(path.absolute()),
-                        "old_string_preview": old_string[:200] + ("..." if len(old_string) > 200 else "")
+                        "old_string_preview": old_string[:200]
+                        + ("..." if len(old_string) > 200 else ""),
                     },
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Check for uniqueness if not replace_all
@@ -381,10 +379,8 @@ def register_file_tools(mcp: FastMCP):
                         "action": "edit_file",
                         "error": f"old_string found {occurrences} times. Use replace_all=True or provide more context for unique match.",
                         "error_code": "MULTIPLE_MATCHES",
-                        "data": {
-                            "occurrences": occurrences
-                        },
-                        "timestamp": datetime.now().isoformat()
+                        "data": {"occurrences": occurrences},
+                        "timestamp": datetime.now().isoformat(),
                     }
 
             # Perform replacement
@@ -407,10 +403,12 @@ def register_file_tools(mcp: FastMCP):
                 "data": {
                     "file_path": str(path.absolute()),
                     "replacements": replacements,
-                    "old_string_preview": old_string[:100] + ("..." if len(old_string) > 100 else ""),
-                    "new_string_preview": new_string[:100] + ("..." if len(new_string) > 100 else "")
+                    "old_string_preview": old_string[:100]
+                    + ("..." if len(old_string) > 100 else ""),
+                    "new_string_preview": new_string[:100]
+                    + ("..." if len(new_string) > 100 else ""),
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except PermissionError:
@@ -419,7 +417,7 @@ def register_file_tools(mcp: FastMCP):
                 "action": "edit_file",
                 "error": f"Permission denied: {file_path}",
                 "error_code": "PERMISSION_DENIED",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"edit_file failed: {e}", exc_info=True)
@@ -427,14 +425,11 @@ def register_file_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "edit_file",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
-    async def multi_edit_file(
-        file_path: str,
-        edits: List[Dict[str, str]]
-    ) -> Dict[str, Any]:
+    async def multi_edit_file(file_path: str, edits: List[Dict[str, str]]) -> Dict[str, Any]:
         """
         Make multiple edits to a single file in one atomic operation.
 
@@ -473,7 +468,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "multi_edit_file",
                     "error": f"File not found: {file_path}",
                     "error_code": "FILE_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Validate edits format
@@ -483,7 +478,7 @@ def register_file_tools(mcp: FastMCP):
                     "action": "multi_edit_file",
                     "error": "edits must be a non-empty list of {old_string, new_string} objects",
                     "error_code": "INVALID_EDITS",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Read current content
@@ -512,10 +507,8 @@ def register_file_tools(mcp: FastMCP):
                     "action": "multi_edit_file",
                     "error": "Validation failed for one or more edits",
                     "error_code": "VALIDATION_FAILED",
-                    "data": {
-                        "errors": validation_errors
-                    },
-                    "timestamp": datetime.now().isoformat()
+                    "data": {"errors": validation_errors},
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Apply all edits
@@ -535,9 +528,9 @@ def register_file_tools(mcp: FastMCP):
                 "data": {
                     "file_path": str(path.absolute()),
                     "total_edits": len(edits),
-                    "successful_edits": len(edits)
+                    "successful_edits": len(edits),
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except PermissionError:
@@ -546,7 +539,7 @@ def register_file_tools(mcp: FastMCP):
                 "action": "multi_edit_file",
                 "error": f"Permission denied: {file_path}",
                 "error_code": "PERMISSION_DENIED",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"multi_edit_file failed: {e}", exc_info=True)
@@ -554,7 +547,7 @@ def register_file_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "multi_edit_file",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     logger.debug("Registered file tools: read_file, write_file, edit_file, multi_edit_file")

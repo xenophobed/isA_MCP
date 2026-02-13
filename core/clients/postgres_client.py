@@ -15,7 +15,7 @@ try:
 
     logger.info("✅ isa-common PostgreSQL client loaded")
 
-    __all__ = ['PostgresClient', 'AsyncPostgresClient', 'ConsulRegistry', 'get_postgres_client']
+    __all__ = ["PostgresClient", "AsyncPostgresClient", "ConsulRegistry", "get_postgres_client"]
 
 except ImportError as e:
     logger.error(f"❌ Failed to import isa-common PostgreSQL client: {e}")

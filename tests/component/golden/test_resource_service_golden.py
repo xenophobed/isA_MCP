@@ -7,8 +7,9 @@ If these tests fail, it means behavior has changed unexpectedly.
 Service Under Test: services/resource_service/resource_service.py
 Repository Under Test: services/resource_service/resource_repository.py
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden
@@ -45,6 +46,7 @@ class TestResourceServiceGolden:
     def resource_service(self, mock_repository):
         """Create ResourceService with mocked repository."""
         from services.resource_service.resource_service import ResourceService
+
         return ResourceService(repository=mock_repository)
 
     # ═══════════════════════════════════════════════════════════════
@@ -56,9 +58,7 @@ class TestResourceServiceGolden:
         CURRENT BEHAVIOR: register_resource raises ValueError if uri is missing.
         """
         with pytest.raises(ValueError) as exc_info:
-            await resource_service.register_resource({
-                "name": "test_resource"
-            })
+            await resource_service.register_resource({"name": "test_resource"})
 
         assert "uri" in str(exc_info.value).lower()
 
@@ -67,9 +67,7 @@ class TestResourceServiceGolden:
         CURRENT BEHAVIOR: register_resource raises ValueError if name is missing.
         """
         with pytest.raises(ValueError) as exc_info:
-            await resource_service.register_resource({
-                "uri": "resource://test/1"
-            })
+            await resource_service.register_resource({"uri": "resource://test/1"})
 
         assert "name" in str(exc_info.value).lower()
 
@@ -77,16 +75,12 @@ class TestResourceServiceGolden:
         """
         CURRENT BEHAVIOR: register_resource raises ValueError for duplicate URIs.
         """
-        mock_repository.get_resource_by_uri.return_value = {
-            "id": 1,
-            "uri": "resource://existing/1"
-        }
+        mock_repository.get_resource_by_uri.return_value = {"id": 1, "uri": "resource://existing/1"}
 
         with pytest.raises(ValueError):
-            await resource_service.register_resource({
-                "uri": "resource://existing/1",
-                "name": "test"
-            })
+            await resource_service.register_resource(
+                {"uri": "resource://existing/1", "name": "test"}
+            )
 
     async def test_register_resource_success(self, resource_service, mock_repository):
         """
@@ -96,13 +90,12 @@ class TestResourceServiceGolden:
         mock_repository.create_resource.return_value = {
             "id": 1,
             "uri": "resource://new/1",
-            "name": "new_resource"
+            "name": "new_resource",
         }
 
-        result = await resource_service.register_resource({
-            "uri": "resource://new/1",
-            "name": "new_resource"
-        })
+        result = await resource_service.register_resource(
+            {"uri": "resource://new/1", "name": "new_resource"}
+        )
 
         assert result["id"] == 1
         assert result["uri"] == "resource://new/1"
@@ -188,7 +181,7 @@ class TestResourceServiceGolden:
         mock_repository.get_resource_by_id.return_value = {
             "id": 1,
             "uri": "resource://test/1",
-            "allowed_users": []
+            "allowed_users": [],
         }
         mock_repository.grant_access.return_value = True
 
@@ -197,7 +190,9 @@ class TestResourceServiceGolden:
         assert result is True
         mock_repository.grant_access.assert_called_once_with(1, "new_user")
 
-    async def test_revoke_access_requires_existing_resource(self, resource_service, mock_repository):
+    async def test_revoke_access_requires_existing_resource(
+        self, resource_service, mock_repository
+    ):
         """
         CURRENT BEHAVIOR: revoke_access raises ValueError if resource not found.
         """
@@ -215,7 +210,7 @@ class TestResourceServiceGolden:
         mock_repository.get_resource_by_id.return_value = {
             "id": 1,
             "uri": "resource://test/1",
-            "allowed_users": ["user_to_remove"]
+            "allowed_users": ["user_to_remove"],
         }
         mock_repository.revoke_access.return_value = True
 
@@ -240,7 +235,9 @@ class TestResourceServiceGolden:
         assert result is True
         mock_repository.increment_access_count.assert_called_once_with(1)
 
-    async def test_record_resource_access_returns_false_for_unknown(self, resource_service, mock_repository):
+    async def test_record_resource_access_returns_false_for_unknown(
+        self, resource_service, mock_repository
+    ):
         """
         CURRENT BEHAVIOR: record_resource_access returns False for unknown resource.
         """
@@ -268,14 +265,8 @@ class TestResourceServiceGolden:
         """
         CURRENT BEHAVIOR: update_resource validates new URI is unique.
         """
-        mock_repository.get_resource_by_id.return_value = {
-            "id": 1,
-            "uri": "resource://old/1"
-        }
-        mock_repository.get_resource_by_uri.return_value = {
-            "id": 2,
-            "uri": "resource://existing/1"
-        }
+        mock_repository.get_resource_by_id.return_value = {"id": 1, "uri": "resource://old/1"}
+        mock_repository.get_resource_by_uri.return_value = {"id": 2, "uri": "resource://existing/1"}
 
         with pytest.raises(ValueError) as exc_info:
             await resource_service.update_resource(1, {"uri": "resource://existing/1"})
@@ -286,10 +277,7 @@ class TestResourceServiceGolden:
         """
         CURRENT BEHAVIOR: delete_resource performs soft delete via repository.
         """
-        mock_repository.get_resource_by_id.return_value = {
-            "id": 1,
-            "uri": "resource://test/1"
-        }
+        mock_repository.get_resource_by_id.return_value = {"id": 1, "uri": "resource://test/1"}
         mock_repository.delete_resource.return_value = True
 
         result = await resource_service.delete_resource(1)
@@ -315,8 +303,8 @@ class TestResourceServiceGolden:
             [  # all resources
                 {"id": 1, "uri": "resource://owned/1", "owner_id": "user_123", "allowed_users": []},
                 {"id": 2, "uri": "resource://public/1", "is_public": True, "allowed_users": []},
-                {"id": 3, "uri": "resource://shared/1", "allowed_users": ["user_123"]}
-            ]
+                {"id": 3, "uri": "resource://shared/1", "allowed_users": ["user_123"]},
+            ],
         ]
 
         result = await resource_service.get_user_resources("user_123", limit=10)
@@ -333,7 +321,7 @@ class TestResourceServiceGolden:
         mock_repository.list_resources.side_effect = [
             [{"id": 1, "uri": "resource://test/1"}],  # owned
             [{"id": 1, "uri": "resource://test/1"}],  # also public
-            [{"id": 1, "uri": "resource://test/1", "allowed_users": []}]  # in all
+            [{"id": 1, "uri": "resource://test/1", "allowed_users": []}],  # in all
         ]
 
         result = await resource_service.get_user_resources("user_123", limit=10)
@@ -362,12 +350,12 @@ class TestResourceRepositoryGolden:
         from services.resource_service.resource_repository import ResourceRepository
 
         # Verify expected methods exist
-        assert hasattr(ResourceRepository, 'get_resource_by_id')
-        assert hasattr(ResourceRepository, 'get_resource_by_uri')
-        assert hasattr(ResourceRepository, 'create_resource')
-        assert hasattr(ResourceRepository, 'update_resource')
-        assert hasattr(ResourceRepository, 'delete_resource')
-        assert hasattr(ResourceRepository, 'list_resources')
+        assert hasattr(ResourceRepository, "get_resource_by_id")
+        assert hasattr(ResourceRepository, "get_resource_by_uri")
+        assert hasattr(ResourceRepository, "create_resource")
+        assert hasattr(ResourceRepository, "update_resource")
+        assert hasattr(ResourceRepository, "delete_resource")
+        assert hasattr(ResourceRepository, "list_resources")
 
     def test_uri_field_documented_as_unique(self):
         """

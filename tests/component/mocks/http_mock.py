@@ -4,7 +4,8 @@ Mock for HTTP client.
 Provides a mock implementation of httpx AsyncClient
 for testing HTTP operations without real network calls.
 """
-from typing import Any, Dict, List, Optional, Union, Callable
+
+from typing import Any, Dict, List, Callable
 from dataclasses import dataclass, field
 import json
 
@@ -12,6 +13,7 @@ import json
 @dataclass
 class MockResponse:
     """Mock HTTP response."""
+
     status_code: int = 200
     content: bytes = b""
     headers: Dict[str, str] = field(default_factory=dict)
@@ -36,6 +38,7 @@ class MockResponse:
 
 class HTTPStatusError(Exception):
     """HTTP status error."""
+
     def __init__(self, message: str, response: MockResponse):
         super().__init__(message)
         self.response = response
@@ -44,6 +47,7 @@ class HTTPStatusError(Exception):
 @dataclass
 class MockRequest:
     """Recorded request."""
+
     method: str
     url: str
     headers: Dict[str, str] = field(default_factory=dict)
@@ -87,7 +91,7 @@ class MockHTTPClient:
         json_data: Any = None,
         content: bytes = None,
         status_code: int = 200,
-        headers: Dict[str, str] = None
+        headers: Dict[str, str] = None,
     ) -> None:
         """Add a mock response for a specific request."""
         key = f"{method.upper()}:{url}"
@@ -96,36 +100,25 @@ class MockHTTPClient:
             content = json.dumps(json_data).encode()
 
         self._responses[key] = MockResponse(
-            status_code=status_code,
-            content=content or b"",
-            headers=headers or {},
-            _json=json_data
+            status_code=status_code, content=content or b"", headers=headers or {}, _json=json_data
         )
 
     def add_response_handler(
-        self,
-        method: str,
-        url: str,
-        handler: Callable[[MockRequest], MockResponse]
+        self, method: str, url: str, handler: Callable[[MockRequest], MockResponse]
     ) -> None:
         """Add a handler function for dynamic responses."""
         key = f"{method.upper()}:{url}"
         self._response_handlers[key] = handler
 
     def set_default_response(
-        self,
-        json_data: Any = None,
-        content: bytes = None,
-        status_code: int = 200
+        self, json_data: Any = None, content: bytes = None, status_code: int = 200
     ) -> None:
         """Set default response for unmatched requests."""
         if json_data is not None:
             content = json.dumps(json_data).encode()
 
         self._default_response = MockResponse(
-            status_code=status_code,
-            content=content or b"",
-            _json=json_data
+            status_code=status_code, content=content or b"", _json=json_data
         )
 
     async def request(
@@ -137,7 +130,7 @@ class MockHTTPClient:
         json: Any = None,
         data: Any = None,
         content: bytes = None,
-        **kwargs
+        **kwargs,
     ) -> MockResponse:
         """Make a request."""
         full_url = self._build_url(url)
@@ -150,7 +143,7 @@ class MockHTTPClient:
             params=params or {},
             json_data=json,
             data=data,
-            content=content
+            content=content,
         )
         self.requests.append(request)
 
@@ -201,6 +194,7 @@ class MockHTTPClient:
     def _matches_pattern(self, pattern: str, key: str) -> bool:
         """Check if key matches pattern (with simple wildcard support)."""
         import fnmatch
+
         return fnmatch.fnmatch(key, pattern)
 
     def get_requests(self, method: str = None, url_contains: str = None) -> List[MockRequest]:
@@ -264,23 +258,18 @@ def create_json_response(data: Any, status_code: int = 200) -> MockResponse:
         status_code=status_code,
         content=json.dumps(data).encode(),
         headers={"content-type": "application/json"},
-        _json=data
+        _json=data,
     )
 
 
 def create_error_response(
-    status_code: int,
-    message: str = "Error",
-    details: Dict = None
+    status_code: int, message: str = "Error", details: Dict = None
 ) -> MockResponse:
     """Helper to create an error response."""
-    error_data = {
-        "error": message,
-        "details": details or {}
-    }
+    error_data = {"error": message, "details": details or {}}
     return MockResponse(
         status_code=status_code,
         content=json.dumps(error_data).encode(),
         headers={"content-type": "application/json"},
-        _json=error_data
+        _json=error_data,
     )

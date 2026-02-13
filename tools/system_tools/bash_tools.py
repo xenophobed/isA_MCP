@@ -37,6 +37,7 @@ _background_shells: Dict[str, "BackgroundShell"] = {}
 @dataclass
 class BackgroundShell:
     """Represents a background shell process."""
+
     shell_id: str
     process: asyncio.subprocess.Process
     command: str
@@ -57,7 +58,7 @@ def register_bash_tools(mcp: FastMCP):
         timeout: int = DEFAULT_TIMEOUT,
         working_directory: Optional[str] = None,
         run_in_background: bool = False,
-        env: Optional[Dict[str, str]] = None
+        env: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Execute a bash command in a shell session.
@@ -120,7 +121,7 @@ def register_bash_tools(mcp: FastMCP):
                         "action": "bash_execute",
                         "error": f"Potentially dangerous command blocked: {pattern}",
                         "error_code": "DANGEROUS_COMMAND",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
 
             # Set working directory
@@ -131,7 +132,7 @@ def register_bash_tools(mcp: FastMCP):
                     "action": "bash_execute",
                     "error": f"Working directory not found: {cwd}",
                     "error_code": "DIRECTORY_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Prepare environment
@@ -146,25 +147,22 @@ def register_bash_tools(mcp: FastMCP):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
-                env=process_env
+                env=process_env,
             )
 
             if run_in_background:
                 # Background execution
                 shell_id = str(uuid.uuid4())[:8]
                 shell = BackgroundShell(
-                    shell_id=shell_id,
-                    process=process,
-                    command=command,
-                    started_at=start_time
+                    shell_id=shell_id, process=process, command=command, started_at=start_time
                 )
 
                 # Start background task to collect output
                 async def collect_output():
                     try:
                         stdout, stderr = await process.communicate()
-                        shell.output_buffer.append(stdout.decode('utf-8', errors='replace'))
-                        shell.error_buffer.append(stderr.decode('utf-8', errors='replace'))
+                        shell.output_buffer.append(stdout.decode("utf-8", errors="replace"))
+                        shell.error_buffer.append(stderr.decode("utf-8", errors="replace"))
                         shell.exit_code = process.returncode
                         shell.completed = True
                     except Exception as e:
@@ -183,17 +181,14 @@ def register_bash_tools(mcp: FastMCP):
                         "shell_id": shell_id,
                         "command": command,
                         "working_directory": cwd,
-                        "message": "Command running in background. Use bash_output to check status."
+                        "message": "Command running in background. Use bash_output to check status.",
                     },
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Foreground execution with timeout
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 # Kill the process on timeout
                 try:
@@ -207,19 +202,16 @@ def register_bash_tools(mcp: FastMCP):
                     "action": "bash_execute",
                     "error": f"Command timed out after {timeout} seconds",
                     "error_code": "TIMEOUT",
-                    "data": {
-                        "command": command,
-                        "timeout": timeout
-                    },
-                    "timestamp": datetime.now().isoformat()
+                    "data": {"command": command, "timeout": timeout},
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             end_time = datetime.now()
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             # Decode output
-            stdout_text = stdout.decode('utf-8', errors='replace')
-            stderr_text = stderr.decode('utf-8', errors='replace')
+            stdout_text = stdout.decode("utf-8", errors="replace")
+            stderr_text = stderr.decode("utf-8", errors="replace")
 
             # Truncate if too large
             truncated = False
@@ -233,7 +225,9 @@ def register_bash_tools(mcp: FastMCP):
             exit_code = process.returncode
             status = "success" if exit_code == 0 else "error"
 
-            logger.info(f"bash_execute: '{command[:50]}...' exit_code={exit_code} duration={duration_ms}ms")
+            logger.info(
+                f"bash_execute: '{command[:50]}...' exit_code={exit_code} duration={duration_ms}ms"
+            )
 
             result = {
                 "status": status,
@@ -245,9 +239,9 @@ def register_bash_tools(mcp: FastMCP):
                     "exit_code": exit_code,
                     "duration_ms": duration_ms,
                     "working_directory": cwd,
-                    "truncated": truncated
+                    "truncated": truncated,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             if exit_code != 0:
@@ -262,15 +256,11 @@ def register_bash_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "bash_execute",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
-    async def bash_output(
-        shell_id: str,
-        wait: bool = False,
-        timeout: int = 30
-    ) -> Dict[str, Any]:
+    async def bash_output(shell_id: str, wait: bool = False, timeout: int = 30) -> Dict[str, Any]:
         """
         Retrieve output from a background shell session.
 
@@ -302,10 +292,8 @@ def register_bash_tools(mcp: FastMCP):
                     "action": "bash_output",
                     "error": f"Shell not found: {shell_id}",
                     "error_code": "SHELL_NOT_FOUND",
-                    "data": {
-                        "active_shells": list(_background_shells.keys())
-                    },
-                    "timestamp": datetime.now().isoformat()
+                    "data": {"active_shells": list(_background_shells.keys())},
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             shell = _background_shells[shell_id]
@@ -330,9 +318,9 @@ def register_bash_tools(mcp: FastMCP):
                     "exit_code": shell.exit_code,
                     "stdout": "".join(shell.output_buffer),
                     "stderr": "".join(shell.error_buffer),
-                    "running_time_ms": running_time_ms
+                    "running_time_ms": running_time_ms,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Clean up completed shells
@@ -350,13 +338,11 @@ def register_bash_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "bash_output",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
-    async def kill_shell(
-        shell_id: str
-    ) -> Dict[str, Any]:
+    async def kill_shell(shell_id: str) -> Dict[str, Any]:
         """
         Terminate a running background shell.
 
@@ -381,10 +367,8 @@ def register_bash_tools(mcp: FastMCP):
                     "action": "kill_shell",
                     "error": f"Shell not found: {shell_id}",
                     "error_code": "SHELL_NOT_FOUND",
-                    "data": {
-                        "active_shells": list(_background_shells.keys())
-                    },
-                    "timestamp": datetime.now().isoformat()
+                    "data": {"active_shells": list(_background_shells.keys())},
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             shell = _background_shells[shell_id]
@@ -396,9 +380,9 @@ def register_bash_tools(mcp: FastMCP):
                     "data": {
                         "shell_id": shell_id,
                         "message": "Shell already completed",
-                        "exit_code": shell.exit_code
+                        "exit_code": shell.exit_code,
                     },
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Kill the process
@@ -428,9 +412,9 @@ def register_bash_tools(mcp: FastMCP):
                 "data": {
                     "shell_id": shell_id,
                     "command": shell.command,
-                    "message": "Shell terminated"
+                    "message": "Shell terminated",
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -439,7 +423,7 @@ def register_bash_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "kill_shell",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
@@ -469,23 +453,23 @@ def register_bash_tools(mcp: FastMCP):
             shells = []
             for shell_id, shell in _background_shells.items():
                 running_time_ms = int((datetime.now() - shell.started_at).total_seconds() * 1000)
-                shells.append({
-                    "shell_id": shell_id,
-                    "command": shell.command[:100] + ("..." if len(shell.command) > 100 else ""),
-                    "completed": shell.completed,
-                    "exit_code": shell.exit_code,
-                    "running_time_ms": running_time_ms,
-                    "started_at": shell.started_at.isoformat()
-                })
+                shells.append(
+                    {
+                        "shell_id": shell_id,
+                        "command": shell.command[:100]
+                        + ("..." if len(shell.command) > 100 else ""),
+                        "completed": shell.completed,
+                        "exit_code": shell.exit_code,
+                        "running_time_ms": running_time_ms,
+                        "started_at": shell.started_at.isoformat(),
+                    }
+                )
 
             return {
                 "status": "success",
                 "action": "list_shells",
-                "data": {
-                    "shells": shells,
-                    "total": len(shells)
-                },
-                "timestamp": datetime.now().isoformat()
+                "data": {"shells": shells, "total": len(shells)},
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -494,7 +478,7 @@ def register_bash_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "list_shells",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     logger.debug("Registered bash tools: bash_execute, bash_output, kill_shell, list_shells")

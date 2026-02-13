@@ -53,7 +53,7 @@ async def save_screenshot(page, filename: str = None) -> str:
         return filename
     else:
         screenshot = await page.screenshot()
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp.write(screenshot)
             return tmp.name
 
@@ -61,10 +61,10 @@ async def save_screenshot(page, filename: str = None) -> str:
 def prepare_image_input(image: Union[str, bytes]) -> str:
     """
     Prepare image input - convert bytes to temp file if needed
-    
+
     Args:
         image: Image file path or bytes
-        
+
     Returns:
         File path to image
     """
@@ -73,7 +73,7 @@ def prepare_image_input(image: Union[str, bytes]) -> str:
         return image
     elif isinstance(image, bytes):
         # Create temporary file for bytes
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp.write(image)
             return tmp.name
     else:
@@ -83,7 +83,7 @@ def prepare_image_input(image: Union[str, bytes]) -> str:
 def cleanup_temp_file(file_path: str):
     """
     Clean up temporary file safely
-    
+
     Args:
         file_path: Path to file to delete
     """

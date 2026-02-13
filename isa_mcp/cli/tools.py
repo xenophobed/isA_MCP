@@ -9,6 +9,7 @@ Commands:
     isa_mcp tools execute <name>     Execute a tool
     isa_mcp tools aggregated         List tools from external MCP servers
 """
+
 import asyncio
 import json
 import sys
@@ -31,6 +32,7 @@ def run_async(coro):
 # Tools Command Group
 # =========================================================================
 
+
 @click.group()
 def tools():
     """Discover and manage MCP tools."""
@@ -39,9 +41,14 @@ def tools():
 
 @tools.command("discover")
 @click.argument("query")
-@click.option("--type", "-t", "item_type",
-              type=click.Choice(["all", "tools", "prompts", "resources", "skills"]),
-              default="all", help="Item type to search")
+@click.option(
+    "--type",
+    "-t",
+    "item_type",
+    type=click.Choice(["all", "tools", "prompts", "resources", "skills"]),
+    default="all",
+    help="Item type to search",
+)
 @click.option("--limit", "-n", default=10, help="Maximum results")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def tools_discover(query: str, item_type: str, limit: int, as_json: bool):
@@ -60,16 +67,18 @@ def tools_discover(query: str, item_type: str, limit: int, as_json: bool):
 
     async def do_discover():
         try:
-            from services.search_service.hierarchical_search_service import HierarchicalSearchService
+            from services.search_service.hierarchical_search_service import (
+                HierarchicalSearchService,
+            )
+
             service = HierarchicalSearchService()
             return await service.search(
-                query=query,
-                item_type=None if item_type == "all" else item_type,
-                limit=limit
+                query=query, item_type=None if item_type == "all" else item_type, limit=limit
             )
         except ImportError:
             # Fallback to basic tool listing
             from tools.meta_tools.discovery_tools import discover
+
             return await discover(query=query, item_type=item_type, limit=limit)
 
     try:
@@ -99,7 +108,9 @@ def tools_discover(query: str, item_type: str, limit: int, as_json: bool):
                 "skill": "cyan",
             }.get(item_type_str, "white")
 
-            click.echo(f"  [{click.style(item_type_str, fg=type_color)}] {click.style(name, bold=True)}")
+            click.echo(
+                f"  [{click.style(item_type_str, fg=type_color)}] {click.style(name, bold=True)}"
+            )
             click.echo(f"    {desc[:70]}{'...' if len(desc) > 70 else ''}")
             if score:
                 click.echo(f"    Score: {score:.2f}")
@@ -124,17 +135,17 @@ def tools_list(category: Optional[str], limit: int, as_json: bool):
       isa_mcp tools list --category calendar-events
       isa_mcp tools list --json
     """
+
     async def do_list():
         try:
             from services.tool_service.tool_repository import ToolRepository
+
             repo = ToolRepository()
-            return await repo.list_tools(
-                category=category,
-                limit=limit
-            )
+            return await repo.list_tools(category=category, limit=limit)
         except ImportError:
             # Fallback to meta-tools
             from tools.meta_tools.discovery_tools import discover
+
             result = await discover(query="", item_type="tools", limit=limit)
             return result.get("items", [])
 
@@ -185,12 +196,15 @@ def tools_schema(name: str, as_json: bool):
     Example:
       isa_mcp tools schema create_calendar_event
     """
+
     async def do_get_schema():
         try:
             from tools.meta_tools.discovery_tools import get_tool_schema
+
             return await get_tool_schema(tool_name=name)
         except ImportError:
             from services.tool_service.tool_repository import ToolRepository
+
             repo = ToolRepository()
             return await repo.get_tool_schema(name)
 
@@ -228,7 +242,7 @@ def tools_schema(name: str, as_json: bool):
 
         click.echo()
         click.echo(click.style("Execute with:", fg="blue"))
-        click.echo(f"  isa_mcp tools execute {name} --params '{{\"key\": \"value\"}}'")
+        click.echo(f'  isa_mcp tools execute {name} --params \'{{"key": "value"}}\'')
 
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e}", fg="red"))
@@ -263,6 +277,7 @@ def tools_execute(name: str, params: str, as_json: bool):
     async def do_execute():
         try:
             from tools.meta_tools.discovery_tools import execute
+
             return await execute(tool_name=name, params=params_dict)
         except ImportError:
             click.echo(click.style("Error: Tool execution requires full MCP environment", fg="red"))
@@ -307,14 +322,17 @@ def tools_defaults(as_json: bool):
     Example:
       isa_mcp tools defaults
     """
+
     async def do_list():
         try:
             from services.tool_service.tool_service import ToolService
+
             service = ToolService()
             return await service.get_default_tools()
         except ImportError:
             # Fallback to HTTP API
             from isa_mcp.mcp_client import AsyncMCPClient
+
             async with AsyncMCPClient() as client:
                 return await client.get_default_tools()
 
@@ -353,9 +371,11 @@ def tools_aggregated(as_json: bool):
     Example:
       isa_mcp tools aggregated
     """
+
     async def do_list():
         try:
             from services.aggregator_service.aggregator_service import AggregatorService
+
             service = AggregatorService()
             return await service.list_all_aggregated_tools()
         except ImportError:

@@ -16,7 +16,7 @@ AUTO-DISCOVERY REGISTRATION PATTERN
 ==============================================================================
 
 To enable automatic tool discovery and registration, follow this pattern:
- 
+
 1. **Filename**: Must end with `_tools.py`
    Example: `weather_tools.py`, `data_analytics_tools.py`
 
@@ -66,6 +66,7 @@ To enable automatic tool discovery and registration, follow this pattern:
 
 ==============================================================================
 """
+
 import json
 import asyncio
 import inspect
@@ -80,6 +81,7 @@ import logging
 try:
     from mcp.server.fastmcp import Context
     from mcp.types import CallToolResult, TextContent, ImageContent, ToolAnnotations
+
     MCP_SDK_AVAILABLE = True
 except ImportError:
     MCP_SDK_AVAILABLE = False
@@ -92,36 +94,38 @@ from core.security import SecurityLevel, get_security_manager
 logger = logging.getLogger(__name__)
 
 # Type variables for generic decorators
-P = ParamSpec('P')
-T = TypeVar('T')
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 def json_serializer(obj):
     """Custom JSON serializer for datetime and other objects"""
     # Skip Context objects (not serializable) - check multiple ways
-    if obj.__class__.__name__ == 'Context':
+    if obj.__class__.__name__ == "Context":
         return "<Context>"
-    if 'Context' in str(type(obj)):
+    if "Context" in str(type(obj)):
         return "<Context>"
     # Skip any MCP types
-    if 'mcp.' in str(type(obj)):
+    if "mcp." in str(type(obj)):
         return f"<{type(obj).__name__}>"
 
     if isinstance(obj, datetime):
         return obj.isoformat()
     elif isinstance(obj, Decimal):
         return float(obj)
-    elif hasattr(obj, 'dict') and callable(obj.dict):  # Pydantic models
+    elif hasattr(obj, "dict") and callable(obj.dict):  # Pydantic models
         return obj.dict()
-    elif hasattr(obj, '__dict__') and not callable(obj):
+    elif hasattr(obj, "__dict__") and not callable(obj):
         # Filter out non-serializable objects from __dict__
         filtered_dict = {}
         for k, v in obj.__dict__.items():
-            if 'Context' not in str(type(v)) and 'mcp.' not in str(type(v)):
+            if "Context" not in str(type(v)) and "mcp." not in str(type(v)):
                 filtered_dict[k] = v
         return filtered_dict
     # Handle numpy types - be more aggressive
     try:
         import numpy as np
+
         # Handle any numpy type first
         if isinstance(obj, np.generic):
             return obj.item()
@@ -129,18 +133,19 @@ def json_serializer(obj):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         # Backup: check for any numpy module types
-        elif hasattr(obj, 'dtype') and hasattr(obj, 'item'):
+        elif hasattr(obj, "dtype") and hasattr(obj, "item"):
             return obj.item()
     except ImportError:
         pass
     except Exception:
         # If numpy conversion fails, try basic conversions
         try:
-            if hasattr(obj, 'item'):
+            if hasattr(obj, "item"):
                 return obj.item()
         except:
             pass
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
 
 class BaseTool:
     """
@@ -161,7 +166,7 @@ class BaseTool:
         self._security_manager = None
         self.registered_tools = []
         self._current_user_id: Optional[str] = None
-        self._rate_limiters: Dict[str, 'AsyncLimiter'] = {}
+        self._rate_limiters: Dict[str, "AsyncLimiter"] = {}
         self._active_operations: Dict[str, asyncio.Task] = {}
 
         # Check MCP SDK availability
@@ -170,11 +175,12 @@ class BaseTool:
                 "MCP SDK not available. Advanced features "
                 "(progress, HIL, streaming) will be limited."
             )
-    
+
     async def get_isa_client(self):
         """异步获取ISA客户端"""
         if self._isa_client is None:
             from core.clients.model_client import get_isa_client
+
             self._isa_client = await get_isa_client()
         return self._isa_client
 
@@ -184,7 +190,7 @@ class BaseTool:
         input_data: Union[str, List[Dict], Dict],
         task: str,
         service_type: str,
-        parameters: Optional[Dict] = None
+        parameters: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         适配器：将旧的invoke API转换为新的OpenAI兼容API
@@ -205,70 +211,69 @@ class BaseTool:
             # 根据service_type和task映射到新API
             if service_type == "text" and task == "chat":
                 # Text generation - chat.completions
-                messages = input_data if isinstance(input_data, list) else [
-                    {"role": "user", "content": str(input_data)}
-                ]
+                messages = (
+                    input_data
+                    if isinstance(input_data, list)
+                    else [{"role": "user", "content": str(input_data)}]
+                )
 
                 response = await client.chat.completions.create(
-                    model=params.get('model', 'gpt-4o-mini'),
+                    model=params.get("model", "gpt-4o-mini"),
                     messages=messages,
-                    **{k: v for k, v in params.items() if k != 'model'}
+                    **{k: v for k, v in params.items() if k != "model"},
                 )
 
                 return {
-                    'success': True,
-                    'result': response.choices[0].message.content,
-                    'billing': {
-                        'model': response.model,
-                        'provider': 'openai',
-                        'input_tokens': response.usage.prompt_tokens if response.usage else 0,
-                        'output_tokens': response.usage.completion_tokens if response.usage else 0,
-                        'cost_usd': 0.0  # 需要计算
+                    "success": True,
+                    "result": response.choices[0].message.content,
+                    "billing": {
+                        "model": response.model,
+                        "provider": "openai",
+                        "input_tokens": response.usage.prompt_tokens if response.usage else 0,
+                        "output_tokens": response.usage.completion_tokens if response.usage else 0,
+                        "cost_usd": 0.0,  # 需要计算
                     },
-                    'metadata': {
-                        'finish_reason': response.choices[0].finish_reason
-                    }
+                    "metadata": {"finish_reason": response.choices[0].finish_reason},
                 }
 
             elif service_type == "embedding" and task == "embed":
                 # Embeddings
                 response = await client.embeddings.create(
-                    input=str(input_data),
-                    model=params.get('model', 'text-embedding-3-small')
+                    input=str(input_data), model=params.get("model", "text-embedding-3-small")
                 )
 
                 return {
-                    'success': True,
-                    'result': response.data[0].embedding,
-                    'billing': {
-                        'model': response.model,
-                        'provider': 'openai',
-                        'input_tokens': response.usage.total_tokens if response.usage else 0,
-                        'cost_usd': 0.0
+                    "success": True,
+                    "result": response.data[0].embedding,
+                    "billing": {
+                        "model": response.model,
+                        "provider": "openai",
+                        "input_tokens": response.usage.total_tokens if response.usage else 0,
+                        "cost_usd": 0.0,
                     },
-                    'metadata': {}
+                    "metadata": {},
                 }
 
             elif service_type == "image" and task == "generate_image":
                 # Image generation
                 response = await client.images.generate(
                     prompt=str(input_data),
-                    model=params.get('model', 'dall-e-3'),
-                    n=params.get('n', 1),
-                    size=params.get('size', '1024x1024')
+                    model=params.get("model", "dall-e-3"),
+                    n=params.get("n", 1),
+                    size=params.get("size", "1024x1024"),
                 )
 
                 return {
-                    'success': True,
-                    'result': response.data[0].url if response.data else None,
-                    'billing': {
-                        'model': params.get('model', 'dall-e-3'),
-                        'provider': 'openai',
-                        'cost_usd': 0.0
+                    "success": True,
+                    "result": response.data[0].url if response.data else None,
+                    "billing": {
+                        "model": params.get("model", "dall-e-3"),
+                        "provider": "openai",
+                        "cost_usd": 0.0,
                     },
-                    'metadata': {
-                        'revised_prompt': response.data[0].revised_prompt if response.data else None
-                    }
+                    "metadata": {
+                        "revised_prompt": response.data[0].revised_prompt if response.data else None
+                    },
                 }
 
             else:
@@ -279,13 +284,13 @@ class BaseTool:
         except Exception as e:
             logger.error(f"ISA model invocation failed: {e}")
             return {
-                'success': False,
-                'result': None,
-                'error': str(e),
-                'billing': {},
-                'metadata': {}
+                "success": False,
+                "result": None,
+                "error": str(e),
+                "billing": {},
+                "metadata": {},
             }
-    
+
     @property
     def security_manager(self):
         """Get the global security manager instance"""
@@ -295,14 +300,18 @@ class BaseTool:
             except RuntimeError:
                 # Fallback to simple security manager if not initialized
                 logger.warning("Security manager not initialized, using fallback")
+
                 class SimpleSecurityManager:
                     def security_check(self, func):
                         return func
+
                     def require_authorization(self, security_level):
                         def decorator(func):
                             func._security_level = security_level.name
                             return func
+
                         return decorator
+
                 self._security_manager = SimpleSecurityManager()
         return self._security_manager
 
@@ -336,13 +345,11 @@ class BaseTool:
                 "request_id": None,
                 "client_id": None,
                 "session_id": None,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         # 只提取可序列化的基本属性
-        info = {
-            "timestamp": datetime.now().isoformat()
-        }
+        info = {"timestamp": datetime.now().isoformat()}
 
         # 安全提取 request_id
         try:
@@ -366,14 +373,14 @@ class BaseTool:
             info["session_id"] = None
 
         return info
-    
+
     async def call_isa_with_events(
         self,
         input_data: Union[str, List[Dict], Dict],
         task: str,
         service_type: str,
         user_id: str,
-        parameters: Optional[Dict] = None
+        parameters: Optional[Dict] = None,
     ) -> Any:
         """
         调用ISA客户端并发布billing事件 (Event-driven architecture)
@@ -398,29 +405,31 @@ class BaseTool:
                 input_data=input_data,
                 task=task,
                 service_type=service_type,
-                parameters=parameters
+                parameters=parameters,
             )
 
             # 提取结果
-            result_data = isa_response.get('result', {})
+            result_data = isa_response.get("result", {})
 
-            if not isa_response.get('success'):
-                raise Exception(f"ISA API call failed: {isa_response.get('error', 'Unknown error')}")
+            if not isa_response.get("success"):
+                raise Exception(
+                    f"ISA API call failed: {isa_response.get('error', 'Unknown error')}"
+                )
 
             # 发布billing事件 (异步，不阻塞主流程)
-            billing_info = isa_response.get('billing', {})
+            billing_info = isa_response.get("billing", {})
             if billing_info:
                 await self._publish_billing_event(
                     user_id=user_id,
                     service_type=service_type,
                     operation=task,
                     metadata={
-                        'model': billing_info.get('model', 'unknown'),
-                        'provider': billing_info.get('provider', 'unknown'),
-                        'cost_usd': billing_info.get('cost_usd', 0.0),
-                        'input_tokens': billing_info.get('input_tokens'),
-                        'output_tokens': billing_info.get('output_tokens'),
-                    }
+                        "model": billing_info.get("model", "unknown"),
+                        "provider": billing_info.get("provider", "unknown"),
+                        "cost_usd": billing_info.get("cost_usd", 0.0),
+                        "input_tokens": billing_info.get("input_tokens"),
+                        "output_tokens": billing_info.get("output_tokens"),
+                    },
                 )
 
             return result_data
@@ -438,7 +447,7 @@ class BaseTool:
         output_tokens: Optional[int] = None,
         input_units: Optional[float] = None,
         output_units: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         发布billing事件到NATS (异步事件驱动架构)
@@ -467,7 +476,7 @@ class BaseTool:
                 unit_type = "request"
             else:
                 # Extract from metadata if available
-                if metadata and 'cost_usd' in metadata:
+                if metadata and "cost_usd" in metadata:
                     usage_amount = Decimal(1)  # Count as 1 request
                     unit_type = "request"
                 else:
@@ -493,12 +502,12 @@ class BaseTool:
 
                 success = await publish_usage_event(
                     user_id=user_id,
-                    product_id=metadata.get('model', 'unknown') if metadata else 'unknown',
+                    product_id=metadata.get("model", "unknown") if metadata else "unknown",
                     usage_amount=usage_amount,
                     unit_type=unit_type,
                     usage_details=usage_details,
-                    nats_host='localhost',  # TODO: from config
-                    nats_port=50056
+                    nats_host="localhost",  # TODO: from config
+                    nats_port=50056,
                 )
 
                 if success:
@@ -551,9 +560,7 @@ class BaseTool:
     # ============================================================================
 
     async def create_progress_operation(
-        self,
-        operation_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        self, operation_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Create a new progress operation (NEW RECOMMENDED WAY)
@@ -608,7 +615,7 @@ class BaseTool:
         current: Optional[int] = None,
         total: Optional[int] = None,
         message: str = "",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Update progress for an operation (NEW RECOMMENDED WAY)
@@ -632,16 +639,13 @@ class BaseTool:
             current=current,
             total=total,
             message=message,
-            metadata=metadata
+            metadata=metadata,
         )
 
         logger.debug(f"Updated progress {operation_id}: {progress}% - {message}")
 
     async def complete_progress_operation(
-        self,
-        operation_id: str,
-        result: Optional[Dict[str, Any]] = None,
-        message: str = "Completed"
+        self, operation_id: str, result: Optional[Dict[str, Any]] = None, message: str = "Completed"
     ):
         """
         Mark operation as completed (NEW RECOMMENDED WAY)
@@ -658,12 +662,7 @@ class BaseTool:
 
         logger.info(f"Completed progress operation: {operation_id}")
 
-    async def fail_progress_operation(
-        self,
-        operation_id: str,
-        error: str,
-        message: str = "Failed"
-    ):
+    async def fail_progress_operation(self, operation_id: str, error: str, message: str = "Failed"):
         """
         Mark operation as failed (NEW RECOMMENDED WAY)
 
@@ -688,22 +687,16 @@ class BaseTool:
     #   3. complete_progress_operation(operation_id, result)
     # ============================================================================
 
-    async def report_progress(
-        self,
-        ctx: Optional[Context],
-        current: int,
-        total: int,
-        message: str
-    ):
+    async def report_progress(self, ctx: Optional[Context], current: int, total: int, message: str):
         """
         Backward compatibility method for progress reporting
-        
+
         Args:
             ctx: MCP Context (optional, for compatibility)
             current: Current step number
             total: Total steps
             message: Progress message
-            
+
         Note:
             This is a simple logging wrapper. For full progress tracking,
             use ProgressManager (create_progress_operation, etc.)
@@ -753,7 +746,7 @@ class BaseTool:
         ctx: Optional[Context],
         message: str,
         schema: Any,
-        fallback_response: Optional[Any] = None
+        fallback_response: Optional[Any] = None,
     ) -> Optional[Any]:
         """
         Request user input via MCP elicitation protocol
@@ -786,8 +779,7 @@ class BaseTool:
         else:
             # Fallback: Use custom HIL response
             logger.warning(
-                "MCP elicitation not available. "
-                "Use custom HIL responses for this scenario."
+                "MCP elicitation not available. " "Use custom HIL responses for this scenario."
             )
             return fallback_response
 
@@ -804,7 +796,7 @@ class BaseTool:
         context: Optional[Dict[str, Any]] = None,
         options: Optional[List[str]] = None,
         timeout: int = 300,
-        data: Optional[Dict[str, Any]] = None
+        data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Internal method to create standardized HIL response
@@ -832,7 +824,7 @@ class BaseTool:
             "question": question,
             "message": message,
             "timeout": timeout,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         if context is not None:
@@ -852,7 +844,7 @@ class BaseTool:
         reason: str,
         risk_level: str = "high",
         context: Optional[Dict[str, Any]] = None,
-        timeout: int = 300
+        timeout: int = 300,
     ) -> Dict[str, Any]:
         """
         Request user authorization to execute an operation
@@ -926,8 +918,8 @@ class BaseTool:
                 "request_type": "authorization",
                 "action": action,
                 "reason": reason,
-                "risk_level": risk_level
-            }
+                "risk_level": risk_level,
+            },
         )
 
     def request_input(
@@ -939,7 +931,7 @@ class BaseTool:
         current_data: Optional[Any] = None,
         suggestions: Optional[List[str]] = None,
         default_value: Optional[Any] = None,
-        timeout: int = 300
+        timeout: int = 300,
     ) -> Dict[str, Any]:
         """
         Request user to provide information or augment existing data
@@ -1000,11 +992,7 @@ class BaseTool:
         Response includes:
             - Options: ["submit", "skip", "cancel"]
         """
-        data = {
-            "request_type": "input",
-            "input_type": input_type,
-            "prompt": prompt
-        }
+        data = {"request_type": "input", "input_type": input_type, "prompt": prompt}
 
         if schema is not None:
             data["schema"] = schema
@@ -1033,7 +1021,7 @@ class BaseTool:
             context=context,
             options=["submit", "skip", "cancel"],
             timeout=timeout,
-            data=data
+            data=data,
         )
 
     def request_review(
@@ -1042,7 +1030,7 @@ class BaseTool:
         content_type: str,
         instructions: str,
         editable: bool = True,
-        timeout: int = 600
+        timeout: int = 600,
     ) -> Dict[str, Any]:
         """
         Request user to review and optionally edit content before approval
@@ -1104,7 +1092,7 @@ class BaseTool:
             context={
                 "content_type": content_type,
                 "editable": editable,
-                "content_length": len(str(content))
+                "content_length": len(str(content)),
             },
             options=["approve", "edit", "reject"] if editable else ["approve", "reject"],
             timeout=timeout,
@@ -1112,8 +1100,8 @@ class BaseTool:
                 "request_type": "review",
                 "content_type": content_type,
                 "content": content,
-                "editable": editable
-            }
+                "editable": editable,
+            },
         )
 
     def request_input_with_authorization(
@@ -1125,7 +1113,7 @@ class BaseTool:
         risk_level: str = "high",
         schema: Optional[Dict[str, Any]] = None,
         context: Optional[Dict[str, Any]] = None,
-        timeout: int = 300
+        timeout: int = 300,
     ) -> Dict[str, Any]:
         """
         Request user to provide information AND authorize the action
@@ -1194,15 +1182,12 @@ class BaseTool:
                 "input_type": input_type,
                 "input_schema": schema,
                 "authorization_reason": authorization_reason,
-                "risk_level": risk_level
-            }
+                "risk_level": risk_level,
+            },
         )
 
     async def with_timeout(
-        self,
-        coro: Callable,
-        timeout_seconds: float,
-        operation_name: str = "operation"
+        self, coro: Callable, timeout_seconds: float, operation_name: str = "operation"
     ) -> Any:
         """
         Execute operation with timeout
@@ -1259,12 +1244,7 @@ class BaseTool:
             return True
         return False
 
-    def rate_limit(
-        self,
-        calls: int,
-        period: float,
-        per_user: bool = False
-    ):
+    def rate_limit(self, calls: int, period: float, per_user: bool = False):
         """
         Rate limiting decorator
 
@@ -1278,6 +1258,7 @@ class BaseTool:
             async def my_tool(self, user_id: str):
                 ...
         """
+
         def decorator(func: Callable[P, T]) -> Callable[P, T]:
             @wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -1293,7 +1274,7 @@ class BaseTool:
 
                 # Determine rate limit key
                 if per_user:
-                    user_id = kwargs.get('user_id', 'default')
+                    user_id = kwargs.get("user_id", "default")
                     limit_key = f"{func.__name__}:{user_id}"
                 else:
                     limit_key = func.__name__
@@ -1309,6 +1290,7 @@ class BaseTool:
                     return await func(*args, **kwargs)
 
             return wrapper
+
         return decorator
 
     @asynccontextmanager
@@ -1327,22 +1309,17 @@ class BaseTool:
         finally:
             for resource in resources:
                 try:
-                    if hasattr(resource, 'close'):
+                    if hasattr(resource, "close"):
                         if asyncio.iscoroutinefunction(resource.close):
                             await resource.close()
                         else:
                             resource.close()
-                    elif hasattr(resource, '__aexit__'):
+                    elif hasattr(resource, "__aexit__"):
                         await resource.__aexit__(None, None, None)
                 except Exception as e:
                     logger.error(f"Error closing resource: {e}")
 
-    async def stream_response(
-        self,
-        ctx: Optional[Context],
-        chunks: List[str],
-        delay: float = 0.1
-    ):
+    async def stream_response(self, ctx: Optional[Context], chunks: List[str], delay: float = 0.1):
         """
         Stream response chunks to client (for LLM streaming)
 
@@ -1365,12 +1342,7 @@ class BaseTool:
             if delay > 0:
                 await asyncio.sleep(delay)
 
-    async def stream_generator(
-        self,
-        ctx: Optional[Context],
-        generator,
-        report_interval: int = 10
-    ):
+    async def stream_generator(self, ctx: Optional[Context], generator, report_interval: int = 10):
         """
         Stream results from an async generator with progress reporting
 
@@ -1397,7 +1369,7 @@ class BaseTool:
                     ctx,
                     progress=count,
                     total=count,  # Unknown total for generators
-                    message=f"Processed {count} items"
+                    message=f"Processed {count} items",
                 )
 
             yield item
@@ -1408,7 +1380,7 @@ class BaseTool:
         action: str,
         data: Dict[str, Any],
         error_message: Optional[str] = None,
-        error_code: Optional[str] = None
+        error_code: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         创建统一格式的响应（返回可序列化的字典）
@@ -1460,7 +1432,7 @@ class BaseTool:
                 "status": "success",
                 "action": action,
                 "data": data,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
         else:
             response = {
@@ -1468,13 +1440,13 @@ class BaseTool:
                 "action": action,
                 "error": error_message or "Unknown error",
                 "data": data,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             # Add error_code if provided
             if error_code:
                 response["error_code"] = error_code
             return response
-    
+
     def register_tool(
         self,
         mcp,
@@ -1483,7 +1455,7 @@ class BaseTool:
         timeout: Optional[float] = None,
         rate_limit_calls: Optional[int] = None,
         rate_limit_period: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         注册工具到MCP服务器 - Enhanced with MCP SDK features
@@ -1525,15 +1497,18 @@ class BaseTool:
         # If it has a Context parameter, we MUST preserve the exact signature
         # so FastMCP can inject it properly
         import inspect
+
         sig = inspect.signature(func)
 
         # Check for Context parameter (handle Optional[Context] and Context)
         has_context_param = False
         for param_name, param in sig.parameters.items():
             param_type_str = str(param.annotation)
-            if 'Context' in param_type_str:
+            if "Context" in param_type_str:
                 has_context_param = True
-                logger.debug(f"Tool '{func.__name__}' has Context parameter: {param_name}: {param_type_str}")
+                logger.debug(
+                    f"Tool '{func.__name__}' has Context parameter: {param_name}: {param_type_str}"
+                )
                 break
 
         if not has_context_param:
@@ -1548,15 +1523,15 @@ class BaseTool:
                         result = await self.with_timeout(
                             func(**kwargs_only),
                             timeout_seconds=timeout,
-                            operation_name=func.__name__
+                            operation_name=func.__name__,
                         )
                     else:
                         result = await func(**kwargs_only)
 
                     # Convert Pydantic models
-                    if hasattr(result, 'model_dump'):
+                    if hasattr(result, "model_dump"):
                         result = result.model_dump()
-                    elif hasattr(result, 'dict'):
+                    elif hasattr(result, "dict"):
                         result = result.dict()
 
                     return result
@@ -1568,7 +1543,7 @@ class BaseTool:
                         "action": func.__name__,
                         "error": f"Operation timed out after {timeout}s",
                         "error_code": "TIMEOUT",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
                 except Exception as e:
                     logger.error(f"{func.__name__} failed: {e}", exc_info=True)
@@ -1576,7 +1551,7 @@ class BaseTool:
                         "status": "error",
                         "action": func.__name__,
                         "error": str(e),
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
 
             # Preserve original signature for FastMCP Context injection
@@ -1596,15 +1571,15 @@ class BaseTool:
                         result = await self.with_timeout(
                             func(*args, **kwargs),
                             timeout_seconds=timeout,
-                            operation_name=func.__name__
+                            operation_name=func.__name__,
                         )
                     else:
                         result = await func(*args, **kwargs)
 
                     # Convert Pydantic models
-                    if hasattr(result, 'model_dump'):
+                    if hasattr(result, "model_dump"):
                         result = result.model_dump()
-                    elif hasattr(result, 'dict'):
+                    elif hasattr(result, "dict"):
                         result = result.dict()
 
                     return result
@@ -1616,7 +1591,7 @@ class BaseTool:
                         "action": func.__name__,
                         "error": f"Operation timed out after {timeout}s",
                         "error_code": "TIMEOUT",
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
                 except Exception as e:
                     logger.error(f"{func.__name__} failed: {e}", exc_info=True)
@@ -1624,15 +1599,13 @@ class BaseTool:
                         "status": "error",
                         "action": func.__name__,
                         "error": str(e),
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
 
         # Apply rate limiting if specified
         if rate_limit_calls and rate_limit_period:
             wrapped_func = self.rate_limit(
-                calls=rate_limit_calls,
-                period=rate_limit_period,
-                per_user=True
+                calls=rate_limit_calls, period=rate_limit_period, per_user=True
             )(wrapped_func)
             logger.debug(
                 f"Applied rate limit to '{func.__name__}': "
@@ -1642,19 +1615,22 @@ class BaseTool:
         # Apply security level if specified
         if security_level is not None:
             wrapped_func = self.security_manager.require_authorization(security_level)(wrapped_func)
-            logger.debug(f"Registered tool '{func.__name__}' with security level: {security_level.name}")
+            logger.debug(
+                f"Registered tool '{func.__name__}' with security level: {security_level.name}"
+            )
         else:
             wrapped_func = self.security_manager.security_check(wrapped_func)
 
         # CRITICAL FIX: Remove Context from type annotations to prevent serialization issues
         # FastMCP reads __annotations__ to generate schema, but Context type causes problems
         # This allows FastMCP to properly inject Context while avoiding serialization errors
-        if hasattr(wrapped_func, '__annotations__'):
+        if hasattr(wrapped_func, "__annotations__"):
             from typing import Any
+
             clean_annotations = {}
             for param_name, param_type in wrapped_func.__annotations__.items():
                 # Skip Context types entirely or replace with Any
-                if 'Context' not in str(param_type):
+                if "Context" not in str(param_type):
                     clean_annotations[param_name] = param_type
                 else:
                     # For Context parameters, use Any to avoid serialization but allow injection
@@ -1662,7 +1638,9 @@ class BaseTool:
 
             wrapped_func.__annotations__ = clean_annotations
             if has_context_param:
-                logger.debug(f"Cleaned Context annotations for '{func.__name__}' to enable injection")
+                logger.debug(
+                    f"Cleaned Context annotations for '{func.__name__}' to enable injection"
+                )
 
         # Register with MCP (use FastMCP defaults: structured_output=True)
         # FastMCP will automatically inject Context when ctx parameter is in signature
@@ -1673,7 +1651,7 @@ class BaseTool:
         self.registered_tools.append(func.__name__)
 
         return tool_func
-    
+
     def register_all_tools(self, mcp):
         """
         注册所有工具的模板方法

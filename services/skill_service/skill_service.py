@@ -7,6 +7,7 @@ Provides:
 - Skill embedding generation and updates
 - Manual assignment overrides
 """
+
 import json
 import logging
 import uuid
@@ -37,10 +38,7 @@ class SkillService:
     """
 
     def __init__(
-        self,
-        repository: Optional[SkillRepository] = None,
-        qdrant_client=None,
-        model_client=None
+        self, repository: Optional[SkillRepository] = None, qdrant_client=None, model_client=None
     ):
         """
         Initialize the skill service.
@@ -65,11 +63,12 @@ class SkillService:
         """Get or create Qdrant client."""
         if self._qdrant_client is None:
             from isa_common import AsyncQdrantClient
+
             settings = get_settings()
             self._qdrant_client = AsyncQdrantClient(
                 host=settings.infrastructure.qdrant_grpc_host,
                 port=settings.infrastructure.qdrant_grpc_port,
-                user_id="mcp-skill-service"
+                user_id="mcp-skill-service",
             )
         return self._qdrant_client
 
@@ -77,10 +76,7 @@ class SkillService:
     # Skill Category Management
     # =========================================================================
 
-    async def create_skill_category(
-        self,
-        skill_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def create_skill_category(self, skill_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new skill category.
 
@@ -95,20 +91,20 @@ class SkillService:
             RuntimeError: If creation fails
         """
         # Validate required fields
-        if not skill_data.get('id'):
+        if not skill_data.get("id"):
             raise ValueError("Skill ID is required")
-        if not skill_data.get('name'):
+        if not skill_data.get("name"):
             raise ValueError("Skill name is required")
-        if not skill_data.get('description'):
+        if not skill_data.get("description"):
             raise ValueError("Skill description is required")
-        if len(skill_data.get('description', '')) < 10:
+        if len(skill_data.get("description", "")) < 10:
             raise ValueError("Skill description must be at least 10 characters")
 
         # Validate ID format
-        skill_id = skill_data['id']
+        skill_id = skill_data["id"]
         if not skill_id[0].isalpha():
             raise ValueError("Skill ID must start with a letter")
-        if not all(c.isalnum() or c == '_' for c in skill_id):
+        if not all(c.isalnum() or c == "_" for c in skill_id):
             raise ValueError("Skill ID can only contain letters, numbers, and underscores")
         if skill_id != skill_id.lower():
             raise ValueError("Skill ID must be lowercase")
@@ -119,9 +115,9 @@ class SkillService:
             raise ValueError(f"Skill already exists: {skill_id}")
 
         # Normalize keywords to lowercase
-        if 'keywords' in skill_data:
-            skill_data['keywords'] = [
-                k.lower().strip() for k in skill_data['keywords'] if k.strip()
+        if "keywords" in skill_data:
+            skill_data["keywords"] = [
+                k.lower().strip() for k in skill_data["keywords"] if k.strip()
             ]
 
         # Create in database
@@ -131,7 +127,7 @@ class SkillService:
 
         # Generate initial embedding from description
         try:
-            await self._update_skill_embedding(skill_id, skill['description'])
+            await self._update_skill_embedding(skill_id, skill["description"])
         except Exception as e:
             logger.warning(f"Failed to generate initial embedding for skill {skill_id}: {e}")
 
@@ -155,7 +151,7 @@ class SkillService:
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
         List skill categories.
@@ -170,17 +166,10 @@ class SkillService:
             List of skill records
         """
         return await self.repository.list_skills(
-            is_active=is_active,
-            parent_domain=parent_domain,
-            limit=limit,
-            offset=offset
+            is_active=is_active, parent_domain=parent_domain, limit=limit, offset=offset
         )
 
-    async def update_skill_category(
-        self,
-        skill_id: str,
-        updates: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def update_skill_category(self, skill_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update a skill category.
 
@@ -200,19 +189,17 @@ class SkillService:
             raise ValueError(f"Skill not found: {skill_id}")
 
         # Normalize keywords if updating
-        if 'keywords' in updates:
-            updates['keywords'] = [
-                k.lower().strip() for k in updates['keywords'] if k.strip()
-            ]
+        if "keywords" in updates:
+            updates["keywords"] = [k.lower().strip() for k in updates["keywords"] if k.strip()]
 
         skill = await self.repository.update_skill_category(skill_id, updates)
         if not skill:
             raise RuntimeError(f"Failed to update skill: {skill_id}")
 
         # Update embedding if description changed
-        if 'description' in updates:
+        if "description" in updates:
             try:
-                await self._update_skill_embedding(skill_id, updates['description'])
+                await self._update_skill_embedding(skill_id, updates["description"])
             except Exception as e:
                 logger.warning(f"Failed to update embedding for skill {skill_id}: {e}")
 
@@ -244,7 +231,7 @@ class SkillService:
         tool_name: str,
         tool_description: str,
         input_schema_summary: Optional[str] = None,
-        force_reclassify: bool = False
+        force_reclassify: bool = False,
     ) -> Dict[str, Any]:
         """
         Classify a tool into skill categories using LLM.
@@ -271,16 +258,16 @@ class SkillService:
                 if has_override:
                     logger.info(f"Tool {tool_id} has human override, skipping classification")
                     return {
-                        'tool_id': tool_id,
-                        'tool_name': tool_name,
-                        'assignments': existing,
-                        'primary_skill_id': next(
-                            (a['skill_id'] for a in existing if a.get('is_primary')),
-                            existing[0]['skill_id'] if existing else None
+                        "tool_id": tool_id,
+                        "tool_name": tool_name,
+                        "assignments": existing,
+                        "primary_skill_id": next(
+                            (a["skill_id"] for a in existing if a.get("is_primary")),
+                            existing[0]["skill_id"] if existing else None,
                         ),
-                        'suggested_new_skill': None,
-                        'classification_timestamp': datetime.now(timezone.utc),
-                        'skipped': True,
+                        "suggested_new_skill": None,
+                        "classification_timestamp": datetime.now(timezone.utc),
+                        "skipped": True,
                     }
 
         # Get available skills
@@ -296,21 +283,19 @@ class SkillService:
             tool_name=tool_name,
             tool_description=description,
             input_schema_summary=input_schema_summary,
-            available_skills=skills
+            available_skills=skills,
         )
 
         # Filter by confidence threshold
         valid_assignments = [
-            a for a in classification.get('assignments', [])
-            if a.get('confidence', 0) >= MIN_CONFIDENCE_THRESHOLD
+            a
+            for a in classification.get("assignments", [])
+            if a.get("confidence", 0) >= MIN_CONFIDENCE_THRESHOLD
         ][:MAX_ASSIGNMENTS_PER_TOOL]
 
         # Validate skill IDs exist
-        skill_ids = {s['id'] for s in skills}
-        valid_assignments = [
-            a for a in valid_assignments
-            if a.get('skill_id') in skill_ids
-        ]
+        skill_ids = {s["id"] for s in skills}
+        valid_assignments = [a for a in valid_assignments if a.get("skill_id") in skill_ids]
 
         # Delete existing assignments if re-classifying
         if force_reclassify or valid_assignments:
@@ -321,60 +306,65 @@ class SkillService:
         primary_skill_id = None
 
         for i, assignment in enumerate(valid_assignments):
-            is_primary = (i == 0)  # First (highest confidence) is primary
+            is_primary = i == 0  # First (highest confidence) is primary
             stored = await self.repository.create_assignment(
                 tool_id=tool_id,
-                skill_id=assignment['skill_id'],
-                confidence=assignment['confidence'],
+                skill_id=assignment["skill_id"],
+                confidence=assignment["confidence"],
                 is_primary=is_primary,
-                source='llm_auto'
+                source="llm_auto",
             )
             if stored:
                 stored_assignments.append(stored)
                 if is_primary:
-                    primary_skill_id = assignment['skill_id']
+                    primary_skill_id = assignment["skill_id"]
 
                 # Update skill tool count
-                await self.repository.increment_tool_count(assignment['skill_id'], 1)
+                await self.repository.increment_tool_count(assignment["skill_id"], 1)
 
                 # Update skill embedding
                 try:
-                    await self._trigger_skill_embedding_update(assignment['skill_id'])
+                    await self._trigger_skill_embedding_update(assignment["skill_id"])
                 except Exception as e:
-                    logger.warning(f"Failed to update embedding for skill {assignment['skill_id']}: {e}")
+                    logger.warning(
+                        f"Failed to update embedding for skill {assignment['skill_id']}: {e}"
+                    )
 
         # Handle suggestion if no valid assignments
         suggested_new_skill = None
-        if not valid_assignments and classification.get('suggested_new_skill'):
-            suggestion = classification['suggested_new_skill']
+        if not valid_assignments and classification.get("suggested_new_skill"):
+            suggestion = classification["suggested_new_skill"]
             await self.repository.create_suggestion(
-                suggested_name=suggestion.get('name', 'Unknown'),
-                suggested_description=suggestion.get('description', ''),
+                suggested_name=suggestion.get("name", "Unknown"),
+                suggested_description=suggestion.get("description", ""),
                 source_tool_id=tool_id,
                 source_tool_name=tool_name,
-                reasoning=suggestion.get('reasoning', 'LLM suggested')
+                reasoning=suggestion.get("reasoning", "LLM suggested"),
             )
             suggested_new_skill = suggestion
             logger.info(f"Created skill suggestion for tool {tool_name}: {suggestion.get('name')}")
 
         result = {
-            'tool_id': tool_id,
-            'tool_name': tool_name,
-            'assignments': [
+            "tool_id": tool_id,
+            "tool_name": tool_name,
+            "assignments": [
                 {
-                    'skill_id': a['skill_id'],
-                    'confidence': a['confidence'],
-                    'reasoning': next(
-                        (x.get('reasoning') for x in classification.get('assignments', [])
-                         if x.get('skill_id') == a['skill_id']),
-                        None
-                    )
+                    "skill_id": a["skill_id"],
+                    "confidence": a["confidence"],
+                    "reasoning": next(
+                        (
+                            x.get("reasoning")
+                            for x in classification.get("assignments", [])
+                            if x.get("skill_id") == a["skill_id"]
+                        ),
+                        None,
+                    ),
                 }
                 for a in stored_assignments
             ],
-            'primary_skill_id': primary_skill_id,
-            'suggested_new_skill': suggested_new_skill,
-            'classification_timestamp': datetime.now(timezone.utc),
+            "primary_skill_id": primary_skill_id,
+            "suggested_new_skill": suggested_new_skill,
+            "classification_timestamp": datetime.now(timezone.utc),
         }
 
         # BR-002: Update Qdrant tool payload with skill_ids and primary_skill_id
@@ -382,8 +372,8 @@ class SkillService:
             try:
                 await self._update_tool_qdrant_payload(
                     tool_id=tool_id,
-                    skill_ids=[a['skill_id'] for a in stored_assignments],
-                    primary_skill_id=primary_skill_id
+                    skill_ids=[a["skill_id"] for a in stored_assignments],
+                    primary_skill_id=primary_skill_id,
                 )
             except Exception as e:
                 logger.warning(f"Failed to update Qdrant payload for tool {tool_id}: {e}")
@@ -396,7 +386,7 @@ class SkillService:
         tool_name: str,
         tool_description: str,
         input_schema_summary: Optional[str],
-        available_skills: List[Dict[str, Any]]
+        available_skills: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """
         Call LLM to classify a tool.
@@ -411,10 +401,9 @@ class SkillService:
             Classification result from LLM
         """
         # Build skill list for prompt
-        skill_list = "\n".join([
-            f"- {s['id']}: {s['name']} - {s['description'][:200]}"
-            for s in available_skills
-        ])
+        skill_list = "\n".join(
+            [f"- {s['id']}: {s['name']} - {s['description'][:200]}" for s in available_skills]
+        )
 
         prompt = f"""You are a STRICT tool classifier. Your goal is PRECISE categorization - each tool should belong to exactly 1-2 categories (rarely 3).
 
@@ -454,35 +443,36 @@ Description: {tool_description}
             response = await model_client.chat.completions.create(
                 model="gpt-4.1-nano",
                 messages=[
-                    {"role": "system", "content": "You are a tool classifier. Respond only with valid JSON."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a tool classifier. Respond only with valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=1000
+                max_tokens=1000,
             )
 
             content = response.choices[0].message.content.strip()
 
             # Clean up markdown code blocks if present
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1]
-            if content.endswith('```'):
-                content = content.rsplit('```', 1)[0]
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1]
+            if content.endswith("```"):
+                content = content.rsplit("```", 1)[0]
             content = content.strip()
 
             return json.loads(content)
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response for tool {tool_name}: {e}")
-            return {'assignments': [], 'primary_skill_id': None, 'suggested_new_skill': None}
+            return {"assignments": [], "primary_skill_id": None, "suggested_new_skill": None}
         except Exception as e:
             logger.error(f"LLM classification failed for tool {tool_name}: {e}")
             raise RuntimeError(f"Classification failed: {e}")
 
     async def classify_tools_batch(
-        self,
-        tools: List[Dict[str, Any]],
-        batch_size: int = 20
+        self, tools: List[Dict[str, Any]], batch_size: int = 20
     ) -> List[Dict[str, Any]]:
         """
         Classify multiple tools in batched LLM calls.
@@ -501,13 +491,16 @@ Description: {tool_description}
         skills = await self.repository.list_skills(is_active=True, limit=1000)
         if not skills:
             logger.warning("No skills available for batch classification")
-            return [{'tool_id': t['tool_id'], 'assignments': [], 'primary_skill_id': None} for t in tools]
+            return [
+                {"tool_id": t["tool_id"], "assignments": [], "primary_skill_id": None}
+                for t in tools
+            ]
 
         results = []
 
         # Process in batches
         for i in range(0, len(tools), batch_size):
-            batch = tools[i:i + batch_size]
+            batch = tools[i : i + batch_size]
             logger.debug(f"Classifying batch {i // batch_size + 1} ({len(batch)} tools)...")
 
             try:
@@ -516,8 +509,8 @@ Description: {tool_description}
 
                 # Process each result
                 for tool, classification in zip(batch, batch_results):
-                    tool_id = tool['tool_id']
-                    tool_name = tool['tool_name']
+                    tool_id = tool["tool_id"]
+                    tool_name = tool["tool_name"]
 
                     try:
                         # Filter and store assignments
@@ -525,37 +518,39 @@ Description: {tool_description}
                             tool_id=tool_id,
                             tool_name=tool_name,
                             classification=classification,
-                            skills=skills
+                            skills=skills,
                         )
                         results.append(result)
                     except Exception as e:
                         logger.error(f"Failed to store classification for {tool_name}: {e}")
-                        results.append({
-                            'tool_id': tool_id,
-                            'tool_name': tool_name,
-                            'assignments': [],
-                            'primary_skill_id': None,
-                            'error': str(e)
-                        })
+                        results.append(
+                            {
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "assignments": [],
+                                "primary_skill_id": None,
+                                "error": str(e),
+                            }
+                        )
 
             except Exception as e:
                 logger.error(f"Batch classification failed: {e}")
                 # Return empty results for failed batch
                 for tool in batch:
-                    results.append({
-                        'tool_id': tool['tool_id'],
-                        'tool_name': tool['tool_name'],
-                        'assignments': [],
-                        'primary_skill_id': None,
-                        'error': str(e)
-                    })
+                    results.append(
+                        {
+                            "tool_id": tool["tool_id"],
+                            "tool_name": tool["tool_name"],
+                            "assignments": [],
+                            "primary_skill_id": None,
+                            "error": str(e),
+                        }
+                    )
 
         return results
 
     async def _llm_classify_batch(
-        self,
-        tools: List[Dict[str, Any]],
-        available_skills: List[Dict[str, Any]]
+        self, tools: List[Dict[str, Any]], available_skills: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         Call LLM to classify multiple tools in one request.
@@ -568,16 +563,17 @@ Description: {tool_description}
             List of classification results (same order as input)
         """
         # Build skill list
-        skill_list = "\n".join([
-            f"- {s['id']}: {s['name']} - {s['description'][:150]}"
-            for s in available_skills
-        ])
+        skill_list = "\n".join(
+            [f"- {s['id']}: {s['name']} - {s['description'][:150]}" for s in available_skills]
+        )
 
         # Build tools list
-        tools_list = "\n".join([
-            f"{idx + 1}. **{t['tool_name']}**: {t['description'][:200]}"
-            for idx, t in enumerate(tools)
-        ])
+        tools_list = "\n".join(
+            [
+                f"{idx + 1}. **{t['tool_name']}**: {t['description'][:200]}"
+                for idx, t in enumerate(tools)
+            ]
+        )
 
         prompt = f"""You are a STRICT tool classifier. Your goal is PRECISE categorization with MINIMAL overlap.
 
@@ -614,20 +610,23 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
             response = await model_client.chat.completions.create(
                 model="gpt-4.1-nano",
                 messages=[
-                    {"role": "system", "content": "You are a tool classifier. Respond only with a valid JSON array."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a tool classifier. Respond only with a valid JSON array.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=4000  # Larger for batch response
+                max_tokens=4000,  # Larger for batch response
             )
 
             content = response.choices[0].message.content.strip()
 
             # Clean up markdown code blocks if present
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1]
-            if content.endswith('```'):
-                content = content.rsplit('```', 1)[0]
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1]
+            if content.endswith("```"):
+                content = content.rsplit("```", 1)[0]
             content = content.strip()
 
             parsed = json.loads(content)
@@ -637,13 +636,13 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
                 logger.warning(f"LLM returned {len(parsed)} results for {len(tools)} tools")
                 # Pad or truncate as needed
                 while len(parsed) < len(tools):
-                    parsed.append({'assignments': [], 'primary_skill_id': None})
+                    parsed.append({"assignments": [], "primary_skill_id": None})
 
             return parsed
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse batch LLM response: {e}")
-            return [{'assignments': [], 'primary_skill_id': None} for _ in tools]
+            return [{"assignments": [], "primary_skill_id": None} for _ in tools]
         except Exception as e:
             logger.error(f"Batch LLM classification failed: {e}")
             raise
@@ -653,7 +652,7 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
         tool_id: int,
         tool_name: str,
         classification: Dict[str, Any],
-        skills: List[Dict[str, Any]]
+        skills: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """
         Store classification results in PostgreSQL and update Qdrant.
@@ -668,10 +667,11 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
             Stored classification result
         """
         # Validate skill IDs
-        skill_ids = {s['id'] for s in skills}
+        skill_ids = {s["id"] for s in skills}
         valid_assignments = [
-            a for a in classification.get('assignments', [])
-            if a.get('skill_id') in skill_ids and a.get('confidence', 0) >= MIN_CONFIDENCE_THRESHOLD
+            a
+            for a in classification.get("assignments", [])
+            if a.get("skill_id") in skill_ids and a.get("confidence", 0) >= MIN_CONFIDENCE_THRESHOLD
         ][:MAX_ASSIGNMENTS_PER_TOOL]
 
         # Delete existing assignments
@@ -683,38 +683,38 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
         primary_skill_id = None
 
         for i, assignment in enumerate(valid_assignments):
-            is_primary = (i == 0)
+            is_primary = i == 0
             stored = await self.repository.create_assignment(
                 tool_id=tool_id,
-                skill_id=assignment['skill_id'],
-                confidence=assignment.get('confidence', 0.8),
+                skill_id=assignment["skill_id"],
+                confidence=assignment.get("confidence", 0.8),
                 is_primary=is_primary,
-                source='llm_auto'
+                source="llm_auto",
             )
             if stored:
                 stored_assignments.append(stored)
                 if is_primary:
-                    primary_skill_id = assignment['skill_id']
+                    primary_skill_id = assignment["skill_id"]
 
                 # Update skill tool count
-                await self.repository.increment_tool_count(assignment['skill_id'], 1)
+                await self.repository.increment_tool_count(assignment["skill_id"], 1)
 
         # Update Qdrant payload
         if stored_assignments:
             try:
                 await self._update_tool_qdrant_payload(
                     tool_id=tool_id,
-                    skill_ids=[a['skill_id'] for a in valid_assignments],
-                    primary_skill_id=primary_skill_id
+                    skill_ids=[a["skill_id"] for a in valid_assignments],
+                    primary_skill_id=primary_skill_id,
                 )
             except Exception as e:
                 logger.warning(f"Failed to update Qdrant payload for tool {tool_id}: {e}")
 
         return {
-            'tool_id': tool_id,
-            'tool_name': tool_name,
-            'assignments': stored_assignments,
-            'primary_skill_id': primary_skill_id,
+            "tool_id": tool_id,
+            "tool_name": tool_name,
+            "assignments": stored_assignments,
+            "primary_skill_id": primary_skill_id,
         }
 
     # =========================================================================
@@ -722,10 +722,7 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
     # =========================================================================
 
     async def classify_entities_batch(
-        self,
-        entities: List[Dict[str, Any]],
-        entity_type: str = "resource",
-        batch_size: int = 20
+        self, entities: List[Dict[str, Any]], entity_type: str = "resource", batch_size: int = 20
     ) -> List[Dict[str, Any]]:
         """
         Classify multiple entities (resources, prompts, etc.) into skill categories.
@@ -748,14 +745,16 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
         skills = await self.repository.list_skills(is_active=True, limit=1000)
         if not skills:
             logger.warning("No skills available for entity classification")
-            return [{'id': e['id'], 'skill_ids': [], 'primary_skill_id': None} for e in entities]
+            return [{"id": e["id"], "skill_ids": [], "primary_skill_id": None} for e in entities]
 
         results = []
 
         # Process in batches
         for i in range(0, len(entities), batch_size):
-            batch = entities[i:i + batch_size]
-            logger.debug(f"Classifying batch {i // batch_size + 1} ({len(batch)} {entity_type}s)...")
+            batch = entities[i : i + batch_size]
+            logger.debug(
+                f"Classifying batch {i // batch_size + 1} ({len(batch)} {entity_type}s)..."
+            )
 
             try:
                 # Call LLM for batch
@@ -763,18 +762,20 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
 
                 # Process each result
                 for entity, classification in zip(batch, batch_results):
-                    entity_id = entity['id']
-                    entity_name = entity['name']
+                    entity_id = entity["id"]
+                    entity_name = entity["name"]
 
                     # Validate and extract skill assignments
-                    skill_id_set = {s['id'] for s in skills}
+                    skill_id_set = {s["id"] for s in skills}
                     valid_assignments = [
-                        a for a in classification.get('assignments', [])
-                        if a.get('skill_id') in skill_id_set and a.get('confidence', 0) >= MIN_CONFIDENCE_THRESHOLD
+                        a
+                        for a in classification.get("assignments", [])
+                        if a.get("skill_id") in skill_id_set
+                        and a.get("confidence", 0) >= MIN_CONFIDENCE_THRESHOLD
                     ][:MAX_ASSIGNMENTS_PER_TOOL]
 
-                    skill_ids = [a['skill_id'] for a in valid_assignments]
-                    primary_skill_id = classification.get('primary_skill_id')
+                    skill_ids = [a["skill_id"] for a in valid_assignments]
+                    primary_skill_id = classification.get("primary_skill_id")
                     if primary_skill_id not in skill_ids and skill_ids:
                         primary_skill_id = skill_ids[0]
 
@@ -784,34 +785,42 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
                             entity_id=entity_id,
                             entity_type=entity_type,
                             skill_ids=skill_ids,
-                            primary_skill_id=primary_skill_id
+                            primary_skill_id=primary_skill_id,
                         )
-                        results.append({
-                            'id': entity_id,
-                            'name': entity_name,
-                            'skill_ids': skill_ids,
-                            'primary_skill_id': primary_skill_id,
-                        })
+                        results.append(
+                            {
+                                "id": entity_id,
+                                "name": entity_name,
+                                "skill_ids": skill_ids,
+                                "primary_skill_id": primary_skill_id,
+                            }
+                        )
                     except Exception as e:
-                        logger.error(f"Failed to store classification for {entity_type} {entity_name}: {e}")
-                        results.append({
-                            'id': entity_id,
-                            'name': entity_name,
-                            'skill_ids': [],
-                            'primary_skill_id': None,
-                            'error': str(e)
-                        })
+                        logger.error(
+                            f"Failed to store classification for {entity_type} {entity_name}: {e}"
+                        )
+                        results.append(
+                            {
+                                "id": entity_id,
+                                "name": entity_name,
+                                "skill_ids": [],
+                                "primary_skill_id": None,
+                                "error": str(e),
+                            }
+                        )
 
             except Exception as e:
                 logger.error(f"Batch entity classification failed: {e}")
                 for entity in batch:
-                    results.append({
-                        'id': entity['id'],
-                        'name': entity['name'],
-                        'skill_ids': [],
-                        'primary_skill_id': None,
-                        'error': str(e)
-                    })
+                    results.append(
+                        {
+                            "id": entity["id"],
+                            "name": entity["name"],
+                            "skill_ids": [],
+                            "primary_skill_id": None,
+                            "error": str(e),
+                        }
+                    )
 
         return results
 
@@ -819,7 +828,7 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
         self,
         entities: List[Dict[str, Any]],
         available_skills: List[Dict[str, Any]],
-        entity_type: str
+        entity_type: str,
     ) -> List[Dict[str, Any]]:
         """
         Call LLM to classify multiple entities in one request.
@@ -833,17 +842,18 @@ Return exactly {len(tools)} classifications. Most tools should have only 1 assig
             List of classification results (same order as input)
         """
         # Build skill list
-        skill_list = "\n".join([
-            f"- {s['id']}: {s['name']} - {s['description'][:150]}"
-            for s in available_skills
-        ])
+        skill_list = "\n".join(
+            [f"- {s['id']}: {s['name']} - {s['description'][:150]}" for s in available_skills]
+        )
 
         # Build entities list
         entity_type_label = entity_type.title()
-        entities_list = "\n".join([
-            f"{idx + 1}. **{e['name']}**: {e.get('description', '')[:200]}"
-            for idx, e in enumerate(entities)
-        ])
+        entities_list = "\n".join(
+            [
+                f"{idx + 1}. **{e['name']}**: {e.get('description', '')[:200]}"
+                for idx, e in enumerate(entities)
+            ]
+        )
 
         prompt = f"""You are a STRICT {entity_type} classifier. Each {entity_type} gets exactly 1-2 categories (rarely more).
 
@@ -877,35 +887,40 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
             response = await model_client.chat.completions.create(
                 model="gpt-4.1-nano",
                 messages=[
-                    {"role": "system", "content": f"You are a {entity_type} classifier. Respond only with a valid JSON array."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": f"You are a {entity_type} classifier. Respond only with a valid JSON array.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=4000
+                max_tokens=4000,
             )
 
             content = response.choices[0].message.content.strip()
 
             # Clean up markdown code blocks if present
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1]
-            if content.endswith('```'):
-                content = content.rsplit('```', 1)[0]
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1]
+            if content.endswith("```"):
+                content = content.rsplit("```", 1)[0]
             content = content.strip()
 
             parsed = json.loads(content)
 
             # Ensure we have the right number of results
             if len(parsed) != len(entities):
-                logger.warning(f"LLM returned {len(parsed)} results for {len(entities)} {entity_type}s")
+                logger.warning(
+                    f"LLM returned {len(parsed)} results for {len(entities)} {entity_type}s"
+                )
                 while len(parsed) < len(entities):
-                    parsed.append({'assignments': [], 'primary_skill_id': None})
+                    parsed.append({"assignments": [], "primary_skill_id": None})
 
             return parsed
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse batch LLM response: {e}")
-            return [{'assignments': [], 'primary_skill_id': None} for _ in entities]
+            return [{"assignments": [], "primary_skill_id": None} for _ in entities]
         except Exception as e:
             logger.error(f"Batch LLM entity classification failed: {e}")
             raise
@@ -915,7 +930,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         entity_id: int,
         entity_type: str,
         skill_ids: List[str],
-        primary_skill_id: Optional[str]
+        primary_skill_id: Optional[str],
     ) -> None:
         """
         Store classification results for an entity.
@@ -928,10 +943,12 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         """
         if entity_type == "resource":
             from services.resource_service.resource_repository import ResourceRepository
+
             repo = ResourceRepository()
             await repo.update_resource_skills(entity_id, skill_ids, primary_skill_id)
         elif entity_type == "prompt":
             from services.prompt_service.prompt_repository import PromptRepository
+
             repo = PromptRepository()
             await repo.update_prompt_skills(entity_id, skill_ids, primary_skill_id)
         else:
@@ -943,7 +960,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
                 entity_id=entity_id,
                 entity_type=entity_type,
                 skill_ids=skill_ids,
-                primary_skill_id=primary_skill_id
+                primary_skill_id=primary_skill_id,
             )
         except Exception as e:
             logger.warning(f"Failed to update Qdrant payload for {entity_type} {entity_id}: {e}")
@@ -953,7 +970,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         entity_id: int,
         entity_type: str,
         skill_ids: List[str],
-        primary_skill_id: Optional[str]
+        primary_skill_id: Optional[str],
     ) -> None:
         """Update Qdrant payload with skill classification for any entity type."""
         from services.vector_service.vector_repository import VectorRepository
@@ -970,7 +987,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
                 payload={
                     "skill_ids": skill_ids,
                     "primary_skill_id": primary_skill_id,
-                }
+                },
             )
             logger.debug(f"Updated Qdrant payload for {entity_type} {entity_id}")
         except Exception as e:
@@ -986,7 +1003,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         tool_id: int,
         skill_ids: List[str],
         primary_skill_id: str,
-        source: str = 'human_manual'
+        source: str = "human_manual",
     ) -> List[Dict[str, Any]]:
         """
         Manually assign a tool to skills.
@@ -1020,13 +1037,13 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         # Create new assignments
         assignments = []
         for skill_id in skill_ids:
-            is_primary = (skill_id == primary_skill_id)
+            is_primary = skill_id == primary_skill_id
             assignment = await self.repository.create_assignment(
                 tool_id=tool_id,
                 skill_id=skill_id,
                 confidence=1.0,  # Human assignments have full confidence
                 is_primary=is_primary,
-                source=source
+                source=source,
             )
             if assignment:
                 assignments.append(assignment)
@@ -1040,10 +1057,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
     # =========================================================================
 
     async def get_tools_by_skill(
-        self,
-        skill_id: str,
-        limit: int = 100,
-        offset: int = 0
+        self, skill_id: str, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get all tools assigned to a skill.
@@ -1064,20 +1078,14 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
             raise ValueError(f"Skill not found: {skill_id}")
 
         return await self.repository.get_assignments_for_skill(
-            skill_id=skill_id,
-            limit=limit,
-            offset=offset
+            skill_id=skill_id, limit=limit, offset=offset
         )
 
     # =========================================================================
     # Skill Embedding Management
     # =========================================================================
 
-    async def _update_skill_embedding(
-        self,
-        skill_id: str,
-        description: str
-    ) -> None:
+    async def _update_skill_embedding(self, skill_id: str, description: str) -> None:
         """
         Update skill embedding from description.
 
@@ -1091,8 +1099,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
 
             # Generate embedding
             response = await model_client.embeddings.create(
-                input=description,
-                model="text-embedding-3-small"
+                input=description, model="text-embedding-3-small"
             )
             embedding = response.data[0].embedding
 
@@ -1108,17 +1115,19 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
             # Upsert to Qdrant
             await qdrant_client.upsert_points(
                 collection_name="mcp_skills",
-                points=[{
-                    'id': skill_uuid,
-                    'vector': embedding,
-                    'payload': {
-                        'id': skill_id,  # Keep original string ID in payload for reference
-                        'name': skill['name'],
-                        'description': skill['description'],
-                        'tool_count': skill.get('tool_count', 0),
-                        'is_active': skill.get('is_active', True),
+                points=[
+                    {
+                        "id": skill_uuid,
+                        "vector": embedding,
+                        "payload": {
+                            "id": skill_id,  # Keep original string ID in payload for reference
+                            "name": skill["name"],
+                            "description": skill["description"],
+                            "tool_count": skill.get("tool_count", 0),
+                            "is_active": skill.get("is_active", True),
+                        },
                     }
-                }]
+                ],
             )
 
             logger.debug(f"Updated embedding for skill {skill_id}")
@@ -1128,10 +1137,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
             raise
 
     async def _update_tool_qdrant_payload(
-        self,
-        tool_id: int,
-        skill_ids: List[str],
-        primary_skill_id: Optional[str]
+        self, tool_id: int, skill_ids: List[str], primary_skill_id: Optional[str]
     ) -> None:
         """
         Update Qdrant tool payload with skill_ids and primary_skill_id.
@@ -1145,14 +1151,15 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         """
         try:
             from services.vector_service.vector_repository import VectorRepository
+
             vector_repo = VectorRepository()
 
             success = await vector_repo.update_payload(
                 item_id=tool_id,
                 payload_updates={
-                    'skill_ids': skill_ids,
-                    'primary_skill_id': primary_skill_id,
-                }
+                    "skill_ids": skill_ids,
+                    "primary_skill_id": primary_skill_id,
+                },
             )
 
             if success:
@@ -1184,12 +1191,12 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
 
             if not assignments:
                 # No tools - use description embedding
-                await self._update_skill_embedding(skill_id, skill['description'])
+                await self._update_skill_embedding(skill_id, skill["description"])
                 return
 
             # For now, just update with description
             # TODO: Implement weighted average of tool embeddings
-            await self._update_skill_embedding(skill_id, skill['description'])
+            await self._update_skill_embedding(skill_id, skill["description"])
 
         except Exception as e:
             logger.error(f"Failed to trigger embedding update for skill {skill_id}: {e}")
@@ -1199,10 +1206,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
     # =========================================================================
 
     async def list_suggestions(
-        self,
-        status: str = 'pending',
-        limit: int = 100,
-        offset: int = 0
+        self, status: str = "pending", limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         List skill suggestions.
@@ -1218,8 +1222,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         return await self.repository.list_suggestions(status, limit, offset)
 
     async def approve_suggestion(
-        self,
-        suggestion_id: int
+        self, suggestion_id: int
     ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
         """
         Approve a skill suggestion and create the skill.
@@ -1234,33 +1237,35 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
             ValueError: If suggestion not found
         """
         # Get suggestion
-        suggestions = await self.repository.list_suggestions(status='pending', limit=1000)
-        suggestion = next((s for s in suggestions if s['id'] == suggestion_id), None)
+        suggestions = await self.repository.list_suggestions(status="pending", limit=1000)
+        suggestion = next((s for s in suggestions if s["id"] == suggestion_id), None)
 
         if not suggestion:
             raise ValueError(f"Suggestion not found: {suggestion_id}")
 
         # Create the skill
-        skill_id = suggestion['suggested_name'].lower().replace(' ', '_')
-        skill = await self.create_skill_category({
-            'id': skill_id,
-            'name': suggestion['suggested_name'],
-            'description': suggestion['suggested_description'],
-            'keywords': [],
-            'examples': [suggestion['source_tool_name']],
-        })
+        skill_id = suggestion["suggested_name"].lower().replace(" ", "_")
+        skill = await self.create_skill_category(
+            {
+                "id": skill_id,
+                "name": suggestion["suggested_name"],
+                "description": suggestion["suggested_description"],
+                "keywords": [],
+                "examples": [suggestion["source_tool_name"]],
+            }
+        )
 
         # Update suggestion status
-        await self.repository.update_suggestion_status(suggestion_id, 'approved')
+        await self.repository.update_suggestion_status(suggestion_id, "approved")
 
         # Assign the source tool
         assignment = None
-        if suggestion.get('source_tool_id'):
+        if suggestion.get("source_tool_id"):
             assignments = await self.assign_tool_to_skills(
-                tool_id=suggestion['source_tool_id'],
+                tool_id=suggestion["source_tool_id"],
                 skill_ids=[skill_id],
                 primary_skill_id=skill_id,
-                source='human_manual'
+                source="human_manual",
             )
             assignment = assignments[0] if assignments else None
 
@@ -1277,7 +1282,7 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         Returns:
             True if successful
         """
-        success = await self.repository.update_suggestion_status(suggestion_id, 'rejected')
+        success = await self.repository.update_suggestion_status(suggestion_id, "rejected")
         if success:
             logger.info(f"Rejected suggestion {suggestion_id}")
         return success

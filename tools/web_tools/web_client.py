@@ -17,6 +17,7 @@ import json
 # Optional consul import for service discovery
 try:
     import consul
+
     CONSUL_AVAILABLE = True
 except ImportError:
     CONSUL_AVAILABLE = False
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WebServiceConfig:
     """Web service configuration"""
+
     service_name: str = "web_service"
     consul_host: str = "localhost"
     consul_port: int = 8500
@@ -36,16 +38,16 @@ class WebServiceConfig:
     fallback_port: int = 8083
 
     @classmethod
-    def from_env(cls) -> 'WebServiceConfig':
+    def from_env(cls) -> "WebServiceConfig":
         """Create config from environment variables"""
         return cls(
-            service_name=os.getenv('WEB_SERVICE_NAME', 'web_service'),
-            consul_host=os.getenv('CONSUL_HOST', 'localhost'),
-            consul_port=int(os.getenv('CONSUL_PORT', '8500')),
-            api_timeout=int(os.getenv('WEB_API_TIMEOUT', '120')),
-            max_retries=int(os.getenv('WEB_MAX_RETRIES', '3')),
-            fallback_host=os.getenv('WEB_FALLBACK_HOST', 'localhost'),
-            fallback_port=int(os.getenv('WEB_FALLBACK_PORT', '8083'))
+            service_name=os.getenv("WEB_SERVICE_NAME", "web_service"),
+            consul_host=os.getenv("CONSUL_HOST", "localhost"),
+            consul_port=int(os.getenv("CONSUL_PORT", "8500")),
+            api_timeout=int(os.getenv("WEB_API_TIMEOUT", "120")),
+            max_retries=int(os.getenv("WEB_MAX_RETRIES", "3")),
+            fallback_host=os.getenv("WEB_FALLBACK_HOST", "localhost"),
+            fallback_port=int(os.getenv("WEB_FALLBACK_PORT", "8083")),
         )
 
 
@@ -74,18 +76,14 @@ class WebServiceClient:
         try:
             if not self.consul_client:
                 self.consul_client = consul.Consul(
-                    host=self.config.consul_host,
-                    port=self.config.consul_port
+                    host=self.config.consul_host, port=self.config.consul_port
                 )
 
             # Get healthy service instances
-            services = self.consul_client.health.service(
-                self.config.service_name,
-                passing=True
-            )[1]
+            services = self.consul_client.health.service(self.config.service_name, passing=True)[1]
 
             if services:
-                service = services[0]['Service']
+                service = services[0]["Service"]
                 service_url = f"http://{service['Address']}:{service['Port']}"
                 logger.info(f"Discovered web service at: {service_url}")
                 return service_url
@@ -117,12 +115,7 @@ class WebServiceClient:
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request with retry logic"""
         base_url = await self._get_service_url()
         url = f"{base_url}{endpoint}"
@@ -148,7 +141,9 @@ class WebServiceClient:
 
             except aiohttp.ClientError as e:
                 last_error = e
-                logger.warning(f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}")
+                logger.warning(
+                    f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}"
+                )
 
                 if attempt < self.config.max_retries - 1:
                     await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
@@ -162,10 +157,7 @@ class WebServiceClient:
         raise Exception(f"All retry attempts failed. Last error: {last_error}")
 
     async def _request_sse(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
+        self, method: str, endpoint: str, **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Make HTTP request and stream SSE (Server-Sent Events) responses
@@ -194,17 +186,17 @@ class WebServiceClient:
 
                 # Stream SSE messages
                 async for line in response.content:
-                    line = line.decode('utf-8').strip()
+                    line = line.decode("utf-8").strip()
 
                     # SSE format: "data: {...}"
-                    if line.startswith('data: '):
+                    if line.startswith("data: "):
                         try:
                             data_str = line[6:]  # Remove "data: " prefix
                             data = json.loads(data_str)
                             yield data
 
                             # Check if completed
-                            if data.get('completed'):
+                            if data.get("completed"):
                                 break
 
                         except json.JSONDecodeError as e:
@@ -236,7 +228,7 @@ class WebServiceClient:
         count: int = 10,
         freshness: Optional[str] = None,
         result_filter: Optional[str] = None,
-        goggle_type: Optional[str] = None
+        goggle_type: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Basic web search with SSE progress tracking
@@ -264,11 +256,7 @@ class WebServiceClient:
             yield message
 
     async def deep_search(
-        self,
-        query: str,
-        user_id: str,
-        depth: int = 2,
-        rag_mode: bool = True
+        self, query: str, user_id: str, depth: int = 2, rag_mode: bool = True
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Deep search with multi-strategy approach and SSE progress
@@ -282,12 +270,7 @@ class WebServiceClient:
         Yields:
             Progress updates and final results via SSE
         """
-        payload = {
-            "query": query,
-            "user_id": user_id,
-            "depth": depth,
-            "rag_mode": rag_mode
-        }
+        payload = {"query": query, "user_id": user_id, "depth": depth, "rag_mode": rag_mode}
 
         async for message in self._request_sse("POST", "/api/v1/web/search/deep", json=payload):
             yield message
@@ -298,7 +281,7 @@ class WebServiceClient:
         user_id: str,
         count: int = 10,
         summarize_count: int = 5,
-        include_citations: bool = True
+        include_citations: bool = True,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Search with AI-powered summary and SSE progress
@@ -318,10 +301,12 @@ class WebServiceClient:
             "user_id": user_id,
             "count": count,
             "summarize_count": summarize_count,
-            "include_citations": include_citations
+            "include_citations": include_citations,
         }
 
-        async for message in self._request_sse("POST", "/api/v1/web/search/with-summary", json=payload):
+        async for message in self._request_sse(
+            "POST", "/api/v1/web/search/with-summary", json=payload
+        ):
             yield message
 
     # ==================== Web Crawl Operations ====================
@@ -332,7 +317,7 @@ class WebServiceClient:
         provider: str = "self_hosted_crawl",
         use_vlm: bool = False,
         analyze: bool = False,
-        analysis_request: Optional[str] = None
+        analysis_request: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Crawl and extract content from a web page with SSE progress
@@ -347,11 +332,7 @@ class WebServiceClient:
         Yields:
             Progress updates and final crawl results via SSE
         """
-        payload = {
-            "url": url,
-            "provider": provider,
-            "use_vlm": use_vlm
-        }
+        payload = {"url": url, "provider": provider, "use_vlm": use_vlm}
 
         if analyze:
             payload["analyze"] = True
@@ -369,7 +350,7 @@ class WebServiceClient:
         task: str,
         provider: str = "self_hosted",
         routing_strategy: str = "dom_first",
-        use_vlm: bool = False
+        use_vlm: bool = False,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Execute web automation task with SSE progress
@@ -389,10 +370,12 @@ class WebServiceClient:
             "task": task,
             "provider": provider,
             "routing_strategy": routing_strategy,
-            "use_vlm": use_vlm
+            "use_vlm": use_vlm,
         }
 
-        async for message in self._request_sse("POST", "/api/v1/web/automation/execute", json=payload):
+        async for message in self._request_sse(
+            "POST", "/api/v1/web/automation/execute", json=payload
+        ):
             yield message
 
     async def automation_search(
@@ -401,7 +384,7 @@ class WebServiceClient:
         search_engine: str = "google",
         task: Optional[str] = None,
         provider: str = "self_hosted",
-        use_vlm: bool = False
+        use_vlm: bool = False,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Execute search automation task with SSE progress
@@ -420,13 +403,15 @@ class WebServiceClient:
             "query": query,
             "search_engine": search_engine,
             "provider": provider,
-            "use_vlm": use_vlm
+            "use_vlm": use_vlm,
         }
 
         if task:
             payload["task"] = task
 
-        async for message in self._request_sse("POST", "/api/v1/web/automation/search", json=payload):
+        async for message in self._request_sse(
+            "POST", "/api/v1/web/automation/search", json=payload
+        ):
             yield message
 
 

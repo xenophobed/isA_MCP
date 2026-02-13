@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Infrastructure services configuration (Native drivers - isa-common 0.3.0)"""
+
 import os
 from dataclasses import dataclass
 from typing import Optional
 
+
 def _bool(val: str) -> bool:
     return val.lower() == "true"
+
 
 def _int(val: str, default: int) -> int:
     try:
@@ -13,9 +16,11 @@ def _int(val: str, default: int) -> int:
     except ValueError:
         return default
 
+
 @dataclass
 class InfraConfig:
     """All infrastructure service endpoints (native drivers)"""
+
     # MinIO Object Storage (native S3 - port 9000)
     minio_host: str = "localhost"
     minio_port: int = 9000
@@ -115,7 +120,7 @@ class InfraConfig:
         return self.mqtt_port
 
     @classmethod
-    def from_env(cls) -> 'InfraConfig':
+    def from_env(cls) -> "InfraConfig":
         """Load configuration from environment variables"""
         return cls(
             # MinIO (native S3)

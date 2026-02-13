@@ -6,6 +6,7 @@ Handles:
 - Package lookup across registries
 - Dependency resolution
 """
+
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 import re
@@ -121,20 +122,25 @@ class PackageResolver:
             # Create a default version from latest_version
             if package.get("latest_version"):
                 major, minor, patch, prerelease = self._parse_semver(package["latest_version"])
-                version = await self._repo.create_version({
-                    "package_id": package_id,
-                    "version": package["latest_version"],
-                    "version_major": major,
-                    "version_minor": minor,
-                    "version_patch": patch,
-                    "prerelease": prerelease,
-                    "mcp_config": package.get("mcp_config", {
-                        "transport": "stdio",
-                        "command": "npx",
-                        "args": ["-y", package["name"]],
-                    }),
-                    "published_at": package.get("created_at"),
-                })
+                version = await self._repo.create_version(
+                    {
+                        "package_id": package_id,
+                        "version": package["latest_version"],
+                        "version_major": major,
+                        "version_minor": minor,
+                        "version_patch": patch,
+                        "prerelease": prerelease,
+                        "mcp_config": package.get(
+                            "mcp_config",
+                            {
+                                "transport": "stdio",
+                                "command": "npx",
+                                "args": ["-y", package["name"]],
+                            },
+                        ),
+                        "published_at": package.get("created_at"),
+                    }
+                )
                 return version
             return None
 
@@ -165,7 +171,8 @@ class PackageResolver:
             major, minor, patch, _ = self._parse_semver(target)
 
             matching = [
-                v for v in versions
+                v
+                for v in versions
                 if v["version_major"] == major
                 and (v["version_minor"], v["version_patch"]) >= (minor, patch)
                 and not v.get("prerelease")
@@ -177,7 +184,8 @@ class PackageResolver:
             major, minor, patch, _ = self._parse_semver(target)
 
             matching = [
-                v for v in versions
+                v
+                for v in versions
                 if v["version_major"] == major
                 and v["version_minor"] == minor
                 and v["version_patch"] >= patch
@@ -190,8 +198,10 @@ class PackageResolver:
             major, minor, patch, _ = self._parse_semver(target)
 
             matching = [
-                v for v in versions
-                if (v["version_major"], v["version_minor"], v["version_patch"]) >= (major, minor, patch)
+                v
+                for v in versions
+                if (v["version_major"], v["version_minor"], v["version_patch"])
+                >= (major, minor, patch)
                 and not v.get("prerelease")
             ]
 
@@ -201,8 +211,10 @@ class PackageResolver:
             major, minor, patch, _ = self._parse_semver(target)
 
             matching = [
-                v for v in versions
-                if (v["version_major"], v["version_minor"], v["version_patch"]) > (major, minor, patch)
+                v
+                for v in versions
+                if (v["version_major"], v["version_minor"], v["version_patch"])
+                > (major, minor, patch)
                 and not v.get("prerelease")
             ]
 
@@ -214,7 +226,7 @@ class PackageResolver:
             # Return highest matching version
             matching.sort(
                 key=lambda v: (v["version_major"], v["version_minor"], v["version_patch"]),
-                reverse=True
+                reverse=True,
             )
             return matching[0]
 
@@ -222,12 +234,12 @@ class PackageResolver:
 
     def _parse_semver(self, version: str) -> Tuple[int, int, int, Optional[str]]:
         """Parse semver string into components."""
-        match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$', version)
+        match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
         if not match:
-            parts = version.split('.')
+            parts = version.split(".")
             major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
             minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
-            patch_str = parts[2].split('-')[0] if len(parts) > 2 else "0"
+            patch_str = parts[2].split("-")[0] if len(parts) > 2 else "0"
             patch = int(patch_str) if patch_str.isdigit() else 0
             return major, minor, patch, None
 
@@ -267,8 +279,6 @@ class PackageResolver:
         # Check MCP version compatibility
         min_mcp = version.get("min_mcp_version")
         if min_mcp:
-            result["warnings"].append(
-                f"This package requires MCP version >= {min_mcp}"
-            )
+            result["warnings"].append(f"This package requires MCP version >= {min_mcp}")
 
         return result

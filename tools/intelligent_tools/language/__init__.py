@@ -18,8 +18,7 @@ from .text_summarizer import TextSummarizer
 __version__ = "1.0.0"
 __all__ = [
     # Text generation
-    'TextGenerator',
-    
+    "TextGenerator",
     # Text summarization
-    'TextSummarizer'
+    "TextSummarizer",
 ]

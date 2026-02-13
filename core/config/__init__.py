@@ -9,6 +9,7 @@ Configuration hierarchy:
 - consul_config: Service discovery settings
 - logging_config: Logging configuration
 """
+
 import os
 from dotenv import load_dotenv
 from .logging_config import LoggingConfig
@@ -27,15 +28,21 @@ from .mcp_config import (
 
 # Load environment file based on ENV
 env = os.getenv("ENV", "development")
-env_file = f"deployment/{env}/config/.env.{env}" if env != "development" else "deployment/environments/dev.env"
+env_file = (
+    f"deployment/{env}/config/.env.{env}"
+    if env != "development"
+    else "deployment/environments/dev.env"
+)
 load_dotenv(env_file, override=False)
 
 # Create global settings instance
 settings = MCPConfig.from_env()
 
+
 def get_settings() -> MCPConfig:
     """Get global settings instance"""
     return settings
+
 
 def reload_settings() -> MCPConfig:
     """Reload settings from environment"""
@@ -43,22 +50,23 @@ def reload_settings() -> MCPConfig:
     settings = MCPConfig.from_env()
     return settings
 
+
 __all__ = [
     # Main config
-    'MCPConfig',
-    'get_settings',
-    'reload_settings',
-    'settings',
+    "MCPConfig",
+    "get_settings",
+    "reload_settings",
+    "settings",
     # Sub-configs
-    'LoggingConfig',
-    'InfraConfig',
-    'ConsulConfig',
-    'ModelConfig',
-    'ServiceConfig',
+    "LoggingConfig",
+    "InfraConfig",
+    "ConsulConfig",
+    "ModelConfig",
+    "ServiceConfig",
     # MCP resource configs
-    'MCPResourceConfig',
-    'MCPQdrantConfig',
-    'MCPMinIOConfig',
-    'MCPRedisConfig',
-    'MCPPostgresConfig',
+    "MCPResourceConfig",
+    "MCPQdrantConfig",
+    "MCPMinIOConfig",
+    "MCPRedisConfig",
+    "MCPPostgresConfig",
 ]

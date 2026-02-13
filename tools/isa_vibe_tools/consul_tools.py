@@ -22,6 +22,7 @@ from tools.base_tool import BaseTool
 # Optional consul import
 try:
     import consul
+
     CONSUL_AVAILABLE = True
 except ImportError:
     CONSUL_AVAILABLE = False
@@ -67,27 +68,18 @@ def register_consul_tools(mcp: FastMCP):
 
             service_list = []
             for svc_name, tags in services.items():
-                service_list.append({
-                    "name": svc_name,
-                    "tags": tags
-                })
+                service_list.append({"name": svc_name, "tags": tags})
 
             return tools.create_response(
                 status="success",
                 action="consul_list_services",
-                data={
-                    "services": service_list,
-                    "count": len(service_list)
-                }
+                data={"services": service_list, "count": len(service_list)},
             )
 
         except Exception as e:
             logger.error(f"Error in consul_list_services: {e}")
             return tools.create_response(
-                status="error",
-                action="consul_list_services",
-                data={},
-                error_message=str(e)
+                status="error", action="consul_list_services", data={}, error_message=str(e)
             )
 
     @mcp.tool()
@@ -109,19 +101,21 @@ def register_consul_tools(mcp: FastMCP):
                     status="error",
                     action="consul_get_service",
                     data={"service_name": service_name},
-                    error_message=f"Service '{service_name}' not found"
+                    error_message=f"Service '{service_name}' not found",
                 )
 
             service_info = []
             for instance in instances:
-                service_info.append({
-                    "service_id": instance.get("ServiceID"),
-                    "address": instance.get("ServiceAddress") or instance.get("Address"),
-                    "port": instance.get("ServicePort"),
-                    "tags": instance.get("ServiceTags", []),
-                    "meta": instance.get("ServiceMeta", {}),
-                    "node": instance.get("Node")
-                })
+                service_info.append(
+                    {
+                        "service_id": instance.get("ServiceID"),
+                        "address": instance.get("ServiceAddress") or instance.get("Address"),
+                        "port": instance.get("ServicePort"),
+                        "tags": instance.get("ServiceTags", []),
+                        "meta": instance.get("ServiceMeta", {}),
+                        "node": instance.get("Node"),
+                    }
+                )
 
             return tools.create_response(
                 status="success",
@@ -129,8 +123,8 @@ def register_consul_tools(mcp: FastMCP):
                 data={
                     "service_name": service_name,
                     "instances": service_info,
-                    "count": len(service_info)
-                }
+                    "count": len(service_info),
+                },
             )
 
         except Exception as e:
@@ -139,7 +133,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_get_service",
                 data={"service_name": service_name},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -163,8 +157,8 @@ def register_consul_tools(mcp: FastMCP):
                     data={
                         "service": service_name,
                         "status": "not_found",
-                        "message": f"Service '{service_name}' not found"
-                    }
+                        "message": f"Service '{service_name}' not found",
+                    },
                 )
 
             health_info = []
@@ -176,17 +170,24 @@ def register_consul_tools(mcp: FastMCP):
                         status = check.get("Status", "unknown")
                         break
 
-                health_info.append({
-                    "service_id": entry.get("Service", {}).get("ID"),
-                    "status": status,
-                    "checks": [{
-                        "name": chk.get("Name"),
-                        "status": chk.get("Status"),
-                        "output": chk.get("Output", "")[:200]  # Truncate output
-                    } for chk in checks]
-                })
+                health_info.append(
+                    {
+                        "service_id": entry.get("Service", {}).get("ID"),
+                        "status": status,
+                        "checks": [
+                            {
+                                "name": chk.get("Name"),
+                                "status": chk.get("Status"),
+                                "output": chk.get("Output", "")[:200],  # Truncate output
+                            }
+                            for chk in checks
+                        ],
+                    }
+                )
 
-            overall_status = "passing" if all(h["status"] == "passing" for h in health_info) else "failing"
+            overall_status = (
+                "passing" if all(h["status"] == "passing" for h in health_info) else "failing"
+            )
 
             return tools.create_response(
                 status="success",
@@ -194,8 +195,8 @@ def register_consul_tools(mcp: FastMCP):
                 data={
                     "service": service_name,
                     "overall_status": overall_status,
-                    "instances": health_info
-                }
+                    "instances": health_info,
+                },
             )
 
         except Exception as e:
@@ -204,7 +205,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_health_check",
                 data={"service_name": service_name},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -229,12 +230,14 @@ def register_consul_tools(mcp: FastMCP):
             node_info = []
             for node in nodes:
                 svc = node.get("Service", {})
-                node_info.append({
-                    "node": node.get("Node", {}).get("Node"),
-                    "address": svc.get("Address") or node.get("Node", {}).get("Address"),
-                    "port": svc.get("Port"),
-                    "service_id": svc.get("ID")
-                })
+                node_info.append(
+                    {
+                        "node": node.get("Node", {}).get("Node"),
+                        "address": svc.get("Address") or node.get("Node", {}).get("Address"),
+                        "port": svc.get("Port"),
+                        "service_id": svc.get("ID"),
+                    }
+                )
 
             return tools.create_response(
                 status="success",
@@ -243,8 +246,8 @@ def register_consul_tools(mcp: FastMCP):
                     "service": service_name,
                     "passing_only": passing_only,
                     "nodes": node_info,
-                    "count": len(node_info)
-                }
+                    "count": len(node_info),
+                },
             )
 
         except Exception as e:
@@ -253,7 +256,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_get_service_nodes",
                 data={"service_name": service_name},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -280,7 +283,7 @@ def register_consul_tools(mcp: FastMCP):
                     status="error",
                     action="consul_get_kv",
                     data={"key": key},
-                    error_message="Key not found"
+                    error_message="Key not found",
                 )
 
             if isinstance(data, list):
@@ -298,15 +301,12 @@ def register_consul_tools(mcp: FastMCP):
                                 pass
                         except (UnicodeDecodeError, AttributeError):
                             value = str(value)
-                    kv_items.append({
-                        "key": item.get("Key"),
-                        "value": value
-                    })
+                    kv_items.append({"key": item.get("Key"), "value": value})
 
                 return tools.create_response(
                     status="success",
                     action="consul_get_kv",
-                    data={"items": kv_items, "count": len(kv_items)}
+                    data={"items": kv_items, "count": len(kv_items)},
                 )
             else:
                 value = data.get("Value")
@@ -321,18 +321,13 @@ def register_consul_tools(mcp: FastMCP):
                         value = str(value)
 
                 return tools.create_response(
-                    status="success",
-                    action="consul_get_kv",
-                    data={"key": key, "value": value}
+                    status="success", action="consul_get_kv", data={"key": key, "value": value}
                 )
 
         except Exception as e:
             logger.error(f"Error in consul_get_kv: {e}")
             return tools.create_response(
-                status="error",
-                action="consul_get_kv",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="consul_get_kv", data={"key": key}, error_message=str(e)
             )
 
     @mcp.tool()
@@ -352,11 +347,7 @@ def register_consul_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="consul_list_kv",
-                data={
-                    "prefix": prefix,
-                    "keys": keys or [],
-                    "count": len(keys) if keys else 0
-                }
+                data={"prefix": prefix, "keys": keys or [], "count": len(keys) if keys else 0},
             )
 
         except Exception as e:
@@ -365,7 +356,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_list_kv",
                 data={"prefix": prefix},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -387,7 +378,7 @@ def register_consul_tools(mcp: FastMCP):
                     status="error",
                     action="consul_get_service_tags",
                     data={"service_name": service_name},
-                    error_message=f"Service '{service_name}' not found"
+                    error_message=f"Service '{service_name}' not found",
                 )
 
             # Collect unique tags from all instances
@@ -399,10 +390,7 @@ def register_consul_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="consul_get_service_tags",
-                data={
-                    "service": service_name,
-                    "tags": sorted(list(all_tags))
-                }
+                data={"service": service_name, "tags": sorted(list(all_tags))},
             )
 
         except Exception as e:
@@ -411,7 +399,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_get_service_tags",
                 data={"service_name": service_name},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -433,7 +421,7 @@ def register_consul_tools(mcp: FastMCP):
                     status="error",
                     action="consul_get_service_meta",
                     data={"service_name": service_name},
-                    error_message=f"Service '{service_name}' not found"
+                    error_message=f"Service '{service_name}' not found",
                 )
 
             # Get metadata from first instance (should be same across instances)
@@ -442,10 +430,7 @@ def register_consul_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="consul_get_service_meta",
-                data={
-                    "service": service_name,
-                    "meta": meta
-                }
+                data={"service": service_name, "meta": meta},
             )
 
         except Exception as e:
@@ -454,7 +439,7 @@ def register_consul_tools(mcp: FastMCP):
                 status="error",
                 action="consul_get_service_meta",
                 data={"service_name": service_name},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -475,23 +460,20 @@ def register_consul_tools(mcp: FastMCP):
                     "config": {
                         "datacenter": agent_info.get("Config", {}).get("Datacenter"),
                         "node_name": agent_info.get("Config", {}).get("NodeName"),
-                        "version": agent_info.get("Config", {}).get("Version")
+                        "version": agent_info.get("Config", {}).get("Version"),
                     },
                     "member": {
                         "name": agent_info.get("Member", {}).get("Name"),
                         "addr": agent_info.get("Member", {}).get("Addr"),
-                        "status": agent_info.get("Member", {}).get("Status")
-                    }
-                }
+                        "status": agent_info.get("Member", {}).get("Status"),
+                    },
+                },
             )
 
         except Exception as e:
             logger.error(f"Error in consul_agent_self: {e}")
             return tools.create_response(
-                status="error",
-                action="consul_agent_self",
-                data={},
-                error_message=str(e)
+                status="error", action="consul_agent_self", data={}, error_message=str(e)
             )
 
     logger.debug("Registered 9 Consul tools")

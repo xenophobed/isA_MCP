@@ -16,6 +16,7 @@ import json
 # Optional consul import for service discovery
 try:
     import consul
+
     CONSUL_AVAILABLE = True
 except ImportError:
     CONSUL_AVAILABLE = False
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DigitalServiceConfig:
     """Digital analytics service configuration"""
+
     service_name: str = "data_service"
     consul_host: str = "localhost"
     consul_port: int = 8500
@@ -35,16 +37,16 @@ class DigitalServiceConfig:
     fallback_port: int = 8083
 
     @classmethod
-    def from_env(cls) -> 'DigitalServiceConfig':
+    def from_env(cls) -> "DigitalServiceConfig":
         """Create config from environment variables"""
         return cls(
-            service_name=os.getenv('DATA_SERVICE_NAME', 'data_service'),
-            consul_host=os.getenv('CONSUL_HOST', 'localhost'),
-            consul_port=int(os.getenv('CONSUL_PORT', '8500')),
-            api_timeout=int(os.getenv('DATA_API_TIMEOUT', '300')),
-            max_retries=int(os.getenv('DATA_MAX_RETRIES', '3')),
-            fallback_host=os.getenv('DATA_FALLBACK_HOST', 'localhost'),
-            fallback_port=int(os.getenv('DATA_FALLBACK_PORT', '8083'))
+            service_name=os.getenv("DATA_SERVICE_NAME", "data_service"),
+            consul_host=os.getenv("CONSUL_HOST", "localhost"),
+            consul_port=int(os.getenv("CONSUL_PORT", "8500")),
+            api_timeout=int(os.getenv("DATA_API_TIMEOUT", "300")),
+            max_retries=int(os.getenv("DATA_MAX_RETRIES", "3")),
+            fallback_host=os.getenv("DATA_FALLBACK_HOST", "localhost"),
+            fallback_port=int(os.getenv("DATA_FALLBACK_PORT", "8083")),
         )
 
 
@@ -73,18 +75,14 @@ class DigitalServiceClient:
         try:
             if not self.consul_client:
                 self.consul_client = consul.Consul(
-                    host=self.config.consul_host,
-                    port=self.config.consul_port
+                    host=self.config.consul_host, port=self.config.consul_port
                 )
 
             # Get healthy service instances
-            services = self.consul_client.health.service(
-                self.config.service_name,
-                passing=True
-            )[1]
+            services = self.consul_client.health.service(self.config.service_name, passing=True)[1]
 
             if services:
-                service = services[0]['Service']
+                service = services[0]["Service"]
                 service_url = f"http://{service['Address']}:{service['Port']}"
                 logger.info(f"Discovered data service at: {service_url}")
                 return service_url
@@ -116,12 +114,7 @@ class DigitalServiceClient:
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request with retry logic"""
         base_url = await self._get_service_url()
         url = f"{base_url}{endpoint}"
@@ -147,7 +140,9 @@ class DigitalServiceClient:
 
             except aiohttp.ClientError as e:
                 last_error = e
-                logger.warning(f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}")
+                logger.warning(
+                    f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}"
+                )
 
                 if attempt < self.config.max_retries - 1:
                     await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
@@ -161,10 +156,7 @@ class DigitalServiceClient:
         raise Exception(f"All retry attempts failed. Last error: {last_error}")
 
     async def _request_sse(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
+        self, method: str, endpoint: str, **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Make HTTP request and stream SSE (Server-Sent Events) responses
@@ -193,17 +185,17 @@ class DigitalServiceClient:
 
                 # Stream SSE messages
                 async for line in response.content:
-                    line = line.decode('utf-8').strip()
+                    line = line.decode("utf-8").strip()
 
                     # SSE format: "data: {...}"
-                    if line.startswith('data: '):
+                    if line.startswith("data: "):
                         try:
                             data_str = line[6:]  # Remove "data: " prefix
                             data = json.loads(data_str)
                             yield data
 
                             # Check if completed
-                            if data.get('type') == 'result' or data.get('completed'):
+                            if data.get("type") == "result" or data.get("completed"):
                                 break
 
                         except json.JSONDecodeError as e:
@@ -236,7 +228,7 @@ class DigitalServiceClient:
         content_type: str = "text",
         mode: str = "simple",
         collection_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Store content to knowledge base with SSE progress tracking
@@ -257,7 +249,7 @@ class DigitalServiceClient:
             "user_id": user_id,
             "content": content,
             "content_type": content_type,
-            "mode": mode
+            "mode": mode,
         }
 
         if collection_name:
@@ -275,7 +267,7 @@ class DigitalServiceClient:
         mode: str = "simple",
         collection_name: Optional[str] = None,
         top_k: int = 5,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Search knowledge base for relevant content
@@ -291,12 +283,7 @@ class DigitalServiceClient:
         Returns:
             Search results with relevance scores
         """
-        payload = {
-            "user_id": user_id,
-            "query": query,
-            "mode": mode,
-            "top_k": top_k
-        }
+        payload = {"user_id": user_id, "query": query, "mode": mode, "top_k": top_k}
 
         if collection_name:
             payload["collection_name"] = collection_name
@@ -312,7 +299,7 @@ class DigitalServiceClient:
         mode: str = "simple",
         collection_name: Optional[str] = None,
         top_k: int = 5,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Generate AI response based on retrieved context with SSE progress
@@ -328,12 +315,7 @@ class DigitalServiceClient:
         Yields:
             Progress updates and final generated response via SSE
         """
-        payload = {
-            "user_id": user_id,
-            "query": query,
-            "mode": mode,
-            "top_k": top_k
-        }
+        payload = {"user_id": user_id, "query": query, "mode": mode, "top_k": top_k}
 
         if collection_name:
             payload["collection_name"] = collection_name

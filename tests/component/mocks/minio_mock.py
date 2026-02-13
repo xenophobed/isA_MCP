@@ -4,7 +4,8 @@ Mock for MinIO/S3 client.
 Provides a mock implementation of MinIO client
 for testing file storage operations without a real MinIO instance.
 """
-from typing import Any, Dict, List, Optional, BinaryIO, Iterator
+
+from typing import Dict, List, BinaryIO, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 import io
@@ -14,6 +15,7 @@ import hashlib
 @dataclass
 class MockObject:
     """Represents a stored object."""
+
     bucket_name: str
     object_name: str
     data: bytes
@@ -31,6 +33,7 @@ class MockObject:
 @dataclass
 class MockBucket:
     """Represents a storage bucket."""
+
     name: str
     creation_date: datetime = field(default_factory=datetime.utcnow)
 
@@ -87,14 +90,14 @@ class MockMinioClient:
         length: int = -1,
         content_type: str = "application/octet-stream",
         metadata: Dict[str, str] = None,
-        **kwargs
+        **kwargs,
     ) -> MockObject:
         """Upload an object."""
         if bucket_name not in self.buckets:
             raise ValueError(f"Bucket {bucket_name} not found")
 
         # Read all data
-        if hasattr(data, 'read'):
+        if hasattr(data, "read"):
             content = data.read()
         else:
             content = data
@@ -104,18 +107,13 @@ class MockMinioClient:
             object_name=object_name,
             data=content,
             content_type=content_type,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         self.objects[bucket_name][object_name] = obj
         return obj
 
-    def get_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        **kwargs
-    ) -> "MockResponse":
+    def get_object(self, bucket_name: str, object_name: str, **kwargs) -> "MockResponse":
         """Get an object."""
         if bucket_name not in self.buckets:
             raise ValueError(f"Bucket {bucket_name} not found")
@@ -127,11 +125,7 @@ class MockMinioClient:
         return MockResponse(obj.data)
 
     def fget_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        file_path: str,
-        **kwargs
+        self, bucket_name: str, object_name: str, file_path: str, **kwargs
     ) -> MockObject:
         """Download object to file."""
         if bucket_name not in self.buckets:
@@ -142,7 +136,7 @@ class MockMinioClient:
 
         obj = self.objects[bucket_name][object_name]
 
-        with open(file_path, 'wb') as f:
+        with open(file_path, "wb") as f:
             f.write(obj.data)
 
         return obj
@@ -154,19 +148,14 @@ class MockMinioClient:
         file_path: str,
         content_type: str = "application/octet-stream",
         metadata: Dict[str, str] = None,
-        **kwargs
+        **kwargs,
     ) -> MockObject:
         """Upload file to object."""
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             data = f.read()
 
         return self.put_object(
-            bucket_name,
-            object_name,
-            io.BytesIO(data),
-            len(data),
-            content_type,
-            metadata
+            bucket_name, object_name, io.BytesIO(data), len(data), content_type, metadata
         )
 
     def remove_object(self, bucket_name: str, object_name: str) -> None:
@@ -178,11 +167,7 @@ class MockMinioClient:
             del self.objects[bucket_name][object_name]
 
     def list_objects(
-        self,
-        bucket_name: str,
-        prefix: str = "",
-        recursive: bool = False,
-        **kwargs
+        self, bucket_name: str, prefix: str = "", recursive: bool = False, **kwargs
     ) -> Iterator[MockObject]:
         """List objects in bucket."""
         if bucket_name not in self.buckets:
@@ -192,12 +177,7 @@ class MockMinioClient:
             if name.startswith(prefix):
                 yield obj
 
-    def stat_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        **kwargs
-    ) -> MockObject:
+    def stat_object(self, bucket_name: str, object_name: str, **kwargs) -> MockObject:
         """Get object metadata."""
         if bucket_name not in self.buckets:
             raise ValueError(f"Bucket {bucket_name} not found")
@@ -207,13 +187,7 @@ class MockMinioClient:
 
         return self.objects[bucket_name][object_name]
 
-    def copy_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        source: str,
-        **kwargs
-    ) -> MockObject:
+    def copy_object(self, bucket_name: str, object_name: str, source: str, **kwargs) -> MockObject:
         """Copy an object."""
         # Parse source (format: bucket/object)
         parts = source.split("/", 1)
@@ -234,25 +208,17 @@ class MockMinioClient:
             io.BytesIO(src_obj.data),
             src_obj.size,
             src_obj.content_type,
-            src_obj.metadata.copy()
+            src_obj.metadata.copy(),
         )
 
     def presigned_get_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        expires: int = 604800,
-        **kwargs
+        self, bucket_name: str, object_name: str, expires: int = 604800, **kwargs
     ) -> str:
         """Generate presigned URL for GET."""
         return f"http://mock-minio/{bucket_name}/{object_name}?expires={expires}"
 
     def presigned_put_object(
-        self,
-        bucket_name: str,
-        object_name: str,
-        expires: int = 604800,
-        **kwargs
+        self, bucket_name: str, object_name: str, expires: int = 604800, **kwargs
     ) -> str:
         """Generate presigned URL for PUT."""
         return f"http://mock-minio/{bucket_name}/{object_name}?expires={expires}&method=PUT"

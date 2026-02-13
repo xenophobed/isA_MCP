@@ -13,7 +13,7 @@ Provides:
 - Hierarchical skill-based routing
 - Combined scoring and ranking
 """
-import asyncio
+
 import logging
 import time
 from dataclasses import dataclass, field
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 class EntityType(str, Enum):
     """Types of searchable entities."""
+
     TOOL = "tool"
     PROMPT = "prompt"
     RESOURCE = "resource"
@@ -37,6 +38,7 @@ class EntityType(str, Enum):
 @dataclass
 class EntityMatch:
     """A matched entity from search."""
+
     id: str
     entity_type: EntityType
     name: str
@@ -58,6 +60,7 @@ class EntityMatch:
 @dataclass
 class SkillCategoryMatch:
     """A matched skill category for hierarchical routing."""
+
     id: str
     name: str
     description: str
@@ -68,6 +71,7 @@ class SkillCategoryMatch:
 @dataclass
 class UnifiedSearchResult:
     """Complete unified search result."""
+
     query: str
     entities: List[EntityMatch]
     matched_skill_categories: List[SkillCategoryMatch]
@@ -111,16 +115,18 @@ class UnifiedMetaSearch:
     async def _get_hierarchical_search(self):
         """Get or create hierarchical search service."""
         if self._hierarchical_search is None:
-            from services.search_service.hierarchical_search_service import HierarchicalSearchService
-            self._hierarchical_search = HierarchicalSearchService(
-                model_client=self._model_client
+            from services.search_service.hierarchical_search_service import (
+                HierarchicalSearchService,
             )
+
+            self._hierarchical_search = HierarchicalSearchService(model_client=self._model_client)
         return self._hierarchical_search
 
     def _get_skill_manager(self):
         """Get or create skill manager."""
         if self._skill_manager is None:
             from resources.skill_resources import get_skill_manager
+
             self._skill_manager = get_skill_manager()
         return self._skill_manager
 
@@ -177,7 +183,11 @@ class UnifiedMetaSearch:
 
         # Search tools/prompts/resources/skills via hierarchical search
         # Skills are stored as resources with resource_type="skill"
-        db_types = [t for t in entity_types if t in (EntityType.TOOL, EntityType.PROMPT, EntityType.RESOURCE, EntityType.SKILL)]
+        db_types = [
+            t
+            for t in entity_types
+            if t in (EntityType.TOOL, EntityType.PROMPT, EntityType.RESOURCE, EntityType.SKILL)
+        ]
         if db_types:
             db_results = await self._search_database_entities(
                 query=query,
@@ -197,7 +207,7 @@ class UnifiedMetaSearch:
         all_entities.sort(key=lambda x: x.score, reverse=True)
 
         # Limit total results
-        all_entities = all_entities[:limit * len(entity_types)]
+        all_entities = all_entities[: limit * len(entity_types)]
 
         # Calculate totals
         metadata["total_results"] = len(all_entities)
@@ -264,43 +274,47 @@ class UnifiedMetaSearch:
                 for tool in result.tools:
                     # Determine actual entity type (for SKILL, check if it's a skill resource)
                     actual_entity_type = entity_type
-                    source = "external" if getattr(tool, 'is_external', False) else "internal"
+                    source = "external" if getattr(tool, "is_external", False) else "internal"
                     uri = None
 
                     # If searching for SKILL, filter to only include skill resources
                     if entity_type == EntityType.SKILL:
                         # Check metadata for resource_type
-                        metadata = getattr(tool, 'metadata', {}) or {}
-                        resource_type = metadata.get('resource_type', '')
-                        if resource_type != 'skill':
+                        metadata = getattr(tool, "metadata", {}) or {}
+                        resource_type = metadata.get("resource_type", "")
+                        if resource_type != "skill":
                             continue  # Skip non-skill resources
-                        uri = metadata.get('uri')
+                        uri = metadata.get("uri")
                         # Determine source from URI
-                        if uri and 'external' in uri:
-                            source = 'external'
-                        elif uri and 'vibe' in uri:
-                            source = 'vibe'
+                        if uri and "external" in uri:
+                            source = "external"
+                        elif uri and "vibe" in uri:
+                            source = "vibe"
 
                     # If searching for RESOURCE, skip skill resources (to avoid duplicates)
                     if entity_type == EntityType.RESOURCE:
-                        metadata = getattr(tool, 'metadata', {}) or {}
-                        resource_type = metadata.get('resource_type', '')
-                        if resource_type == 'skill':
+                        metadata = getattr(tool, "metadata", {}) or {}
+                        resource_type = metadata.get("resource_type", "")
+                        if resource_type == "skill":
                             continue  # Skip skill resources when searching for regular resources
 
-                    entities.append(EntityMatch(
-                        id=tool.id,
-                        entity_type=actual_entity_type,
-                        name=tool.name,
-                        description=tool.description,
-                        score=tool.score,
-                        source=source,
-                        db_id=tool.db_id,
-                        skill_ids=tool.skill_ids,
-                        primary_skill_id=tool.primary_skill_id,
-                        input_schema=tool.input_schema if entity_type == EntityType.TOOL else None,
-                        uri=uri,
-                    ))
+                    entities.append(
+                        EntityMatch(
+                            id=tool.id,
+                            entity_type=actual_entity_type,
+                            name=tool.name,
+                            description=tool.description,
+                            score=tool.score,
+                            source=source,
+                            db_id=tool.db_id,
+                            skill_ids=tool.skill_ids,
+                            primary_skill_id=tool.primary_skill_id,
+                            input_schema=(
+                                tool.input_schema if entity_type == EntityType.TOOL else None
+                            ),
+                            uri=uri,
+                        )
+                    )
 
                 # Collect skill categories (only from first search to avoid duplicates)
                 if not skill_categories and result.matched_skills:
@@ -344,18 +358,20 @@ class UnifiedMetaSearch:
             normalized_score = min(raw_score / 2.0, 1.0)
 
             # Skills have lower threshold since they use keyword matching
-            skill_threshold = threshold * 0.5  # More lenient for skills
+            threshold * 0.5  # More lenient for skills
 
             if raw_score > 0:  # Any match is valid
-                entities.append(EntityMatch(
-                    id=f"skill_{skill['type']}_{skill['name']}",
-                    entity_type=EntityType.SKILL,
-                    name=skill["name"],
-                    description=skill.get("description", ""),
-                    score=normalized_score,
-                    source=skill.get("type", "vibe"),  # 'vibe' or 'external'
-                    uri=skill.get("uri"),
-                ))
+                entities.append(
+                    EntityMatch(
+                        id=f"skill_{skill['type']}_{skill['name']}",
+                        entity_type=EntityType.SKILL,
+                        name=skill["name"],
+                        description=skill.get("description", ""),
+                        score=normalized_score,
+                        source=skill.get("type", "vibe"),  # 'vibe' or 'external'
+                        uri=skill.get("uri"),
+                    )
+                )
 
         return entities
 

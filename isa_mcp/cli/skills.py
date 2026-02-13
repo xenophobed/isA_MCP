@@ -9,6 +9,7 @@ Commands:
     isa_mcp skill info <name>       Show skill details
     isa_mcp skill create            Create a new skill category
 """
+
 import asyncio
 import json
 import sys
@@ -27,6 +28,7 @@ def get_installer():
             search_npm_skills,
             search_github_skills,
         )
+
         return ExternalSkillInstaller(), SkillSource, search_npm_skills, search_github_skills
     except ImportError as e:
         click.echo(click.style(f"Error: Could not import skill installer: {e}", fg="red"))
@@ -70,6 +72,7 @@ def do_sync_skills(verbose: bool = False):
 # Skill Command Group
 # =========================================================================
 
+
 @click.group()
 def skill():
     """Manage external skills for Claude Code."""
@@ -80,10 +83,11 @@ def skill():
 @click.argument("name")
 @click.option("--version", "-v", default=None, help="Specific version to install")
 @click.option(
-    "--source", "-s",
+    "--source",
+    "-s",
     type=click.Choice(["npm", "github", "auto"], case_sensitive=False),
     default="auto",
-    help="Source registry (auto-detect by default)"
+    help="Source registry (auto-detect by default)",
 )
 @click.option("--force", "-f", is_flag=True, help="Force reinstall if already exists")
 @click.option("--sync/--no-sync", default=True, help="Auto-sync after install (default: sync)")
@@ -230,7 +234,7 @@ def skill_list(as_json: bool):
     for s in skills:
         click.echo(f"  {click.style(s['name'], fg='green', bold=True)}")
         click.echo(f"    Version:     {s.get('version', 'unknown')}")
-        desc = s.get('description', 'No description')
+        desc = s.get("description", "No description")
         click.echo(f"    Description: {desc[:60]}{'...' if len(desc) > 60 else ''}")
         click.echo(f"    Guides:      {'Yes' if s.get('has_guides') else 'No'}")
         click.echo(f"    Templates:   {'Yes' if s.get('has_templates') else 'No'}")
@@ -239,9 +243,13 @@ def skill_list(as_json: bool):
 
 @skill.command("search")
 @click.argument("query")
-@click.option("--source", "-s",
-              type=click.Choice(["all", "npm", "github"], case_sensitive=False),
-              default="all", help="Search source")
+@click.option(
+    "--source",
+    "-s",
+    type=click.Choice(["all", "npm", "github"], case_sensitive=False),
+    default="all",
+    help="Search source",
+)
 @click.option("--limit", "-n", default=10, help="Maximum results per source")
 def skill_search(query: str, source: str, limit: int):
     """
@@ -287,7 +295,7 @@ def skill_search(query: str, source: str, limit: int):
         click.echo(click.style("npm packages:", fg="blue", bold=True))
         for s in npm_skills:
             click.echo(f"  {click.style(s['name'], fg='green')}")
-            desc = s.get('description', 'No description')
+            desc = s.get("description", "No description")
             click.echo(f"    {desc[:70]}{'...' if len(desc) > 70 else ''}")
             click.echo(f"    Install: isa_mcp skill install {s['name']}")
             click.echo()
@@ -297,8 +305,10 @@ def skill_search(query: str, source: str, limit: int):
         for s in gh_skills:
             stars = s.get("stars", 0)
             star_str = f"★ {stars}" if stars else ""
-            click.echo(f"  {click.style(s['name'], fg='green')} {click.style(star_str, fg='yellow')}")
-            desc = s.get('description', 'No description')
+            click.echo(
+                f"  {click.style(s['name'], fg='green')} {click.style(star_str, fg='yellow')}"
+            )
+            desc = s.get("description", "No description")
             click.echo(f"    {desc[:70]}{'...' if len(desc) > 70 else ''}")
             click.echo(f"    Install: isa_mcp skill install {s['name']}")
             click.echo()

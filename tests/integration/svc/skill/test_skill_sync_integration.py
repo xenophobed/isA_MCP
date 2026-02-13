@@ -9,21 +9,18 @@ Requirements:
     - kubectl port-forward svc/qdrant-grpc 50062:50062 -n isa-cloud-staging
     - kubectl port-forward svc/model 8082:8082 -n isa-cloud-staging
 """
+
 import pytest
-import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 from tests.contracts.skill.data_contract import (
     SkillTestDataFactory,
-    SkillCategoryCreateRequestContract,
-    ToolClassificationRequestContract,
-    SkillCategoryBuilder,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 async def skill_service(mcp_settings):
@@ -34,7 +31,7 @@ async def skill_service(mcp_settings):
 
         repository = SkillRepository(
             host=mcp_settings.infrastructure.postgres_grpc_host,
-            port=mcp_settings.infrastructure.postgres_grpc_port
+            port=mcp_settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repository)
         yield service
@@ -55,6 +52,7 @@ async def seeded_skills(skill_service):
 # Skill Category CRUD Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.skill
 class TestSkillCRUDIntegration:
@@ -70,7 +68,7 @@ class TestSkillCRUDIntegration:
         request = SkillTestDataFactory.make_skill_category(
             id=test_skill_id,
             name=f"Integration Test Skill {test_skill_id}",  # Unique name
-            description="A skill created for integration testing purposes"
+            description="A skill created for integration testing purposes",
         )
 
         try:
@@ -83,12 +81,11 @@ class TestSkillCRUDIntegration:
             pg_client = AsyncPostgresClient(
                 host=mcp_settings.infrastructure.postgres_grpc_host,
                 port=mcp_settings.infrastructure.postgres_grpc_port,
-                user_id="mcp-integration-test"
+                user_id="mcp-integration-test",
             )
             async with pg_client:
                 rows = await pg_client.query(
-                    "SELECT * FROM mcp.skill_categories WHERE id = $1",
-                    params=[test_skill_id]
+                    "SELECT * FROM mcp.skill_categories WHERE id = $1", params=[test_skill_id]
                 )
             assert rows is not None and len(rows) > 0
             assert rows[0]["name"] == f"Integration Test Skill {test_skill_id}"
@@ -116,7 +113,7 @@ class TestSkillCRUDIntegration:
 
         repository = SkillRepository(
             host=mcp_settings.infrastructure.postgres_grpc_host,
-            port=mcp_settings.infrastructure.postgres_grpc_port
+            port=mcp_settings.infrastructure.postgres_grpc_port,
         )
         skill_service = SkillService(repository=repository)
 
@@ -142,6 +139,7 @@ class TestSkillCRUDIntegration:
 # Tool Classification Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.skill
 class TestToolClassificationIntegration:
@@ -163,7 +161,7 @@ class TestToolClassificationIntegration:
         pg_client = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client:
             rows = await pg_client.query(
@@ -178,7 +176,7 @@ class TestToolClassificationIntegration:
             tool_id=tool["id"],
             tool_name=tool["name"],
             tool_description=tool.get("description", "Calendar tool"),
-            force_reclassify=True
+            force_reclassify=True,
         )
 
         # Should match calendar-management skill (BR-002)
@@ -192,7 +190,9 @@ class TestToolClassificationIntegration:
             assert assignment["confidence"] >= 0.5
 
     @pytest.mark.asyncio
-    async def test_classify_tool_stores_assignment(self, skill_service, mcp_settings, seeded_skills):
+    async def test_classify_tool_stores_assignment(
+        self, skill_service, mcp_settings, seeded_skills
+    ):
         """
         Test that classification stores assignment in PostgreSQL.
 
@@ -205,7 +205,7 @@ class TestToolClassificationIntegration:
         pg_client = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client:
             rows = await pg_client.query(
@@ -218,23 +218,22 @@ class TestToolClassificationIntegration:
         tool = rows[0]
         tool_id = tool["id"]
 
-        result = await skill_service.classify_tool(
+        await skill_service.classify_tool(
             tool_id=tool_id,
             tool_name=tool["name"],
             tool_description=tool.get("description", "Event tool"),
-            force_reclassify=True
+            force_reclassify=True,
         )
 
         # Verify stored in database
         pg_client2 = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client2:
             rows = await pg_client2.query(
-                "SELECT * FROM mcp.tool_skill_assignments WHERE tool_id = $1",
-                params=[tool_id]
+                "SELECT * FROM mcp.tool_skill_assignments WHERE tool_id = $1", params=[tool_id]
             )
 
         assert rows is not None and len(rows) >= 1
@@ -242,7 +241,9 @@ class TestToolClassificationIntegration:
         assert rows[0]["confidence"] >= 0.5
 
     @pytest.mark.asyncio
-    async def test_classify_tool_updates_qdrant_payload(self, skill_service, mcp_settings, seeded_skills):
+    async def test_classify_tool_updates_qdrant_payload(
+        self, skill_service, mcp_settings, seeded_skills
+    ):
         """
         Test that classification updates tool vector payload with skill_ids.
 
@@ -254,7 +255,7 @@ class TestToolClassificationIntegration:
         pg_client = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client:
             rows = await pg_client.query(
@@ -267,25 +268,23 @@ class TestToolClassificationIntegration:
         tool = rows[0]
         tool_id = tool["id"]
 
-        result = await skill_service.classify_tool(
+        await skill_service.classify_tool(
             tool_id=tool_id,
             tool_name=tool["name"],
             tool_description=tool.get("description", "Search tool"),
-            force_reclassify=True
+            force_reclassify=True,
         )
 
         # Verify Qdrant payload updated
         qdrant_client = AsyncQdrantClient(
             host=mcp_settings.infrastructure.qdrant_grpc_host,
             port=mcp_settings.infrastructure.qdrant_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
 
         # Get point from Qdrant - use db_id as point ID
         points = await qdrant_client.retrieve_points(
-            collection_name="mcp_unified_search",
-            ids=[tool_id],
-            with_payload=True
+            collection_name="mcp_unified_search", ids=[tool_id], with_payload=True
         )
 
         if points and len(points) > 0:
@@ -298,6 +297,7 @@ class TestToolClassificationIntegration:
 # ═══════════════════════════════════════════════════════════════
 # Skill Embedding Update Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.skill
@@ -338,6 +338,7 @@ class TestSkillEmbeddingIntegration:
 # Sync Service Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.skill
 class TestSyncIntegration:
@@ -375,7 +376,7 @@ class TestSyncIntegration:
             qdrant_client = AsyncQdrantClient(
                 host=mcp_settings.infrastructure.qdrant_grpc_host,
                 port=mcp_settings.infrastructure.qdrant_grpc_port,
-                user_id="mcp-integration-test"
+                user_id="mcp-integration-test",
             )
 
             # Check collection has points
@@ -396,8 +397,10 @@ class TestSyncIntegration:
         class MockMCPServer:
             async def list_tools(self):
                 return []
+
             async def list_prompts(self):
                 return []
+
             async def list_resources(self):
                 return []
 
@@ -438,15 +441,12 @@ class TestSyncIntegration:
             qdrant_client = AsyncQdrantClient(
                 host=mcp_settings.infrastructure.qdrant_grpc_host,
                 port=mcp_settings.infrastructure.qdrant_grpc_port,
-                user_id="mcp-integration-test"
+                user_id="mcp-integration-test",
             )
 
             # Scroll to get some points with vectors
             scroll_result = await qdrant_client.scroll(
-                collection_name="mcp_skills",
-                limit=5,
-                with_payload=True,
-                with_vectors=True
+                collection_name="mcp_skills", limit=5, with_payload=True, with_vectors=True
             )
 
             assert scroll_result is not None
@@ -460,12 +460,15 @@ class TestSyncIntegration:
 
                     # Verify payload has required fields
                     payload = point.get("payload", {})
-                    assert "id" in payload or "name" in payload, "Payload should have skill identifier"
+                    assert (
+                        "id" in payload or "name" in payload
+                    ), "Payload should have skill identifier"
 
 
 # ═══════════════════════════════════════════════════════════════
 # Error Handling Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.skill
@@ -492,6 +495,7 @@ class TestErrorHandlingIntegration:
 # SkillManager Database Sync Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.skill
 class TestSkillManagerSyncIntegration:
@@ -509,7 +513,7 @@ class TestSkillManagerSyncIntegration:
         skill_manager = get_skill_manager()
 
         # First ensure skills are loaded
-        skill_manager.load_skills()
+        skill_manager.reload_skills()
         total_skills = len(skill_manager._vibe_cache) + len(skill_manager._external_cache)
 
         if total_skills == 0:
@@ -533,7 +537,7 @@ class TestSkillManagerSyncIntegration:
         from services.resource_service.resource_repository import ResourceRepository
 
         skill_manager = get_skill_manager()
-        skill_manager.load_skills()
+        skill_manager.reload_skills()
 
         if not skill_manager._vibe_cache:
             pytest.skip("No vibe skills found")
@@ -556,6 +560,7 @@ class TestSkillManagerSyncIntegration:
 # ═══════════════════════════════════════════════════════════════
 # Unified Meta Search Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.skill
@@ -595,7 +600,12 @@ class TestUnifiedMetaSearchIntegration:
         # Search across all types
         result = await search.search(
             query="calendar management",
-            entity_types=[EntityType.TOOL, EntityType.PROMPT, EntityType.RESOURCE, EntityType.SKILL],
+            entity_types=[
+                EntityType.TOOL,
+                EntityType.PROMPT,
+                EntityType.RESOURCE,
+                EntityType.SKILL,
+            ],
             limit=5,
         )
 
@@ -605,7 +615,12 @@ class TestUnifiedMetaSearchIntegration:
 
         # Check results are typed correctly
         for entity in result.entities:
-            assert entity.entity_type in [EntityType.TOOL, EntityType.PROMPT, EntityType.RESOURCE, EntityType.SKILL]
+            assert entity.entity_type in [
+                EntityType.TOOL,
+                EntityType.PROMPT,
+                EntityType.RESOURCE,
+                EntityType.SKILL,
+            ]
 
     @pytest.mark.asyncio
     async def test_unified_search_skill_category_matching(self, mcp_settings):
@@ -657,6 +672,7 @@ class TestUnifiedMetaSearchIntegration:
 # Entity Classification Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.skill
 class TestEntityClassificationIntegration:
@@ -676,7 +692,7 @@ class TestEntityClassificationIntegration:
         pg_client = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client:
             rows = await pg_client.query(
@@ -692,17 +708,17 @@ class TestEntityClassificationIntegration:
         # Classify the prompt
         repository = SkillRepository(
             host=mcp_settings.infrastructure.postgres_grpc_host,
-            port=mcp_settings.infrastructure.postgres_grpc_port
+            port=mcp_settings.infrastructure.postgres_grpc_port,
         )
         skill_service = SkillService(repository=repository)
 
         entity = {
             "id": prompt["id"],
             "name": prompt["name"],
-            "description": prompt.get("description", "A test prompt")
+            "description": prompt.get("description", "A test prompt"),
         }
 
-        results = await skill_service.classify_entities_batch([entity], entity_type="prompt")
+        await skill_service.classify_entities_batch([entity], entity_type="prompt")
 
         # Verify stored in database
         prompt_repo = PromptRepository()
@@ -726,7 +742,7 @@ class TestEntityClassificationIntegration:
         pg_client = AsyncPostgresClient(
             host=mcp_settings.infrastructure.postgres_grpc_host,
             port=mcp_settings.infrastructure.postgres_grpc_port,
-            user_id="mcp-integration-test"
+            user_id="mcp-integration-test",
         )
         async with pg_client:
             rows = await pg_client.query(
@@ -742,17 +758,17 @@ class TestEntityClassificationIntegration:
         # Classify the resource
         repository = SkillRepository(
             host=mcp_settings.infrastructure.postgres_grpc_host,
-            port=mcp_settings.infrastructure.postgres_grpc_port
+            port=mcp_settings.infrastructure.postgres_grpc_port,
         )
         skill_service = SkillService(repository=repository)
 
         entity = {
             "id": resource["id"],
             "name": resource["name"],
-            "description": resource.get("description", "A test resource")
+            "description": resource.get("description", "A test resource"),
         }
 
-        results = await skill_service.classify_entities_batch([entity], entity_type="resource")
+        await skill_service.classify_entities_batch([entity], entity_type="resource")
 
         # Verify stored in database
         resource_repo = ResourceRepository()

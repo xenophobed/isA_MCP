@@ -33,7 +33,7 @@ def register_digital_tools(mcp: FastMCP):
         content: str,
         mode: str = "simple",
         collection_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Store text content to knowledge base with RAG support
 
@@ -98,31 +98,35 @@ def register_digital_tools(mcp: FastMCP):
                 content_type="text",
                 mode=mode,
                 collection_name=collection_name,
-                metadata=metadata
+                metadata=metadata,
             ):
                 # Track progress
-                if message.get('type') == 'progress':
-                    progress_updates.append({
-                        'progress': message.get('progress', 0),
-                        'message': message.get('message', '')
-                    })
+                if message.get("type") == "progress":
+                    progress_updates.append(
+                        {
+                            "progress": message.get("progress", 0),
+                            "message": message.get("message", ""),
+                        }
+                    )
 
                 # Capture final result
-                if message.get('type') == 'result':
-                    final_result = message.get('data', {})
+                if message.get("type") == "result":
+                    final_result = message.get("data", {})
 
             # Return formatted response with progress history
             return tools.create_response(
-                status="success" if final_result and final_result.get('success') else "error",
+                status="success" if final_result and final_result.get("success") else "error",
                 action="digital_store_text",
                 data={
                     "user_id": user_id,
                     "mode": mode,
                     "collection_name": collection_name,
-                    "success": final_result.get('success') if final_result else False,
-                    "message": final_result.get('message') if final_result else "No result received",
-                    "progress_history": progress_updates
-                }
+                    "success": final_result.get("success") if final_result else False,
+                    "message": (
+                        final_result.get("message") if final_result else "No result received"
+                    ),
+                    "progress_history": progress_updates,
+                },
             )
 
         except Exception as e:
@@ -131,7 +135,7 @@ def register_digital_tools(mcp: FastMCP):
                 status="error",
                 action="digital_store_text",
                 data={"user_id": user_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -142,7 +146,7 @@ def register_digital_tools(mcp: FastMCP):
         pdf_url: str,
         mode: str = "simple",
         collection_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Store PDF document to knowledge base with automatic text extraction
 
@@ -194,32 +198,36 @@ def register_digital_tools(mcp: FastMCP):
                 content_type="pdf",
                 mode=mode,
                 collection_name=collection_name,
-                metadata=metadata
+                metadata=metadata,
             ):
                 # Track progress
-                if message.get('type') == 'progress':
-                    progress_updates.append({
-                        'progress': message.get('progress', 0),
-                        'message': message.get('message', '')
-                    })
+                if message.get("type") == "progress":
+                    progress_updates.append(
+                        {
+                            "progress": message.get("progress", 0),
+                            "message": message.get("message", ""),
+                        }
+                    )
 
                 # Capture final result
-                if message.get('type') == 'result':
-                    final_result = message.get('data', {})
+                if message.get("type") == "result":
+                    final_result = message.get("data", {})
 
             # Return formatted response
             return tools.create_response(
-                status="success" if final_result and final_result.get('success') else "error",
+                status="success" if final_result and final_result.get("success") else "error",
                 action="digital_store_pdf",
                 data={
                     "user_id": user_id,
                     "pdf_url": pdf_url,
                     "mode": mode,
                     "collection_name": collection_name,
-                    "success": final_result.get('success') if final_result else False,
-                    "message": final_result.get('message') if final_result else "No result received",
-                    "progress_history": progress_updates
-                }
+                    "success": final_result.get("success") if final_result else False,
+                    "message": (
+                        final_result.get("message") if final_result else "No result received"
+                    ),
+                    "progress_history": progress_updates,
+                },
             )
 
         except Exception as e:
@@ -228,7 +236,7 @@ def register_digital_tools(mcp: FastMCP):
                 status="error",
                 action="digital_store_pdf",
                 data={"user_id": user_id, "pdf_url": pdf_url},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -239,7 +247,7 @@ def register_digital_tools(mcp: FastMCP):
         image_url: str,
         mode: str = "simple",
         collection_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Store image to knowledge base with automatic visual analysis
 
@@ -288,32 +296,36 @@ def register_digital_tools(mcp: FastMCP):
                 content_type="image",
                 mode=mode,
                 collection_name=collection_name,
-                metadata=metadata
+                metadata=metadata,
             ):
                 # Track progress
-                if message.get('type') == 'progress':
-                    progress_updates.append({
-                        'progress': message.get('progress', 0),
-                        'message': message.get('message', '')
-                    })
+                if message.get("type") == "progress":
+                    progress_updates.append(
+                        {
+                            "progress": message.get("progress", 0),
+                            "message": message.get("message", ""),
+                        }
+                    )
 
                 # Capture final result
-                if message.get('type') == 'result':
-                    final_result = message.get('data', {})
+                if message.get("type") == "result":
+                    final_result = message.get("data", {})
 
             # Return formatted response
             return tools.create_response(
-                status="success" if final_result and final_result.get('success') else "error",
+                status="success" if final_result and final_result.get("success") else "error",
                 action="digital_store_image",
                 data={
                     "user_id": user_id,
                     "image_url": image_url,
                     "mode": mode,
                     "collection_name": collection_name,
-                    "success": final_result.get('success') if final_result else False,
-                    "message": final_result.get('message') if final_result else "No result received",
-                    "progress_history": progress_updates
-                }
+                    "success": final_result.get("success") if final_result else False,
+                    "message": (
+                        final_result.get("message") if final_result else "No result received"
+                    ),
+                    "progress_history": progress_updates,
+                },
             )
 
         except Exception as e:
@@ -322,7 +334,7 @@ def register_digital_tools(mcp: FastMCP):
                 status="error",
                 action="digital_store_image",
                 data={"user_id": user_id, "image_url": image_url},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     # ========== DIGITAL ANALYTICS SEARCH TOOLS ==========
@@ -336,7 +348,7 @@ def register_digital_tools(mcp: FastMCP):
         mode: str = "simple",
         collection_name: Optional[str] = None,
         top_k: int = 5,
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Search knowledge base for relevant content
 
@@ -398,22 +410,22 @@ def register_digital_tools(mcp: FastMCP):
                 mode=mode,
                 collection_name=collection_name,
                 top_k=top_k,
-                options=options
+                options=options,
             )
 
             # Return formatted response
             return tools.create_response(
-                status="success" if result.get('success') else "error",
+                status="success" if result.get("success") else "error",
                 action="digital_search",
                 data={
                     "user_id": user_id,
                     "query": query,
                     "mode": mode,
                     "collection_name": collection_name,
-                    "sources": result.get('sources', []),
-                    "metadata": result.get('metadata', {}),
-                    "num_results": len(result.get('sources', []))
-                }
+                    "sources": result.get("sources", []),
+                    "metadata": result.get("metadata", {}),
+                    "num_results": len(result.get("sources", [])),
+                },
             )
 
         except Exception as e:
@@ -422,7 +434,7 @@ def register_digital_tools(mcp: FastMCP):
                 status="error",
                 action="digital_search",
                 data={"user_id": user_id, "query": query},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     # ========== DIGITAL ANALYTICS RESPONSE TOOLS ==========
@@ -436,7 +448,7 @@ def register_digital_tools(mcp: FastMCP):
         mode: str = "simple",
         collection_name: Optional[str] = None,
         top_k: int = 5,
-        use_citations: bool = True
+        use_citations: bool = True,
     ) -> str:
         """Generate AI response based on knowledge base content
 
@@ -505,32 +517,34 @@ def register_digital_tools(mcp: FastMCP):
                 mode=mode,
                 collection_name=collection_name,
                 top_k=top_k,
-                options=options
+                options=options,
             ):
                 # Track progress
-                if message.get('type') == 'progress':
-                    progress_updates.append({
-                        'progress': message.get('progress', 0),
-                        'message': message.get('message', '')
-                    })
+                if message.get("type") == "progress":
+                    progress_updates.append(
+                        {
+                            "progress": message.get("progress", 0),
+                            "message": message.get("message", ""),
+                        }
+                    )
 
                 # Capture final result
-                if message.get('type') == 'result':
-                    final_result = message.get('data', {})
+                if message.get("type") == "result":
+                    final_result = message.get("data", {})
 
             # Return formatted response
             return tools.create_response(
-                status="success" if final_result and final_result.get('success') else "error",
+                status="success" if final_result and final_result.get("success") else "error",
                 action="digital_response",
                 data={
                     "user_id": user_id,
                     "query": query,
                     "mode": mode,
-                    "response": final_result.get('response') if final_result else None,
-                    "context_used": final_result.get('context_used', 0) if final_result else 0,
-                    "citations": final_result.get('citations', []) if final_result else [],
-                    "progress_history": progress_updates
-                }
+                    "response": final_result.get("response") if final_result else None,
+                    "context_used": final_result.get("context_used", 0) if final_result else 0,
+                    "citations": final_result.get("citations", []) if final_result else [],
+                    "progress_history": progress_updates,
+                },
             )
 
         except Exception as e:
@@ -539,7 +553,7 @@ def register_digital_tools(mcp: FastMCP):
                 status="error",
                 action="digital_response",
                 data={"user_id": user_id, "query": query},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     # ========== UTILITY TOOLS ==========
@@ -566,6 +580,7 @@ def register_digital_tools(mcp: FastMCP):
             client = get_digital_client()
 
             import time
+
             start_time = time.time()
             health = await client.health_check()
             response_time = (time.time() - start_time) * 1000
@@ -577,15 +592,12 @@ def register_digital_tools(mcp: FastMCP):
                     "status": "healthy",
                     "service_url": client.service_url or "not discovered yet",
                     "response_time_ms": round(response_time, 2),
-                    "health_data": health
-                }
+                    "health_data": health,
+                },
             )
 
         except Exception as e:
             logger.error(f"Error checking digital service health: {e}")
             return tools.create_response(
-                status="error",
-                action="digital_service_health_check",
-                data={},
-                error_message=str(e)
+                status="error", action="digital_service_health_check", data={}, error_message=str(e)
             )

@@ -14,13 +14,11 @@ from tests.contracts.aggregator.data_contract import (
     ServerTransportType,
     ServerStatus,
     RoutingStrategy,
-
     # Request Contracts
     ServerRegistrationRequestContract,
     ServerConnectionRequestContract,
     AggregatedSearchRequestContract,
     ToolExecutionRequestContract,
-
     # Response Contracts
     ServerRecordContract,
     AggregatedToolContract,
@@ -28,10 +26,8 @@ from tests.contracts.aggregator.data_contract import (
     AggregatorStateContract,
     ToolExecutionResponseContract,
     ServerHealthContract,
-
     # Factory
     AggregatorTestDataFactory,
-
     # Builders
     ServerRegistrationBuilder,
     AggregatedToolBuilder,
@@ -42,13 +38,11 @@ __all__ = [
     "ServerTransportType",
     "ServerStatus",
     "RoutingStrategy",
-
     # Request Contracts
     "ServerRegistrationRequestContract",
     "ServerConnectionRequestContract",
     "AggregatedSearchRequestContract",
     "ToolExecutionRequestContract",
-
     # Response Contracts
     "ServerRecordContract",
     "AggregatedToolContract",
@@ -56,10 +50,8 @@ __all__ = [
     "AggregatorStateContract",
     "ToolExecutionResponseContract",
     "ServerHealthContract",
-
     # Factory
     "AggregatorTestDataFactory",
-
     # Builders
     "ServerRegistrationBuilder",
     "AggregatedToolBuilder",

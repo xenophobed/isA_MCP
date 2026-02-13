@@ -25,6 +25,7 @@ from tools.base_tool import BaseTool
 try:
     from notion_client import AsyncClient
     from notion_client.errors import APIResponseError
+
     NOTION_CLIENT_AVAILABLE = True
 except ImportError:
     NOTION_CLIENT_AVAILABLE = False
@@ -131,11 +132,15 @@ def blocks_to_markdown(blocks: List[Dict], indent: int = 0) -> str:
             lines.append(f"{prefix}### {text}")
 
         elif block_type == "bulleted_list_item":
-            text = extract_text_from_rich_text(block.get("bulleted_list_item", {}).get("rich_text", []))
+            text = extract_text_from_rich_text(
+                block.get("bulleted_list_item", {}).get("rich_text", [])
+            )
             lines.append(f"{prefix}- {text}")
 
         elif block_type == "numbered_list_item":
-            text = extract_text_from_rich_text(block.get("numbered_list_item", {}).get("rich_text", []))
+            text = extract_text_from_rich_text(
+                block.get("numbered_list_item", {}).get("rich_text", [])
+            )
             lines.append(f"{prefix}1. {text}")
 
         elif block_type == "to_do":
@@ -196,7 +201,7 @@ def parse_id(id_or_url: str) -> str:
         if "?" in last_part:
             last_part = last_part.split("?")[0]
         # Extract 32-char hex ID from end of string
-        match = re.search(r'([a-f0-9]{32})$', last_part.replace("-", ""))
+        match = re.search(r"([a-f0-9]{32})$", last_part.replace("-", ""))
         if match:
             return match.group(1)
         # Fallback: return last part without dashes
@@ -216,53 +221,81 @@ def markdown_to_blocks(markdown: str) -> List[Dict]:
             continue
 
         if line.startswith("### "):
-            blocks.append({
-                "type": "heading_3",
-                "heading_3": {"rich_text": [{"type": "text", "text": {"content": line[4:]}}]}
-            })
+            blocks.append(
+                {
+                    "type": "heading_3",
+                    "heading_3": {"rich_text": [{"type": "text", "text": {"content": line[4:]}}]},
+                }
+            )
         elif line.startswith("## "):
-            blocks.append({
-                "type": "heading_2",
-                "heading_2": {"rich_text": [{"type": "text", "text": {"content": line[3:]}}]}
-            })
+            blocks.append(
+                {
+                    "type": "heading_2",
+                    "heading_2": {"rich_text": [{"type": "text", "text": {"content": line[3:]}}]},
+                }
+            )
         elif line.startswith("# "):
-            blocks.append({
-                "type": "heading_1",
-                "heading_1": {"rich_text": [{"type": "text", "text": {"content": line[2:]}}]}
-            })
+            blocks.append(
+                {
+                    "type": "heading_1",
+                    "heading_1": {"rich_text": [{"type": "text", "text": {"content": line[2:]}}]},
+                }
+            )
         elif line.startswith("- [ ] "):
-            blocks.append({
-                "type": "to_do",
-                "to_do": {"rich_text": [{"type": "text", "text": {"content": line[6:]}}], "checked": False}
-            })
+            blocks.append(
+                {
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"type": "text", "text": {"content": line[6:]}}],
+                        "checked": False,
+                    },
+                }
+            )
         elif line.startswith("- [x] "):
-            blocks.append({
-                "type": "to_do",
-                "to_do": {"rich_text": [{"type": "text", "text": {"content": line[6:]}}], "checked": True}
-            })
+            blocks.append(
+                {
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"type": "text", "text": {"content": line[6:]}}],
+                        "checked": True,
+                    },
+                }
+            )
         elif line.startswith("- "):
-            blocks.append({
-                "type": "bulleted_list_item",
-                "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": line[2:]}}]}
-            })
+            blocks.append(
+                {
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {
+                        "rich_text": [{"type": "text", "text": {"content": line[2:]}}]
+                    },
+                }
+            )
         elif line.startswith("> "):
-            blocks.append({
-                "type": "quote",
-                "quote": {"rich_text": [{"type": "text", "text": {"content": line[2:]}}]}
-            })
+            blocks.append(
+                {
+                    "type": "quote",
+                    "quote": {"rich_text": [{"type": "text", "text": {"content": line[2:]}}]},
+                }
+            )
         elif line.startswith("---"):
             blocks.append({"type": "divider", "divider": {}})
         elif line.startswith("1. ") or (len(line) > 2 and line[0].isdigit() and line[1:3] == ". "):
             text = line.split(". ", 1)[1] if ". " in line else line
-            blocks.append({
-                "type": "numbered_list_item",
-                "numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": text}}]}
-            })
+            blocks.append(
+                {
+                    "type": "numbered_list_item",
+                    "numbered_list_item": {
+                        "rich_text": [{"type": "text", "text": {"content": text}}]
+                    },
+                }
+            )
         else:
-            blocks.append({
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"type": "text", "text": {"content": line}}]}
-            })
+            blocks.append(
+                {
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": line}}]},
+                }
+            )
 
     return blocks
 
@@ -271,11 +304,7 @@ def register_notion_tools(mcp: FastMCP):
     """Register Notion tools with the MCP server."""
 
     @mcp.tool()
-    async def notion_search(
-        query: str,
-        filter_type: Optional[str] = None,
-        limit: int = 10
-    ) -> dict:
+    async def notion_search(query: str, filter_type: Optional[str] = None, limit: int = 10) -> dict:
         """Search for pages and databases in Notion workspace
 
         Args:
@@ -303,27 +332,33 @@ def register_notion_tools(mcp: FastMCP):
 
                 if obj_type == "page":
                     props = extract_page_properties(item.get("properties", {}))
-                    title = props.get("title") or props.get("Name") or props.get("Title") or "Untitled"
-                    items.append({
-                        "type": "page",
-                        "id": item_id,
-                        "title": title,
-                        "url": item.get("url"),
-                        "last_edited": item.get("last_edited_time")
-                    })
+                    title = (
+                        props.get("title") or props.get("Name") or props.get("Title") or "Untitled"
+                    )
+                    items.append(
+                        {
+                            "type": "page",
+                            "id": item_id,
+                            "title": title,
+                            "url": item.get("url"),
+                            "last_edited": item.get("last_edited_time"),
+                        }
+                    )
                 elif obj_type == "database":
                     title = extract_text_from_rich_text(item.get("title", []))
-                    items.append({
-                        "type": "database",
-                        "id": item_id,
-                        "title": title or "Untitled Database",
-                        "url": item.get("url")
-                    })
+                    items.append(
+                        {
+                            "type": "database",
+                            "id": item_id,
+                            "title": title or "Untitled Database",
+                            "url": item.get("url"),
+                        }
+                    )
 
             return tools.create_response(
                 status="success",
                 action="notion_search",
-                data={"query": query, "results": items, "count": len(items)}
+                data={"query": query, "results": items, "count": len(items)},
             )
 
         except APIResponseError as e:
@@ -332,15 +367,14 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_search",
                 data={"query": query},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None if hasattr(e, 'code') else None
+                error_code=(
+                    str(e.code) if hasattr(e, "code") else None if hasattr(e, "code") else None
+                ),
             )
         except Exception as e:
             logger.error(f"Error in notion_search: {e}")
             return tools.create_response(
-                status="error",
-                action="notion_search",
-                data={"query": query},
-                error_message=str(e)
+                status="error", action="notion_search", data={"query": query}, error_message=str(e)
             )
 
     @mcp.tool()
@@ -369,8 +403,8 @@ def register_notion_tools(mcp: FastMCP):
                     "created_time": page.get("created_time"),
                     "last_edited_time": page.get("last_edited_time"),
                     "archived": page.get("archived"),
-                    "properties": props
-                }
+                    "properties": props,
+                },
             )
 
         except APIResponseError as e:
@@ -379,7 +413,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_get_page",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_get_page: {e}")
@@ -387,7 +421,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_get_page",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -424,8 +458,8 @@ def register_notion_tools(mcp: FastMCP):
                     "title": title,
                     "url": page.get("url"),
                     "content_markdown": markdown,
-                    "block_count": len(blocks)
-                }
+                    "block_count": len(blocks),
+                },
             )
 
         except APIResponseError as e:
@@ -434,7 +468,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_get_page_content",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_get_page_content: {e}")
@@ -442,7 +476,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_get_page_content",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -474,7 +508,8 @@ def register_notion_tools(mcp: FastMCP):
                     ]
                 elif prop_type == "multi_select":
                     schema[prop_name]["options"] = [
-                        opt.get("name") for opt in prop_def.get("multi_select", {}).get("options", [])
+                        opt.get("name")
+                        for opt in prop_def.get("multi_select", {}).get("options", [])
                     ]
                 elif prop_type == "status":
                     schema[prop_name]["options"] = [
@@ -488,8 +523,8 @@ def register_notion_tools(mcp: FastMCP):
                     "id": db.get("id"),
                     "title": title or "Untitled Database",
                     "url": db.get("url"),
-                    "schema": schema
-                }
+                    "schema": schema,
+                },
             )
 
         except APIResponseError as e:
@@ -498,7 +533,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_get_database",
                 data={"database_id": database_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_get_database: {e}")
@@ -506,7 +541,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_get_database",
                 data={"database_id": database_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -514,7 +549,7 @@ def register_notion_tools(mcp: FastMCP):
         database_id: str,
         filter_obj: Optional[dict] = None,
         sorts: Optional[list] = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> dict:
         """Query a database with optional filters and sorts
 
@@ -543,11 +578,7 @@ def register_notion_tools(mcp: FastMCP):
             items = []
             for page in results.get("results", []):
                 props = extract_page_properties(page.get("properties", {}))
-                items.append({
-                    "id": page.get("id"),
-                    "url": page.get("url"),
-                    "properties": props
-                })
+                items.append({"id": page.get("id"), "url": page.get("url"), "properties": props})
 
             return tools.create_response(
                 status="success",
@@ -556,8 +587,8 @@ def register_notion_tools(mcp: FastMCP):
                     "database_id": db_id,
                     "results": items,
                     "count": len(items),
-                    "has_more": results.get("has_more", False)
-                }
+                    "has_more": results.get("has_more", False),
+                },
             )
 
         except APIResponseError as e:
@@ -566,7 +597,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_query_database",
                 data={"database_id": database_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_query_database: {e}")
@@ -574,7 +605,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_query_database",
                 data={"database_id": database_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -583,7 +614,7 @@ def register_notion_tools(mcp: FastMCP):
         title: str,
         parent_type: str = "database",
         properties: Optional[dict] = None,
-        content: Optional[str] = None
+        content: Optional[str] = None,
     ) -> dict:
         """Create a new page in a database or as child of another page
 
@@ -616,9 +647,7 @@ def register_notion_tools(mcp: FastMCP):
                 if isinstance(prop_value, dict):
                     notion_props[prop_name] = prop_value
                 elif isinstance(prop_value, str):
-                    notion_props[prop_name] = {
-                        "rich_text": [{"text": {"content": prop_value}}]
-                    }
+                    notion_props[prop_name] = {"rich_text": [{"text": {"content": prop_value}}]}
 
             if "Name" in properties and isinstance(properties["Name"], str):
                 notion_props["Name"] = {"title": [{"text": {"content": properties["Name"]}}]}
@@ -633,11 +662,7 @@ def register_notion_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="notion_create_page",
-                data={
-                    "created": True,
-                    "id": page.get("id"),
-                    "url": page.get("url")
-                }
+                data={"created": True, "id": page.get("id"), "url": page.get("url")},
             )
 
         except APIResponseError as e:
@@ -646,7 +671,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_create_page",
                 data={"parent_id": parent_id, "title": title},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_create_page: {e}")
@@ -654,14 +679,12 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_create_page",
                 data={"parent_id": parent_id, "title": title},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
     async def notion_update_page(
-        page_id: str,
-        properties: Optional[dict] = None,
-        archived: Optional[bool] = None
+        page_id: str, properties: Optional[dict] = None, archived: Optional[bool] = None
     ) -> dict:
         """Update page properties
 
@@ -685,9 +708,7 @@ def register_notion_tools(mcp: FastMCP):
                     if isinstance(prop_value, dict):
                         notion_props[prop_name] = prop_value
                     elif isinstance(prop_value, str):
-                        notion_props[prop_name] = {
-                            "rich_text": [{"text": {"content": prop_value}}]
-                        }
+                        notion_props[prop_name] = {"rich_text": [{"text": {"content": prop_value}}]}
                 update_params["properties"] = notion_props
 
             if archived is not None:
@@ -702,8 +723,8 @@ def register_notion_tools(mcp: FastMCP):
                     "updated": True,
                     "id": page.get("id"),
                     "url": page.get("url"),
-                    "archived": page.get("archived")
-                }
+                    "archived": page.get("archived"),
+                },
             )
 
         except APIResponseError as e:
@@ -712,7 +733,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_update_page",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_update_page: {e}")
@@ -720,7 +741,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_update_page",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -744,11 +765,7 @@ def register_notion_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="notion_append_blocks",
-                data={
-                    "appended": True,
-                    "page_id": page_id,
-                    "blocks_added": len(blocks)
-                }
+                data={"appended": True, "page_id": page_id, "blocks_added": len(blocks)},
             )
 
         except APIResponseError as e:
@@ -757,7 +774,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_append_blocks",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_append_blocks: {e}")
@@ -765,7 +782,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_append_blocks",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -805,8 +822,8 @@ def register_notion_tools(mcp: FastMCP):
                     "replaced": True,
                     "page_id": page_id,
                     "blocks_deleted": deleted_count,
-                    "blocks_added": len(blocks)
-                }
+                    "blocks_added": len(blocks),
+                },
             )
 
         except APIResponseError as e:
@@ -815,7 +832,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_replace_content",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_replace_content: {e}")
@@ -823,7 +840,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_replace_content",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -836,7 +853,7 @@ def register_notion_tools(mcp: FastMCP):
         name: Optional[str] = None,
         description: Optional[str] = None,
         latest_status: Optional[str] = None,
-        content: Optional[str] = None
+        content: Optional[str] = None,
     ) -> dict:
         """Update a Product Backlog item with common fields (Status, Priority, Type, etc.)
 
@@ -901,9 +918,7 @@ def register_notion_tools(mcp: FastMCP):
                 result["blocks_added"] = len(blocks)
 
             return tools.create_response(
-                status="success",
-                action="notion_update_backlog_item",
-                data=result
+                status="success", action="notion_update_backlog_item", data=result
             )
 
         except APIResponseError as e:
@@ -912,7 +927,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_update_backlog_item",
                 data={"page_id": page_id},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_update_backlog_item: {e}")
@@ -920,7 +935,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_update_backlog_item",
                 data={"page_id": page_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -948,16 +963,18 @@ def register_notion_tools(mcp: FastMCP):
                 if len(databases) >= limit:
                     break
                 title = extract_text_from_rich_text(db.get("title", []))
-                databases.append({
-                    "id": db.get("id"),
-                    "title": title or "Untitled Database",
-                    "url": db.get("url")
-                })
+                databases.append(
+                    {
+                        "id": db.get("id"),
+                        "title": title or "Untitled Database",
+                        "url": db.get("url"),
+                    }
+                )
 
             return tools.create_response(
                 status="success",
                 action="notion_list_databases",
-                data={"databases": databases, "count": len(databases)}
+                data={"databases": databases, "count": len(databases)},
             )
 
         except APIResponseError as e:
@@ -966,23 +983,16 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_list_databases",
                 data={},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_list_databases: {e}")
             return tools.create_response(
-                status="error",
-                action="notion_list_databases",
-                data={},
-                error_message=str(e)
+                status="error", action="notion_list_databases", data={}, error_message=str(e)
             )
 
     @mcp.tool()
-    async def notion_create_database(
-        parent_page_id: str,
-        title: str,
-        properties: dict
-    ) -> dict:
+    async def notion_create_database(parent_page_id: str, title: str, properties: dict) -> dict:
         """Create a new database as a child of a page
 
         Args:
@@ -998,9 +1008,7 @@ def register_notion_tools(mcp: FastMCP):
             parent_page_id = parse_id(parent_page_id)
 
             # Build Notion properties schema
-            notion_properties = {
-                "Name": {"title": {}}  # Title property is required
-            }
+            notion_properties = {"Name": {"title": {}}}  # Title property is required
 
             for prop_name, prop_def in properties.items():
                 if prop_name == "Name":
@@ -1034,7 +1042,9 @@ def register_notion_tools(mcp: FastMCP):
                 elif prop_type == "checkbox":
                     notion_properties[prop_name] = {"checkbox": {}}
                 elif prop_type == "number":
-                    notion_properties[prop_name] = {"number": {"format": prop_def.get("format", "number")}}
+                    notion_properties[prop_name] = {
+                        "number": {"format": prop_def.get("format", "number")}
+                    }
                 elif prop_type == "url":
                     notion_properties[prop_name] = {"url": {}}
                 elif prop_type == "email":
@@ -1043,7 +1053,7 @@ def register_notion_tools(mcp: FastMCP):
                     notion_properties[prop_name] = {
                         "relation": {
                             "database_id": prop_def.get("database_id", ""),
-                            "single_property": {}
+                            "single_property": {},
                         }
                     }
                 else:  # Default to rich_text
@@ -1052,7 +1062,7 @@ def register_notion_tools(mcp: FastMCP):
             db = await client.databases.create(
                 parent={"page_id": parent_page_id},
                 title=[{"type": "text", "text": {"content": title}}],
-                properties=notion_properties
+                properties=notion_properties,
             )
 
             return tools.create_response(
@@ -1063,8 +1073,8 @@ def register_notion_tools(mcp: FastMCP):
                     "id": db.get("id"),
                     "title": title,
                     "url": db.get("url"),
-                    "properties": list(notion_properties.keys())
-                }
+                    "properties": list(notion_properties.keys()),
+                },
             )
 
         except APIResponseError as e:
@@ -1073,7 +1083,7 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_create_database",
                 data={"parent_page_id": parent_page_id, "title": title},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_create_database: {e}")
@@ -1081,7 +1091,7 @@ def register_notion_tools(mcp: FastMCP):
                 status="error",
                 action="notion_create_database",
                 data={"parent_page_id": parent_page_id, "title": title},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -1097,17 +1107,23 @@ def register_notion_tools(mcp: FastMCP):
 
             users = []
             for user in results.get("results", []):
-                users.append({
-                    "id": user.get("id"),
-                    "name": user.get("name"),
-                    "type": user.get("type"),
-                    "email": user.get("person", {}).get("email") if user.get("type") == "person" else None
-                })
+                users.append(
+                    {
+                        "id": user.get("id"),
+                        "name": user.get("name"),
+                        "type": user.get("type"),
+                        "email": (
+                            user.get("person", {}).get("email")
+                            if user.get("type") == "person"
+                            else None
+                        ),
+                    }
+                )
 
             return tools.create_response(
                 status="success",
                 action="notion_list_users",
-                data={"users": users, "count": len(users)}
+                data={"users": users, "count": len(users)},
             )
 
         except APIResponseError as e:
@@ -1116,15 +1132,12 @@ def register_notion_tools(mcp: FastMCP):
                 action="notion_list_users",
                 data={},
                 error_message=str(e),
-                error_code=str(e.code) if hasattr(e, 'code') else None
+                error_code=str(e.code) if hasattr(e, "code") else None,
             )
         except Exception as e:
             logger.error(f"Error in notion_list_users: {e}")
             return tools.create_response(
-                status="error",
-                action="notion_list_users",
-                data={},
-                error_message=str(e)
+                status="error", action="notion_list_users", data={}, error_message=str(e)
             )
 
     logger.debug("Registered 13 Notion tools")

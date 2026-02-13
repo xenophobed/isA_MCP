@@ -4,9 +4,10 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of config component interactions.
 If these tests fail, it means config integration has changed.
 """
+
 import pytest
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 @pytest.mark.golden
@@ -38,24 +39,24 @@ class TestMCPConfigComponentGolden:
         from core.config.mcp_config import MCPConfig
 
         test_env = {
-            'HOST': '192.168.1.1',
-            'MCP_PORT': '9999',
-            'QDRANT_GRPC_HOST': 'qdrant.test.com',
-            'QDRANT_GRPC_PORT': '6334',
-            'REDIS_GRPC_HOST': 'redis.test.com'
+            "HOST": "192.168.1.1",
+            "MCP_PORT": "9999",
+            "QDRANT_HOST": "qdrant.test.com",
+            "QDRANT_PORT": "6334",
+            "REDIS_HOST": "redis.test.com",
         }
 
         with patch.dict(os.environ, test_env, clear=True):
             config = MCPConfig.from_env()
 
         # Main config should be set
-        assert config.host == '192.168.1.1'
+        assert config.host == "192.168.1.1"
         assert config.port == 9999
 
         # Sub-config should also be loaded from env
-        assert config.infrastructure.qdrant_grpc_host == 'qdrant.test.com'
+        assert config.infrastructure.qdrant_grpc_host == "qdrant.test.com"
         assert config.infrastructure.qdrant_grpc_port == 6334
-        assert config.infrastructure.redis_grpc_host == 'redis.test.com'
+        assert config.infrastructure.redis_grpc_host == "redis.test.com"
 
     def test_mcp_config_sub_configs_have_defaults(self):
         """MCPConfig sub-configs have sensible defaults when env not set."""
@@ -65,10 +66,10 @@ class TestMCPConfigComponentGolden:
             config = MCPConfig.from_env()
 
         # Infrastructure defaults
-        assert config.infrastructure.minio_grpc_host == 'localhost'
-        assert config.infrastructure.qdrant_grpc_host == 'localhost'
-        assert config.infrastructure.redis_grpc_host == 'localhost'
-        assert config.infrastructure.postgres_grpc_host == 'localhost'
+        assert config.infrastructure.minio_grpc_host == "localhost"
+        assert config.infrastructure.qdrant_grpc_host == "localhost"
+        assert config.infrastructure.redis_grpc_host == "localhost"
+        assert config.infrastructure.postgres_grpc_host == "localhost"
 
 
 @pytest.mark.golden
@@ -82,22 +83,24 @@ class TestInfraConfigComponentGolden:
 
         config = InfraConfig()
 
-        # All services should have host and port
+        # All network services should have host and port
         services = [
-            ('minio', config.minio_grpc_host, config.minio_grpc_port),
-            ('qdrant', config.qdrant_grpc_host, config.qdrant_grpc_port),
-            ('redis', config.redis_grpc_host, config.redis_grpc_port),
-            ('postgres', config.postgres_grpc_host, config.postgres_grpc_port),
-            ('neo4j', config.neo4j_grpc_host, config.neo4j_grpc_port),
-            ('duckdb', config.duckdb_grpc_host, config.duckdb_grpc_port),
-            ('nats', config.nats_grpc_host, config.nats_grpc_port),
-            ('mqtt', config.mqtt_grpc_host, config.mqtt_grpc_port),
+            ("minio", config.minio_host, config.minio_port),
+            ("qdrant", config.qdrant_host, config.qdrant_port),
+            ("redis", config.redis_host, config.redis_port),
+            ("postgres", config.postgres_host, config.postgres_port),
+            ("neo4j", config.neo4j_host, config.neo4j_port),
+            ("nats", config.nats_host, config.nats_port),
+            ("mqtt", config.mqtt_host, config.mqtt_port),
         ]
 
         for name, host, port in services:
             assert host is not None, f"{name} host should not be None"
             assert isinstance(port, int), f"{name} port should be int"
             assert port > 0, f"{name} port should be positive"
+
+        # DuckDB is embedded (no network endpoint)
+        assert config.duckdb_path is not None
 
     def test_infra_config_minio_credentials(self):
         """InfraConfig provides MinIO credentials."""
@@ -113,14 +116,15 @@ class TestInfraConfigComponentGolden:
         """InfraConfig supports optional URL overrides."""
         from core.config.infra_config import InfraConfig
 
-        with patch.dict(os.environ, {
-            'QDRANT_URL': 'http://qdrant.cloud:6334',
-            'NATS_URL': 'nats://nats.cloud:4222'
-        }, clear=True):
+        with patch.dict(
+            os.environ,
+            {"QDRANT_URL": "http://qdrant.cloud:6334", "NATS_URL": "nats://nats.cloud:4222"},
+            clear=True,
+        ):
             config = InfraConfig.from_env()
 
-        assert config.qdrant_url == 'http://qdrant.cloud:6334'
-        assert config.nats_url == 'nats://nats.cloud:4222'
+        assert config.qdrant_url == "http://qdrant.cloud:6334"
+        assert config.nats_url == "nats://nats.cloud:4222"
 
 
 @pytest.mark.golden
@@ -164,7 +168,7 @@ class TestConfigValidationGolden:
         """Invalid port value falls back to default."""
         from core.config.mcp_config import MCPConfig
 
-        with patch.dict(os.environ, {'MCP_PORT': 'invalid'}, clear=True):
+        with patch.dict(os.environ, {"MCP_PORT": "invalid"}, clear=True):
             config = MCPConfig.from_env()
 
         assert config.port == 8081  # Default value
@@ -173,7 +177,7 @@ class TestConfigValidationGolden:
         """Empty string for boolean fields is False."""
         from core.config.mcp_config import MCPConfig
 
-        with patch.dict(os.environ, {'DEBUG': ''}, clear=True):
+        with patch.dict(os.environ, {"DEBUG": ""}, clear=True):
             config = MCPConfig.from_env()
 
         assert config.debug is False

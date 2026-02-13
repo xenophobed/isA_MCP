@@ -8,6 +8,7 @@ Commands:
     isa_mcp marketplace update <name>     Update a package
     isa_mcp marketplace uninstall <name>  Uninstall a package
 """
+
 import asyncio
 import json
 import sys
@@ -30,6 +31,7 @@ def get_marketplace_service():
     """Get MarketplaceService instance."""
     try:
         from services.marketplace_service.marketplace_service import MarketplaceService
+
         return MarketplaceService()
     except ImportError as e:
         click.echo(click.style(f"Error: Could not import MarketplaceService: {e}", fg="red"))
@@ -66,6 +68,7 @@ def do_sync_all(verbose: bool = False):
 # Marketplace Command Group
 # =========================================================================
 
+
 @click.group()
 def marketplace():
     """Browse and install MCP packages from the marketplace."""
@@ -74,9 +77,13 @@ def marketplace():
 
 @marketplace.command("search")
 @click.argument("query")
-@click.option("--source", "-s",
-              type=click.Choice(["all", "npm", "isa-cloud"], case_sensitive=False),
-              default="all", help="Search source")
+@click.option(
+    "--source",
+    "-s",
+    type=click.Choice(["all", "npm", "isa-cloud"], case_sensitive=False),
+    default="all",
+    help="Search source",
+)
 @click.option("--limit", "-n", default=20, help="Maximum results")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def marketplace_search(query: str, source: str, limit: int, as_json: bool):
@@ -96,9 +103,7 @@ def marketplace_search(query: str, source: str, limit: int, as_json: bool):
     async def do_search():
         service = get_marketplace_service()
         return await service.search_packages(
-            query=query,
-            source=None if source == "all" else source,
-            limit=limit
+            query=query, source=None if source == "all" else source, limit=limit
         )
 
     try:
@@ -125,9 +130,13 @@ def marketplace_search(query: str, source: str, limit: int, as_json: bool):
 
             source_color = "blue" if source_str == "npm" else "magenta"
 
-            click.echo(f"  {click.style(name, fg='green', bold=True)} {click.style(f'v{version}', fg='white')}")
+            click.echo(
+                f"  {click.style(name, fg='green', bold=True)} {click.style(f'v{version}', fg='white')}"
+            )
             click.echo(f"    {desc[:70]}{'...' if len(desc) > 70 else ''}")
-            click.echo(f"    Source: {click.style(source_str, fg=source_color)} | Downloads: {downloads:,}")
+            click.echo(
+                f"    Source: {click.style(source_str, fg=source_color)} | Downloads: {downloads:,}"
+            )
             click.echo(f"    Install: isa_mcp marketplace install {name}")
             click.echo()
 
@@ -139,13 +148,14 @@ def marketplace_search(query: str, source: str, limit: int, as_json: bool):
 @marketplace.command("install")
 @click.argument("name")
 @click.option("--version", "-v", default=None, help="Specific version")
-@click.option("--auto-configure/--no-auto-configure", default=True,
-              help="Auto-configure as MCP server")
-@click.option("--classify/--no-classify", default=True,
-              help="Auto-classify tools into skills")
+@click.option(
+    "--auto-configure/--no-auto-configure", default=True, help="Auto-configure as MCP server"
+)
+@click.option("--classify/--no-classify", default=True, help="Auto-classify tools into skills")
 @click.option("--sync/--no-sync", default=True, help="Auto-sync after install (default: sync)")
-def marketplace_install(name: str, version: Optional[str], auto_configure: bool,
-                        classify: bool, sync: bool):
+def marketplace_install(
+    name: str, version: Optional[str], auto_configure: bool, classify: bool, sync: bool
+):
     """
     Install an MCP package from the marketplace.
 
@@ -163,10 +173,7 @@ def marketplace_install(name: str, version: Optional[str], auto_configure: bool,
     async def do_install():
         service = get_marketplace_service()
         return await service.install_package(
-            name=name,
-            version=version,
-            auto_configure=auto_configure,
-            auto_classify=classify
+            name=name, version=version, auto_configure=auto_configure, auto_classify=classify
         )
 
     try:
@@ -213,6 +220,7 @@ def marketplace_list(as_json: bool):
     Example:
       isa_mcp marketplace list
     """
+
     async def do_list():
         service = get_marketplace_service()
         return await service.list_installed_packages()
@@ -326,6 +334,7 @@ def marketplace_info(name: str):
     Example:
       isa_mcp marketplace info @modelcontextprotocol/server-filesystem
     """
+
     async def do_info():
         service = get_marketplace_service()
         return await service.get_package_info(name)

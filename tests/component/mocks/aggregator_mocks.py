@@ -3,23 +3,14 @@ Mock implementations for Aggregator Service testing.
 
 Provides mock sessions, registries, and external server behavior for component tests.
 """
-from typing import Any, Dict, List, Optional, Callable
+
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
 import uuid
 import asyncio
 
 from tests.contracts.aggregator.data_contract import (
-    ServerTransportType,
     ServerStatus,
-    RoutingStrategy,
-    ServerRecordContract,
-    AggregatedToolContract,
-    SourceServerContract,
-    ToolExecutionResponseContract,
-    ServerHealthContract,
-    AggregatorStateContract,
-    RoutingContextContract,
 )
 
 
@@ -42,11 +33,9 @@ class MockMCPSession:
 
     def _record_call(self, method: str, **kwargs):
         """Record a method call."""
-        self._calls.append({
-            "method": method,
-            "args": kwargs,
-            "timestamp": datetime.now(timezone.utc)
-        })
+        self._calls.append(
+            {"method": method, "args": kwargs, "timestamp": datetime.now(timezone.utc)}
+        )
 
     def get_calls(self, method: str = None) -> List[Dict[str, Any]]:
         """Get recorded calls, optionally filtered by method."""
@@ -97,7 +86,7 @@ class MockMCPSession:
         return {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": f"mock-server-{self.server_id[:8]}", "version": "1.0.0"}
+            "serverInfo": {"name": f"mock-server-{self.server_id[:8]}", "version": "1.0.0"},
         }
 
     async def list_tools(self) -> Dict[str, Any]:
@@ -123,10 +112,7 @@ class MockMCPSession:
             return response
 
         # Default mock response
-        return {
-            "content": [{"type": "text", "text": f"Mock result for {name}"}],
-            "isError": False
-        }
+        return {"content": [{"type": "text", "text": f"Mock result for {name}"}], "isError": False}
 
     @property
     def is_connected(self) -> bool:
@@ -241,13 +227,12 @@ class MockServerRegistry:
         return results
 
     async def update_status(
-        self,
-        server_id: str,
-        status: ServerStatus,
-        error_message: Optional[str] = None
+        self, server_id: str, status: ServerStatus, error_message: Optional[str] = None
     ) -> bool:
         """Update server connection status."""
-        self._record_call("update_status", server_id=server_id, status=status, error_message=error_message)
+        self._record_call(
+            "update_status", server_id=server_id, status=status, error_message=error_message
+        )
 
         if server_id not in self.servers:
             return False
@@ -298,11 +283,13 @@ class MockExternalServer:
 
     def add_tool(self, name: str, description: str, input_schema: Dict = None):
         """Add a tool to the server."""
-        self.tools.append({
-            "name": name,
-            "description": description,
-            "inputSchema": input_schema or {"type": "object", "properties": {}}
-        })
+        self.tools.append(
+            {
+                "name": name,
+                "description": description,
+                "inputSchema": input_schema or {"type": "object", "properties": {}},
+            }
+        )
 
     def set_healthy(self, is_healthy: bool):
         """Set server health status."""
@@ -336,14 +323,11 @@ class MockExternalServer:
             await asyncio.sleep(self._tool_execution_delay)
 
         if self._should_fail_execution.get(name, False):
-            return {
-                "content": [{"type": "text", "text": f"Tool {name} failed"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": f"Tool {name} failed"}], "isError": True}
 
         return {
             "content": [{"type": "text", "text": f"Executed {name} with {arguments}"}],
-            "isError": False
+            "isError": False,
         }
 
     def create_session(self) -> MockMCPSession:
@@ -382,19 +366,30 @@ class MockSkillClassifier:
         """Set the default skill for unclassified tools."""
         self._default_skill_id = skill_id
 
+    async def classify_tools_batch(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Batch classify tools."""
+        self._record_call("classify_tools_batch", tools=tools)
+        results = []
+        for tool in tools:
+            tool_name = tool.get("tool_name", "")
+            if tool_name in self._classification_results:
+                result = self._classification_results[tool_name]
+            else:
+                result = {
+                    "tool_id": tool.get("tool_id"),
+                    "tool_name": tool_name,
+                    "assignments": [{"skill_id": self._default_skill_id, "confidence": 0.75}],
+                    "primary_skill_id": self._default_skill_id,
+                }
+            results.append(result)
+        return results
+
     async def classify_tool(
-        self,
-        tool_id: int,
-        tool_name: str,
-        tool_description: str,
-        **kwargs
+        self, tool_id: int, tool_name: str, tool_description: str, **kwargs
     ) -> Dict[str, Any]:
         """Classify a tool into skill categories."""
         self._record_call(
-            "classify_tool",
-            tool_id=tool_id,
-            tool_name=tool_name,
-            tool_description=tool_description
+            "classify_tool", tool_id=tool_id, tool_name=tool_name, tool_description=tool_description
         )
 
         if tool_name in self._classification_results:
@@ -408,11 +403,11 @@ class MockSkillClassifier:
                 {
                     "skill_id": self._default_skill_id,
                     "confidence": 0.75,
-                    "reasoning": "Mock classification"
+                    "reasoning": "Mock classification",
                 }
             ],
             "primary_skill_id": self._default_skill_id,
-            "suggested_new_skill": None
+            "suggested_new_skill": None,
         }
 
 
@@ -460,9 +455,7 @@ class MockSessionManager:
             # Update status to ERROR
             if self._server_registry:
                 await self._server_registry.update_status(
-                    server_id,
-                    ServerStatus.ERROR,
-                    "Mock connection failure"
+                    server_id, ServerStatus.ERROR, "Mock connection failure"
                 )
             raise ConnectionError(f"Mock connection failure for {server_id}")
 
@@ -512,17 +505,11 @@ class MockSessionManager:
         return all_tools
 
     async def call_tool(
-        self,
-        server_id: str,
-        tool_name: str,
-        arguments: Dict[str, Any]
+        self, server_id: str, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Call a tool on an external server."""
         self._record_call(
-            "call_tool",
-            server_id=server_id,
-            tool_name=tool_name,
-            arguments=arguments
+            "call_tool", server_id=server_id, tool_name=tool_name, arguments=arguments
         )
 
         session = self._sessions.get(server_id)
@@ -574,6 +561,27 @@ class MockToolRepository:
         self._calls = []
         self._next_id = 1
 
+    async def create_external_tool(
+        self,
+        name: str,
+        description: str,
+        input_schema: Dict,
+        source_server_id: str,
+        original_name: str,
+        is_external: bool = True,
+        org_id: str = None,
+        is_global: bool = True,
+    ) -> int:
+        """Create an external tool record (delegates to create_tool)."""
+        return await self.create_tool(
+            name=name,
+            description=description,
+            input_schema=input_schema,
+            source_server_id=source_server_id,
+            original_name=original_name,
+            is_external=is_external,
+        )
+
     async def create_tool(
         self,
         name: str,
@@ -581,7 +589,7 @@ class MockToolRepository:
         input_schema: Dict,
         source_server_id: str,
         original_name: str,
-        is_external: bool = True
+        is_external: bool = True,
     ) -> int:
         """Create a tool record."""
         self._record_call(
@@ -589,7 +597,7 @@ class MockToolRepository:
             name=name,
             description=description,
             source_server_id=source_server_id,
-            original_name=original_name
+            original_name=original_name,
         )
 
         tool_id = self._next_id
@@ -616,9 +624,7 @@ class MockToolRepository:
         return self.tools.get(tool_id)
 
     async def get_tool_by_name(
-        self,
-        name: str,
-        source_server_id: str = None
+        self, name: str, source_server_id: str = None
     ) -> Optional[Dict[str, Any]]:
         """Get a tool by name and optionally server."""
         self._record_call("get_tool_by_name", name=name, source_server_id=source_server_id)
@@ -633,11 +639,7 @@ class MockToolRepository:
         """Get all tool IDs for a server."""
         self._record_call("get_tool_ids_by_server", server_id=server_id)
 
-        return [
-            tool["id"]
-            for tool in self.tools.values()
-            if tool["source_server_id"] == server_id
-        ]
+        return [tool["id"] for tool in self.tools.values() if tool["source_server_id"] == server_id]
 
     async def update_tool(self, tool_id: int, **updates) -> Optional[Dict[str, Any]]:
         """Update a tool."""
@@ -658,9 +660,7 @@ class MockToolRepository:
         self._record_call("delete_tools_by_server", server_id=server_id)
 
         to_delete = [
-            tool_id
-            for tool_id, tool in self.tools.items()
-            if tool["source_server_id"] == server_id
+            tool_id for tool_id, tool in self.tools.items() if tool["source_server_id"] == server_id
         ]
 
         for tool_id in to_delete:
@@ -669,9 +669,7 @@ class MockToolRepository:
         return len(to_delete)
 
     async def list_tools(
-        self,
-        server_id: str = None,
-        is_classified: bool = None
+        self, server_id: str = None, is_classified: bool = None
     ) -> List[Dict[str, Any]]:
         """List tools with optional filters."""
         self._record_call("list_tools", server_id=server_id, is_classified=is_classified)
@@ -719,15 +717,10 @@ class MockVectorRepository:
         name: str,
         description: str,
         embedding: List[float],
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ) -> bool:
         """Upsert a tool vector."""
-        self._record_call(
-            "upsert_tool",
-            tool_id=tool_id,
-            name=name,
-            metadata=metadata
-        )
+        self._record_call("upsert_tool", tool_id=tool_id, name=name, metadata=metadata)
 
         self.vectors[str(tool_id)] = {
             "id": str(tool_id),
@@ -750,17 +743,14 @@ class MockVectorRepository:
         return False
 
     async def update_tool_skills(
-        self,
-        tool_id: int,
-        skill_ids: List[str],
-        primary_skill_id: str
+        self, tool_id: int, skill_ids: List[str], primary_skill_id: str
     ) -> bool:
         """Update skill assignments for a tool vector."""
         self._record_call(
             "update_tool_skills",
             tool_id=tool_id,
             skill_ids=skill_ids,
-            primary_skill_id=primary_skill_id
+            primary_skill_id=primary_skill_id,
         )
 
         key = str(tool_id)
@@ -772,10 +762,7 @@ class MockVectorRepository:
         return False
 
     async def search(
-        self,
-        query_vector: List[float],
-        filter_conditions: Dict = None,
-        limit: int = 10
+        self, query_vector: List[float], filter_conditions: Dict = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Search for similar tools."""
         self._record_call("search", filter_conditions=filter_conditions, limit=limit)
@@ -784,11 +771,7 @@ class MockVectorRepository:
         for vector in self.vectors.values():
             # Simple mock scoring
             score = 0.7 + (hash(vector["id"]) % 30) / 100
-            results.append({
-                "id": vector["id"],
-                "score": score,
-                "payload": vector["metadata"]
-            })
+            results.append({"id": vector["id"], "score": score, "payload": vector["metadata"]})
 
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]

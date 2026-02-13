@@ -8,29 +8,25 @@ Requirements:
     - Running MCP server
     - TEST_MCP_URL environment variable set
 """
+
 import pytest
 import httpx
 import uuid
 
 from tests.contracts.aggregator.data_contract import (
     AggregatorTestDataFactory,
-    ServerRegistrationRequestContract,
-    ServerRecordContract,
-    ServerTransportType,
-    ServerStatus,
 )
-
 
 # ============================================================================
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 async def api_client(test_config):
     """Create async HTTP client for API tests."""
     async with httpx.AsyncClient(
-        base_url=test_config.get("mcp_url", "http://localhost:8081"),
-        timeout=30.0
+        base_url=test_config.get("mcp_url", "http://localhost:8081"), timeout=30.0
     ) as client:
         yield client
 
@@ -59,6 +55,7 @@ async def created_server(api_client):
 # ============================================================================
 # POST /api/v1/aggregator/servers - Register Server
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -104,7 +101,7 @@ class TestRegisterServerAPI:
         invalid_data = {
             "name": "123-invalid",  # Starts with number
             "transport_type": "sse",
-            "connection_config": {"url": "https://example.com/sse"}
+            "connection_config": {"url": "https://example.com/sse"},
         }
         response = await api_client.post("/api/v1/aggregator/servers", json=invalid_data)
         assert response.status_code == 422
@@ -131,6 +128,7 @@ class TestRegisterServerAPI:
 # GET /api/v1/aggregator/servers - List Servers
 # ============================================================================
 
+
 @pytest.mark.api
 @pytest.mark.aggregator
 class TestListServersAPI:
@@ -147,8 +145,7 @@ class TestListServersAPI:
     async def test_list_servers_filters_by_status(self, api_client, created_server):
         """Test that servers can be filtered by status."""
         response = await api_client.get(
-            "/api/v1/aggregator/servers",
-            params={"status": "disconnected"}
+            "/api/v1/aggregator/servers", params={"status": "disconnected"}
         )
         assert response.status_code == 200
         servers = response.json()
@@ -169,6 +166,7 @@ class TestListServersAPI:
 # GET /api/v1/aggregator/servers/{id} - Get Server
 # ============================================================================
 
+
 @pytest.mark.api
 @pytest.mark.aggregator
 class TestGetServerAPI:
@@ -177,9 +175,7 @@ class TestGetServerAPI:
     @pytest.mark.asyncio
     async def test_get_server_returns_200(self, api_client, created_server):
         """Test that getting a server by ID returns 200 OK."""
-        response = await api_client.get(
-            f"/api/v1/aggregator/servers/{created_server['id']}"
-        )
+        response = await api_client.get(f"/api/v1/aggregator/servers/{created_server['id']}")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == created_server["id"]
@@ -197,6 +193,7 @@ class TestGetServerAPI:
 # DELETE /api/v1/aggregator/servers/{id} - Remove Server
 # ============================================================================
 
+
 @pytest.mark.api
 @pytest.mark.aggregator
 class TestRemoveServerAPI:
@@ -212,10 +209,7 @@ class TestRemoveServerAPI:
         ).model_dump()
         server_data["transport_type"] = server_data["transport_type"].value
 
-        create_response = await api_client.post(
-            "/api/v1/aggregator/servers",
-            json=server_data
-        )
+        create_response = await api_client.post("/api/v1/aggregator/servers", json=server_data)
         server_id = create_response.json()["id"]
 
         # Remove it
@@ -237,6 +231,7 @@ class TestRemoveServerAPI:
 # ============================================================================
 # POST /api/v1/aggregator/servers/{id}/connect - Connect Server
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -265,6 +260,7 @@ class TestConnectServerAPI:
 # POST /api/v1/aggregator/servers/{id}/disconnect - Disconnect Server
 # ============================================================================
 
+
 @pytest.mark.api
 @pytest.mark.aggregator
 class TestDisconnectServerAPI:
@@ -279,14 +275,10 @@ class TestDisconnectServerAPI:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_disconnect_already_disconnected_is_idempotent(
-        self, api_client, created_server
-    ):
+    async def test_disconnect_already_disconnected_is_idempotent(self, api_client, created_server):
         """Test that disconnecting already disconnected server succeeds."""
         # Disconnect twice
-        await api_client.post(
-            f"/api/v1/aggregator/servers/{created_server['id']}/disconnect"
-        )
+        await api_client.post(f"/api/v1/aggregator/servers/{created_server['id']}/disconnect")
         response = await api_client.post(
             f"/api/v1/aggregator/servers/{created_server['id']}/disconnect"
         )
@@ -296,6 +288,7 @@ class TestDisconnectServerAPI:
 # ============================================================================
 # GET /api/v1/aggregator/tools - List Aggregated Tools
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -313,8 +306,7 @@ class TestListToolsAPI:
     async def test_list_tools_filters_by_server(self, api_client, created_server):
         """Test that tools can be filtered by server."""
         response = await api_client.get(
-            "/api/v1/aggregator/tools",
-            params={"server_id": created_server["id"]}
+            "/api/v1/aggregator/tools", params={"server_id": created_server["id"]}
         )
         assert response.status_code == 200
 
@@ -322,6 +314,7 @@ class TestListToolsAPI:
 # ============================================================================
 # POST /api/v1/aggregator/search - Search Tools
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -332,8 +325,7 @@ class TestSearchToolsAPI:
     async def test_search_tools_returns_200(self, api_client):
         """Test that searching tools returns 200 OK."""
         response = await api_client.post(
-            "/api/v1/aggregator/search",
-            json={"query": "create issue"}
+            "/api/v1/aggregator/search", json={"query": "create issue"}
         )
         assert response.status_code == 200
         assert isinstance(response.json(), list)
@@ -343,10 +335,7 @@ class TestSearchToolsAPI:
         """Test searching with server filter."""
         response = await api_client.post(
             "/api/v1/aggregator/search",
-            json={
-                "query": "test",
-                "server_filter": [created_server["name"]]
-            }
+            json={"query": "test", "server_filter": [created_server["name"]]},
         )
         assert response.status_code == 200
 
@@ -361,6 +350,7 @@ class TestSearchToolsAPI:
 # POST /api/v1/aggregator/execute - Execute Tool
 # ============================================================================
 
+
 @pytest.mark.api
 @pytest.mark.aggregator
 class TestExecuteToolAPI:
@@ -369,10 +359,7 @@ class TestExecuteToolAPI:
     @pytest.mark.asyncio
     async def test_execute_tool_missing_name_returns_422(self, api_client):
         """Test that missing tool name returns 422."""
-        response = await api_client.post(
-            "/api/v1/aggregator/execute",
-            json={"arguments": {}}
-        )
+        response = await api_client.post("/api/v1/aggregator/execute", json={"arguments": {}})
         assert response.status_code == 422
 
     @pytest.mark.asyncio
@@ -380,10 +367,7 @@ class TestExecuteToolAPI:
         """Test that executing non-existent tool returns 404."""
         response = await api_client.post(
             "/api/v1/aggregator/execute",
-            json={
-                "tool_name": "nonexistent-server.fake_tool",
-                "arguments": {}
-            }
+            json={"tool_name": "nonexistent-server.fake_tool", "arguments": {}},
         )
         assert response.status_code in (404, 400)
 
@@ -391,6 +375,7 @@ class TestExecuteToolAPI:
 # ============================================================================
 # GET /api/v1/aggregator/health - Health Check
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -408,9 +393,7 @@ class TestHealthCheckAPI:
     @pytest.mark.asyncio
     async def test_server_health_returns_200(self, api_client, created_server):
         """Test that server-specific health check returns 200."""
-        response = await api_client.get(
-            f"/api/v1/aggregator/servers/{created_server['id']}/health"
-        )
+        response = await api_client.get(f"/api/v1/aggregator/servers/{created_server['id']}/health")
         assert response.status_code == 200
         data = response.json()
         assert "server_id" in data
@@ -419,6 +402,7 @@ class TestHealthCheckAPI:
 # ============================================================================
 # Integration Tests
 # ============================================================================
+
 
 @pytest.mark.api
 @pytest.mark.aggregator
@@ -436,10 +420,7 @@ class TestAggregatorIntegration:
         ).model_dump()
         server_data["transport_type"] = server_data["transport_type"].value
 
-        create_response = await api_client.post(
-            "/api/v1/aggregator/servers",
-            json=server_data
-        )
+        create_response = await api_client.post("/api/v1/aggregator/servers", json=server_data)
         assert create_response.status_code == 201
         server = create_response.json()
 
@@ -454,15 +435,11 @@ class TestAggregatorIntegration:
         assert disconnect_response.status_code == 200
 
         # 4. Remove
-        remove_response = await api_client.delete(
-            f"/api/v1/aggregator/servers/{server['id']}"
-        )
+        remove_response = await api_client.delete(f"/api/v1/aggregator/servers/{server['id']}")
         assert remove_response.status_code in (200, 204)
 
         # 5. Verify removed
-        get_response = await api_client.get(
-            f"/api/v1/aggregator/servers/{server['id']}"
-        )
+        get_response = await api_client.get(f"/api/v1/aggregator/servers/{server['id']}")
         assert get_response.status_code == 404
 
     @pytest.mark.asyncio

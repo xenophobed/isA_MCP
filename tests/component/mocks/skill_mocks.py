@@ -3,9 +3,10 @@ Mock implementations for Skill Service testing.
 
 Provides mock repositories and clients for component tests.
 """
+
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 class MockSkillRepository:
@@ -84,7 +85,7 @@ class MockSkillRepository:
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """List skills with optional filters."""
         self._record_call(
@@ -92,7 +93,7 @@ class MockSkillRepository:
             is_active=is_active,
             parent_domain=parent_domain,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
 
         results = []
@@ -105,12 +106,10 @@ class MockSkillRepository:
 
         # Sort by name
         results.sort(key=lambda x: x["name"])
-        return results[offset:offset + limit]
+        return results[offset : offset + limit]
 
     async def update_skill_category(
-        self,
-        skill_id: str,
-        updates: Dict[str, Any]
+        self, skill_id: str, updates: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Update a skill."""
         self._record_call("update_skill_category", skill_id=skill_id, updates=updates)
@@ -143,10 +142,7 @@ class MockSkillRepository:
         if skill_id not in self.skills:
             return False
 
-        self.skills[skill_id]["tool_count"] = max(
-            0,
-            self.skills[skill_id]["tool_count"] + delta
-        )
+        self.skills[skill_id]["tool_count"] = max(0, self.skills[skill_id]["tool_count"] + delta)
         return True
 
     # =========================================================================
@@ -159,7 +155,7 @@ class MockSkillRepository:
         skill_id: str,
         confidence: float,
         is_primary: bool = False,
-        source: str = "llm_auto"
+        source: str = "llm_auto",
     ) -> Optional[Dict[str, Any]]:
         """Create a tool-skill assignment."""
         self._record_call(
@@ -168,7 +164,7 @@ class MockSkillRepository:
             skill_id=skill_id,
             confidence=confidence,
             is_primary=is_primary,
-            source=source
+            source=source,
         )
 
         now = datetime.now(timezone.utc)
@@ -184,7 +180,8 @@ class MockSkillRepository:
 
         # Remove existing assignment for same tool+skill
         self.assignments = [
-            a for a in self.assignments
+            a
+            for a in self.assignments
             if not (a["tool_id"] == tool_id and a["skill_id"] == skill_id)
         ]
         self.assignments.append(assignment)
@@ -199,22 +196,16 @@ class MockSkillRepository:
         return results
 
     async def get_assignments_for_skill(
-        self,
-        skill_id: str,
-        limit: int = 100,
-        offset: int = 0
+        self, skill_id: str, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """Get assignments for a skill."""
         self._record_call(
-            "get_assignments_for_skill",
-            skill_id=skill_id,
-            limit=limit,
-            offset=offset
+            "get_assignments_for_skill", skill_id=skill_id, limit=limit, offset=offset
         )
 
         results = [a for a in self.assignments if a["skill_id"] == skill_id]
         results.sort(key=lambda x: x["confidence"], reverse=True)
-        return results[offset:offset + limit]
+        return results[offset : offset + limit]
 
     async def delete_assignments_for_tool(self, tool_id: int) -> bool:
         """Delete all assignments for a tool."""
@@ -243,7 +234,7 @@ class MockSkillRepository:
         suggested_description: str,
         source_tool_id: int,
         source_tool_name: str,
-        reasoning: str
+        reasoning: str,
     ) -> Optional[Dict[str, Any]]:
         """Create a skill suggestion."""
         self._record_call(
@@ -252,7 +243,7 @@ class MockSkillRepository:
             suggested_description=suggested_description,
             source_tool_id=source_tool_id,
             source_tool_name=source_tool_name,
-            reasoning=reasoning
+            reasoning=reasoning,
         )
 
         now = datetime.now(timezone.utc)
@@ -273,29 +264,18 @@ class MockSkillRepository:
         return suggestion
 
     async def list_suggestions(
-        self,
-        status: str = "pending",
-        limit: int = 100,
-        offset: int = 0
+        self, status: str = "pending", limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """List skill suggestions."""
         self._record_call("list_suggestions", status=status, limit=limit, offset=offset)
 
         results = [s for s in self.suggestions if s["status"] == status]
         results.sort(key=lambda x: x["created_at"], reverse=True)
-        return results[offset:offset + limit]
+        return results[offset : offset + limit]
 
-    async def update_suggestion_status(
-        self,
-        suggestion_id: int,
-        status: str
-    ) -> bool:
+    async def update_suggestion_status(self, suggestion_id: int, status: str) -> bool:
         """Update suggestion status."""
-        self._record_call(
-            "update_suggestion_status",
-            suggestion_id=suggestion_id,
-            status=status
-        )
+        self._record_call("update_suggestion_status", suggestion_id=suggestion_id, status=status)
 
         for s in self.suggestions:
             if s["id"] == suggestion_id:
@@ -353,7 +333,7 @@ class MockAsyncQdrantClient:
         filter_conditions: Optional[Dict] = None,
         limit: int = 10,
         with_payload: bool = True,
-        with_vectors: bool = False
+        with_vectors: bool = False,
     ) -> List[Dict[str, Any]]:
         """Search with filter."""
         self._record_call(
@@ -361,7 +341,7 @@ class MockAsyncQdrantClient:
             collection_name=collection_name,
             vector_size=len(vector) if vector else 0,
             filter_conditions=filter_conditions,
-            limit=limit
+            limit=limit,
         )
 
         if collection_name not in self.collections:
@@ -403,11 +383,7 @@ class MockAsyncQdrantClient:
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]
 
-    async def upsert(
-        self,
-        collection_name: str,
-        points: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def upsert(self, collection_name: str, points: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Upsert points."""
         self._record_call("upsert", collection_name=collection_name, point_count=len(points))
 
@@ -417,34 +393,24 @@ class MockAsyncQdrantClient:
         for point in points:
             # Remove existing point with same ID
             self.collections[collection_name] = [
-                p for p in self.collections[collection_name]
-                if p.get("id") != point.get("id")
+                p for p in self.collections[collection_name] if p.get("id") != point.get("id")
             ]
             self.collections[collection_name].append(point)
 
         return {"status": "ok"}
 
-    async def delete(
-        self,
-        collection_name: str,
-        point_ids: List[str]
-    ) -> Dict[str, Any]:
+    async def delete(self, collection_name: str, point_ids: List[str]) -> Dict[str, Any]:
         """Delete points."""
         self._record_call("delete", collection_name=collection_name, point_ids=point_ids)
 
         if collection_name in self.collections:
             self.collections[collection_name] = [
-                p for p in self.collections[collection_name]
-                if p.get("id") not in point_ids
+                p for p in self.collections[collection_name] if p.get("id") not in point_ids
             ]
 
         return {"status": "ok"}
 
-    def seed_collection(
-        self,
-        collection_name: str,
-        points: List[Dict[str, Any]]
-    ):
+    def seed_collection(self, collection_name: str, points: List[Dict[str, Any]]):
         """Seed a collection with test data."""
         self.collections[collection_name] = points
 
@@ -478,25 +444,28 @@ class MockOpenAIEmbeddings:
 @dataclass
 class MockChatMessage:
     """Mock chat message."""
+
     content: str
 
 
 @dataclass
 class MockChatChoice:
     """Mock chat choice."""
+
     message: MockChatMessage
 
 
 @dataclass
 class MockChatCompletion:
     """Mock chat completion response."""
+
     choices: List[MockChatChoice]
 
 
 class MockChatCompletions:
     """Mock for chat.completions interface."""
 
-    def __init__(self, parent: 'MockModelClient'):
+    def __init__(self, parent: "MockModelClient"):
         self._parent = parent
 
     async def create(
@@ -505,14 +474,16 @@ class MockChatCompletions:
         messages: List[Dict] = None,
         temperature: float = 0.7,
         max_tokens: int = 1000,
-        **kwargs
+        **kwargs,
     ) -> MockChatCompletion:
         """Create chat completion."""
-        self._parent._calls.append({
-            "method": "chat.completions.create",
-            "messages": messages,
-            "model": model,
-        })
+        self._parent._calls.append(
+            {
+                "method": "chat.completions.create",
+                "messages": messages,
+                "model": model,
+            }
+        )
 
         response_content = self._parent._completion_response
         if not response_content:
@@ -527,7 +498,7 @@ class MockChatCompletions:
 class MockChat:
     """Mock for chat interface."""
 
-    def __init__(self, parent: 'MockModelClient'):
+    def __init__(self, parent: "MockModelClient"):
         self.completions = MockChatCompletions(parent)
 
 

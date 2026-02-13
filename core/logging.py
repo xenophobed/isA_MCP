@@ -4,7 +4,7 @@ Centralized Logging and Monitoring System - isA MCP Core
 
 PROJECT DESCRIPTION:
     Advanced logging infrastructure providing structured, contextual, and performance-oriented logging
-    for the isA MCP system. Implements configurable log formatters, rotating file handlers, 
+    for the isA MCP system. Implements configurable log formatters, rotating file handlers,
     security event logging, and specialized loggers for different system components.
 
 INPUTS:
@@ -28,25 +28,25 @@ FUNCTIONALITY:
       * Human-readable formatting for development
       * Configurable log levels and output destinations
       * Log rotation with size and time-based policies
-    
+
     - Contextual Logging:
       * Request ID tracking across service calls
       * User ID association with all operations
       * Tool execution context and performance metrics
       * Security event correlation and audit trails
-    
+
     - Specialized Loggers:
       * Security logger for authentication/authorization events
       * Tool execution logger with performance metrics
       * Monitoring logger for system health and metrics
       * Error logger with enhanced context and debugging info
-    
+
     - Performance Monitoring:
       * Execution time tracking for all operations
       * Tool performance metrics and optimization insights
       * System resource usage monitoring
       * Response time analysis and bottleneck detection
-    
+
     - Security and Compliance:
       * Security event logging with threat detection
       * Authorization decision audit trails
@@ -81,21 +81,22 @@ LOGGER CATEGORIES:
 
 USAGE:
     from core.logging import get_logger, setup_mcp_logging
-    
+
     # Setup logging infrastructure
     setup_mcp_logging()
-    
+
     # Get specialized loggers
     logger = get_logger(__name__)
     security_logger = get_logger("mcp.security")
-    
+
     # Context-aware logging
     logger.set_context(user_id="user123", request_id="req456")
     logger.info("Processing user request")
-    
+
     # Tool execution logging
     logger.tool_execution("analyze_data", "user123", True, 1.23)
 """
+
 import logging
 import logging.handlers
 import sys
@@ -105,9 +106,10 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 
+
 class StructuredFormatter(logging.Formatter):
     """Custom formatter that outputs structured JSON logs"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -116,71 +118,73 @@ class StructuredFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
         }
-        
+
         # Add exception information if present
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
-        
+
         # Add extra fields if present
-        if hasattr(record, 'user_id'):
-            log_entry["user_id"] = getattr(record, 'user_id')
-        if hasattr(record, 'tool_name'):
-            log_entry["tool_name"] = getattr(record, 'tool_name')
-        if hasattr(record, 'request_id'):
-            log_entry["request_id"] = getattr(record, 'request_id')
-        if hasattr(record, 'execution_time'):
-            log_entry["execution_time"] = getattr(record, 'execution_time')
-            
+        if hasattr(record, "user_id"):
+            log_entry["user_id"] = getattr(record, "user_id")
+        if hasattr(record, "tool_name"):
+            log_entry["tool_name"] = getattr(record, "tool_name")
+        if hasattr(record, "request_id"):
+            log_entry["request_id"] = getattr(record, "request_id")
+        if hasattr(record, "execution_time"):
+            log_entry["execution_time"] = getattr(record, "execution_time")
+
         return json.dumps(log_entry)
+
 
 class MCPLogger:
     """Enhanced logger for MCP operations with context"""
-    
+
     def __init__(self, name: str, logger: logging.Logger):
         self.name = name
         self.logger = logger
         self.context: Dict[str, Any] = {}
-    
-    def set_context(self, **kwargs) -> 'MCPLogger':
+
+    def set_context(self, **kwargs) -> "MCPLogger":
         """Set context that will be included in all log messages"""
         self.context.update(kwargs)
         return self
-    
-    def clear_context(self) -> 'MCPLogger':
+
+    def clear_context(self) -> "MCPLogger":
         """Clear the current context"""
         self.context.clear()
         return self
-    
+
     def _log_with_context(self, level: int, message: str, **kwargs):
         """Log message with context"""
         # Merge context with kwargs
         extra = {**self.context, **kwargs}
         self.logger.log(level, message, extra=extra)
-    
+
     def debug(self, message: str, **kwargs):
         """Log debug message"""
         self._log_with_context(logging.DEBUG, message, **kwargs)
-    
+
     def info(self, message: str, **kwargs):
         """Log info message"""
         self._log_with_context(logging.INFO, message, **kwargs)
-    
+
     def warning(self, message: str, **kwargs):
         """Log warning message"""
         self._log_with_context(logging.WARNING, message, **kwargs)
-    
+
     def error(self, message: str, **kwargs):
         """Log error message"""
         self._log_with_context(logging.ERROR, message, **kwargs)
-    
+
     def critical(self, message: str, **kwargs):
         """Log critical message"""
         self._log_with_context(logging.CRITICAL, message, **kwargs)
-    
-    def tool_execution(self, tool_name: str, user_id: str, success: bool, 
-                      execution_time: float, **kwargs):
+
+    def tool_execution(
+        self, tool_name: str, user_id: str, success: bool, execution_time: float, **kwargs
+    ):
         """Log tool execution with standard fields"""
         self.info(
             f"Tool execution: {tool_name}",
@@ -188,28 +192,30 @@ class MCPLogger:
             user_id=user_id,
             success=success,
             execution_time=execution_time,
-            **kwargs
+            **kwargs,
         )
-    
+
     def security_event(self, event_type: str, user_id: str, details: Dict[str, Any]):
         """Log security events"""
         self.warning(
             f"Security event: {event_type}",
             event_type=event_type,
             user_id=user_id,
-            security_details=details
+            security_details=details,
         )
-    
-    def authorization_event(self, tool_name: str, user_id: str, status: str, 
-                           request_id: Optional[str] = None):
+
+    def authorization_event(
+        self, tool_name: str, user_id: str, status: str, request_id: Optional[str] = None
+    ):
         """Log authorization events"""
         self.info(
             f"Authorization {status}: {tool_name}",
             tool_name=tool_name,
             user_id=user_id,
             authorization_status=status,
-            request_id=request_id
+            request_id=request_id,
         )
+
 
 def setup_logging(
     log_level: str = "INFO",
@@ -222,7 +228,7 @@ def setup_logging(
     loki_port: int = 50054,
     loki_enabled: bool = False,
     service_name: str = "mcp",
-    environment: str = "development"
+    environment: str = "development",
 ) -> None:
     """
     Setup centralized logging configuration with Loki gRPC support
@@ -249,10 +255,10 @@ def setup_logging(
         file_formatter = StructuredFormatter()
     else:
         console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
         )
 
     # Configure root logger
@@ -286,7 +292,9 @@ def setup_logging(
                 and efficient batching.
                 """
 
-                def __init__(self, loki_host: str, loki_port: int, user_id: str, service_labels: dict):
+                def __init__(
+                    self, loki_host: str, loki_port: int, user_id: str, service_labels: dict
+                ):
                     super().__init__()
                     self.loki_host = loki_host
                     self.loki_port = loki_port
@@ -302,9 +310,7 @@ def setup_logging(
                         # Lazy initialization of LokiClient (only when needed)
                         if self.client is None:
                             self.client = LokiClient(
-                                host=self.loki_host,
-                                port=self.loki_port,
-                                user_id=self.user_id
+                                host=self.loki_host, port=self.loki_port, user_id=self.user_id
                             )
                             self.client.__enter__()  # Open connection
 
@@ -313,26 +319,33 @@ def setup_logging(
 
                         # Build labels with level and logger name
                         labels = self.service_labels.copy()
-                        labels['level'] = record.levelname.lower()
-                        labels['logger'] = record.name.replace(f"{self.user_id}.", "").replace(self.user_id, "main")
+                        labels["level"] = record.levelname.lower()
+                        labels["logger"] = record.name.replace(f"{self.user_id}.", "").replace(
+                            self.user_id, "main"
+                        )
 
                         # Push to Loki using simple API
-                        self.client.push_log(
-                            message=log_entry,
-                            labels=labels
-                        )
+                        self.client.push_log(message=log_entry, labels=labels)
 
                         self._success_count += 1
 
                         # Debug: log first few successful pushes (use stderr to not corrupt MCP stdio)
                         if self._success_count <= 2:
-                            print(f"[LOKI_DEBUG] Successfully pushed log to Loki: {log_entry[:80]}", file=sys.stderr, flush=True)
+                            print(
+                                f"[LOKI_DEBUG] Successfully pushed log to Loki: {log_entry[:80]}",
+                                file=sys.stderr,
+                                flush=True,
+                            )
 
                     except Exception as e:
                         # Graceful degradation - don't fail the application
                         self._error_count += 1
                         if self._error_count <= 3:
-                            print(f"[LOKI_ERROR] Failed to push log to Loki: {e}", file=sys.stderr, flush=True)
+                            print(
+                                f"[LOKI_ERROR] Failed to push log to Loki: {e}",
+                                file=sys.stderr,
+                                flush=True,
+                            )
 
                 def close(self):
                     """Clean up Loki client connection"""
@@ -348,18 +361,14 @@ def setup_logging(
             service_id = f"{service_name}_service"
 
             # Labels for Loki (used for filtering and searching)
-            service_labels = {
-                "service": service_id,
-                "environment": environment,
-                "job": service_id
-            }
+            service_labels = {"service": service_id, "environment": environment, "job": service_id}
 
             # Create Loki gRPC handler
             loki_handler = LokiGrpcHandler(
                 loki_host=loki_host,
                 loki_port=loki_port,
                 user_id=service_id,
-                service_labels=service_labels
+                service_labels=service_labels,
             )
 
             # Set formatter
@@ -432,26 +441,26 @@ def setup_logging(
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.handlers.RotatingFileHandler(
-            log_file,
-            maxBytes=max_file_size,
-            backupCount=backup_count
+            log_file, maxBytes=max_file_size, backupCount=backup_count
         )
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
 
+
 def get_logger(name: str) -> MCPLogger:
     """
     Get an enhanced MCP logger instance
-    
+
     Args:
         name: Logger name (usually __name__)
-        
+
     Returns:
         MCPLogger instance with enhanced functionality
     """
     logger = logging.getLogger(name)
     return MCPLogger(name, logger)
+
 
 # Default setup for MCP server
 def setup_mcp_logging(config=None):
@@ -461,7 +470,7 @@ def setup_mcp_logging(config=None):
     Args:
         config: Optional MCPSettings config object. If not provided, uses environment variables.
     """
-    if config and hasattr(config, 'logging'):
+    if config and hasattr(config, "logging"):
         # Use config from MCPSettings
         log_config = config.logging
         setup_logging(
@@ -473,21 +482,26 @@ def setup_mcp_logging(config=None):
             loki_port=log_config.loki_grpc_port,
             loki_enabled=log_config.loki_enabled,
             service_name=log_config.service_name,
-            environment=log_config.environment
+            environment=log_config.environment,
         )
     else:
         # Fallback to environment variables
         setup_logging(
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            log_file=os.getenv("LOG_FILE", "logs/mcp_server.log") if not os.getenv("LOKI_ENABLED", "false").lower() == "true" else None,
+            log_file=(
+                os.getenv("LOG_FILE", "logs/mcp_server.log")
+                if not os.getenv("LOKI_ENABLED", "false").lower() == "true"
+                else None
+            ),
             enable_console=True,
             enable_structured=os.getenv("ENABLE_STRUCTURED_LOGGING", "false").lower() == "true",
             loki_host=os.getenv("LOKI_GRPC_HOST", "localhost"),
             loki_port=int(os.getenv("LOKI_GRPC_PORT", "50054")),
             loki_enabled=os.getenv("LOKI_ENABLED", "false").lower() == "true",
             service_name=os.getenv("SERVICE_NAME", "mcp"),
-            environment=os.getenv("ENVIRONMENT", "development")
+            environment=os.getenv("ENVIRONMENT", "development"),
         )
+
 
 # Global logger instances
 logger = get_logger(__name__)

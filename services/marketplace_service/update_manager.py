@@ -6,7 +6,7 @@ Handles:
 - Version upgrades
 - Rollback on failure
 """
-from datetime import datetime, timezone
+
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -90,15 +90,19 @@ class UpdateManager:
             if latest_version and latest_version != current_version:
                 # Parse versions to compare
                 if self._is_newer_version(latest_version, current_version):
-                    updates.append({
-                        "package_id": package["id"],
-                        "package_name": package["name"],
-                        "display_name": package.get("display_name", package["name"]),
-                        "current_version": current_version,
-                        "latest_version": latest_version,
-                        "update_channel": inst.get("update_channel", UpdateChannel.STABLE.value),
-                        "installation_id": inst["id"],
-                    })
+                    updates.append(
+                        {
+                            "package_id": package["id"],
+                            "package_name": package["name"],
+                            "display_name": package.get("display_name", package["name"]),
+                            "current_version": current_version,
+                            "latest_version": latest_version,
+                            "update_channel": inst.get(
+                                "update_channel", UpdateChannel.STABLE.value
+                            ),
+                            "installation_id": inst["id"],
+                        }
+                    )
 
         logger.info(f"Found {len(updates)} packages with updates available")
         return updates
@@ -185,7 +189,7 @@ class UpdateManager:
 
             # Prepare new config
             user_config = installation.get("install_config", {})
-            mcp_config = await self._installer.prepare_config(
+            await self._installer.prepare_config(
                 new_version.get("mcp_config", {}),
                 user_config,
             )
@@ -218,13 +222,17 @@ class UpdateManager:
                     )
             else:
                 self._repo._installations[installation["id"]]["version_id"] = new_version["id"]
-                self._repo._installations[installation["id"]]["status"] = InstallStatus.INSTALLED.value
+                self._repo._installations[installation["id"]][
+                    "status"
+                ] = InstallStatus.INSTALLED.value
 
             # Refresh tool discovery
-            tools_discovered = await self._installer.refresh_tools({
-                **installation,
-                "package_name": package_name,
-            })
+            tools_discovered = await self._installer.refresh_tools(
+                {
+                    **installation,
+                    "package_name": package_name,
+                }
+            )
 
             logger.info(f"Updated {package_name} to {new_version['version']}")
 
@@ -305,7 +313,6 @@ class UpdateManager:
 
     def _parse_version(self, version: str) -> tuple:
         """Parse version string to comparable tuple."""
-        import re
 
         # Remove prerelease suffix for comparison
         base = version.split("-")[0]

@@ -4,9 +4,9 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of the AutoDiscoverySystem.
 If these tests fail, it means the auto-discovery interface has changed.
 """
+
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 import tempfile
 import os
 
@@ -189,7 +189,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'discover_tools')
+        assert hasattr(system, "discover_tools")
         assert callable(system.discover_tools)
 
     def test_has_discover_prompts_method(self):
@@ -198,7 +198,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'discover_prompts')
+        assert hasattr(system, "discover_prompts")
         assert callable(system.discover_prompts)
 
     def test_has_discover_resources_method(self):
@@ -207,7 +207,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'discover_resources')
+        assert hasattr(system, "discover_resources")
         assert callable(system.discover_resources)
 
     def test_has_auto_register_with_mcp_method(self):
@@ -216,7 +216,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'auto_register_with_mcp')
+        assert hasattr(system, "auto_register_with_mcp")
         assert callable(system.auto_register_with_mcp)
 
     def test_has_get_all_metadata_method(self):
@@ -225,7 +225,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'get_all_metadata')
+        assert hasattr(system, "get_all_metadata")
         assert callable(system.get_all_metadata)
 
     def test_has_discover_functions_in_file_method(self):
@@ -234,7 +234,7 @@ class TestAutoDiscoveryInterfaceGolden:
 
         system = AutoDiscoverySystem()
 
-        assert hasattr(system, 'discover_functions_in_file')
+        assert hasattr(system, "discover_functions_in_file")
         assert callable(system.discover_functions_in_file)
 
 
@@ -290,8 +290,8 @@ class TestAutoDiscoveryToolDetectionGolden:
         system = AutoDiscoverySystem()
 
         # Create temp file with @mcp.tool
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('@mcp.tool()\ndef test(): pass')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("@mcp.tool()\ndef test(): pass")
             temp_path = f.name
 
         try:
@@ -308,8 +308,8 @@ class TestAutoDiscoveryToolDetectionGolden:
         system = AutoDiscoverySystem()
 
         # Create temp file without @mcp.tool
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('def regular_function(): pass')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("def regular_function(): pass")
             temp_path = f.name
 
         try:

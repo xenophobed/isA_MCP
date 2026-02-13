@@ -30,31 +30,31 @@ FUNCTIONALITY:
       * Input sanitization removing control characters and null bytes
       * JSON validation and safe parsing with fallbacks
       * Length restrictions and truncation for security
-    
+
     - Security and Cryptographic Utilities:
       * Secure hash generation (MD5, SHA1, SHA256)
       * Sensitive data masking for logs and responses
       * Request ID generation for tracing and audit trails
       * Input validation against injection attacks
-    
+
     - Formatting and Conversion:
       * Human-readable timestamp formatting (ISO 8601)
       * Duration formatting (ms, seconds, minutes, hours)
       * Byte count formatting (B, KB, MB, GB, TB, PB)
       * Standardized response format creation
-    
+
     - File System Operations:
       * Safe file reading with encoding and error handling
       * Secure file writing with directory creation
       * Path validation and directory management
       * Cross-platform path handling with pathlib
-    
+
     - JSON Processing:
       * Safe JSON parsing with default fallback values
       * JSON serialization with custom encoding support
       * Multi-object merging for configuration management
       * Error-tolerant JSON operations
-    
+
     - Retry and Resilience:
       * Decorator-based retry mechanism for functions
       * Exponential backoff for failed operations
@@ -98,18 +98,19 @@ USAGE:
         validate_email, sanitize_input, generate_hash,
         format_timestamp, safe_json_loads, create_success_response
     )
-    
+
     # Validation
     if validate_email(user_email):
         clean_input = sanitize_input(user_data)
-    
+
     # Security
     data_hash = generate_hash(sensitive_data)
     masked_data = mask_sensitive_data(response_data)
-    
+
     # Formatting
     response = create_success_response(data, "Operation completed")
 """
+
 import json
 import hashlib
 import re
@@ -132,6 +133,7 @@ logger = get_logger(__name__)
 # VALIDATION UTILITIES
 # =====================
 
+
 def validate_json(data: str) -> bool:
     """Validate if string is valid JSON"""
     try:
@@ -140,41 +142,47 @@ def validate_json(data: str) -> bool:
     except (json.JSONDecodeError, TypeError):
         return False
 
+
 def validate_email(email: str) -> bool:
     """Validate email format"""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     return bool(re.match(pattern, email))
+
 
 def validate_user_id(user_id: str) -> bool:
     """Validate user ID format"""
     # Allow alphanumeric, underscore, hyphen, and dot
-    pattern = r'^[a-zA-Z0-9_.-]+$'
+    pattern = r"^[a-zA-Z0-9_.-]+$"
     return bool(re.match(pattern, user_id)) and len(user_id) <= 100
+
 
 def validate_tool_name(tool_name: str) -> bool:
     """Validate tool name format"""
     # Allow alphanumeric and underscore only
-    pattern = r'^[a-zA-Z0-9_]+$'
+    pattern = r"^[a-zA-Z0-9_]+$"
     return bool(re.match(pattern, tool_name)) and len(tool_name) <= 50
+
 
 def sanitize_input(text: str, max_length: int = 1000) -> str:
     """Sanitize user input"""
     if not isinstance(text, str):
         raise ValidationError("Input must be a string")
-    
+
     # Remove null bytes and control characters (except newline and tab)
-    sanitized = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
-    
+    sanitized = "".join(char for char in text if ord(char) >= 32 or char in "\n\t")
+
     # Truncate if too long
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
         logger.warning(f"Input truncated to {max_length} characters")
-    
+
     return sanitized
+
 
 # =====================
 # FORMATTING UTILITIES
 # =====================
+
 
 def format_timestamp(dt: Optional[datetime] = None) -> str:
     """Format datetime as ISO string"""
@@ -182,12 +190,14 @@ def format_timestamp(dt: Optional[datetime] = None) -> str:
         dt = datetime.now()
     return dt.isoformat()
 
+
 def parse_timestamp(timestamp_str: str) -> datetime:
     """Parse ISO timestamp string to datetime"""
     try:
-        return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
     except ValueError as e:
         raise ValidationError(f"Invalid timestamp format: {timestamp_str}")
+
 
 def format_duration(seconds: float) -> str:
     """Format duration in human-readable format"""
@@ -202,45 +212,53 @@ def format_duration(seconds: float) -> str:
         hours = seconds / 3600
         return f"{hours:.1f}h"
 
+
 def format_bytes(bytes_count: int) -> str:
     """Format byte count in human-readable format"""
     size = float(bytes_count)
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024.0:
             return f"{size:.1f}{unit}"
         size /= 1024.0
     return f"{size:.1f}PB"
 
+
 # =====================
 # HASHING AND SECURITY UTILITIES
 # =====================
 
-def generate_hash(data: str, algorithm: str = 'sha256') -> str:
+
+def generate_hash(data: str, algorithm: str = "sha256") -> str:
     """Generate hash of data"""
-    if algorithm == 'md5':
+    if algorithm == "md5":
         return hashlib.md5(data.encode()).hexdigest()
-    elif algorithm == 'sha1':
+    elif algorithm == "sha1":
         return hashlib.sha1(data.encode()).hexdigest()
-    elif algorithm == 'sha256':
+    elif algorithm == "sha256":
         return hashlib.sha256(data.encode()).hexdigest()
     else:
         raise ValidationError(f"Unsupported hash algorithm: {algorithm}")
+
 
 def generate_request_id() -> str:
     """Generate unique request ID"""
     import time
     import random
+
     timestamp = int(time.time() * 1000)
     random_part = random.randint(1000, 9999)
     return f"req_{timestamp}_{random_part}"
 
-def mask_sensitive_data(data: Dict[str, Any], sensitive_keys: Optional[List[str]] = None) -> Dict[str, Any]:
+
+def mask_sensitive_data(
+    data: Dict[str, Any], sensitive_keys: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """Mask sensitive data in dictionary"""
     if sensitive_keys is None:
-        sensitive_keys = ['password', 'token', 'key', 'secret', 'api_key']
-    
+        sensitive_keys = ["password", "token", "key", "secret", "api_key"]
+
     masked_data = data.copy()
-    
+
     def mask_recursive(obj, path=""):
         if isinstance(obj, dict):
             for key, value in obj.items():
@@ -252,13 +270,15 @@ def mask_sensitive_data(data: Dict[str, Any], sensitive_keys: Optional[List[str]
         elif isinstance(obj, list):
             for i, item in enumerate(obj):
                 mask_recursive(item, f"{path}[{i}]")
-    
+
     mask_recursive(masked_data)
     return masked_data
+
 
 # =====================
 # JSON UTILITIES
 # =====================
+
 
 def safe_json_loads(json_str: str, default: Any = None) -> Any:
     """Safely load JSON with default fallback"""
@@ -268,6 +288,7 @@ def safe_json_loads(json_str: str, default: Any = None) -> Any:
         logger.warning(f"Failed to parse JSON: {json_str[:100]}...")
         return default
 
+
 def safe_json_dumps(obj: Any, indent: int = 2) -> str:
     """Safely dump object to JSON"""
     try:
@@ -275,6 +296,7 @@ def safe_json_dumps(obj: Any, indent: int = 2) -> str:
     except (TypeError, ValueError) as e:
         logger.error(f"Failed to serialize to JSON: {e}")
         return json.dumps({"error": "Serialization failed", "type": str(type(obj))})
+
 
 def merge_json_objects(*objects: Dict[str, Any]) -> Dict[str, Any]:
     """Merge multiple JSON objects"""
@@ -284,9 +306,11 @@ def merge_json_objects(*objects: Dict[str, Any]) -> Dict[str, Any]:
             result.update(obj)
     return result
 
+
 # =====================
 # FILE UTILITIES
 # =====================
+
 
 def ensure_directory(path: Union[str, Path]) -> Path:
     """Ensure directory exists, create if necessary"""
@@ -294,39 +318,44 @@ def ensure_directory(path: Union[str, Path]) -> Path:
     path_obj.mkdir(parents=True, exist_ok=True)
     return path_obj
 
-def safe_file_read(file_path: Union[str, Path], encoding: str = 'utf-8') -> Optional[str]:
+
+def safe_file_read(file_path: Union[str, Path], encoding: str = "utf-8") -> Optional[str]:
     """Safely read file content"""
     try:
-        with open(file_path, 'r', encoding=encoding) as f:
+        with open(file_path, "r", encoding=encoding) as f:
             return f.read()
     except (IOError, UnicodeDecodeError) as e:
         logger.error(f"Failed to read file {file_path}: {e}")
         return None
 
-def safe_file_write(file_path: Union[str, Path], content: str, encoding: str = 'utf-8') -> bool:
+
+def safe_file_write(file_path: Union[str, Path], content: str, encoding: str = "utf-8") -> bool:
     """Safely write content to file"""
     try:
         path_obj = Path(file_path)
         ensure_directory(path_obj.parent)
-        
-        with open(file_path, 'w', encoding=encoding) as f:
+
+        with open(file_path, "w", encoding=encoding) as f:
             f.write(content)
         return True
     except IOError as e:
         logger.error(f"Failed to write file {file_path}: {e}")
         return False
 
+
 # =====================
 # RETRY UTILITIES
 # =====================
+
 
 def retry_on_exception(
     max_attempts: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,
-    exceptions: tuple = (Exception,)
+    exceptions: tuple = (Exception,),
 ):
     """Decorator for retrying function calls on exceptions"""
+
     def decorator(func: Callable):
         async def async_wrapper(*args, **kwargs):
             last_exception: Optional[Exception] = None
@@ -336,18 +365,21 @@ def retry_on_exception(
                 except exceptions as e:
                     last_exception = e
                     if attempt < max_attempts - 1:
-                        wait_time = delay * (backoff ** attempt)
-                        logger.warning(f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {wait_time}s...")
+                        wait_time = delay * (backoff**attempt)
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {wait_time}s..."
+                        )
                         import asyncio
+
                         await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"All {max_attempts} attempts failed for {func.__name__}")
-            
+
             if last_exception:
                 raise last_exception
             else:
                 raise RuntimeError("No attempts were made")
-        
+
         def sync_wrapper(*args, **kwargs):
             last_exception: Optional[Exception] = None
             for attempt in range(max_attempts):
@@ -356,48 +388,48 @@ def retry_on_exception(
                 except exceptions as e:
                     last_exception = e
                     if attempt < max_attempts - 1:
-                        wait_time = delay * (backoff ** attempt)
-                        logger.warning(f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {wait_time}s...")
+                        wait_time = delay * (backoff**attempt)
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed for {func.__name__}: {e}. Retrying in {wait_time}s..."
+                        )
                         import time
+
                         time.sleep(wait_time)
                     else:
                         logger.error(f"All {max_attempts} attempts failed for {func.__name__}")
-            
+
             if last_exception:
                 raise last_exception
             else:
                 raise RuntimeError("No attempts were made")
-        
+
         # Return appropriate wrapper based on function type
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         else:
             return sync_wrapper
-    
+
     return decorator
+
 
 # =====================
 # RESPONSE UTILITIES
 # =====================
 
+
 def create_success_response(data: Any, message: str = "Operation successful") -> Dict[str, Any]:
     """Create standardized success response"""
-    return {
-        "status": "success",
-        "message": message,
-        "data": data,
-        "timestamp": format_timestamp()
-    }
+    return {"status": "success", "message": message, "data": data, "timestamp": format_timestamp()}
 
-def create_error_response(error_code: str, message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+def create_error_response(
+    error_code: str, message: str, details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Create standardized error response"""
     return {
         "status": "error",
-        "error": {
-            "code": error_code,
-            "message": message,
-            "details": details or {}
-        },
-        "timestamp": format_timestamp()
+        "error": {"code": error_code, "message": message, "details": details or {}},
+        "timestamp": format_timestamp(),
     }

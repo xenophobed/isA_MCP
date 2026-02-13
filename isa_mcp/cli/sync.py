@@ -8,6 +8,7 @@ Commands:
     isa_mcp sync resources    Sync only resources
     isa_mcp sync skills       Sync skill categories
 """
+
 import asyncio
 import os
 import sys
@@ -45,6 +46,7 @@ async def call_sync_endpoint(url: str):
 # =========================================================================
 # Sync Command Group
 # =========================================================================
+
 
 @click.command()
 @click.option("--url", "-u", default=None, help="MCP server URL (default: http://localhost:8081)")
@@ -90,15 +92,21 @@ def sync(url: Optional[str], verbose: bool):
 
                 if result.get("tools"):
                     t = result["tools"]
-                    click.echo(f"    Tools:     {t.get('total', 0)} total, {t.get('synced', 0)} synced")
+                    click.echo(
+                        f"    Tools:     {t.get('total', 0)} total, {t.get('synced', 0)} synced"
+                    )
 
                 if result.get("prompts"):
                     p = result["prompts"]
-                    click.echo(f"    Prompts:   {p.get('total', 0)} total, {p.get('synced', 0)} synced")
+                    click.echo(
+                        f"    Prompts:   {p.get('total', 0)} total, {p.get('synced', 0)} synced"
+                    )
 
                 if result.get("resources"):
                     r = result["resources"]
-                    click.echo(f"    Resources: {r.get('total', 0)} total, {r.get('synced', 0)} synced")
+                    click.echo(
+                        f"    Resources: {r.get('total', 0)} total, {r.get('synced', 0)} synced"
+                    )
 
                 if result.get("skills"):
                     s = result["skills"]
@@ -106,7 +114,9 @@ def sync(url: Optional[str], verbose: bool):
             else:
                 click.echo(f"  Synced: {result.get('total_synced', 0)} items")
         else:
-            click.echo(click.style(f"✗ Sync failed: {result.get('message', 'Unknown error')}", fg="red"))
+            click.echo(
+                click.style(f"✗ Sync failed: {result.get('message', 'Unknown error')}", fg="red")
+            )
             sys.exit(1)
 
     except httpx.ConnectError:
@@ -121,6 +131,7 @@ def sync(url: Optional[str], verbose: bool):
         click.echo(click.style(f"\n✗ Sync failed: {e}", fg="red"))
         if verbose:
             import traceback
+
             click.echo(traceback.format_exc())
         sys.exit(1)
 

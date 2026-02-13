@@ -7,28 +7,18 @@ and use data structures from tests/contracts/aggregator/data_contract.py.
 
 TDD Status: RED/GREEN PHASE - Implementation in progress.
 """
+
 import pytest
-import json
-from datetime import datetime, timezone
-from typing import List
 from pydantic import ValidationError
 
 # Import contracts
 from tests.contracts.aggregator.data_contract import (
     AggregatorTestDataFactory,
     ServerRegistrationRequestContract,
-    ServerRecordContract,
-    AggregatedToolContract,
-    ToolExecutionRequestContract,
-    ToolExecutionResponseContract,
-    ServerHealthContract,
-    AggregatorStateContract,
-    RoutingContextContract,
     ServerRegistrationBuilder,
     AggregatedToolBuilder,
     ServerTransportType,
     ServerStatus,
-    RoutingStrategy,
 )
 
 # Service imports - will be available once service is implemented
@@ -50,6 +40,7 @@ try:
         MockVectorRepository,
         MockModelClient,
     )
+
     SERVICE_AVAILABLE = True
 except ImportError as e:
     # Service not yet available - tests will be skipped
@@ -68,6 +59,7 @@ except ImportError as e:
     MockModelClient = None
     SERVICE_AVAILABLE = False
     import warnings
+
     warnings.warn(f"AggregatorService not available for testing: {e}")
 
 
@@ -75,6 +67,7 @@ except ImportError as e:
 # Contract Validation Tests (Data Contract)
 # These tests validate that the data contracts themselves work correctly
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.unit
@@ -183,6 +176,7 @@ class TestDataContractValidation:
 # Fixtures for Aggregator Service Testing
 # ============================================================================
 
+
 @pytest.fixture
 def mock_server_registry():
     """Provide mock server registry for testing."""
@@ -238,7 +232,7 @@ def aggregator_service(
     mock_tool_repository,
     mock_vector_repository,
     mock_skill_classifier,
-    mock_model_client
+    mock_model_client,
 ):
     """Provide AggregatorService with mocked dependencies."""
     if not SERVICE_AVAILABLE:
@@ -257,6 +251,7 @@ def aggregator_service(
 # ============================================================================
 # BR-001: Server Registration
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -298,7 +293,9 @@ class TestBR001ServerRegistration:
         assert len(calls) == 1
 
     @pytest.mark.asyncio
-    async def test_register_server_auto_connect(self, aggregator_service, mock_server_registry, mock_session_manager):
+    async def test_register_server_auto_connect(
+        self, aggregator_service, mock_server_registry, mock_session_manager
+    ):
         """Test that auto_connect=true initiates connection."""
         # Arrange
         config = AggregatorTestDataFactory.make_sse_server_registration(
@@ -333,7 +330,9 @@ class TestBR001ServerRegistration:
         assert "already exists" in str(exc.value).lower()
 
     @pytest.mark.asyncio
-    async def test_register_stdio_server_with_command(self, aggregator_service, mock_server_registry):
+    async def test_register_stdio_server_with_command(
+        self, aggregator_service, mock_server_registry
+    ):
         """Test STDIO server registration with command config."""
         # Arrange
         config = AggregatorTestDataFactory.make_stdio_server_registration(
@@ -348,7 +347,9 @@ class TestBR001ServerRegistration:
         assert result["name"] == "local-mcp"
 
     @pytest.mark.asyncio
-    async def test_register_http_server_with_base_url(self, aggregator_service, mock_server_registry):
+    async def test_register_http_server_with_base_url(
+        self, aggregator_service, mock_server_registry
+    ):
         """Test HTTP server registration with base_url config."""
         # Arrange
         config = AggregatorTestDataFactory.make_http_server_registration(
@@ -366,6 +367,7 @@ class TestBR001ServerRegistration:
 # ============================================================================
 # BR-002: Server Connection
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -464,6 +466,7 @@ class TestBR002ServerConnection:
 # ============================================================================
 # BR-003: Tool Discovery
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -604,6 +607,7 @@ class TestBR003ToolDiscovery:
 # BR-004: Skill Classification for External Tools
 # ============================================================================
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.aggregator
@@ -635,13 +639,16 @@ class TestBR004SkillClassification:
             original_name="create_issue",
         )
 
-        mock_skill_classifier.set_classification_result("github-mcp.create_issue", {
-            "assignments": [
-                {"skill_id": "code_management", "confidence": 0.9},
-                {"skill_id": "issue_tracking", "confidence": 0.85},
-            ],
-            "primary_skill_id": "code_management",
-        })
+        mock_skill_classifier.set_classification_result(
+            "github-mcp.create_issue",
+            {
+                "assignments": [
+                    {"skill_id": "code_management", "confidence": 0.9},
+                    {"skill_id": "issue_tracking", "confidence": 0.85},
+                ],
+                "primary_skill_id": "code_management",
+            },
+        )
 
         # Act
         result = await aggregator_service.classify_tool(tool_id)
@@ -668,12 +675,15 @@ class TestBR004SkillClassification:
             original_name="low_conf_tool",
         )
 
-        mock_skill_classifier.set_classification_result("test-server.low_conf_tool", {
-            "assignments": [
-                {"skill_id": "maybe_skill", "confidence": 0.3},  # Below 0.5 threshold
-            ],
-            "primary_skill_id": None,
-        })
+        mock_skill_classifier.set_classification_result(
+            "test-server.low_conf_tool",
+            {
+                "assignments": [
+                    {"skill_id": "maybe_skill", "confidence": 0.3},  # Below 0.5 threshold
+                ],
+                "primary_skill_id": None,
+            },
+        )
 
         # Act
         result = await aggregator_service.classify_tool(tool_id)
@@ -686,6 +696,7 @@ class TestBR004SkillClassification:
 # ============================================================================
 # BR-005: Request Routing
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -720,10 +731,10 @@ class TestBR005RequestRouting:
 
         # Connect and setup session
         session = MockMCPSession()
-        session.set_tool_response("create_issue", {
-            "content": [{"type": "text", "text": '{"issue_number": 42}'}],
-            "isError": False
-        })
+        session.set_tool_response(
+            "create_issue",
+            {"content": [{"type": "text", "text": '{"issue_number": 42}'}], "isError": False},
+        )
         await session.connect()
         mock_session_manager._sessions[server_id] = session
         await mock_server_registry.update_status(server_id, ServerStatus.CONNECTED)
@@ -739,8 +750,7 @@ class TestBR005RequestRouting:
 
         # Act
         result = await aggregator_service.execute_tool(
-            tool_name="github-mcp.create_issue",
-            arguments={"title": "Bug", "body": "Description"}
+            tool_name="github-mcp.create_issue", arguments={"title": "Bug", "body": "Description"}
         )
 
         # Assert
@@ -761,10 +771,9 @@ class TestBR005RequestRouting:
         server_id = server["id"]
 
         session = MockMCPSession()
-        session.set_tool_response("my_tool", {
-            "content": [{"type": "text", "text": "Success"}],
-            "isError": False
-        })
+        session.set_tool_response(
+            "my_tool", {"content": [{"type": "text", "text": "Success"}], "isError": False}
+        )
         await session.connect()
         mock_session_manager._sessions[server_id] = session
         await mock_server_registry.update_status(server_id, ServerStatus.CONNECTED)
@@ -779,9 +788,7 @@ class TestBR005RequestRouting:
 
         # Act - use explicit server_id
         result = await aggregator_service.execute_tool(
-            tool_name="my_tool",
-            arguments={},
-            server_id=server_id
+            tool_name="my_tool", arguments={}, server_id=server_id
         )
 
         # Assert
@@ -811,8 +818,7 @@ class TestBR005RequestRouting:
         # Act & Assert
         with pytest.raises(Exception) as exc:
             await aggregator_service.execute_tool(
-                tool_name="disconnected-server.some_tool",
-                arguments={}
+                tool_name="disconnected-server.some_tool", arguments={}
             )
         assert "unavailable" in str(exc.value).lower() or "disconnected" in str(exc.value).lower()
 
@@ -822,8 +828,7 @@ class TestBR005RequestRouting:
         # Act & Assert
         with pytest.raises(ValueError) as exc:
             await aggregator_service.execute_tool(
-                tool_name="nonexistent-server.no_tool",
-                arguments={}
+                tool_name="nonexistent-server.no_tool", arguments={}
             )
         assert "not found" in str(exc.value).lower()
 
@@ -831,6 +836,7 @@ class TestBR005RequestRouting:
 # ============================================================================
 # BR-006: Health Monitoring
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -927,6 +933,7 @@ class TestBR006HealthMonitoring:
 # ============================================================================
 # BR-007: Server Disconnection
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1029,6 +1036,7 @@ class TestBR007ServerDisconnection:
 # BR-008: Server Removal
 # ============================================================================
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.aggregator
@@ -1046,9 +1054,7 @@ class TestBR008ServerRemoval:
     """
 
     @pytest.mark.asyncio
-    async def test_remove_server_success(
-        self, aggregator_service, mock_server_registry
-    ):
+    async def test_remove_server_success(self, aggregator_service, mock_server_registry):
         """Test successful server removal."""
         # Arrange
         config = AggregatorTestDataFactory.make_sse_server_registration(
@@ -1139,6 +1145,7 @@ class TestBR008ServerRemoval:
 # ============================================================================
 # Edge Cases (from logic_contract.md)
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1256,11 +1263,14 @@ class TestEdgeCases:
         )
 
         # Configure classifier to fail
-        mock_skill_classifier.set_classification_result("test-server.unclassified_tool", {
-            "error": "Service unavailable",
-            "assignments": [],
-            "primary_skill_id": None,
-        })
+        mock_skill_classifier.set_classification_result(
+            "test-server.unclassified_tool",
+            {
+                "error": "Service unavailable",
+                "assignments": [],
+                "primary_skill_id": None,
+            },
+        )
 
         # Act - classification should handle failure gracefully
         result = await aggregator_service.classify_tool(tool_id)
@@ -1275,6 +1285,7 @@ class TestEdgeCases:
 # State & Aggregation Tests
 # ============================================================================
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.aggregator
@@ -1282,9 +1293,7 @@ class TestAggregatorState:
     """Tests for aggregator state management."""
 
     @pytest.mark.asyncio
-    async def test_get_state_returns_counts(
-        self, aggregator_service, mock_server_registry
-    ):
+    async def test_get_state_returns_counts(self, aggregator_service, mock_server_registry):
         """Test that get_state returns correct counts."""
         # Arrange - create multiple servers in different states
         for name in ["connected-1", "connected-2"]:
@@ -1313,6 +1322,7 @@ class TestAggregatorState:
 # ============================================================================
 # Performance Tests
 # ============================================================================
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1346,8 +1356,7 @@ class TestPerformanceSLAs:
         import time
 
         mock_tools = [
-            {"name": f"tool_{i}", "description": f"Tool {i}", "inputSchema": {}}
-            for i in range(50)
+            {"name": f"tool_{i}", "description": f"Tool {i}", "inputSchema": {}} for i in range(50)
         ]
         session = MockMCPSession(tools=mock_tools)
         await session.connect()

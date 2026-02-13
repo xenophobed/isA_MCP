@@ -33,10 +33,7 @@ NOTEBOOKLM_DEFAULT_NOTEBOOK = os.getenv("NOTEBOOKLM_DEFAULT_NOTEBOOK", "")
 NOTEBOOKLM_BASE_URL = "https://notebooklm.google.com"
 
 # State management (module-level)
-_state = {
-    "current_notebook_id": NOTEBOOKLM_DEFAULT_NOTEBOOK or None,
-    "is_authenticated": False
-}
+_state = {"current_notebook_id": NOTEBOOKLM_DEFAULT_NOTEBOOK or None, "is_authenticated": False}
 
 
 async def call_web_automation(
@@ -44,7 +41,7 @@ async def call_web_automation(
     task: str,
     task_context: Optional[Dict[str, Any]] = None,
     routing_strategy: str = "dom_first",
-    max_steps: int = 10
+    max_steps: int = 10,
 ) -> Dict[str, Any]:
     """
     Call the web automation service via HTTP API.
@@ -67,7 +64,7 @@ async def call_web_automation(
             "routing_strategy": routing_strategy,
             "task_context": task_context or {},
             "max_steps": max_steps,
-            "user_id": NOTEBOOKLM_SESSION_ID
+            "user_id": NOTEBOOKLM_SESSION_ID,
         }
 
         response_data = None
@@ -75,7 +72,7 @@ async def call_web_automation(
             "POST",
             f"{WEB_SERVICE_URL}/api/v1/web/automation/execute",
             json=payload,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         ) as response:
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
@@ -117,7 +114,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                 url=url,
                 task="Wait for page to load. If on Google login page, wait for user to complete login. Once logged in and on NotebookLM, confirm the page shows the notebook interface.",
                 routing_strategy="intelligent",
-                max_steps=3
+                max_steps=3,
             )
 
             if result.get("success"):
@@ -132,8 +129,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                         "authenticated": True,
                         "message": "Successfully logged in to NotebookLM",
                         "notebook_id": _state["current_notebook_id"],
-                        "final_url": result.get("final_url", url)
-                    }
+                        "final_url": result.get("final_url", url),
+                    },
                 )
             else:
                 return tools.create_response(
@@ -143,8 +140,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                         "authenticated": False,
                         "message": "Browser opened. Please complete Google login manually.",
                         "url": url,
-                        "error": result.get("error")
-                    }
+                        "error": result.get("error"),
+                    },
                 )
 
         except httpx.TimeoutException:
@@ -152,29 +149,24 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_login",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Web automation service timeout. Check if web service is running."
+                error_message="Web automation service timeout. Check if web service is running.",
             )
         except httpx.ConnectError:
             return tools.create_response(
                 status="error",
                 action="notebooklm_login",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Cannot connect to web automation service. Start the web service or port-forward."
+                error_message="Cannot connect to web automation service. Start the web service or port-forward.",
             )
         except Exception as e:
             logger.error(f"Error in notebooklm_login: {e}")
             return tools.create_response(
-                status="error",
-                action="notebooklm_login",
-                data={},
-                error_message=str(e)
+                status="error", action="notebooklm_login", data={}, error_message=str(e)
             )
 
     @mcp.tool()
     async def notebooklm_chat(
-        message: str,
-        notebook_id: Optional[str] = None,
-        wait_for_complete: bool = True
+        message: str, notebook_id: Optional[str] = None, wait_for_complete: bool = True
     ) -> dict:
         """Send a message to NotebookLM and get the AI response. Requires prior authentication.
 
@@ -196,7 +188,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                     status="error",
                     action="notebooklm_chat",
                     data={},
-                    error_message="No notebook specified. Use 'navigate' or provide notebook_id."
+                    error_message="No notebook specified. Use 'navigate' or provide notebook_id.",
                 )
 
             combined_task = f"""
@@ -214,13 +206,9 @@ def register_notebooklm_tools(mcp: FastMCP):
             result = await call_web_automation(
                 url=url,
                 task=combined_task,
-                task_context={
-                    "message": message,
-                    "action": "chat",
-                    "wait_for_response": True
-                },
+                task_context={"message": message, "action": "chat", "wait_for_response": True},
                 routing_strategy="intelligent",
-                max_steps=10
+                max_steps=10,
             )
 
             # Extract response from automation result
@@ -232,7 +220,10 @@ def register_notebooklm_tools(mcp: FastMCP):
                 for step in automation_result.get("steps", []):
                     if step.get("extracted_text"):
                         response_text = step.get("extracted_text", "")
-                    if step.get("description") and "response" in step.get("description", "").lower():
+                    if (
+                        step.get("description")
+                        and "response" in step.get("description", "").lower()
+                    ):
                         if not response_text:
                             response_text = step.get("description", "")
 
@@ -256,9 +247,9 @@ def register_notebooklm_tools(mcp: FastMCP):
                     "automation_result": {
                         "success": result.get("success"),
                         "method": result.get("performance_metrics", {}).get("method_used"),
-                        "time_elapsed": total_time
-                    }
-                }
+                        "time_elapsed": total_time,
+                    },
+                },
             )
 
         except httpx.TimeoutException:
@@ -266,14 +257,14 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_chat",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Web automation service timeout"
+                error_message="Web automation service timeout",
             )
         except httpx.ConnectError:
             return tools.create_response(
                 status="error",
                 action="notebooklm_chat",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Cannot connect to web automation service"
+                error_message="Cannot connect to web automation service",
             )
         except Exception as e:
             logger.error(f"Error in notebooklm_chat: {e}")
@@ -281,7 +272,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_chat",
                 data={"message": message},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -300,7 +291,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                     status="error",
                     action="notebooklm_navigate",
                     data={},
-                    error_message="notebook_id is required"
+                    error_message="notebook_id is required",
                 )
 
             _state["current_notebook_id"] = notebook_id
@@ -310,7 +301,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                 url=url,
                 task="Navigate to the notebook and wait for it to fully load. Confirm the notebook interface is visible.",
                 routing_strategy="dom_first",
-                max_steps=3
+                max_steps=3,
             )
 
             return tools.create_response(
@@ -319,8 +310,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                 data={
                     "notebook_id": notebook_id,
                     "url": url,
-                    "message": f"Navigated to notebook {notebook_id}"
-                }
+                    "message": f"Navigated to notebook {notebook_id}",
+                },
             )
 
         except httpx.TimeoutException:
@@ -328,14 +319,14 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_navigate",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Web automation service timeout"
+                error_message="Web automation service timeout",
             )
         except httpx.ConnectError:
             return tools.create_response(
                 status="error",
                 action="notebooklm_navigate",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Cannot connect to web automation service"
+                error_message="Cannot connect to web automation service",
             )
         except Exception as e:
             logger.error(f"Error in notebooklm_navigate: {e}")
@@ -343,7 +334,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_navigate",
                 data={"notebook_id": notebook_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -366,14 +357,14 @@ def register_notebooklm_tools(mcp: FastMCP):
                     status="error",
                     action="notebooklm_get_sources",
                     data={},
-                    error_message="No notebook specified"
+                    error_message="No notebook specified",
                 )
 
             result = await call_web_automation(
                 url=url,
                 task="Find and list all the sources/documents in this notebook. Look for a sources panel or list that shows uploaded documents, PDFs, or links.",
                 routing_strategy="intelligent",
-                max_steps=5
+                max_steps=5,
             )
 
             return tools.create_response(
@@ -382,8 +373,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                 data={
                     "notebook_id": _state["current_notebook_id"],
                     "sources": result.get("extracted_data", []),
-                    "automation_result": result
-                }
+                    "automation_result": result,
+                },
             )
 
         except httpx.TimeoutException:
@@ -391,22 +382,19 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_get_sources",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Web automation service timeout"
+                error_message="Web automation service timeout",
             )
         except httpx.ConnectError:
             return tools.create_response(
                 status="error",
                 action="notebooklm_get_sources",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Cannot connect to web automation service"
+                error_message="Cannot connect to web automation service",
             )
         except Exception as e:
             logger.error(f"Error in notebooklm_get_sources: {e}")
             return tools.create_response(
-                status="error",
-                action="notebooklm_get_sources",
-                data={},
-                error_message=str(e)
+                status="error", action="notebooklm_get_sources", data={}, error_message=str(e)
             )
 
     @mcp.tool()
@@ -425,7 +413,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                     status="error",
                     action="notebooklm_set_default_notebook",
                     data={},
-                    error_message="notebook_id is required"
+                    error_message="notebook_id is required",
                 )
 
             old_notebook = _state["current_notebook_id"]
@@ -437,8 +425,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                 data={
                     "old_notebook_id": old_notebook,
                     "new_notebook_id": notebook_id,
-                    "message": f"Default notebook set to {notebook_id}"
-                }
+                    "message": f"Default notebook set to {notebook_id}",
+                },
             )
 
         except Exception as e:
@@ -447,7 +435,7 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_set_default_notebook",
                 data={"notebook_id": notebook_id},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     @mcp.tool()
@@ -475,17 +463,14 @@ def register_notebooklm_tools(mcp: FastMCP):
                     "web_service_available": web_service_healthy,
                     "authenticated": _state["is_authenticated"],
                     "current_notebook_id": _state["current_notebook_id"],
-                    "session_id": NOTEBOOKLM_SESSION_ID
-                }
+                    "session_id": NOTEBOOKLM_SESSION_ID,
+                },
             )
 
         except Exception as e:
             logger.error(f"Error in notebooklm_healthcheck: {e}")
             return tools.create_response(
-                status="error",
-                action="notebooklm_healthcheck",
-                data={},
-                error_message=str(e)
+                status="error", action="notebooklm_healthcheck", data={}, error_message=str(e)
             )
 
     @mcp.tool()
@@ -508,14 +493,14 @@ def register_notebooklm_tools(mcp: FastMCP):
                     status="error",
                     action="notebooklm_extract_content",
                     data={},
-                    error_message="No notebook specified"
+                    error_message="No notebook specified",
                 )
 
             result = await call_web_automation(
                 url=url,
                 task="Extract all visible content from the notebook page, including chat history, source summaries, and any generated content.",
                 routing_strategy="dom_first",
-                max_steps=3
+                max_steps=3,
             )
 
             return tools.create_response(
@@ -524,8 +509,8 @@ def register_notebooklm_tools(mcp: FastMCP):
                 data={
                     "notebook_id": _state["current_notebook_id"],
                     "content": result.get("extracted_data", ""),
-                    "url": url
-                }
+                    "url": url,
+                },
             )
 
         except httpx.TimeoutException:
@@ -533,22 +518,19 @@ def register_notebooklm_tools(mcp: FastMCP):
                 status="error",
                 action="notebooklm_extract_content",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Web automation service timeout"
+                error_message="Web automation service timeout",
             )
         except httpx.ConnectError:
             return tools.create_response(
                 status="error",
                 action="notebooklm_extract_content",
                 data={"service_url": WEB_SERVICE_URL},
-                error_message="Cannot connect to web automation service"
+                error_message="Cannot connect to web automation service",
             )
         except Exception as e:
             logger.error(f"Error in notebooklm_extract_content: {e}")
             return tools.create_response(
-                status="error",
-                action="notebooklm_extract_content",
-                data={},
-                error_message=str(e)
+                status="error", action="notebooklm_extract_content", data={}, error_message=str(e)
             )
 
     logger.debug("Registered 7 NotebookLM tools")

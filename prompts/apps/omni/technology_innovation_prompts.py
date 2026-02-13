@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_technology_innovation_prompts(mcp):
     """Register Technology & Innovation 💻 category prompts with the MCP server"""
-    
+
     @mcp.prompt("tech_review_prompt")
     async def tech_review_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive technology review and analysis
-        
+
         This prompt guides creation of detailed technology assessments with
         technical evaluation and strategic recommendations.
-        
+
         Args:
             subject: The technology or technical solution to review
             depth: Review depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: technology, review, analysis, evaluation, technical, assessment
         Category: technology_innovation
         """
-        
+
         prompt_template = f"""
 # Technology Analyst with Technical Expertise
 
@@ -71,32 +69,29 @@ def register_technology_innovation_prompts(mcp):
 
 Create a professional technology review that supports informed decision-making.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("implementation_guide_prompt")
     async def implementation_guide_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for detailed implementation guidance and best practices
-        
+
         This prompt guides creation of comprehensive implementation guides with
         practical steps, best practices, and troubleshooting guidance.
-        
+
         Args:
             subject: The technology or solution to implement
             depth: Implementation depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: implementation, guide, best practices, deployment, technical, setup
         Category: technology_innovation
         """
-        
+
         prompt_template = f"""
 # Implementation Specialist with Technical Architecture Expertise
 
@@ -135,12 +130,13 @@ Create a professional technology review that supports informed decision-making.
 
 Create a practical implementation guide that ensures successful deployment.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Technology & Innovation 💻 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_technology_innovation_prompts(mcp)

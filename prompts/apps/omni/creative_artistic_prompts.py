@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_creative_artistic_prompts(mcp):
     """Register Creative & Artistic 🎨 category prompts with the MCP server"""
-    
+
     @mcp.prompt("storytelling_prompt")
     async def storytelling_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for creative storytelling and narrative development
-        
+
         This prompt guides creation of compelling narratives with
         character development, plot structure, and engaging storytelling techniques.
-        
+
         Args:
             subject: The story topic, theme, or narrative focus
             depth: Story depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: storytelling, narrative, creative, writing, character, plot, fiction
         Category: creative_artistic
         """
-        
+
         prompt_template = f"""
 # Master Storyteller with Creative Writing Expertise
 
@@ -87,12 +85,13 @@ def register_creative_artistic_prompts(mcp):
 
 Create compelling storytelling that engages readers and delivers emotional resonance.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Creative & Artistic 🎨 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_creative_artistic_prompts(mcp)

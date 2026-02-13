@@ -7,19 +7,18 @@ All tests MUST use these Pydantic models and factories for consistency.
 This is the SINGLE SOURCE OF TRUTH for search service test data.
 """
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
-
 
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class SearchItemType(str, Enum):
     """Types of searchable items"""
+
     TOOL = "tool"
     PROMPT = "prompt"
     RESOURCE = "resource"
@@ -27,14 +26,16 @@ class SearchItemType(str, Enum):
 
 class SearchStrategy(str, Enum):
     """Search strategy options"""
+
     HIERARCHICAL = "hierarchical"  # Skill → Tools (default)
-    DIRECT = "direct"              # Skip skill layer
-    HYBRID = "hybrid"              # Parallel skill + direct, merge results
+    DIRECT = "direct"  # Skip skill layer
+    HYBRID = "hybrid"  # Parallel skill + direct, merge results
 
 
 # ============================================================================
 # Request Contracts (Input Schemas)
 # ============================================================================
+
 
 class HierarchicalSearchRequestContract(BaseModel):
     """
@@ -43,47 +44,26 @@ class HierarchicalSearchRequestContract(BaseModel):
     Main entry point for skill-based hierarchical search.
     Stage 1: Match skills → Stage 2: Search tools within matched skills
     """
+
     query: str = Field(
-        ...,
-        min_length=1,
-        max_length=1000,
-        description="Natural language search query"
+        ..., min_length=1, max_length=1000, description="Natural language search query"
     )
     item_type: Optional[SearchItemType] = Field(
-        None,
-        description="Filter by item type (tool/prompt/resource). None = all types"
+        None, description="Filter by item type (tool/prompt/resource). None = all types"
     )
-    limit: int = Field(
-        5,
-        ge=1,
-        le=50,
-        description="Maximum tools to return"
-    )
-    skill_limit: int = Field(
-        3,
-        ge=1,
-        le=10,
-        description="Maximum skills to match in stage 1"
-    )
+    limit: int = Field(5, ge=1, le=50, description="Maximum tools to return")
+    skill_limit: int = Field(3, ge=1, le=10, description="Maximum skills to match in stage 1")
     skill_threshold: float = Field(
-        0.4,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity score for skill matching"
+        0.4, ge=0.0, le=1.0, description="Minimum similarity score for skill matching"
     )
     tool_threshold: float = Field(
-        0.3,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity score for tool matching"
+        0.3, ge=0.0, le=1.0, description="Minimum similarity score for tool matching"
     )
     include_schemas: bool = Field(
-        True,
-        description="Include full input schemas in response (lazy loaded)"
+        True, description="Include full input schemas in response (lazy loaded)"
     )
     strategy: SearchStrategy = Field(
-        SearchStrategy.HIERARCHICAL,
-        description="Search strategy to use"
+        SearchStrategy.HIERARCHICAL, description="Search strategy to use"
     )
 
     class Config:
@@ -107,6 +87,7 @@ class SkillSearchRequestContract(BaseModel):
 
     Used for searching skills directly.
     """
+
     query: str = Field(..., min_length=1, max_length=1000, description="Search query")
     limit: int = Field(5, ge=1, le=20, description="Maximum skills to return")
     threshold: float = Field(0.4, ge=0.0, le=1.0, description="Minimum similarity score")
@@ -119,10 +100,10 @@ class ToolSearchRequestContract(BaseModel):
 
     Used for searching tools within specific skills.
     """
+
     query: str = Field(..., min_length=1, max_length=1000, description="Search query")
     skill_ids: Optional[List[str]] = Field(
-        None,
-        description="Filter by skill IDs. None = search all"
+        None, description="Filter by skill IDs. None = search all"
     )
     item_type: Optional[SearchItemType] = Field(None, description="Filter by type")
     limit: int = Field(10, ge=1, le=100, description="Maximum results")
@@ -133,12 +114,14 @@ class ToolSearchRequestContract(BaseModel):
 # Response Contracts (Output Schemas)
 # ============================================================================
 
+
 class SkillMatchContract(BaseModel):
     """
     Contract: Skill match in search response
 
     Represents a matched skill from Stage 1.
     """
+
     id: str = Field(..., description="Skill ID")
     name: str = Field(..., description="Skill name")
     description: str = Field(..., description="Skill description")
@@ -163,6 +146,7 @@ class ToolMatchContract(BaseModel):
 
     Represents a matched tool from Stage 2 before enrichment.
     """
+
     id: str = Field(..., description="Vector DB ID")
     db_id: int = Field(..., description="PostgreSQL ID")
     type: SearchItemType = Field(..., description="Item type")
@@ -179,6 +163,7 @@ class EnrichedToolContract(BaseModel):
 
     Final tool format returned to client after lazy schema loading.
     """
+
     id: str = Field(..., description="Vector DB ID")
     db_id: int = Field(..., description="PostgreSQL ID")
     type: SearchItemType = Field(..., description="Item type")
@@ -187,7 +172,9 @@ class EnrichedToolContract(BaseModel):
     score: float = Field(..., ge=0.0, le=1.0, description="Similarity score")
     skill_ids: List[str] = Field(default_factory=list, description="Assigned skill IDs")
     primary_skill_id: Optional[str] = Field(None, description="Primary skill ID")
-    input_schema: Optional[Dict[str, Any]] = Field(None, description="Full input schema (lazy loaded)")
+    input_schema: Optional[Dict[str, Any]] = Field(
+        None, description="Full input schema (lazy loaded)"
+    )
     output_schema: Optional[Dict[str, Any]] = Field(None, description="Full output schema")
     annotations: Optional[Dict[str, Any]] = Field(None, description="MCP annotations")
 
@@ -222,15 +209,17 @@ class SearchMetadataContract(BaseModel):
 
     Provides insight into how search was executed.
     """
+
     strategy_used: SearchStrategy = Field(..., description="Search strategy used")
     skill_ids_used: Optional[List[str]] = Field(
-        None,
-        description="Skill IDs used for filtering (None = unfiltered)"
+        None, description="Skill IDs used for filtering (None = unfiltered)"
     )
     stage1_skill_count: int = Field(..., ge=0, description="Skills matched in stage 1")
     stage2_candidate_count: int = Field(..., ge=0, description="Tools found in stage 2")
     final_count: int = Field(..., ge=0, description="Tools returned after filtering")
-    query_embedding_time_ms: float = Field(..., ge=0, description="Time to generate query embedding")
+    query_embedding_time_ms: float = Field(
+        ..., ge=0, description="Time to generate query embedding"
+    )
     skill_search_time_ms: float = Field(..., ge=0, description="Time for skill search (stage 1)")
     tool_search_time_ms: float = Field(..., ge=0, description="Time for tool search (stage 2)")
     schema_load_time_ms: float = Field(..., ge=0, description="Time to load schemas")
@@ -243,18 +232,17 @@ class HierarchicalSearchResponseContract(BaseModel):
 
     Complete response from hierarchical search.
     """
+
     query: str = Field(..., description="Original search query")
     tools: List[EnrichedToolContract] = Field(
-        default_factory=list,
-        description="Matched tools (enriched with schemas)"
+        default_factory=list, description="Matched tools (enriched with schemas)"
     )
     matched_skills: List[SkillMatchContract] = Field(
-        default_factory=list,
-        description="Skills matched in stage 1"
+        default_factory=list, description="Skills matched in stage 1"
     )
     metadata: SearchMetadataContract = Field(..., description="Search metadata")
 
-    @field_validator('tools')
+    @field_validator("tools")
     @classmethod
     def validate_tools_sorted(cls, v: List[EnrichedToolContract]) -> List[EnrichedToolContract]:
         """Ensure tools are sorted by score descending"""
@@ -264,6 +252,7 @@ class HierarchicalSearchResponseContract(BaseModel):
 # ============================================================================
 # Test Data Factory
 # ============================================================================
+
 
 class SearchTestDataFactory:
     """
@@ -439,9 +428,9 @@ class SearchTestDataFactory:
     def get_ambiguous_queries() -> List[str]:
         """Get queries that could match multiple skills"""
         return [
-            "export calendar to csv",           # calendar + file
-            "send meeting invite",              # calendar + communication
-            "search for documents about sales", # data + file
+            "export calendar to csv",  # calendar + file
+            "send meeting invite",  # calendar + communication
+            "search for documents about sales",  # data + file
         ]
 
     @staticmethod
@@ -492,6 +481,7 @@ class SearchTestDataFactory:
 # ============================================================================
 # Request Builders (for complex test scenarios)
 # ============================================================================
+
 
 class HierarchicalSearchRequestBuilder:
     """
@@ -600,22 +590,18 @@ __all__ = [
     # Enums
     "SearchItemType",
     "SearchStrategy",
-
     # Request Contracts
     "HierarchicalSearchRequestContract",
     "SkillSearchRequestContract",
     "ToolSearchRequestContract",
-
     # Response Contracts
     "SkillMatchContract",
     "ToolMatchContract",
     "EnrichedToolContract",
     "SearchMetadataContract",
     "HierarchicalSearchResponseContract",
-
     # Factory
     "SearchTestDataFactory",
-
     # Builders
     "HierarchicalSearchRequestBuilder",
 ]

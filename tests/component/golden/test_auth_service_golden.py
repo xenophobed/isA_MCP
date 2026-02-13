@@ -9,8 +9,9 @@ Services Under Test:
 - core/auth/authorization_client.py
 - core/auth/middleware.py
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden
@@ -31,26 +32,30 @@ class TestMCPAuthServiceGolden:
         """Create mock auth client."""
         client = AsyncMock()
         # API expects {"success": True, "user": {...}}
-        client.verify_token = AsyncMock(return_value={
-            "success": True,
-            "user": {
-                "user_id": "user_123",
-                "email": "user@example.com",
-                "organization_id": "org_123",
-                "subscription_tier": "pro"
+        client.verify_token = AsyncMock(
+            return_value={
+                "success": True,
+                "user": {
+                    "user_id": "user_123",
+                    "email": "user@example.com",
+                    "organization_id": "org_123",
+                    "subscription_tier": "pro",
+                },
             }
-        })
+        )
         return client
 
     @pytest.fixture
     def mock_authz_client(self):
         """Create mock authorization client."""
         client = AsyncMock()
-        client.check_access = AsyncMock(return_value={
-            "has_access": True,
-            "user_access_level": "read_write",
-            "reason": "Authorized"
-        })
+        client.check_access = AsyncMock(
+            return_value={
+                "has_access": True,
+                "user_access_level": "read_write",
+                "reason": "Authorized",
+            }
+        )
         client.get_user_permissions = AsyncMock(return_value={})
         client.grant_permission = AsyncMock(return_value={"success": True})
         client.revoke_permission = AsyncMock(return_value={"success": True})
@@ -60,6 +65,7 @@ class TestMCPAuthServiceGolden:
     def auth_service(self, mock_auth_client, mock_authz_client):
         """Create MCPAuthService with mocked clients."""
         from core.auth.mcp_auth_service import MCPAuthService
+
         service = MCPAuthService()
         # Directly inject mock clients to bypass lazy loading
         service._auth_client = mock_auth_client
@@ -70,9 +76,7 @@ class TestMCPAuthServiceGolden:
     # Token Authentication
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_authenticate_token_returns_user_context(
-        self, auth_service, mock_auth_client
-    ):
+    async def test_authenticate_token_returns_user_context(self, auth_service, mock_auth_client):
         """
         CURRENT BEHAVIOR: Valid token returns UserContext with user data.
         """
@@ -82,8 +86,8 @@ class TestMCPAuthServiceGolden:
                 "user_id": "user_123",
                 "email": "user@example.com",
                 "organization_id": "org_123",
-                "subscription_tier": "pro"
-            }
+                "subscription_tier": "pro",
+            },
         }
 
         result = await auth_service.authenticate_token("valid_token")
@@ -98,10 +102,7 @@ class TestMCPAuthServiceGolden:
         """
         CURRENT BEHAVIOR: Invalid token returns anonymous (unauthenticated) context.
         """
-        mock_auth_client.verify_token.return_value = {
-            "success": False,
-            "error": "Token expired"
-        }
+        mock_auth_client.verify_token.return_value = {"success": False, "error": "Token expired"}
 
         result = await auth_service.authenticate_token("invalid_token")
 
@@ -123,47 +124,38 @@ class TestMCPAuthServiceGolden:
     # Resource Access Check
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_check_resource_access_requires_authentication(
-        self, auth_service
-    ):
+    async def test_check_resource_access_requires_authentication(self, auth_service):
         """
         CURRENT BEHAVIOR: check_resource_access requires authenticated user.
         """
         from core.auth.mcp_auth_service import UserContext, ResourceType, AccessLevel
 
-        unauthenticated = UserContext(
-            user_id="anonymous",
-            is_authenticated=False
-        )
+        unauthenticated = UserContext(user_id="anonymous", is_authenticated=False)
 
         result = await auth_service.check_resource_access(
             user_context=unauthenticated,
             resource_type=ResourceType.MCP_TOOL,
             resource_name="test_tool",
-            required_level=AccessLevel.READ_ONLY
+            required_level=AccessLevel.READ_ONLY,
         )
 
         assert result["has_access"] is False
 
-    async def test_check_resource_access_calls_authz_client(
-        self, auth_service, mock_authz_client
-    ):
+    async def test_check_resource_access_calls_authz_client(self, auth_service, mock_authz_client):
         """
         CURRENT BEHAVIOR: Delegates to authorization client for access check.
         """
         from core.auth.mcp_auth_service import UserContext, ResourceType, AccessLevel
 
         authenticated = UserContext(
-            user_id="user_123",
-            is_authenticated=True,
-            organization_id="org_123"
+            user_id="user_123", is_authenticated=True, organization_id="org_123"
         )
 
         await auth_service.check_resource_access(
             user_context=authenticated,
             resource_type=ResourceType.MCP_TOOL,
             resource_name="test_tool",
-            required_level=AccessLevel.READ_WRITE
+            required_level=AccessLevel.READ_WRITE,
         )
 
         mock_authz_client.check_access.assert_called_once()
@@ -172,9 +164,7 @@ class TestMCPAuthServiceGolden:
     # Permission Management
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_get_user_permissions_returns_dict(
-        self, auth_service, mock_authz_client
-    ):
+    async def test_get_user_permissions_returns_dict(self, auth_service, mock_authz_client):
         """
         CURRENT BEHAVIOR: Returns dict of permissions.
         """
@@ -182,30 +172,22 @@ class TestMCPAuthServiceGolden:
 
         mock_authz_client.get_user_permissions.return_value = {
             "tool/text_generator": "read_write",
-            "prompt/assistant": "read_only"
+            "prompt/assistant": "read_only",
         }
 
-        authenticated = UserContext(
-            user_id="user_123",
-            is_authenticated=True
-        )
+        authenticated = UserContext(user_id="user_123", is_authenticated=True)
 
         result = await auth_service.get_user_permissions(authenticated)
 
         assert isinstance(result, dict)
 
-    async def test_get_user_permissions_empty_if_unauthenticated(
-        self, auth_service
-    ):
+    async def test_get_user_permissions_empty_if_unauthenticated(self, auth_service):
         """
         CURRENT BEHAVIOR: Returns empty dict for unauthenticated users.
         """
         from core.auth.mcp_auth_service import UserContext
 
-        unauthenticated = UserContext(
-            user_id="anonymous",
-            is_authenticated=False
-        )
+        unauthenticated = UserContext(user_id="anonymous", is_authenticated=False)
 
         result = await auth_service.get_user_permissions(unauthenticated)
 
@@ -226,7 +208,7 @@ class TestAuthorizationClientGolden:
         """
         from core.auth.authorization_client import AuthorizationServiceClient
 
-        assert hasattr(AuthorizationServiceClient, 'check_access')
+        assert hasattr(AuthorizationServiceClient, "check_access")
 
     def test_authorization_client_has_get_user_permissions_method(self):
         """
@@ -234,7 +216,7 @@ class TestAuthorizationClientGolden:
         """
         from core.auth.authorization_client import AuthorizationServiceClient
 
-        assert hasattr(AuthorizationServiceClient, 'get_user_permissions')
+        assert hasattr(AuthorizationServiceClient, "get_user_permissions")
 
 
 @pytest.mark.golden
@@ -250,7 +232,16 @@ class TestAuthMiddlewareContractsGolden:
         CURRENT BEHAVIOR: These paths bypass authentication:
         /health, /static, /portal, /, /admin, /docs, /redoc, /openapi.json
         """
-        bypass_paths = ["/health", "/static", "/portal", "/", "/admin", "/docs", "/redoc", "/openapi.json"]
+        bypass_paths = [
+            "/health",
+            "/static",
+            "/portal",
+            "/",
+            "/admin",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+        ]
         assert len(bypass_paths) > 0
 
     def test_token_extraction_priority_documented(self):
@@ -336,7 +327,7 @@ class TestAuthEnumsGolden:
             email="test@example.com",
             is_authenticated=True,
             organization_id="org_123",
-            subscription_tier=SubscriptionTier.PRO
+            subscription_tier=SubscriptionTier.PRO,
         )
 
         assert context.user_id == "user_123"

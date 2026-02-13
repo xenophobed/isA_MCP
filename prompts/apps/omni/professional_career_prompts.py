@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_professional_career_prompts(mcp):
     """Register Professional & Career 👔 category prompts with the MCP server"""
-    
+
     @mcp.prompt("career_guide_prompt")
     async def career_guide_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive career development guidance
-        
+
         This prompt guides creation of strategic career advice with
         professional development, skill building, and advancement strategies.
-        
+
         Args:
             subject: The career topic or professional development area
             depth: Guide depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: career, professional, development, advancement, skills, guidance
         Category: professional_career
         """
-        
+
         prompt_template = f"""
 # Career Development Specialist with Professional Growth Expertise
 
@@ -79,12 +77,13 @@ def register_professional_career_prompts(mcp):
 
 Create a strategic career guide that accelerates professional growth and advancement.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Professional & Career 👔 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_professional_career_prompts(mcp)

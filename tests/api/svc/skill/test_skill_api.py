@@ -8,27 +8,24 @@ Requirements:
     - Running MCP server
     - TEST_MCP_URL environment variable set
 """
+
 import pytest
 import httpx
 
 from tests.contracts.skill.data_contract import (
     SkillTestDataFactory,
-    SkillCategoryCreateRequestContract,
-    SkillCategoryResponseContract,
-    ToolClassificationResponseContract,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 async def api_client(test_config):
     """Create async HTTP client for API tests."""
     async with httpx.AsyncClient(
-        base_url=test_config.get("mcp_url", "http://localhost:8081"),
-        timeout=30.0
+        base_url=test_config.get("mcp_url", "http://localhost:8081"), timeout=30.0
     ) as client:
         yield client
 
@@ -46,7 +43,7 @@ async def created_skill(api_client):
     if response.status_code == 201:
         yield response.json()
         # Cleanup
-        await api_client.delete(f"/api/v1/skills/api_test_skill")
+        await api_client.delete("/api/v1/skills/api_test_skill")
     else:
         pytest.skip("Could not create test skill")
 
@@ -54,6 +51,7 @@ async def created_skill(api_client):
 # ═══════════════════════════════════════════════════════════════
 # POST /api/v1/skills - Create Skill Category
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.skill
@@ -111,6 +109,7 @@ class TestCreateSkillAPI:
 # GET /api/v1/skills - List Skills
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.api
 @pytest.mark.skill
 class TestListSkillsAPI:
@@ -149,6 +148,7 @@ class TestListSkillsAPI:
 # GET /api/v1/skills/{skill_id} - Get Skill
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.api
 @pytest.mark.skill
 class TestGetSkillAPI:
@@ -172,6 +172,7 @@ class TestGetSkillAPI:
 # ═══════════════════════════════════════════════════════════════
 # GET /api/v1/skills/{skill_id}/tools - Get Tools in Skill
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.skill
@@ -202,6 +203,7 @@ class TestGetToolsInSkillAPI:
 # ═══════════════════════════════════════════════════════════════
 # POST /api/v1/skills/classify - Classify Tool
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.skill
@@ -234,6 +236,7 @@ class TestClassifyToolAPI:
 # ═══════════════════════════════════════════════════════════════
 # GET /api/v1/skills/suggestions - List Pending Suggestions
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.skill

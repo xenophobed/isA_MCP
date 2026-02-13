@@ -7,6 +7,7 @@ Commands:
     isa_mcp config set <k> <v>   Set a configuration value
     isa_mcp config env           Show environment info
 """
+
 import json
 import os
 import sys
@@ -14,10 +15,10 @@ from pathlib import Path
 
 import click
 
-
 # =========================================================================
 # Config Command Group
 # =========================================================================
+
 
 @click.group()
 def config():
@@ -40,6 +41,7 @@ def config_show(as_json: bool, secrets: bool):
     """
     try:
         from core.config import get_settings
+
         settings = get_settings()
 
         config_dict = {
@@ -70,12 +72,16 @@ def config_show(as_json: bool, secrets: bool):
 
         # Mask secrets unless explicitly requested
         if not secrets:
+
             def mask_secrets(d):
                 for k, v in d.items():
                     if isinstance(v, dict):
                         mask_secrets(v)
-                    elif isinstance(v, str) and any(s in k.lower() for s in ["password", "secret", "key", "token"]):
+                    elif isinstance(v, str) and any(
+                        s in k.lower() for s in ["password", "secret", "key", "token"]
+                    ):
                         d[k] = "***" if v else None
+
             mask_secrets(config_dict)
 
     except ImportError:
@@ -119,6 +125,7 @@ def config_get(key: str):
     """
     try:
         from core.config import get_settings
+
         settings = get_settings()
 
         # Navigate nested keys
@@ -219,8 +226,9 @@ def config_env():
     click.echo(click.style("Relevant Environment Variables:", fg="blue", bold=True))
 
     relevant_prefixes = ["ISA_", "MCP_", "POSTGRES_", "REDIS_", "QDRANT_", "MODEL_", "DEBUG"]
-    env_vars = {k: v for k, v in os.environ.items()
-                if any(k.startswith(p) for p in relevant_prefixes)}
+    env_vars = {
+        k: v for k, v in os.environ.items() if any(k.startswith(p) for p in relevant_prefixes)
+    }
 
     if env_vars:
         for k, v in sorted(env_vars.items()):

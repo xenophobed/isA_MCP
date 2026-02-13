@@ -6,6 +6,7 @@ Provides CRUD operations for:
 - tool_skill_assignments: Tool-to-skill mappings
 - skill_suggestions: LLM-suggested new skills pending review
 """
+
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -39,18 +40,14 @@ class SkillRepository:
         host = host or settings.infrastructure.postgres_grpc_host
         port = port or settings.infrastructure.postgres_grpc_port
 
-        self.db = AsyncPostgresClient(
-            host=host,
-            port=port,
-            user_id='mcp-skill-service'
-        )
+        self.db = AsyncPostgresClient(host=host, port=port, user_id="mcp-skill-service")
         self.schema = "mcp"
         self.skill_table = "skill_categories"
         self.assignment_table = "tool_skill_assignments"
         self.suggestion_table = "skill_suggestions"
 
         # Fields that should never be updated
-        self._immutable_fields = ['id', 'created_at']
+        self._immutable_fields = ["id", "created_at"]
 
     # =========================================================================
     # Skill Category Operations
@@ -69,26 +66,22 @@ class SkillRepository:
         try:
             # Serialize JSON fields
             record = {
-                'id': skill_data['id'],
-                'name': skill_data['name'],
-                'description': skill_data['description'],
-                'keywords': skill_data.get('keywords', []),
-                'examples': skill_data.get('examples', []),
-                'parent_domain': skill_data.get('parent_domain'),
-                'is_active': skill_data.get('is_active', True),
-                'tool_count': 0,
+                "id": skill_data["id"],
+                "name": skill_data["name"],
+                "description": skill_data["description"],
+                "keywords": skill_data.get("keywords", []),
+                "examples": skill_data.get("examples", []),
+                "parent_domain": skill_data.get("parent_domain"),
+                "is_active": skill_data.get("is_active", True),
+                "tool_count": 0,
             }
 
             async with self.db:
-                count = await self.db.insert_into(
-                    self.skill_table,
-                    [record],
-                    schema=self.schema
-                )
+                count = await self.db.insert_into(self.skill_table, [record], schema=self.schema)
 
                 if count > 0:
                     # Fetch the created record
-                    return await self.get_skill_by_id(skill_data['id'])
+                    return await self.get_skill_by_id(skill_data["id"])
 
             return None
 
@@ -110,7 +103,7 @@ class SkillRepository:
             async with self.db:
                 result = await self.db.query_row(
                     f"SELECT * FROM {self.schema}.{self.skill_table} WHERE id = $1",
-                    params=[skill_id]
+                    params=[skill_id],
                 )
             return result
         except Exception as e:
@@ -130,8 +123,7 @@ class SkillRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.skill_table} WHERE name = $1",
-                    params=[name]
+                    f"SELECT * FROM {self.schema}.{self.skill_table} WHERE name = $1", params=[name]
                 )
             return result
         except Exception as e:
@@ -143,7 +135,7 @@ class SkillRepository:
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
         List skill categories with optional filters.
@@ -193,9 +185,7 @@ class SkillRepository:
             return []
 
     async def update_skill_category(
-        self,
-        skill_id: str,
-        updates: Dict[str, Any]
+        self, skill_id: str, updates: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """
         Update a skill category.
@@ -209,10 +199,7 @@ class SkillRepository:
         """
         try:
             # Filter out immutable fields
-            valid_updates = {
-                k: v for k, v in updates.items()
-                if k not in self._immutable_fields
-            }
+            valid_updates = {k: v for k, v in updates.items() if k not in self._immutable_fields}
 
             if not valid_updates:
                 return await self.get_skill_by_id(skill_id)
@@ -271,7 +258,7 @@ class SkillRepository:
                     SET is_active = FALSE, updated_at = $1
                     WHERE id = $2
                     """,
-                    params=[datetime.now(timezone.utc), skill_id]
+                    params=[datetime.now(timezone.utc), skill_id],
                 )
             return True
         except Exception as e:
@@ -297,7 +284,7 @@ class SkillRepository:
                     SET tool_count = GREATEST(0, tool_count + $1), updated_at = $2
                     WHERE id = $3
                     """,
-                    params=[delta, datetime.now(timezone.utc), skill_id]
+                    params=[delta, datetime.now(timezone.utc), skill_id],
                 )
             return True
         except Exception as e:
@@ -314,7 +301,7 @@ class SkillRepository:
         skill_id: str,
         confidence: float,
         is_primary: bool = False,
-        source: str = 'llm_auto'
+        source: str = "llm_auto",
     ) -> Optional[Dict[str, Any]]:
         """
         Create a tool-skill assignment.
@@ -331,18 +318,16 @@ class SkillRepository:
         """
         try:
             record = {
-                'tool_id': tool_id,
-                'skill_id': skill_id,
-                'confidence': confidence,
-                'is_primary': is_primary,
-                'source': source,
+                "tool_id": tool_id,
+                "skill_id": skill_id,
+                "confidence": confidence,
+                "is_primary": is_primary,
+                "source": source,
             }
 
             async with self.db:
                 count = await self.db.insert_into(
-                    self.assignment_table,
-                    [record],
-                    schema=self.schema
+                    self.assignment_table, [record], schema=self.schema
                 )
 
                 if count is not None and count > 0:
@@ -352,7 +337,7 @@ class SkillRepository:
                         SELECT * FROM {self.schema}.{self.assignment_table}
                         WHERE tool_id = $1 AND skill_id = $2
                         """,
-                        params=[tool_id, skill_id]
+                        params=[tool_id, skill_id],
                     )
 
             return None
@@ -379,7 +364,7 @@ class SkillRepository:
                     WHERE tool_id = $1
                     ORDER BY confidence DESC
                     """,
-                    params=[tool_id]
+                    params=[tool_id],
                 )
             return results or []
         except Exception as e:
@@ -387,10 +372,7 @@ class SkillRepository:
             return []
 
     async def get_assignments_for_skill(
-        self,
-        skill_id: str,
-        limit: int = 100,
-        offset: int = 0
+        self, skill_id: str, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Get all tool assignments for a skill.
@@ -412,7 +394,7 @@ class SkillRepository:
                     ORDER BY confidence DESC
                     LIMIT $2 OFFSET $3
                     """,
-                    params=[skill_id, limit, offset]
+                    params=[skill_id, limit, offset],
                 )
             return results or []
         except Exception as e:
@@ -435,7 +417,7 @@ class SkillRepository:
             async with self.db:
                 await self.db.execute(
                     f"DELETE FROM {self.schema}.{self.assignment_table} WHERE tool_id = $1",
-                    params=[tool_id]
+                    params=[tool_id],
                 )
             return True
         except Exception as e:
@@ -460,7 +442,7 @@ class SkillRepository:
                     WHERE tool_id = $1 AND source IN ('human_manual', 'human_override')
                     LIMIT 1
                     """,
-                    params=[tool_id]
+                    params=[tool_id],
                 )
             return result is not None
         except Exception as e:
@@ -477,7 +459,7 @@ class SkillRepository:
         suggested_description: str,
         source_tool_id: int,
         source_tool_name: str,
-        reasoning: str
+        reasoning: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Create a skill suggestion from LLM.
@@ -494,19 +476,17 @@ class SkillRepository:
         """
         try:
             record = {
-                'suggested_name': suggested_name,
-                'suggested_description': suggested_description,
-                'source_tool_id': source_tool_id,
-                'source_tool_name': source_tool_name,
-                'reasoning': reasoning,
-                'status': 'pending',
+                "suggested_name": suggested_name,
+                "suggested_description": suggested_description,
+                "source_tool_id": source_tool_id,
+                "source_tool_name": source_tool_name,
+                "reasoning": reasoning,
+                "status": "pending",
             }
 
             async with self.db:
                 count = await self.db.insert_into(
-                    self.suggestion_table,
-                    [record],
-                    schema=self.schema
+                    self.suggestion_table, [record], schema=self.schema
                 )
 
                 if count > 0:
@@ -518,7 +498,7 @@ class SkillRepository:
                         ORDER BY created_at DESC
                         LIMIT 1
                         """,
-                        params=[suggested_name]
+                        params=[suggested_name],
                     )
 
             return None
@@ -528,10 +508,7 @@ class SkillRepository:
             return None
 
     async def list_suggestions(
-        self,
-        status: str = 'pending',
-        limit: int = 100,
-        offset: int = 0
+        self, status: str = "pending", limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         List skill suggestions.
@@ -553,18 +530,14 @@ class SkillRepository:
                     ORDER BY created_at DESC
                     LIMIT $2 OFFSET $3
                     """,
-                    params=[status, limit, offset]
+                    params=[status, limit, offset],
                 )
             return results or []
         except Exception as e:
             logger.error(f"Failed to list suggestions: {e}")
             return []
 
-    async def update_suggestion_status(
-        self,
-        suggestion_id: int,
-        status: str
-    ) -> bool:
+    async def update_suggestion_status(self, suggestion_id: int, status: str) -> bool:
         """
         Update suggestion status.
 
@@ -583,7 +556,7 @@ class SkillRepository:
                     SET status = $1, updated_at = $2
                     WHERE id = $3
                     """,
-                    params=[status, datetime.now(timezone.utc), suggestion_id]
+                    params=[status, datetime.now(timezone.utc), suggestion_id],
                 )
             return True
         except Exception as e:
@@ -609,9 +582,9 @@ class SkillRepository:
                     SELECT COUNT(*) as count FROM {self.schema}.{self.suggestion_table}
                     WHERE LOWER(suggested_name) = LOWER($1) AND status = 'pending'
                     """,
-                    params=[suggested_name]
+                    params=[suggested_name],
                 )
-            return result.get('count', 0) if result else 0
+            return result.get("count", 0) if result else 0
         except Exception as e:
             logger.error(f"Failed to count suggestions for '{suggested_name}': {e}")
             return 0

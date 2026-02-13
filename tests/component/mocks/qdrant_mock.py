@@ -4,6 +4,7 @@ Mock for Qdrant vector database client.
 Provides a mock implementation of Qdrant client
 for testing vector operations without a real Qdrant instance.
 """
+
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 import uuid
@@ -12,6 +13,7 @@ import uuid
 @dataclass
 class MockPoint:
     """Represents a vector point in Qdrant."""
+
     id: str
     vector: List[float]
     payload: Dict[str, Any] = field(default_factory=dict)
@@ -20,6 +22,7 @@ class MockPoint:
 @dataclass
 class MockScoredPoint:
     """Represents a search result with score."""
+
     id: str
     score: float
     payload: Dict[str, Any] = field(default_factory=dict)
@@ -29,6 +32,7 @@ class MockScoredPoint:
 @dataclass
 class MockCollectionInfo:
     """Collection information."""
+
     name: str
     vectors_count: int = 0
     points_count: int = 0
@@ -57,18 +61,14 @@ class MockQdrantClient:
         self._closed = False
 
     async def create_collection(
-        self,
-        collection_name: str,
-        vectors_config: Dict[str, Any] = None,
-        **kwargs
+        self, collection_name: str, vectors_config: Dict[str, Any] = None, **kwargs
     ) -> bool:
         """Create a new collection."""
         if collection_name in self.collections:
             raise ValueError(f"Collection {collection_name} already exists")
 
         self.collections[collection_name] = MockCollectionInfo(
-            name=collection_name,
-            config=vectors_config or {"size": 1536, "distance": "Cosine"}
+            name=collection_name, config=vectors_config or {"size": 1536, "distance": "Cosine"}
         )
         self.points[collection_name] = []
         return True
@@ -96,10 +96,7 @@ class MockQdrantClient:
         return info
 
     async def upsert(
-        self,
-        collection_name: str,
-        points: List[MockPoint],
-        **kwargs
+        self, collection_name: str, points: List[MockPoint], **kwargs
     ) -> Dict[str, Any]:
         """Insert or update points."""
         if collection_name not in self.collections:
@@ -113,7 +110,7 @@ class MockQdrantClient:
                 point = MockPoint(
                     id=point.get("id", str(uuid.uuid4())),
                     vector=point.get("vector", []),
-                    payload=point.get("payload", {})
+                    payload=point.get("payload", {}),
                 )
 
             # Remove existing point with same ID
@@ -134,7 +131,7 @@ class MockQdrantClient:
         with_payload: bool = True,
         with_vectors: bool = False,
         filter: Dict[str, Any] = None,
-        **kwargs
+        **kwargs,
     ) -> List[MockScoredPoint]:
         """Search for similar vectors."""
         if collection_name not in self.collections:
@@ -148,12 +145,14 @@ class MockQdrantClient:
             results = []
             for i, point in enumerate(points[:limit]):
                 score = 1.0 - (i * 0.1)  # Decreasing scores
-                results.append(MockScoredPoint(
-                    id=point.id,
-                    score=max(0.1, score),
-                    payload=point.payload if with_payload else {},
-                    vector=point.vector if with_vectors else None
-                ))
+                results.append(
+                    MockScoredPoint(
+                        id=point.id,
+                        score=max(0.1, score),
+                        payload=point.payload if with_payload else {},
+                        vector=point.vector if with_vectors else None,
+                    )
+                )
             return results
 
         # Calculate cosine similarity for actual vector search
@@ -171,12 +170,14 @@ class MockQdrantClient:
             if filter and not self._matches_filter(point.payload, filter):
                 continue
 
-            results.append(MockScoredPoint(
-                id=point.id,
-                score=score,
-                payload=point.payload if with_payload else {},
-                vector=point.vector if with_vectors else None
-            ))
+            results.append(
+                MockScoredPoint(
+                    id=point.id,
+                    score=score,
+                    payload=point.payload if with_payload else {},
+                    vector=point.vector if with_vectors else None,
+                )
+            )
 
         # Sort by score descending
         results.sort(key=lambda x: x.score, reverse=True)
@@ -189,7 +190,7 @@ class MockQdrantClient:
         ids: List[str],
         with_payload: bool = True,
         with_vectors: bool = False,
-        **kwargs
+        **kwargs,
     ) -> List[MockPoint]:
         """Retrieve points by IDs."""
         if collection_name not in self.collections:
@@ -203,17 +204,14 @@ class MockQdrantClient:
                 result = MockPoint(
                     id=point.id,
                     vector=point.vector if with_vectors else [],
-                    payload=point.payload if with_payload else {}
+                    payload=point.payload if with_payload else {},
                 )
                 results.append(result)
 
         return results
 
     async def delete(
-        self,
-        collection_name: str,
-        points_selector: Dict[str, Any] = None,
-        **kwargs
+        self, collection_name: str, points_selector: Dict[str, Any] = None, **kwargs
     ) -> Dict[str, Any]:
         """Delete points from collection."""
         if collection_name not in self.collections:
@@ -222,8 +220,7 @@ class MockQdrantClient:
         if points_selector and "points" in points_selector:
             ids_to_delete = set(points_selector["points"])
             self.points[collection_name] = [
-                p for p in self.points[collection_name]
-                if p.id not in ids_to_delete
+                p for p in self.points[collection_name] if p.id not in ids_to_delete
             ]
 
         return {"status": "completed"}
@@ -271,13 +268,11 @@ class MockQdrantClient:
     def create_collection_sync(self, *args, **kwargs):
         """Synchronous create collection."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(
-            self.create_collection(*args, **kwargs)
-        )
+
+        return asyncio.get_event_loop().run_until_complete(self.create_collection(*args, **kwargs))
 
     def search_sync(self, *args, **kwargs):
         """Synchronous search."""
         import asyncio
-        return asyncio.get_event_loop().run_until_complete(
-            self.search(*args, **kwargs)
-        )
+
+        return asyncio.get_event_loop().run_until_complete(self.search(*args, **kwargs))

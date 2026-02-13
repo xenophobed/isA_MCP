@@ -5,37 +5,36 @@ Hunt Application Prompts - 4 Specialized Search Mode Templates
 
 from mcp.server.fastmcp import FastMCP
 
+
 def register_hunt_prompts(mcp: FastMCP):
     """Register hunt application prompts for 4 search modes: ecommerce, academic, social, general"""
-    
+
     @mcp.prompt()
     def hunt_ecommerce_prompt(
-        query: str = "",
-        search_depth: str = "medium",
-        result_format: str = "structured"
+        query: str = "", search_depth: str = "medium", result_format: str = "structured"
     ) -> str:
         """
         E-commerce focused search template for products, pricing, and reviews
-        
+
         Transforms user queries into comprehensive product research requests
         optimized for shopping decisions, price comparisons, and product analysis.
-        
+
         Keywords: hunt, ecommerce, product-search, price-comparison, shopping
         Category: hunt
         """
-        
+
         depth_instructions = {
             "quick": "Focus on top products and key pricing information",
-            "medium": "Comprehensive product analysis with comparisons and reviews", 
-            "deep": "Exhaustive market research including specifications, alternatives, and detailed pricing analysis"
+            "medium": "Comprehensive product analysis with comparisons and reviews",
+            "deep": "Exhaustive market research including specifications, alternatives, and detailed pricing analysis",
         }.get(search_depth.lower(), "Comprehensive product analysis")
-        
+
         format_guidance = {
             "structured": "Organize results in clear categories with comparison tables",
             "detailed": "Provide in-depth analysis with full product descriptions",
-            "summary": "Concise overview with key highlights and recommendations"
+            "summary": "Concise overview with key highlights and recommendations",
         }.get(result_format.lower(), "structured format")
-        
+
         return f"""You are an expert e-commerce research assistant. Transform the user's query into a comprehensive product research request.
 
 ## ORIGINAL QUERY:
@@ -70,32 +69,30 @@ Transform "{query}" into comprehensive shopping intelligence that helps users ma
 
     @mcp.prompt()
     def hunt_academic_prompt(
-        query: str = "",
-        search_depth: str = "medium",
-        result_format: str = "structured"
+        query: str = "", search_depth: str = "medium", result_format: str = "structured"
     ) -> str:
         """
         Academic research template for papers, studies, and scholarly content
-        
+
         Transforms queries into comprehensive academic research requests
         focused on scholarly sources, peer-reviewed content, and research insights.
-        
+
         Keywords: hunt, academic, research, scholarly, papers, citations
         Category: hunt
         """
-        
+
         depth_instructions = {
             "quick": "Find key papers and primary research sources",
             "medium": "Comprehensive literature review with multiple perspectives and methodologies",
-            "deep": "Exhaustive academic analysis including historical context, methodology comparison, and research gaps"
+            "deep": "Exhaustive academic analysis including historical context, methodology comparison, and research gaps",
         }.get(search_depth.lower(), "Comprehensive literature review")
-        
+
         format_guidance = {
             "structured": "Organize by themes with proper academic citations",
             "detailed": "Full analysis with methodology, findings, and implications",
-            "summary": "Key insights with essential references and conclusions"
+            "summary": "Key insights with essential references and conclusions",
         }.get(result_format.lower(), "structured academic format")
-        
+
         return f"""You are a specialized academic research assistant. Transform the user's query into a comprehensive scholarly research request.
 
 ## ORIGINAL QUERY:
@@ -130,32 +127,30 @@ Transform "{query}" into comprehensive academic intelligence that provides schol
 
     @mcp.prompt()
     def hunt_social_prompt(
-        query: str = "",
-        search_depth: str = "medium",
-        result_format: str = "structured"
+        query: str = "", search_depth: str = "medium", result_format: str = "structured"
     ) -> str:
         """
         Social media and community focused search template
-        
+
         Transforms queries into social listening and community research requests
         focused on trends, discussions, and public sentiment analysis.
-        
+
         Keywords: hunt, social, community, trends, sentiment, discussions
         Category: hunt
         """
-        
+
         depth_instructions = {
             "quick": "Capture current trends and popular discussions",
             "medium": "Comprehensive social sentiment analysis with community insights and trend patterns",
-            "deep": "Deep social intelligence including influencer analysis, community dynamics, and sentiment evolution"
+            "deep": "Deep social intelligence including influencer analysis, community dynamics, and sentiment evolution",
         }.get(search_depth.lower(), "Comprehensive social sentiment analysis")
-        
+
         format_guidance = {
             "structured": "Organize by platform with trend analysis and key discussions",
-            "detailed": "Full sentiment breakdown with community context and influencer insights", 
-            "summary": "Key trends with sentiment highlights and viral content"
+            "detailed": "Full sentiment breakdown with community context and influencer insights",
+            "summary": "Key trends with sentiment highlights and viral content",
         }.get(result_format.lower(), "structured social format")
-        
+
         return f"""You are a social media and community research specialist. Transform the user's query into a comprehensive social intelligence request.
 
 ## ORIGINAL QUERY:
@@ -190,32 +185,30 @@ Transform "{query}" into comprehensive social intelligence that captures communi
 
     @mcp.prompt()
     def hunt_general_prompt(
-        query: str = "",
-        search_depth: str = "medium",
-        result_format: str = "structured"
+        query: str = "", search_depth: str = "medium", result_format: str = "structured"
     ) -> str:
         """
         General web search template for comprehensive information gathering
-        
+
         Transforms queries into broad web research requests optimized for
         comprehensive information discovery across diverse sources and topics.
-        
+
         Keywords: hunt, general, web-search, comprehensive, information
         Category: hunt
         """
-        
+
         depth_instructions = {
             "quick": "Provide essential information with key facts and reliable sources",
             "medium": "Thorough research with multiple perspectives and comprehensive coverage",
-            "deep": "Exhaustive information gathering with deep analysis, context, and expert insights"
+            "deep": "Exhaustive information gathering with deep analysis, context, and expert insights",
         }.get(search_depth.lower(), "Thorough research with multiple perspectives")
-        
+
         format_guidance = {
             "structured": "Organize information in clear sections with source attribution",
             "detailed": "Comprehensive analysis with context, implications, and expert perspectives",
-            "summary": "Concise overview with key points and reliable source references"
+            "summary": "Concise overview with key points and reliable source references",
         }.get(result_format.lower(), "structured information format")
-        
+
         return f"""You are a comprehensive web research specialist. Transform the user's query into a thorough information gathering request.
 
 ## ORIGINAL QUERY:
@@ -249,6 +242,7 @@ Transform "{query}" into comprehensive social intelligence that captures communi
 Transform "{query}" into comprehensive web intelligence that provides thorough, reliable, and well-sourced information for informed understanding and decision-making."""
 
     # Registration complete (debug-level event)
+
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

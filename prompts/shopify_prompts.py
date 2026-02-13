@@ -3,6 +3,7 @@
 Shopping Prompts for MCP Server
 Provides AI-enhanced prompts for shopping assistance and personalization
 """
+
 from datetime import datetime
 from typing import Dict, Any
 
@@ -10,19 +11,20 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_shopping_prompts(mcp):
     """Register all shopping-related prompts with the MCP server"""
-    
+
     @mcp.prompt()
     async def personal_stylist_prompt(
-        user_style: str = "casual", 
-        occasion: str = "daily", 
+        user_style: str = "casual",
+        occasion: str = "daily",
         budget: str = "moderate",
         body_type: str = "",
-        color_preference: str = ""
+        color_preference: str = "",
     ) -> str:
         """Generate a personal stylist consultation prompt"""
-        
+
         return f"""You are an expert personal stylist with years of experience in fashion and style consulting. 
 
 CLIENT PROFILE:
@@ -60,10 +62,10 @@ Please provide warm, encouraging advice that builds confidence while being pract
     async def product_comparison_prompt(
         products: str = "",
         comparison_criteria: str = "price,quality,style,reviews",
-        user_priorities: str = "quality"
+        user_priorities: str = "quality",
     ) -> str:
         """Generate a detailed product comparison analysis prompt"""
-        
+
         return f"""You are a product analysis expert specializing in helping customers make informed purchasing decisions.
 
 PRODUCTS TO COMPARE:
@@ -118,10 +120,10 @@ Be objective, thorough, and focus on helping the user make the best decision for
         base_item: str = "",
         style_goal: str = "balanced",
         season: str = "current",
-        color_scheme: str = "harmonious"
+        color_scheme: str = "harmonious",
     ) -> str:
         """Generate outfit coordination and styling suggestions"""
-        
+
         return f"""You are a professional fashion coordinator with expertise in creating cohesive, stylish outfits.
 
 STYLING CHALLENGE:
@@ -180,10 +182,10 @@ Present 3-4 distinct outfit options, each with a different mood or occasion focu
         user_query: str = "",
         shopping_context: str = "",
         user_preferences: str = "",
-        budget_constraints: str = ""
+        budget_constraints: str = "",
     ) -> str:
         """Generate a comprehensive shopping assistant interaction prompt"""
-        
+
         return f"""You are an intelligent shopping assistant with deep knowledge of fashion, trends, and customer service excellence.
 
 CUSTOMER INQUIRY:
@@ -246,10 +248,10 @@ Your goal is to create an exceptional shopping experience that results in custom
         trend_topic: str = "current fashion",
         target_demographic: str = "general",
         season: str = "current",
-        analysis_depth: str = "comprehensive"
+        analysis_depth: str = "comprehensive",
     ) -> str:
         """Generate fashion trend analysis and forecasting prompt"""
-        
+
         return f"""You are a fashion trend analyst and forecaster with expertise in market research and consumer behavior.
 
 ANALYSIS FOCUS:
@@ -314,10 +316,10 @@ Present findings in a structured, data-driven format that supports strategic dec
         product_category: str = "apparel",
         user_measurements: str = "",
         fit_preference: str = "standard",
-        brand_info: str = ""
+        brand_info: str = "",
     ) -> str:
         """Generate size and fit consultation guidance prompt"""
-        
+
         return f"""You are a professional fit consultant with extensive experience in sizing, tailoring, and garment construction.
 
 FIT CONSULTATION REQUEST:

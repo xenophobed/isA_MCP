@@ -9,6 +9,7 @@ Services Under Test:
 - tools/services/intelligence_service/language/embedding_generator.py
 - tools/services/intelligence_service/vision/image_analyzer.py
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,17 +33,18 @@ class TestTextGeneratorGolden:
         client = AsyncMock()
         client.chat = MagicMock()
         client.chat.completions = MagicMock()
-        client.chat.completions.create = AsyncMock(return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content="Generated text"))]
-        ))
+        client.chat.completions.create = AsyncMock(
+            return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="Generated text"))])
+        )
         return client
 
     @pytest.fixture
     def text_generator(self, mock_client):
         """Create TextGenerator with mocked client."""
-        with patch('core.clients.model_client.get_isa_client') as mock_get:
+        with patch("core.clients.model_client.get_isa_client") as mock_get:
             mock_get.return_value = mock_client
             from tools.intelligent_tools.language.text_generator import TextGenerator
+
             generator = TextGenerator()
             generator._client = mock_client
             return generator
@@ -76,7 +78,7 @@ class TestTextGeneratorGolden:
 
         mock_client.chat.completions.create.assert_called()
         call_kwargs = mock_client.chat.completions.create.call_args[1]
-        assert call_kwargs.get('temperature') == 0.5
+        assert call_kwargs.get("temperature") == 0.5
 
 
 @pytest.mark.golden
@@ -97,17 +99,18 @@ class TestEmbeddingGeneratorGolden:
         """Create mock model client."""
         client = AsyncMock()
         client.embeddings = MagicMock()
-        client.embeddings.create = AsyncMock(return_value=MagicMock(
-            data=[MagicMock(embedding=[0.1] * 1536)]
-        ))
+        client.embeddings.create = AsyncMock(
+            return_value=MagicMock(data=[MagicMock(embedding=[0.1] * 1536)])
+        )
         return client
 
     @pytest.fixture
     def embedding_generator(self, mock_client):
         """Create EmbeddingGenerator with mocked client."""
-        with patch('core.clients.model_client.get_isa_client') as mock_get:
+        with patch("core.clients.model_client.get_isa_client") as mock_get:
             mock_get.return_value = mock_client
             from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
+
             generator = EmbeddingGenerator()
             generator._client = mock_client
             return generator
@@ -154,17 +157,18 @@ class TestImageAnalyzerGolden:
         # Vision API uses vision.completions.create
         client.vision = MagicMock()
         client.vision.completions = MagicMock()
-        client.vision.completions.create = AsyncMock(return_value=MagicMock(
-            text="Image description"
-        ))
+        client.vision.completions.create = AsyncMock(
+            return_value=MagicMock(text="Image description")
+        )
         return client
 
     @pytest.fixture
     def image_analyzer(self, mock_client):
         """Create ImageAnalyzer with mocked client."""
-        with patch('core.clients.model_client.get_isa_client') as mock_get:
+        with patch("core.clients.model_client.get_isa_client") as mock_get:
             mock_get.return_value = mock_client
             from tools.intelligent_tools.vision.image_analyzer import ImageAnalyzer
+
             analyzer = ImageAnalyzer()
             analyzer._client = mock_client
             return analyzer
@@ -174,21 +178,17 @@ class TestImageAnalyzerGolden:
         CURRENT BEHAVIOR: analyze() returns ImageAnalysisResult with success and response.
         """
         result = await image_analyzer.analyze(
-            image="https://example.com/image.jpg",
-            prompt="Describe this image"
+            image="https://example.com/image.jpg", prompt="Describe this image"
         )
 
         assert result is not None
-        assert hasattr(result, 'success')
+        assert hasattr(result, "success")
 
     async def test_analyze_calls_vision_api(self, image_analyzer, mock_client):
         """
         CURRENT BEHAVIOR: Uses vision.completions.create API.
         """
-        await image_analyzer.analyze(
-            image="https://example.com/image.jpg",
-            prompt="Describe"
-        )
+        await image_analyzer.analyze(image="https://example.com/image.jpg", prompt="Describe")
 
         mock_client.vision.completions.create.assert_called()
 
@@ -206,7 +206,7 @@ class TestIntelligenceServiceInterfaceGolden:
         """
         from tools.intelligent_tools.language.text_generator import TextGenerator
 
-        assert hasattr(TextGenerator, 'generate')
+        assert hasattr(TextGenerator, "generate")
 
     def test_embedding_generator_has_embed_method(self):
         """
@@ -214,7 +214,7 @@ class TestIntelligenceServiceInterfaceGolden:
         """
         from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
 
-        assert hasattr(EmbeddingGenerator, 'embed')
+        assert hasattr(EmbeddingGenerator, "embed")
 
     def test_image_analyzer_has_analyze_method(self):
         """
@@ -222,4 +222,4 @@ class TestIntelligenceServiceInterfaceGolden:
         """
         from tools.intelligent_tools.vision.image_analyzer import ImageAnalyzer
 
-        assert hasattr(ImageAnalyzer, 'analyze')
+        assert hasattr(ImageAnalyzer, "analyze")

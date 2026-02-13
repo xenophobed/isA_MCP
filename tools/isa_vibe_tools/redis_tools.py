@@ -24,6 +24,7 @@ from tools.base_tool import BaseTool
 # Optional isa_common import
 try:
     from isa_common import AsyncRedisClient
+
     REDIS_CLIENT_AVAILABLE = True
 except ImportError:
     REDIS_CLIENT_AVAILABLE = False
@@ -42,10 +43,7 @@ async def get_client() -> "AsyncRedisClient":
     if not REDIS_CLIENT_AVAILABLE:
         raise ImportError("isa_common not installed. Install with: pip install isa_common")
     client = AsyncRedisClient(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        user_id="mcp_agent",
-        organization_id="isa-platform"
+        host=REDIS_HOST, port=REDIS_PORT, user_id="mcp_agent", organization_id="isa-platform"
     )
     await client.__aenter__()
     return client
@@ -71,15 +69,12 @@ def register_redis_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="redis_health_check",
-                data=health or {"error": "Health check failed"}
+                data=health or {"error": "Health check failed"},
             )
         except Exception as e:
             logger.error(f"Error in redis_health_check: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_health_check",
-                data={},
-                error_message=str(e)
+                status="error", action="redis_health_check", data={}, error_message=str(e)
             )
         finally:
             if client:
@@ -104,7 +99,7 @@ def register_redis_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="redis_get",
-                    data={"key": key, "value": None, "exists": False}
+                    data={"key": key, "value": None, "exists": False},
                 )
 
             # Try to parse as JSON
@@ -113,22 +108,19 @@ def register_redis_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="redis_get",
-                    data={"key": key, "value": parsed, "type": "json"}
+                    data={"key": key, "value": parsed, "type": "json"},
                 )
             except (json.JSONDecodeError, TypeError):
                 return tools.create_response(
                     status="success",
                     action="redis_get",
-                    data={"key": key, "value": value, "type": "string"}
+                    data={"key": key, "value": value, "type": "string"},
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_get: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_get",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_get", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -163,8 +155,8 @@ def register_redis_tools(mcp: FastMCP):
                         "pattern": pattern,
                         "keys": keys or [],
                         "count": len(keys) if keys else 0,
-                        "truncated": truncated
-                    }
+                        "truncated": truncated,
+                    },
                 )
             except AttributeError:
                 return tools.create_response(
@@ -173,17 +165,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "pattern": pattern,
                         "note": "keys() not available in client",
-                        "hint": "Use redis-cli: KEYS " + pattern
-                    }
+                        "hint": "Use redis-cli: KEYS " + pattern,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_keys: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_keys",
-                data={"pattern": pattern},
-                error_message=str(e)
+                status="error", action="redis_keys", data={"pattern": pattern}, error_message=str(e)
             )
         finally:
             if client:
@@ -205,15 +194,15 @@ def register_redis_tools(mcp: FastMCP):
 
             try:
                 ttl = await client.ttl(key)
-                ttl_desc = "no expiry" if ttl == -1 else ("key not found" if ttl == -2 else f"{ttl} seconds")
+                ttl_desc = (
+                    "no expiry"
+                    if ttl == -1
+                    else ("key not found" if ttl == -2 else f"{ttl} seconds")
+                )
                 return tools.create_response(
                     status="success",
                     action="redis_ttl",
-                    data={
-                        "key": key,
-                        "ttl_seconds": ttl,
-                        "ttl_description": ttl_desc
-                    }
+                    data={"key": key, "ttl_seconds": ttl, "ttl_description": ttl_desc},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -222,17 +211,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "note": "ttl() not available in client",
-                        "hint": "Use redis-cli: TTL " + key
-                    }
+                        "hint": "Use redis-cli: TTL " + key,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_ttl: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_ttl",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_ttl", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -255,9 +241,7 @@ def register_redis_tools(mcp: FastMCP):
             try:
                 key_type = await client.type(key)
                 return tools.create_response(
-                    status="success",
-                    action="redis_type",
-                    data={"key": key, "type": key_type}
+                    status="success", action="redis_type", data={"key": key, "type": key_type}
                 )
             except AttributeError:
                 return tools.create_response(
@@ -266,17 +250,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "note": "type() not available in client",
-                        "hint": "Use redis-cli: TYPE " + key
-                    }
+                        "hint": "Use redis-cli: TYPE " + key,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_type: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_type",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_type", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -301,11 +282,7 @@ def register_redis_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="redis_exists",
-                    data={
-                        "keys": keys,
-                        "existing_count": count,
-                        "all_exist": count == len(keys)
-                    }
+                    data={"keys": keys, "existing_count": count, "all_exist": count == len(keys)},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -314,17 +291,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "keys": keys,
                         "note": "exists() not available in client",
-                        "hint": "Use redis-cli: EXISTS " + " ".join(keys)
-                    }
+                        "hint": "Use redis-cli: EXISTS " + " ".join(keys),
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_exists: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_exists",
-                data={"keys": keys},
-                error_message=str(e)
+                status="error", action="redis_exists", data={"keys": keys}, error_message=str(e)
             )
         finally:
             if client:
@@ -349,11 +323,7 @@ def register_redis_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="redis_hgetall",
-                    data={
-                        "key": key,
-                        "data": data or {},
-                        "field_count": len(data) if data else 0
-                    }
+                    data={"key": key, "data": data or {}, "field_count": len(data) if data else 0},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -362,17 +332,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "note": "hgetall() not available in client",
-                        "hint": "Use redis-cli: HGETALL " + key
-                    }
+                        "hint": "Use redis-cli: HGETALL " + key,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_hgetall: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_hgetall",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_hgetall", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -399,11 +366,7 @@ def register_redis_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="redis_lrange",
-                    data={
-                        "key": key,
-                        "items": items or [],
-                        "count": len(items) if items else 0
-                    }
+                    data={"key": key, "items": items or [], "count": len(items) if items else 0},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -412,17 +375,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "note": "lrange() not available in client",
-                        "hint": f"Use redis-cli: LRANGE {key} {start} {stop}"
-                    }
+                        "hint": f"Use redis-cli: LRANGE {key} {start} {stop}",
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_lrange: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_lrange",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_lrange", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -450,8 +410,8 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "members": list(members) if members else [],
-                        "count": len(members) if members else 0
-                    }
+                        "count": len(members) if members else 0,
+                    },
                 )
             except AttributeError:
                 return tools.create_response(
@@ -460,17 +420,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "key": key,
                         "note": "smembers() not available in client",
-                        "hint": "Use redis-cli: SMEMBERS " + key
-                    }
+                        "hint": "Use redis-cli: SMEMBERS " + key,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_smembers: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_smembers",
-                data={"key": key},
-                error_message=str(e)
+                status="error", action="redis_smembers", data={"key": key}, error_message=str(e)
             )
         finally:
             if client:
@@ -493,9 +450,7 @@ def register_redis_tools(mcp: FastMCP):
             try:
                 info = await client.info(section if section != "default" else None)
                 return tools.create_response(
-                    status="success",
-                    action="redis_info",
-                    data={"section": section, "info": info}
+                    status="success", action="redis_info", data={"section": section, "info": info}
                 )
             except AttributeError:
                 return tools.create_response(
@@ -504,17 +459,14 @@ def register_redis_tools(mcp: FastMCP):
                     data={
                         "section": section,
                         "note": "info() not available in client",
-                        "hint": "Use redis-cli: INFO " + section
-                    }
+                        "hint": "Use redis-cli: INFO " + section,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_info: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_info",
-                data={"section": section},
-                error_message=str(e)
+                status="error", action="redis_info", data={"section": section}, error_message=str(e)
             )
         finally:
             if client:
@@ -534,9 +486,7 @@ def register_redis_tools(mcp: FastMCP):
             try:
                 size = await client.dbsize()
                 return tools.create_response(
-                    status="success",
-                    action="redis_dbsize",
-                    data={"key_count": size}
+                    status="success", action="redis_dbsize", data={"key_count": size}
                 )
             except AttributeError:
                 return tools.create_response(
@@ -544,17 +494,14 @@ def register_redis_tools(mcp: FastMCP):
                     action="redis_dbsize",
                     data={
                         "note": "dbsize() not available in client",
-                        "hint": "Use redis-cli: DBSIZE"
-                    }
+                        "hint": "Use redis-cli: DBSIZE",
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in redis_dbsize: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_dbsize",
-                data={},
-                error_message=str(e)
+                status="error", action="redis_dbsize", data={}, error_message=str(e)
             )
         finally:
             if client:
@@ -579,7 +526,7 @@ def register_redis_tools(mcp: FastMCP):
             trace_key = f"obs:{session_id}:trace"
             entries = await client.lrange(trace_key, -limit, -1)
             traces = []
-            for entry in (entries or []):
+            for entry in entries or []:
                 try:
                     traces.append(json.loads(entry))
                 except (json.JSONDecodeError, TypeError):
@@ -588,11 +535,7 @@ def register_redis_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="redis_obs_traces",
-                data={
-                    "session_id": session_id,
-                    "traces": traces,
-                    "count": len(traces)
-                }
+                data={"session_id": session_id, "traces": traces, "count": len(traces)},
             )
 
         except Exception as e:
@@ -601,7 +544,7 @@ def register_redis_tools(mcp: FastMCP):
                 status="error",
                 action="redis_obs_traces",
                 data={"session_id": session_id},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -633,15 +576,13 @@ def register_redis_tools(mcp: FastMCP):
                     "last_activity": data.get("last_activity", ""),
                 }
                 if metrics["tool_calls"] > 0:
-                    metrics["avg_duration_ms"] = metrics["total_duration_ms"] // metrics["tool_calls"]
+                    metrics["avg_duration_ms"] = (
+                        metrics["total_duration_ms"] // metrics["tool_calls"]
+                    )
             else:
                 metrics = {"session_id": session_id, "found": False}
 
-            return tools.create_response(
-                status="success",
-                action="redis_obs_metrics",
-                data=metrics
-            )
+            return tools.create_response(status="success", action="redis_obs_metrics", data=metrics)
 
         except Exception as e:
             logger.error(f"Error in redis_obs_metrics: {e}")
@@ -649,7 +590,7 @@ def register_redis_tools(mcp: FastMCP):
                 status="error",
                 action="redis_obs_metrics",
                 data={"session_id": session_id},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -674,27 +615,23 @@ def register_redis_tools(mcp: FastMCP):
             activity = []
             if entries:
                 for session_id, score in entries:
-                    activity.append({
-                        "session_id": session_id,
-                        "timestamp": datetime.fromtimestamp(score).isoformat(),
-                    })
+                    activity.append(
+                        {
+                            "session_id": session_id,
+                            "timestamp": datetime.fromtimestamp(score).isoformat(),
+                        }
+                    )
 
             return tools.create_response(
                 status="success",
                 action="redis_obs_activity",
-                data={
-                    "recent_activity": activity,
-                    "count": len(activity)
-                }
+                data={"recent_activity": activity, "count": len(activity)},
             )
 
         except Exception as e:
             logger.error(f"Error in redis_obs_activity: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_obs_activity",
-                data={},
-                error_message=str(e)
+                status="error", action="redis_obs_activity", data={}, error_message=str(e)
             )
         finally:
             if client:
@@ -721,17 +658,14 @@ def register_redis_tools(mcp: FastMCP):
                 data={
                     "tool_usage": sorted_stats,
                     "total_tools": len(sorted_stats),
-                    "total_calls": sum(sorted_stats.values())
-                }
+                    "total_calls": sum(sorted_stats.values()),
+                },
             )
 
         except Exception as e:
             logger.error(f"Error in redis_obs_tool_stats: {e}")
             return tools.create_response(
-                status="error",
-                action="redis_obs_tool_stats",
-                data={},
-                error_message=str(e)
+                status="error", action="redis_obs_tool_stats", data={}, error_message=str(e)
             )
         finally:
             if client:

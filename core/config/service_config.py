@@ -3,8 +3,10 @@
 
 External service dependencies from isA_User and peer ISA services.
 """
+
 import os
 from dataclasses import dataclass
+
 
 def _int(val: str, default: int) -> int:
     try:
@@ -12,12 +14,15 @@ def _int(val: str, default: int) -> int:
     except ValueError:
         return default
 
+
 def _bool(val: str) -> bool:
     return val.lower() == "true"
+
 
 @dataclass
 class ServiceConfig:
     """All business HTTP service endpoints"""
+
     business_service_host: str = "localhost"
 
     # ===========================================
@@ -111,7 +116,7 @@ class ServiceConfig:
     use_consul_discovery: bool = False
 
     @classmethod
-    def from_env(cls) -> 'ServiceConfig':
+    def from_env(cls) -> "ServiceConfig":
         """Load service URLs from environment"""
         host = os.getenv("BUSINESS_SERVICE_HOST", "localhost")
 
@@ -123,7 +128,8 @@ class ServiceConfig:
         return cls(
             business_service_host=host,
             # Peer ISA Services
-            model_service_url=os.getenv("MODEL_SERVICE_URL") or os.getenv("ISA_MODEL_URL", "http://localhost:8082"),
+            model_service_url=os.getenv("MODEL_SERVICE_URL")
+            or os.getenv("ISA_MODEL_URL", "http://localhost:8082"),
             agent_service_url=os.getenv("AGENT_SERVICE_URL", "http://localhost:8080"),
             data_service_url=os.getenv("DATA_SERVICE_URL", "http://localhost:8084"),
             web_service_url=os.getenv("WEB_SERVICE_URL", "http://localhost:8083"),

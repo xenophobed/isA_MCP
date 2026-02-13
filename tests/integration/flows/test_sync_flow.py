@@ -4,6 +4,7 @@ TDD TESTS - Define new feature behavior
 Integration flow tests for the sync and search services.
 These tests verify service interfaces and basic flows.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -27,12 +28,12 @@ class TestSyncFlow:
             service = SyncService(mcp_server=mock_mcp)
 
             # Should have core methods
-            assert hasattr(service, 'sync_all')
-            assert hasattr(service, 'sync_tools')
-            assert hasattr(service, 'sync_prompts')
-            assert hasattr(service, 'sync_resources')
-            assert hasattr(service, 'initialize')
-            assert hasattr(service, 'set_mcp_server')
+            assert hasattr(service, "sync_all")
+            assert hasattr(service, "sync_tools")
+            assert hasattr(service, "sync_prompts")
+            assert hasattr(service, "sync_resources")
+            assert hasattr(service, "initialize")
+            assert hasattr(service, "set_mcp_server")
         except Exception as e:
             pytest.skip(f"SyncService not available: {e}")
 
@@ -68,12 +69,12 @@ class TestSearchFlow:
             service = SearchService()
 
             # Should have core methods
-            assert hasattr(service, 'search')
-            assert hasattr(service, 'search_tools')
-            assert hasattr(service, 'search_prompts')
-            assert hasattr(service, 'search_resources')
-            assert hasattr(service, 'get_stats')
-            assert hasattr(service, 'initialize')
+            assert hasattr(service, "search")
+            assert hasattr(service, "search_tools")
+            assert hasattr(service, "search_prompts")
+            assert hasattr(service, "search_resources")
+            assert hasattr(service, "get_stats")
+            assert hasattr(service, "initialize")
         except Exception as e:
             pytest.skip(f"SearchService not available: {e}")
 
@@ -92,7 +93,7 @@ class TestSearchFlow:
                 description="Test",
                 score=0.85,
                 db_id=1,
-                metadata={}
+                metadata={},
             )
 
             assert result.id == "test_1"

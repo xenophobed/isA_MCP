@@ -6,8 +6,9 @@ If these tests fail, it means behavior has changed unexpectedly.
 
 Service Under Test: services/vector_service/vector_repository.py
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.golden
@@ -32,10 +33,9 @@ class TestVectorRepositoryGolden:
         client.list_collections = AsyncMock(return_value=[])
         client.create_collection = AsyncMock(return_value=True)
         client.delete_collection = AsyncMock(return_value=True)
-        client.get_collection_info = AsyncMock(return_value={
-            "points_count": 100,
-            "status": "green"
-        })
+        client.get_collection_info = AsyncMock(
+            return_value={"points_count": 100, "status": "green"}
+        )
         client.create_field_index = AsyncMock(return_value=True)
 
         # Point operations
@@ -49,8 +49,12 @@ class TestVectorRepositoryGolden:
     @pytest.fixture
     def vector_repository(self, mock_qdrant_client):
         """Create VectorRepository with mocked Qdrant client."""
-        with patch('services.vector_service.vector_repository.AsyncQdrantClient', return_value=mock_qdrant_client):
+        with patch(
+            "services.vector_service.vector_repository.AsyncQdrantClient",
+            return_value=mock_qdrant_client,
+        ):
             from services.vector_service.vector_repository import VectorRepository
+
             repo = VectorRepository(host="localhost", port=6334)
             return repo
 
@@ -58,7 +62,9 @@ class TestVectorRepositoryGolden:
     # Collection Management
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_ensure_collection_creates_if_not_exists(self, vector_repository, mock_qdrant_client):
+    async def test_ensure_collection_creates_if_not_exists(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: ensure_collection creates collection if it doesn't exist.
         """
@@ -83,7 +89,9 @@ class TestVectorRepositoryGolden:
     # Vector Dimension Validation
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_upsert_vector_validates_dimension_1536(self, vector_repository, mock_qdrant_client):
+    async def test_upsert_vector_validates_dimension_1536(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: upsert_vector validates vector dimension is exactly 1536.
         """
@@ -98,13 +106,15 @@ class TestVectorRepositoryGolden:
             embedding=valid_vector,
             db_id=1,
             is_active=True,
-            metadata={}
+            metadata={},
         )
 
         assert result is True
         mock_qdrant_client.upsert_points.assert_called_once()
 
-    async def test_upsert_vector_rejects_wrong_dimension(self, vector_repository, mock_qdrant_client):
+    async def test_upsert_vector_rejects_wrong_dimension(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: upsert_vector returns False for wrong dimension vectors.
         """
@@ -118,7 +128,7 @@ class TestVectorRepositoryGolden:
             embedding=invalid_vector,
             db_id=1,
             is_active=True,
-            metadata={}
+            metadata={},
         )
 
         assert result is False
@@ -142,7 +152,7 @@ class TestVectorRepositoryGolden:
             embedding=[0.1] * 1536,
             db_id=42,
             is_active=True,
-            metadata={"category": "intelligence"}
+            metadata={"category": "intelligence"},
         )
 
         mock_qdrant_client.upsert_points.assert_called_once()
@@ -155,7 +165,7 @@ class TestVectorRepositoryGolden:
         points = call_args[0][1]
         assert len(points) == 1
         point = points[0]
-        assert point["id"] == 1
+        assert point["id"] == 42  # _compute_point_id("tool", 42) = TYPE_OFFSETS["tool"](0) + 42
         assert "vector" in point
         assert len(point["vector"]) == 1536
 
@@ -177,14 +187,15 @@ class TestVectorRepositoryGolden:
         CURRENT BEHAVIOR: search_vectors filters by item_type using must conditions.
         """
         mock_qdrant_client.search_with_filter.return_value = [
-            {"id": "1", "score": 0.95, "payload": {"type": "tool", "name": "test", "description": "desc", "db_id": 1}}
+            {
+                "id": "1",
+                "score": 0.95,
+                "payload": {"type": "tool", "name": "test", "description": "desc", "db_id": 1},
+            }
         ]
 
         result = await vector_repository.search_vectors(
-            query_embedding=[0.1] * 1536,
-            item_type="tool",
-            limit=10,
-            score_threshold=0.5
+            query_embedding=[0.1] * 1536, item_type="tool", limit=10, score_threshold=0.5
         )
 
         assert isinstance(result, list)
@@ -196,7 +207,9 @@ class TestVectorRepositoryGolden:
         assert "filter_conditions" in call_kwargs
         assert call_kwargs["filter_conditions"]["must"][0]["field"] == "type"
 
-    async def test_search_vectors_applies_score_threshold(self, vector_repository, mock_qdrant_client):
+    async def test_search_vectors_applies_score_threshold(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: Results below score_threshold are filtered out.
         """
@@ -206,10 +219,7 @@ class TestVectorRepositoryGolden:
         ]
 
         result = await vector_repository.search_vectors(
-            query_embedding=[0.1] * 1536,
-            item_type="tool",
-            limit=10,
-            score_threshold=0.5
+            query_embedding=[0.1] * 1536, item_type="tool", limit=10, score_threshold=0.5
         )
 
         # Only high score result should be returned
@@ -217,7 +227,9 @@ class TestVectorRepositoryGolden:
         assert result[0]["name"] == "high"
         assert result[0]["score"] == 0.9
 
-    async def test_search_vectors_returns_structured_results(self, vector_repository, mock_qdrant_client):
+    async def test_search_vectors_returns_structured_results(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: Returns list of dicts with id, type, name, description, db_id, score, metadata.
         """
@@ -231,15 +243,13 @@ class TestVectorRepositoryGolden:
                     "description": "A test tool",
                     "db_id": 42,
                     "is_active": True,
-                    "metadata": {"category": "utility"}
-                }
+                    "metadata": {"category": "utility"},
+                },
             }
         ]
 
         result = await vector_repository.search_vectors(
-            query_embedding=[0.1] * 1536,
-            limit=10,
-            score_threshold=0.5
+            query_embedding=[0.1] * 1536, limit=10, score_threshold=0.5
         )
 
         assert len(result) == 1
@@ -252,14 +262,14 @@ class TestVectorRepositoryGolden:
         assert item["score"] == 0.95
         assert item["metadata"] == {"category": "utility"}
 
-    async def test_search_vectors_rejects_wrong_dimension(self, vector_repository, mock_qdrant_client):
+    async def test_search_vectors_rejects_wrong_dimension(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: Returns empty list for wrong dimension query vector.
         """
         result = await vector_repository.search_vectors(
-            query_embedding=[0.1] * 512,  # Wrong dimension
-            limit=10,
-            score_threshold=0.5
+            query_embedding=[0.1] * 512, limit=10, score_threshold=0.5  # Wrong dimension
         )
 
         assert result == []
@@ -278,9 +288,11 @@ class TestVectorRepositoryGolden:
         result = await vector_repository.delete_vector("1")
 
         assert result is True
-        mock_qdrant_client.delete_points.assert_called_once_with("mcp_unified_search", ["1"])
+        mock_qdrant_client.delete_points.assert_called_once_with("mcp_unified_search", [1])
 
-    async def test_delete_vector_returns_false_on_failure(self, vector_repository, mock_qdrant_client):
+    async def test_delete_vector_returns_false_on_failure(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: delete_vector returns False when Qdrant returns None.
         """
@@ -320,8 +332,11 @@ class TestVectorRepositoryGolden:
         """
         # First scroll returns results and offset
         mock_qdrant_client.scroll.side_effect = [
-            {"points": [{"id": "1", "payload": {"type": "tool", "name": "tool1", "db_id": 1}}], "next_offset": "offset_1"},
-            {"points": [], "next_offset": None}
+            {
+                "points": [{"id": "1", "payload": {"type": "tool", "name": "tool1", "db_id": 1}}],
+                "next_offset": "offset_1",
+            },
+            {"points": [], "next_offset": None},
         ]
 
         result = await vector_repository.get_all_by_type("tool")
@@ -350,7 +365,7 @@ class TestVectorRepositoryGolden:
         """
         mock_qdrant_client.get_collection_info.return_value = {
             "points_count": 1000,
-            "status": "green"
+            "status": "green",
         }
 
         result = await vector_repository.get_stats()
@@ -376,7 +391,9 @@ class TestVectorRepositoryGolden:
     # Clear Collection
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_clear_collection_drops_and_recreates(self, vector_repository, mock_qdrant_client):
+    async def test_clear_collection_drops_and_recreates(
+        self, vector_repository, mock_qdrant_client
+    ):
         """
         CURRENT BEHAVIOR: clear_collection drops collection and recreates it.
         """

@@ -3,6 +3,7 @@ Server Registry - Data access layer for external MCP server registrations.
 
 Manages server records in PostgreSQL with full CRUD operations.
 """
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -11,7 +12,6 @@ import logging
 from tests.contracts.aggregator.data_contract import (
     ServerTransportType,
     ServerStatus,
-    ServerRecordContract,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,10 +52,18 @@ class ServerRegistry:
         """
         name = config["name"]
 
-        # Check for duplicate name
+        # Check for duplicate name (scoped: global or within same org)
+        new_org = config.get("org_id")
+        new_is_global = config.get("is_global", not bool(new_org))
         existing = await self.get_by_name(name)
         if existing:
-            raise ValueError(f"Server already exists: {name}")
+            existing_org = existing.get("org_id")
+            existing_is_global = existing.get("is_global", True)
+            # Block if: both global, or both in the same org
+            if (new_is_global and existing_is_global) or (
+                new_org and existing_org and new_org == existing_org
+            ):
+                raise ValueError(f"Server already exists: {name}")
 
         server_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -78,6 +86,9 @@ class ServerRegistry:
             "registered_at": now,
             "connected_at": None,
             "last_health_check": None,
+            # Multi-tenant fields
+            "org_id": config.get("org_id"),
+            "is_global": config.get("is_global", True),
         }
 
         if self._db_pool:
@@ -107,30 +118,66 @@ class ServerRegistry:
             status = status.value
 
         import json
+
         connection_config_json = json.dumps(server["connection_config"])
 
         async with self._db_pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO mcp.external_servers (
-                    id, name, description, transport_type, connection_config,
-                    health_check_url, status, tool_count, error_message,
-                    registered_at, connected_at, last_health_check
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                """,
-                server["id"],
-                server["name"],
-                server.get("description"),
-                transport_type,
-                connection_config_json,
-                server.get("health_check_url"),
-                status,
-                server.get("tool_count", 0),
-                server.get("error_message"),
-                server["registered_at"],
-                server.get("connected_at"),
-                server.get("last_health_check"),
+            # Check if tenant columns exist (migration may not have run yet)
+            has_tenant = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                    "WHERE table_schema = 'mcp' AND table_name = 'external_servers' AND column_name = 'is_global'"
+                )
+                > 0
             )
+
+            if has_tenant:
+                await conn.execute(
+                    """
+                    INSERT INTO mcp.external_servers (
+                        id, name, description, transport_type, connection_config,
+                        health_check_url, status, tool_count, error_message,
+                        registered_at, connected_at, last_health_check,
+                        org_id, is_global
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    """,
+                    server["id"],
+                    server["name"],
+                    server.get("description"),
+                    transport_type,
+                    connection_config_json,
+                    server.get("health_check_url"),
+                    status,
+                    server.get("tool_count", 0),
+                    server.get("error_message"),
+                    server["registered_at"],
+                    server.get("connected_at"),
+                    server.get("last_health_check"),
+                    server.get("org_id"),
+                    server.get("is_global", True),
+                )
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO mcp.external_servers (
+                        id, name, description, transport_type, connection_config,
+                        health_check_url, status, tool_count, error_message,
+                        registered_at, connected_at, last_health_check
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    """,
+                    server["id"],
+                    server["name"],
+                    server.get("description"),
+                    transport_type,
+                    connection_config_json,
+                    server.get("health_check_url"),
+                    status,
+                    server.get("tool_count", 0),
+                    server.get("error_message"),
+                    server["registered_at"],
+                    server.get("connected_at"),
+                    server.get("last_health_check"),
+                )
 
     async def get(self, server_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -149,10 +196,7 @@ class ServerRegistry:
     async def _get_server_db(self, server_id: str) -> Optional[Dict[str, Any]]:
         """Get server from database."""
         async with self._db_pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM mcp.external_servers WHERE id = $1",
-                server_id
-            )
+            row = await conn.fetchrow("SELECT * FROM mcp.external_servers WHERE id = $1", server_id)
             if row:
                 return self._row_to_server(row)
         return None
@@ -178,10 +222,7 @@ class ServerRegistry:
     async def _get_server_by_name_db(self, name: str) -> Optional[Dict[str, Any]]:
         """Get server by name from database."""
         async with self._db_pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM mcp.external_servers WHERE name = $1",
-                name
-            )
+            row = await conn.fetchrow("SELECT * FROM mcp.external_servers WHERE name = $1", name)
             if row:
                 return self._row_to_server(row)
         return None
@@ -210,7 +251,9 @@ class ServerRegistry:
 
         return server
 
-    async def _update_server_db(self, server_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _update_server_db(
+        self, server_id: str, updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Update server in database."""
         if not updates:
             return await self.get(server_id)
@@ -231,6 +274,7 @@ class ServerRegistry:
                 value = value.value
             elif key == "connection_config" and isinstance(value, dict):
                 import json
+
                 value = json.dumps(value)
 
             set_clauses.append(f"{key} = ${param_idx}")
@@ -277,51 +321,70 @@ class ServerRegistry:
     async def _remove_server_db(self, server_id: str) -> bool:
         """Remove server from database."""
         async with self._db_pool.acquire() as conn:
-            result = await conn.execute(
-                "DELETE FROM mcp.external_servers WHERE id = $1",
-                server_id
-            )
+            result = await conn.execute("DELETE FROM mcp.external_servers WHERE id = $1", server_id)
             return "DELETE 1" in result
 
-    async def list(self, status: ServerStatus = None) -> List[Dict[str, Any]]:
+    async def list(
+        self, status: ServerStatus = None, org_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
-        List all servers with optional status filter.
+        List all servers with optional status and org filter.
 
         Args:
             status: Optional status filter
+            org_id: Optional organization ID for tenant filtering
 
         Returns:
             List of server records
         """
         if self._db_pool:
-            return await self._list_servers_db(status)
+            return await self._list_servers_db(status, org_id=org_id)
 
         results = []
         for server in self._servers.values():
-            if status is None or server["status"] == status:
-                results.append(server)
+            if status is not None and server["status"] != status:
+                continue
+            # In-memory tenant filter
+            if org_id:
+                if not (server.get("is_global", True) or server.get("org_id") == org_id):
+                    continue
+            else:
+                if not server.get("is_global", True):
+                    continue
+            results.append(server)
         return results
 
-    async def _list_servers_db(self, status: Optional[ServerStatus]) -> List[Dict[str, Any]]:
-        """List servers from database."""
+    async def _list_servers_db(
+        self, status: Optional[ServerStatus], org_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List servers from database with tenant filtering."""
         async with self._db_pool.acquire() as conn:
+            conditions = []
+            params = []
+            param_idx = 1
+
+            # Tenant filter: show global + org's own; without org_id show global only
+            if org_id:
+                conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
+                param_idx += 1
+            else:
+                conditions.append("is_global = TRUE")
+
             if status:
                 status_value = status.value if isinstance(status, ServerStatus) else status
-                rows = await conn.fetch(
-                    "SELECT * FROM mcp.external_servers WHERE status = $1 ORDER BY name",
-                    status_value
-                )
-            else:
-                rows = await conn.fetch(
-                    "SELECT * FROM mcp.external_servers ORDER BY name"
-                )
+                conditions.append(f"status = ${param_idx}")
+                params.append(status_value)
+                param_idx += 1
+
+            where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
+            query = f"SELECT * FROM mcp.external_servers {where_sql} ORDER BY name"
+
+            rows = await conn.fetch(query, *params)
             return [self._row_to_server(row) for row in rows]
 
     async def update_status(
-        self,
-        server_id: str,
-        status: ServerStatus,
-        error_message: Optional[str] = None
+        self, server_id: str, status: ServerStatus, error_message: Optional[str] = None
     ) -> bool:
         """
         Update server connection status.
@@ -342,10 +405,13 @@ class ServerRegistry:
         result = await self.update(server_id, **updates)
 
         if result and self._event_emitter:
-            await self._event_emitter.emit("server.status_changed", {
-                "server_id": server_id,
-                "status": status.value if isinstance(status, ServerStatus) else status
-            })
+            await self._event_emitter.emit(
+                "server.status_changed",
+                {
+                    "server_id": server_id,
+                    "status": status.value if isinstance(status, ServerStatus) else status,
+                },
+            )
 
         return result is not None
 
@@ -373,10 +439,7 @@ class ServerRegistry:
         Returns:
             True if updated, False if not found
         """
-        result = await self.update(
-            server_id,
-            last_health_check=datetime.now(timezone.utc)
-        )
+        result = await self.update(server_id, last_health_check=datetime.now(timezone.utc))
         return result is not None
 
     def _row_to_server(self, row) -> Dict[str, Any]:
@@ -408,4 +471,6 @@ class ServerRegistry:
             "registered_at": row["registered_at"],
             "connected_at": row.get("connected_at"),
             "last_health_check": row.get("last_health_check"),
+            "org_id": str(row["org_id"]) if row.get("org_id") else None,
+            "is_global": row.get("is_global") if row.get("is_global") is not None else True,
         }

@@ -20,8 +20,7 @@ def register_utility_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def get_current_time(
-        timezone_name: Optional[str] = None,
-        format: Optional[str] = None
+        timezone_name: Optional[str] = None, format: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get the current date and time.
@@ -58,6 +57,7 @@ def register_utility_tools(mcp: FastMCP):
             if timezone_name and timezone_name.upper() != "UTC":
                 try:
                     import zoneinfo
+
                     tz = zoneinfo.ZoneInfo(timezone_name)
                     now = now_utc.astimezone(tz)
                     tz_name = timezone_name
@@ -82,7 +82,7 @@ def register_utility_tools(mcp: FastMCP):
                 "day": now.day,
                 "hour": now.hour,
                 "minute": now.minute,
-                "second": now.second
+                "second": now.second,
             }
 
             # Add custom formatted output if format string provided
@@ -130,7 +130,7 @@ def register_utility_tools(mcp: FastMCP):
                 "day": now.day,
                 "day_of_week": now.strftime("%A"),
                 "day_of_year": now.timetuple().tm_yday,
-                "week_number": now.isocalendar()[1]
+                "week_number": now.isocalendar()[1],
             }
 
             logger.info(f"get_current_date() → {result['date']}")

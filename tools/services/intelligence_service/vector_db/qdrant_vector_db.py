@@ -15,16 +15,12 @@ import logging
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
 
-from .base_vector_db import (
-    BaseVectorDB,
-    SearchResult,
-    VectorSearchConfig,
-    SearchMode
-)
+from .base_vector_db import BaseVectorDB, SearchResult, VectorSearchConfig, SearchMode
 
 # Import from isa_common package
 try:
     from isa_common.qdrant_client import QdrantClient
+
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
@@ -75,11 +71,11 @@ class QdrantVectorDB(BaseVectorDB):
             )
 
         # Extract configuration
-        self.host = self.config.get('host', 'localhost')
-        self.port = self.config.get('port', 50062)
-        self.collection_name = self.config.get('collection_name', 'user_knowledge')
-        self.vector_dimension = self.config.get('vector_dimension', 1536)
-        self.distance_metric = self.config.get('distance_metric', 'Cosine')
+        self.host = self.config.get("host", "localhost")
+        self.port = self.config.get("port", 50062)
+        self.collection_name = self.config.get("collection_name", "user_knowledge")
+        self.vector_dimension = self.config.get("vector_dimension", 1536)
+        self.distance_metric = self.config.get("distance_metric", "Cosine")
 
         # Initialize client
         self.client = None
@@ -95,14 +91,12 @@ class QdrantVectorDB(BaseVectorDB):
         """Initialize Qdrant client"""
         try:
             self.client = QdrantClient(
-                host=self.host,
-                port=self.port,
-                user_id='intelligence-service'
+                host=self.host, port=self.port, user_id="intelligence-service"
             )
 
             # Test connection
             health = self.client.health_check()
-            if health and health.get('healthy'):
+            if health and health.get("healthy"):
                 logger.info(f"Connected to Qdrant at {self.host}:{self.port}")
             else:
                 logger.warning("Qdrant health check returned unhealthy status")
@@ -120,11 +114,11 @@ class QdrantVectorDB(BaseVectorDB):
             if self.collection_name not in collections:
                 # Create collection
                 self.client.create_collection(
-                    self.collection_name,
-                    self.vector_dimension,
-                    distance=self.distance_metric
+                    self.collection_name, self.vector_dimension, distance=self.distance_metric
                 )
-                logger.info(f"Created collection '{self.collection_name}' with {self.vector_dimension}D vectors")
+                logger.info(
+                    f"Created collection '{self.collection_name}' with {self.vector_dimension}D vectors"
+                )
             else:
                 logger.info(f"Collection '{self.collection_name}' already exists")
 
@@ -136,11 +130,7 @@ class QdrantVectorDB(BaseVectorDB):
         """Create field indexes for common filter fields"""
         try:
             # Index user_id for multi-tenant filtering
-            self.client.create_field_index(
-                self.collection_name,
-                'user_id',
-                'keyword'
-            )
+            self.client.create_field_index(self.collection_name, "user_id", "keyword")
 
             # Index metadata fields if needed
             # Can add more indexes based on usage patterns
@@ -156,7 +146,7 @@ class QdrantVectorDB(BaseVectorDB):
         text: str,
         embedding: List[float],
         user_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Store a text with its embedding.
@@ -174,26 +164,20 @@ class QdrantVectorDB(BaseVectorDB):
         try:
             # Validate vector dimension
             if len(embedding) != self.vector_dimension:
-                logger.error(f"Vector dimension mismatch: expected {self.vector_dimension}, got {len(embedding)}")
+                logger.error(
+                    f"Vector dimension mismatch: expected {self.vector_dimension}, got {len(embedding)}"
+                )
                 return False
 
             # Build payload
-            payload = {
-                'user_id': user_id,
-                'text': text,
-                'id': id
-            }
+            payload = {"user_id": user_id, "text": text, "id": id}
 
             # Add metadata if provided
             if metadata:
                 payload.update(metadata)
 
             # Upsert point
-            points = [{
-                'id': id,
-                'vector': embedding,
-                'payload': payload
-            }]
+            points = [{"id": id, "vector": embedding, "payload": payload}]
 
             operation_id = self.client.upsert_points(self.collection_name, points)
 
@@ -209,10 +193,7 @@ class QdrantVectorDB(BaseVectorDB):
             return False
 
     async def search_vectors(
-        self,
-        query_embedding: List[float],
-        user_id: str,
-        config: VectorSearchConfig
+        self, query_embedding: List[float], user_id: str, config: VectorSearchConfig
     ) -> List[SearchResult]:
         """
         Search vectors using semantic similarity.
@@ -228,23 +209,18 @@ class QdrantVectorDB(BaseVectorDB):
         try:
             # Validate vector dimension
             if len(query_embedding) != self.vector_dimension:
-                logger.error(f"Query vector dimension mismatch: expected {self.vector_dimension}, got {len(query_embedding)}")
+                logger.error(
+                    f"Query vector dimension mismatch: expected {self.vector_dimension}, got {len(query_embedding)}"
+                )
                 return []
 
             # Build filter conditions for user isolation
-            filter_conditions = {
-                'must': [
-                    {'field': 'user_id', 'match': {'keyword': user_id}}
-                ]
-            }
+            filter_conditions = {"must": [{"field": "user_id", "match": {"keyword": user_id}}]}
 
             # Add additional metadata filters if provided
             if config.filter_metadata:
                 for field, value in config.filter_metadata.items():
-                    filter_conditions['must'].append({
-                        'field': field,
-                        'match': {'keyword': value}
-                    })
+                    filter_conditions["must"].append({"field": field, "match": {"keyword": value}})
 
             # Perform filtered search
             results = self.client.search_with_filter(
@@ -253,21 +229,21 @@ class QdrantVectorDB(BaseVectorDB):
                 filter_conditions=filter_conditions,
                 limit=config.top_k,
                 with_payload=True,
-                with_vectors=config.include_embeddings
+                with_vectors=config.include_embeddings,
             )
 
             # Convert to SearchResult objects
             search_results = []
             for result in results:
-                payload = result.get('payload', {})
+                payload = result.get("payload", {})
 
                 search_result = SearchResult(
-                    id=str(result.get('id')),
-                    text=payload.get('text', ''),
-                    score=result.get('score', 0.0),
-                    semantic_score=result.get('score', 0.0),
+                    id=str(result.get("id")),
+                    text=payload.get("text", ""),
+                    score=result.get("score", 0.0),
+                    semantic_score=result.get("score", 0.0),
                     metadata=payload,
-                    embedding=result.get('vector') if config.include_embeddings else None
+                    embedding=result.get("vector") if config.include_embeddings else None,
                 )
                 search_results.append(search_result)
 
@@ -279,10 +255,7 @@ class QdrantVectorDB(BaseVectorDB):
             return []
 
     async def search_text(
-        self,
-        query_text: str,
-        user_id: str,
-        config: VectorSearchConfig
+        self, query_text: str, user_id: str, config: VectorSearchConfig
     ) -> List[SearchResult]:
         """
         Search text using lexical/BM25 search.
@@ -299,7 +272,9 @@ class QdrantVectorDB(BaseVectorDB):
         Returns:
             Empty list (full-text search not supported natively)
         """
-        logger.warning("Qdrant doesn't support lexical search natively. Use hybrid mode with external FTS.")
+        logger.warning(
+            "Qdrant doesn't support lexical search natively. Use hybrid mode with external FTS."
+        )
         return []
 
     async def delete_vector(self, id: str, user_id: str) -> bool:
@@ -348,26 +323,23 @@ class QdrantVectorDB(BaseVectorDB):
         try:
             # Use scroll to retrieve specific point
             result = self.client.scroll(
-                self.collection_name,
-                limit=1,
-                with_payload=True,
-                with_vectors=False
+                self.collection_name, limit=1, with_payload=True, with_vectors=False
             )
 
-            if result and result.get('points'):
-                for point in result['points']:
-                    if str(point['id']) == id:
-                        payload = point.get('payload', {})
+            if result and result.get("points"):
+                for point in result["points"]:
+                    if str(point["id"]) == id:
+                        payload = point.get("payload", {})
 
                         # Check user ownership
-                        if payload.get('user_id') != user_id:
+                        if payload.get("user_id") != user_id:
                             return None
 
                         return SearchResult(
-                            id=str(point['id']),
-                            text=payload.get('text', ''),
+                            id=str(point["id"]),
+                            text=payload.get("text", ""),
                             score=1.0,
-                            metadata=payload
+                            metadata=payload,
                         )
 
             return None
@@ -377,10 +349,7 @@ class QdrantVectorDB(BaseVectorDB):
             return None
 
     async def list_vectors(
-        self,
-        user_id: str,
-        limit: int = 100,
-        offset: int = 0
+        self, user_id: str, limit: int = 100, offset: int = 0
     ) -> List[SearchResult]:
         """
         List vectors for a user with pagination.
@@ -399,13 +368,10 @@ class QdrantVectorDB(BaseVectorDB):
             if offset > 0:
                 # First scroll to offset position
                 temp_result = self.client.scroll(
-                    self.collection_name,
-                    limit=offset,
-                    with_payload=True,
-                    with_vectors=False
+                    self.collection_name, limit=offset, with_payload=True, with_vectors=False
                 )
-                if temp_result and temp_result.get('next_offset'):
-                    offset_id = temp_result['next_offset']
+                if temp_result and temp_result.get("next_offset"):
+                    offset_id = temp_result["next_offset"]
 
             # Scroll with filter
             result = self.client.scroll(
@@ -413,26 +379,23 @@ class QdrantVectorDB(BaseVectorDB):
                 limit=limit,
                 offset_id=offset_id,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=False,
             )
 
-            if not result or not result.get('points'):
+            if not result or not result.get("points"):
                 return []
 
             # Filter by user_id and convert to SearchResult
             search_results = []
-            for point in result['points']:
-                payload = point.get('payload', {})
+            for point in result["points"]:
+                payload = point.get("payload", {})
 
                 # Filter by user
-                if payload.get('user_id') != user_id:
+                if payload.get("user_id") != user_id:
                     continue
 
                 search_result = SearchResult(
-                    id=str(point['id']),
-                    text=payload.get('text', ''),
-                    score=1.0,
-                    metadata=payload
+                    id=str(point["id"]), text=payload.get("text", ""), score=1.0, metadata=payload
                 )
                 search_results.append(search_result)
 
@@ -458,15 +421,15 @@ class QdrantVectorDB(BaseVectorDB):
             info = self.client.get_collection_info(self.collection_name)
 
             if not info:
-                return {'error': 'Failed to get collection info'}
+                return {"error": "Failed to get collection info"}
 
             stats = {
-                'collection': self.collection_name,
-                'total_points': info.get('points_count', 0),
-                'vector_dimension': self.vector_dimension,
-                'distance_metric': self.distance_metric,
-                'status': info.get('status', 'unknown'),
-                'segments_count': info.get('segments_count', 0)
+                "collection": self.collection_name,
+                "total_points": info.get("points_count", 0),
+                "vector_dimension": self.vector_dimension,
+                "distance_metric": self.distance_metric,
+                "status": info.get("status", "unknown"),
+                "segments_count": info.get("segments_count", 0),
             }
 
             # If user_id provided, count user-specific vectors
@@ -481,36 +444,36 @@ class QdrantVectorDB(BaseVectorDB):
                         limit=100,
                         offset_id=offset_id,
                         with_payload=True,
-                        with_vectors=False
+                        with_vectors=False,
                     )
 
-                    if not result or not result.get('points'):
+                    if not result or not result.get("points"):
                         break
 
-                    for point in result['points']:
-                        payload = point.get('payload', {})
-                        if payload.get('user_id') == user_id:
+                    for point in result["points"]:
+                        payload = point.get("payload", {})
+                        if payload.get("user_id") == user_id:
                             user_count += 1
 
-                    if not result.get('next_offset'):
+                    if not result.get("next_offset"):
                         break
 
-                    offset_id = result['next_offset']
+                    offset_id = result["next_offset"]
 
-                stats['user_points'] = user_count
+                stats["user_points"] = user_count
 
             return stats
 
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     def __del__(self):
         """Cleanup on deletion"""
         if self.client:
             try:
                 # Close client if it has a close method
-                if hasattr(self.client, 'close'):
+                if hasattr(self.client, "close"):
                     self.client.close()
             except:
                 pass

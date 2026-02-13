@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 # Import and re-export isa-common MinIOClient
 try:
     from isa_common.minio_client import MinIOClient
+
     logger.info("✅ isa-common MinIO gRPC client loaded")
     MINIO_AVAILABLE = True
-    __all__ = ['MinIOClient', 'get_minio_client']
+    __all__ = ["MinIOClient", "get_minio_client"]
 except ImportError as e:
     logger.error(f"❌ Failed to import isa-common MinIO client: {e}")
     logger.error("   Install with: pip install -e /path/to/isA_Cloud/isA_common")
@@ -27,10 +28,7 @@ except ImportError as e:
 _minio_client: Optional[MinIOClient] = None
 
 
-def get_minio_client(
-    host: str = 'isa-minio-grpc',
-    port: int = 50051
-) -> Optional[MinIOClient]:
+def get_minio_client(host: str = "isa-minio-grpc", port: int = 50051) -> Optional[MinIOClient]:
     """
     Get global MinIO client instance with lazy initialization
 

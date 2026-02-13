@@ -14,14 +14,14 @@ Prerequisites:
     - kubectl port-forward svc/qdrant-grpc 50062:50062 -n isa-cloud-staging
     - kubectl port-forward svc/model 8082:8082 -n isa-cloud-staging
 """
+
 import asyncio
 import logging
 import sys
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,10 @@ async def test_full_sync():
     class MockMCPServer:
         async def list_tools(self):
             return []
+
         async def list_prompts(self):
             return []
+
         async def list_resources(self):
             return []
 
@@ -138,7 +140,9 @@ async def test_hierarchical_search_direct():
         logger.info(f"Matched {len(result.matched_skills)} skill categories")
 
     for tool in result.tools[:3]:
-        logger.info(f"  - {tool.name} (score: {tool.score:.2f}, primary_skill: {tool.primary_skill_id})")
+        logger.info(
+            f"  - {tool.name} (score: {tool.score:.2f}, primary_skill: {tool.primary_skill_id})"
+        )
 
     # Test for resources (which includes skills)
     logger.info("\nSearching resources with hierarchical strategy...")

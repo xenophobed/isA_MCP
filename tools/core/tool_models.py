@@ -38,9 +38,11 @@ try:
         # AudioContent,  # Not available in mcp.types yet
         # ResourceLink,  # Not available in mcp.types yet
     )
+
     MCP_SDK_AVAILABLE = True
 except ImportError:
     MCP_SDK_AVAILABLE = False
+
     # Fallback definitions if MCP SDK not available
     class TextContent(BaseModel):
         type: Literal["text"] = "text"
@@ -65,8 +67,10 @@ except ImportError:
 # Enums - Standard Values
 # ============================================================================
 
+
 class ToolStatus(str, Enum):
     """Standard tool execution status values"""
+
     SUCCESS = "success"
     ERROR = "error"
     PENDING = "pending"
@@ -83,12 +87,14 @@ class ToolStatus(str, Enum):
 
 class HILAction(str, Enum):
     """Human-in-loop action types"""
+
     ASK_HUMAN = "ask_human"
     REQUEST_AUTHORIZATION = "request_authorization"
 
 
 class InterventionType(str, Enum):
     """Types of manual intervention needed"""
+
     CAPTCHA = "captcha"
     LOGIN = "login"
     PAYMENT = "payment"
@@ -99,6 +105,7 @@ class InterventionType(str, Enum):
 
 class SecurityLevel(str, Enum):
     """Security authorization levels"""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -107,6 +114,7 @@ class SecurityLevel(str, Enum):
 
 class ContentType(str, Enum):
     """MCP content types"""
+
     TEXT = "text"
     IMAGE = "image"
     AUDIO = "audio"
@@ -118,9 +126,11 @@ class ContentType(str, Enum):
 # Additional MCP Content Models (Not in SDK yet)
 # ============================================================================
 
+
 # Keep AudioContent and ResourceLink until they're added to mcp.types
 class AudioContent(BaseModel):
     """MCP audio content"""
+
     type: Literal["audio"] = "audio"
     data: str  # Base64 or URL
     mimeType: str
@@ -130,6 +140,7 @@ class AudioContent(BaseModel):
 
 class ResourceLink(BaseModel):
     """MCP resource link"""
+
     type: Literal["resource_link"] = "resource_link"
     uri: str
     annotations: Optional[Dict[str, Any]] = None
@@ -144,8 +155,10 @@ MCPContent = Union[TextContent, ImageContent, AudioContent, ResourceLink]
 # Base Metadata Models - Our Extended Metadata
 # ============================================================================
 
+
 class ToolMetadata(BaseModel):
     """Metadata for tool execution (stored in structuredContent)"""
+
     status: ToolStatus
     action: str
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -153,13 +166,12 @@ class ToolMetadata(BaseModel):
     session_id: Optional[str] = None
 
     class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class ErrorMetadata(ToolMetadata):
     """Error-specific metadata"""
+
     error: str
     error_code: Optional[str] = None
     traceback: Optional[str] = None
@@ -167,6 +179,7 @@ class ErrorMetadata(ToolMetadata):
 
 class HILMetadata(ToolMetadata):
     """HIL-specific metadata"""
+
     hil_required: bool = True
     message: str
     instruction: Optional[str] = None
@@ -184,8 +197,10 @@ class HILMetadata(ToolMetadata):
 # Standard Response Models - Common Patterns
 # ============================================================================
 
+
 class SuccessResponse(BaseModel):
     """Standard success response structure"""
+
     status: Literal[ToolStatus.SUCCESS] = ToolStatus.SUCCESS
     action: str
     data: Dict[str, Any]
@@ -199,9 +214,9 @@ class SuccessResponse(BaseModel):
                 "status": self.status,
                 "action": self.action,
                 "data": self.data,
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -210,6 +225,7 @@ class SuccessResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Standard error response structure"""
+
     status: Literal[ToolStatus.ERROR] = ToolStatus.ERROR
     action: str
     error: str
@@ -233,9 +249,9 @@ class ErrorResponse(BaseModel):
                 "error_code": self.error_code,
                 "data": self.data,
                 "timestamp": self.timestamp.isoformat(),
-                "traceback": self.traceback
+                "traceback": self.traceback,
             },
-            isError=True
+            isError=True,
         )
 
     class Config:
@@ -246,6 +262,7 @@ class ErrorResponse(BaseModel):
 # HIL Response Models - Human-in-Loop Patterns
 # ============================================================================
 
+
 class AskHumanResponse(BaseModel):
     """
     HIL Response: Ask human for input
@@ -253,12 +270,15 @@ class AskHumanResponse(BaseModel):
     Scenario 1: Agent needs user to provide information
     Used by: interaction_tools.ask_human
     """
+
     status: Literal[ToolStatus.HUMAN_INPUT_REQUESTED] = ToolStatus.HUMAN_INPUT_REQUESTED
     action: Literal[HILAction.ASK_HUMAN] = HILAction.ASK_HUMAN
     question: str
     context: Optional[str] = None
     user_id: str = "default"
-    instruction: str = "This request requires human input. The client should handle the interaction."
+    instruction: str = (
+        "This request requires human input. The client should handle the interaction."
+    )
     timestamp: datetime = Field(default_factory=datetime.now)
 
     # Optional validation rules for user input
@@ -269,8 +289,7 @@ class AskHumanResponse(BaseModel):
         return CallToolResult(
             content=[
                 TextContent(
-                    text=self.question,
-                    meta={"context": self.context} if self.context else None
+                    text=self.question, meta={"context": self.context} if self.context else None
                 )
             ],
             structuredContent={
@@ -282,11 +301,11 @@ class AskHumanResponse(BaseModel):
                     "context": self.context,
                     "user_id": self.user_id,
                     "instruction": self.instruction,
-                    "validation_rules": self.validation_rules
+                    "validation_rules": self.validation_rules,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -300,6 +319,7 @@ class RequestAuthorizationResponse(BaseModel):
     Scenario 2: High-security tool needs user approval
     Used by: interaction_tools.request_authorization, security system
     """
+
     status: Literal[ToolStatus.AUTHORIZATION_REQUESTED] = ToolStatus.AUTHORIZATION_REQUESTED
     action: Literal[HILAction.REQUEST_AUTHORIZATION] = HILAction.REQUEST_AUTHORIZATION
     request_id: str
@@ -309,16 +329,16 @@ class RequestAuthorizationResponse(BaseModel):
     security_level: SecurityLevel
     user_id: str = "default"
     expires_at: datetime
-    instruction: str = "This request requires authorization. The client should handle the approval process."
+    instruction: str = (
+        "This request requires authorization. The client should handle the approval process."
+    )
     timestamp: datetime = Field(default_factory=datetime.now)
 
     def to_mcp_result(self) -> CallToolResult:
         """Convert to MCP CallToolResult"""
         return CallToolResult(
             content=[
-                TextContent(
-                    text=f"Authorization required for '{self.tool_name}': {self.reason}"
-                )
+                TextContent(text=f"Authorization required for '{self.tool_name}': {self.reason}")
             ],
             structuredContent={
                 "hil_required": True,
@@ -332,11 +352,11 @@ class RequestAuthorizationResponse(BaseModel):
                     "security_level": self.security_level,
                     "user_id": self.user_id,
                     "expires_at": self.expires_at.isoformat(),
-                    "instruction": self.instruction
+                    "instruction": self.instruction,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -350,6 +370,7 @@ class RequestCredentialUsageResponse(BaseModel):
     Scenario 4a: Vault has credentials, ask permission to use
     Used by: web_automation_service (login pages)
     """
+
     status: Literal[ToolStatus.AUTHORIZATION_REQUIRED] = ToolStatus.AUTHORIZATION_REQUIRED
     action: Literal[HILAction.REQUEST_AUTHORIZATION] = HILAction.REQUEST_AUTHORIZATION
     message: str
@@ -376,11 +397,11 @@ class RequestCredentialUsageResponse(BaseModel):
                     "credential_preview": self.credential_preview,
                     "url": self.url,
                     "screenshot": self.screenshot,
-                    "details": self.details
+                    "details": self.details,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -394,10 +415,8 @@ class ManualInterventionResponse(BaseModel):
     Scenario 4b: Vault has no credentials OR CAPTCHA detected
     Used by: web_automation_service (CAPTCHA, first-time login, etc.)
     """
-    status: Union[
-        Literal[ToolStatus.CREDENTIAL_REQUIRED],
-        Literal[ToolStatus.HUMAN_REQUIRED]
-    ]
+
+    status: Union[Literal[ToolStatus.CREDENTIAL_REQUIRED], Literal[ToolStatus.HUMAN_REQUIRED]]
     action: Literal[HILAction.ASK_HUMAN] = HILAction.ASK_HUMAN
     message: str
     intervention_type: InterventionType
@@ -412,11 +431,7 @@ class ManualInterventionResponse(BaseModel):
     def to_mcp_result(self) -> CallToolResult:
         """Convert to MCP CallToolResult"""
         return CallToolResult(
-            content=[
-                TextContent(
-                    text=f"{self.message}\n\nInstructions: {self.instructions}"
-                )
-            ],
+            content=[TextContent(text=f"{self.message}\n\nInstructions: {self.instructions}")],
             structuredContent={
                 "hil_required": True,
                 "status": self.status,
@@ -429,11 +444,11 @@ class ManualInterventionResponse(BaseModel):
                     "url": self.url,
                     "screenshot": self.screenshot,
                     "oauth_url": self.oauth_url,
-                    "details": self.details
+                    "details": self.details,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -447,6 +462,7 @@ class OAuthAuthorizationResponse(BaseModel):
     Scenario 3: Composio third-party app OAuth
     Used by: composio_service, HIL service
     """
+
     status: Literal[ToolStatus.AUTHORIZATION_REQUESTED] = ToolStatus.AUTHORIZATION_REQUESTED
     action: str = "oauth_authorization"
     provider: str
@@ -462,7 +478,7 @@ class OAuthAuthorizationResponse(BaseModel):
             content=[
                 TextContent(
                     text=f"OAuth authorization required for {self.provider}",
-                    meta={"oauth_url": self.oauth_url}
+                    meta={"oauth_url": self.oauth_url},
                 )
             ],
             structuredContent={
@@ -475,11 +491,11 @@ class OAuthAuthorizationResponse(BaseModel):
                     "scopes": self.scopes,
                     "context": self.context,
                     "user_id": self.user_id,
-                    "auth_type": "oauth"
+                    "auth_type": "oauth",
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -502,8 +518,10 @@ class OAuthAuthorizationResponse(BaseModel):
 # Specialized Response Models
 # ============================================================================
 
+
 class SearchResultsResponse(BaseModel):
     """Response for search operations (web_search, search_memories, etc.)"""
+
     status: Literal[ToolStatus.SUCCESS] = ToolStatus.SUCCESS
     action: str
     query: str
@@ -527,11 +545,11 @@ class SearchResultsResponse(BaseModel):
                     "total": self.total,
                     "results": self.results,
                     "urls": self.urls,
-                    "search_params": self.search_params
+                    "search_params": self.search_params,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=False
+            isError=False,
         )
 
     class Config:
@@ -540,6 +558,7 @@ class SearchResultsResponse(BaseModel):
 
 class BatchOperationResponse(BaseModel):
     """Response for batch operations"""
+
     status: ToolStatus
     action: str
     total_processed: int
@@ -563,11 +582,11 @@ class BatchOperationResponse(BaseModel):
                     "successful": self.successful,
                     "failed": self.failed,
                     "results": self.results,
-                    "errors": self.errors
+                    "errors": self.errors,
                 },
-                "timestamp": self.timestamp.isoformat()
+                "timestamp": self.timestamp.isoformat(),
             },
-            isError=self.failed > 0
+            isError=self.failed > 0,
         )
 
     class Config:
@@ -578,10 +597,9 @@ class BatchOperationResponse(BaseModel):
 # Helper Functions - Easy Response Creation
 # ============================================================================
 
+
 def create_success(
-    action: str,
-    data: Dict[str, Any],
-    user_id: Optional[str] = None  # Reserved for future use
+    action: str, data: Dict[str, Any], user_id: Optional[str] = None  # Reserved for future use
 ) -> CallToolResult:
     """
     Create a standard success response
@@ -603,7 +621,7 @@ def create_error(
     error: str,
     error_code: Optional[str] = None,
     data: Optional[Dict[str, Any]] = None,
-    traceback: Optional[str] = None
+    traceback: Optional[str] = None,
 ) -> CallToolResult:
     """
     Create a standard error response
@@ -619,11 +637,7 @@ def create_error(
         MCP-compliant CallToolResult
     """
     response = ErrorResponse(
-        action=action,
-        error=error,
-        error_code=error_code,
-        data=data or {},
-        traceback=traceback
+        action=action, error=error, error_code=error_code, data=data or {}, traceback=traceback
     )
     return response.to_mcp_result()
 
@@ -632,7 +646,7 @@ def create_ask_human(
     question: str,
     context: Optional[str] = None,
     user_id: str = "default",
-    validation_rules: Optional[Dict[str, Any]] = None
+    validation_rules: Optional[Dict[str, Any]] = None,
 ) -> CallToolResult:
     """
     Create an ask_human HIL response
@@ -647,10 +661,7 @@ def create_ask_human(
         MCP-compliant CallToolResult
     """
     response = AskHumanResponse(
-        question=question,
-        context=context,
-        user_id=user_id,
-        validation_rules=validation_rules
+        question=question, context=context, user_id=user_id, validation_rules=validation_rules
     )
     return response.to_mcp_result()
 
@@ -662,7 +673,7 @@ def create_request_authorization(
     reason: str,
     security_level: SecurityLevel,
     user_id: str = "default",
-    expires_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None,
 ) -> CallToolResult:
     """
     Create a request_authorization HIL response
@@ -691,7 +702,7 @@ def create_request_authorization(
         reason=reason,
         security_level=security_level,
         user_id=user_id,
-        expires_at=expires_at
+        expires_at=expires_at,
     )
     return response.to_mcp_result()
 
@@ -704,7 +715,7 @@ def create_manual_intervention(
     url: Optional[str] = None,
     screenshot: Optional[str] = None,
     oauth_url: Optional[str] = None,
-    status: str = ToolStatus.HUMAN_REQUIRED
+    status: str = ToolStatus.HUMAN_REQUIRED,
 ) -> CallToolResult:
     """
     Create a manual intervention HIL response
@@ -730,7 +741,7 @@ def create_manual_intervention(
         instructions=instructions,
         url=url,
         screenshot=screenshot,
-        oauth_url=oauth_url
+        oauth_url=oauth_url,
     )
     return response.to_mcp_result()
 
@@ -748,7 +759,7 @@ ToolResponse = Union[
     ManualInterventionResponse,
     OAuthAuthorizationResponse,
     SearchResultsResponse,
-    BatchOperationResponse
+    BatchOperationResponse,
 ]
 
 HILResponse = Union[
@@ -756,5 +767,5 @@ HILResponse = Union[
     RequestAuthorizationResponse,
     RequestCredentialUsageResponse,
     ManualInterventionResponse,
-    OAuthAuthorizationResponse
+    OAuthAuthorizationResponse,
 ]

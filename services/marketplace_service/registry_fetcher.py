@@ -7,6 +7,7 @@ Supports:
 - isA Cloud registry (future)
 - Private enterprise registries
 """
+
 import aiohttp
 import asyncio
 from datetime import datetime, timezone
@@ -186,15 +187,17 @@ class RegistryFetcher:
         versions = []
         for version, version_data in data.get("versions", {}).items():
             major, minor, patch, prerelease = self._parse_semver(version)
-            versions.append({
-                "version": version,
-                "version_major": major,
-                "version_minor": minor,
-                "version_patch": patch,
-                "prerelease": prerelease,
-                "mcp_config": self._extract_mcp_config(version_data),
-                "published_at": data.get("time", {}).get(version),
-            })
+            versions.append(
+                {
+                    "version": version,
+                    "version_major": major,
+                    "version_minor": minor,
+                    "version_patch": patch,
+                    "prerelease": prerelease,
+                    "mcp_config": self._extract_mcp_config(version_data),
+                    "published_at": data.get("time", {}).get(version),
+                }
+            )
 
         package["versions"] = versions
         package["mcp_config"] = mcp_config
@@ -218,7 +221,7 @@ class RegistryFetcher:
 
         # Check for bin entry
         if "bin" in pkg_data:
-            bin_name = list(pkg_data["bin"].keys())[0] if pkg_data["bin"] else name
+            list(pkg_data["bin"].keys())[0] if pkg_data["bin"] else name
             return {
                 "transport": "stdio",
                 "command": "npx",
@@ -408,12 +411,12 @@ class RegistryFetcher:
 
     def _parse_semver(self, version: str) -> tuple:
         """Parse semver string into components."""
-        match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$', version)
+        match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
         if not match:
-            parts = version.split('.')
+            parts = version.split(".")
             major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
             minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
-            patch_str = parts[2].split('-')[0] if len(parts) > 2 else "0"
+            patch_str = parts[2].split("-")[0] if len(parts) > 2 else "0"
             patch = int(patch_str) if patch_str.isdigit() else 0
             return major, minor, patch, None
 

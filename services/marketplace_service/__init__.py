@@ -16,8 +16,9 @@ Example:
     >>> result = await marketplace.install(PackageSpec(name="pencil"))
     >>> print(f"Installed {result.package_name} with {result.tools_discovered} tools")
 """
+
 import logging
-from typing import Optional
+from typing import Optional  # noqa: F401
 
 from .marketplace_service import MarketplaceService
 from .package_repository import PackageRepository
@@ -40,23 +41,21 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     # Service classes
-    'MarketplaceService',
-    'PackageRepository',
-    'RegistryFetcher',
-    'PackageResolver',
-    'InstallManager',
-    'UpdateManager',
-
+    "MarketplaceService",
+    "PackageRepository",
+    "RegistryFetcher",
+    "PackageResolver",
+    "InstallManager",
+    "UpdateManager",
     # Factory function
-    'create_marketplace_service',
-
+    "create_marketplace_service",
     # Contracts
-    'RegistrySource',
-    'InstallStatus',
-    'UpdateChannel',
-    'PackageSpec',
-    'InstallResult',
-    'SearchResult',
+    "RegistrySource",
+    "InstallStatus",
+    "UpdateChannel",
+    "PackageSpec",
+    "InstallResult",
+    "SearchResult",
 ]
 
 
@@ -113,6 +112,7 @@ async def create_marketplace_service(
     # Create database pool if not provided
     if db_pool is None:
         import asyncpg
+
         db_pool = await asyncpg.create_pool(
             host=settings.infrastructure.postgres_host,
             port=settings.infrastructure.postgres_port,
@@ -140,6 +140,7 @@ async def create_marketplace_service(
     if aggregator_service is None:
         try:
             from services.aggregator_service import create_aggregator_service
+
             aggregator_service = await create_aggregator_service(
                 db_pool=db_pool,
                 model_client=model_client,
@@ -154,6 +155,7 @@ async def create_marketplace_service(
         try:
             from services.skill_service import SkillService
             from services.skill_service.skill_repository import SkillRepository
+
             skill_repo = SkillRepository(db_pool=db_pool)
             skill_service = SkillService(
                 repository=skill_repo,
@@ -167,7 +169,10 @@ async def create_marketplace_service(
     # Get or create search service
     if search_service is None:
         try:
-            from services.search_service.hierarchical_search_service import HierarchicalSearchService
+            from services.search_service.hierarchical_search_service import (
+                HierarchicalSearchService,
+            )
+
             search_service = HierarchicalSearchService(
                 model_client=model_client,
             )
@@ -180,6 +185,7 @@ async def create_marketplace_service(
     if tool_repository is None:
         try:
             from services.tool_service.tool_repository import ToolRepository
+
             tool_repository = ToolRepository()
             logger.info("Created ToolRepository for MarketplaceService")
         except Exception as e:
@@ -190,6 +196,7 @@ async def create_marketplace_service(
     if vector_repository is None:
         try:
             from services.vector_service.vector_repository import VectorRepository
+
             vector_repository = VectorRepository()
             logger.info("Created VectorRepository for MarketplaceService")
         except Exception as e:

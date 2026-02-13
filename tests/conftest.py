@@ -18,6 +18,7 @@ Configuration:
 - Set ENV=test to load deployment/test/config/.env.test
 - For integration tests, ensure port-forwarded K8s services are available
 """
+
 import pytest
 import asyncio
 import sys
@@ -36,6 +37,7 @@ os.environ.setdefault("ENV", "test")
 # Load configuration via core/config (centralized config system)
 try:
     from core.config import get_settings, reload_settings, MCPConfig
+
     # Reload to ensure test config is loaded
     _settings = reload_settings()
     CONFIG_AVAILABLE = True
@@ -64,6 +66,7 @@ except ImportError:
 # Event Loop Configuration
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create event loop for async tests."""
@@ -76,6 +79,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 # ═══════════════════════════════════════════════════════════════
 # Mock Fixtures (for unit and component tests)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_db_pool():
@@ -121,6 +125,7 @@ def mock_redis_client():
 # Real Client Fixtures (for integration tests)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 async def db_pool() -> AsyncGenerator:
     """
@@ -133,8 +138,7 @@ async def db_pool() -> AsyncGenerator:
     import asyncpg
 
     database_url = os.getenv(
-        "TEST_DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5432/isa_mcp_test"
+        "TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/isa_mcp_test"
     )
 
     try:
@@ -188,6 +192,7 @@ async def mcp_client() -> AsyncGenerator:
 # Environment & Configuration Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture(scope="session")
 def mcp_settings() -> MCPConfig:
     """
@@ -211,11 +216,7 @@ def test_env(monkeypatch):
     monkeypatch.setenv("ENV", "test")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("MCP_API_KEY", "test_api_key_12345")
-    return {
-        "ENV": "test",
-        "LOG_LEVEL": "DEBUG",
-        "MCP_API_KEY": "test_api_key_12345"
-    }
+    return {"ENV": "test", "LOG_LEVEL": "DEBUG", "MCP_API_KEY": "test_api_key_12345"}
 
 
 @pytest.fixture
@@ -238,7 +239,9 @@ def test_config(mcp_settings):
         }
 
     return {
-        "database_url": os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"),
+        "database_url": os.getenv(
+            "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+        ),
         "qdrant_url": mcp_settings.infrastructure.qdrant_url or "http://localhost:6333",
         "qdrant_grpc_host": mcp_settings.infrastructure.qdrant_grpc_host,
         "qdrant_grpc_port": mcp_settings.infrastructure.qdrant_grpc_port,
@@ -268,6 +271,7 @@ def legacy_test_config():
 # Temporary File/Directory Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def temp_tools_dir(tmp_path) -> Path:
     """Create temporary directory for tool files."""
@@ -295,6 +299,7 @@ def temp_resources_dir(tmp_path) -> Path:
 # ═══════════════════════════════════════════════════════════════
 # Sample Data Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def sample_tool_source():
@@ -358,6 +363,7 @@ async def sample_resource(id: str) -> dict:
 # ═══════════════════════════════════════════════════════════════
 # Utility Functions
 # ═══════════════════════════════════════════════════════════════
+
 
 def assert_valid_tool_schema(schema: dict):
     """Assert that a tool schema is valid."""

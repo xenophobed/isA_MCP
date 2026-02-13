@@ -37,7 +37,7 @@ Returns information about planned video processing features.
 
 Keywords: video, capabilities, features, processing
 Category: video""",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
     async def get_capabilities_impl(self) -> Dict[str, Any]:
@@ -51,26 +51,26 @@ Category: video""",
                     {
                         "name": "video_transcription",
                         "description": "Extract text from video audio tracks",
-                        "status": "planned"
+                        "status": "planned",
                     },
                     {
                         "name": "video_summarization",
                         "description": "Generate concise summaries of video content",
-                        "status": "planned"
+                        "status": "planned",
                     },
                     {
                         "name": "video_to_frames",
                         "description": "Extract key frames from video for analysis",
-                        "status": "planned"
+                        "status": "planned",
                     },
                     {
                         "name": "video_analysis",
                         "description": "Analyze video content including scenes, objects, and actions",
-                        "status": "planned"
-                    }
+                        "status": "planned",
+                    },
                 ],
-                "message": "Video processing capabilities are under development. Check back for updates."
-            }
+                "message": "Video processing capabilities are under development. Check back for updates.",
+            },
         )
 
 

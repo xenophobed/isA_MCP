@@ -82,13 +82,15 @@ class EnhancedAutonomousPlanner(BaseTool):
             "failed": "❌",
             "blocked": "🚫",
             "revision": "🔄",
-            "branch": "🌿"
+            "branch": "🌿",
         }
 
         task_status = status or task.get("status", "pending")
-        task_type = "revision" if task.get("is_revision") else \
-                    "branch" if task.get("branch_from_task_id") else \
-                    task_status
+        task_type = (
+            "revision"
+            if task.get("is_revision")
+            else "branch" if task.get("branch_from_task_id") else task_status
+        )
 
         emoji = emojis.get(task_type, "📌")
 
@@ -104,7 +106,9 @@ class EnhancedAutonomousPlanner(BaseTool):
 
         return output
 
-    def _create_planning_prompt(self, guidance: str, available_tools: List[str], request: str) -> Dict[str, Any]:
+    def _create_planning_prompt(
+        self, guidance: str, available_tools: List[str], request: str
+    ) -> Dict[str, Any]:
         """Create enhanced planning prompt with hypothesis-driven approach"""
         tool_list = "\n".join([f"- {tool}" for tool in available_tools])
 
@@ -174,11 +178,7 @@ class EnhancedAutonomousPlanner(BaseTool):
         """
 
     async def create_execution_plan(
-        self,
-        guidance: str,
-        available_tools: List[str],
-        request: str,
-        plan_id: Optional[str] = None
+        self, guidance: str, available_tools: List[str], request: str, plan_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create execution plan with state tracking
@@ -203,12 +203,14 @@ class EnhancedAutonomousPlanner(BaseTool):
             # Parse results
             if isinstance(result_data, str):
                 # Extract JSON from markdown code blocks if present
-                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_data, re.DOTALL)
+                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", result_data, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(1)
                 else:
                     # Try to find JSON object in the text
-                    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result_data, re.DOTALL)
+                    json_match = re.search(
+                        r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", result_data, re.DOTALL
+                    )
                     if json_match:
                         json_str = json_match.group(0)
                     else:
@@ -243,7 +245,7 @@ class EnhancedAutonomousPlanner(BaseTool):
                 "total_tasks": len(plan_data.get("tasks", [])),
                 "created_at": datetime.utcnow().isoformat(),
                 "status": "created",
-                **plan_data
+                **plan_data,
             }
 
             # Save to state manager
@@ -252,16 +254,16 @@ class EnhancedAutonomousPlanner(BaseTool):
                 print(f"✅ Plan saved with {len(plan_data.get('tasks', []))} tasks")
 
                 # Print visual summary
-                print("\n" + "="*60)
+                print("\n" + "=" * 60)
                 print(f"📊 PLAN SUMMARY")
-                print("="*60)
+                print("=" * 60)
                 print(f"Hypothesis: {plan.get('solution_hypothesis', 'N/A')}")
                 print(f"Execution Mode: {plan.get('execution_mode', 'N/A')}")
                 print(f"Total Tasks: {plan['total_tasks']}")
                 print("\nTasks:")
                 for task in plan_data.get("tasks", []):
                     print(f"  {self._format_task_status(task)}")
-                print("="*60 + "\n")
+                print("=" * 60 + "\n")
             else:
                 print("⚠️ Failed to save plan to state manager")
 
@@ -279,16 +281,13 @@ class EnhancedAutonomousPlanner(BaseTool):
                     "• Reject - Cancel this plan and start over"
                 ),
                 editable=True,
-                timeout=600  # 10 minutes to review
+                timeout=600,  # 10 minutes to review
             )
 
         except Exception as e:
             logger.error(f"Planning creation failed: {str(e)}", exc_info=True)
             return self.create_response(
-                "error",
-                "create_execution_plan",
-                {},
-                f"Planning creation failed: {str(e)}"
+                "error", "create_execution_plan", {}, f"Planning creation failed: {str(e)}"
             )
 
     def _create_fallback_plan(self, request: str, available_tools: List[str]) -> Dict[str, Any]:
@@ -310,9 +309,9 @@ class EnhancedAutonomousPlanner(BaseTool):
                     "expected_output": "Completed request",
                     "verification_criteria": "Task completes without errors",
                     "priority": "high",
-                    "status": "pending"
+                    "status": "pending",
                 }
-            ]
+            ],
         }
 
     async def adjust_execution_plan(
@@ -321,7 +320,7 @@ class EnhancedAutonomousPlanner(BaseTool):
         adjustment_type: str,
         task_id: Optional[int] = None,
         new_tasks: Optional[List[Dict[str, Any]]] = None,
-        reasoning: str = ""
+        reasoning: str = "",
     ) -> Dict[str, Any]:
         """
         Dynamically adjust plan during execution
@@ -339,17 +338,18 @@ class EnhancedAutonomousPlanner(BaseTool):
             plan = self.state_manager.get_plan(plan_id)
             if not plan:
                 return self.create_response(
-                    "error",
-                    "adjust_execution_plan",
-                    {},
-                    f"Plan {plan_id} not found"
+                    "error", "adjust_execution_plan", {}, f"Plan {plan_id} not found"
                 )
 
             if adjustment_type == "expand":
                 # Add new tasks beyond initial count
                 if not new_tasks:
-                    return self.create_response("error", "adjust_execution_plan", {},
-                                              "new_tasks required for expand adjustment")
+                    return self.create_response(
+                        "error",
+                        "adjust_execution_plan",
+                        {},
+                        "new_tasks required for expand adjustment",
+                    )
 
                 current_tasks = plan.get("tasks", [])
                 max_id = max([t["id"] for t in current_tasks]) if current_tasks else 0
@@ -364,21 +364,25 @@ class EnhancedAutonomousPlanner(BaseTool):
                 plan["tasks"] = current_tasks
 
                 # Add event
-                self.state_manager.add_execution_event(plan_id, {
-                    "event_type": "plan_expanded",
-                    "data": {
-                        "new_task_count": len(new_tasks),
-                        "reasoning": reasoning
-                    }
-                })
+                self.state_manager.add_execution_event(
+                    plan_id,
+                    {
+                        "event_type": "plan_expanded",
+                        "data": {"new_task_count": len(new_tasks), "reasoning": reasoning},
+                    },
+                )
 
                 print(f"✅ Plan expanded with {len(new_tasks)} new tasks")
 
             elif adjustment_type == "revise":
                 # Revise existing task
                 if task_id is None:
-                    return self.create_response("error", "adjust_execution_plan", {},
-                                              "task_id required for revise adjustment")
+                    return self.create_response(
+                        "error",
+                        "adjust_execution_plan",
+                        {},
+                        "task_id required for revise adjustment",
+                    )
 
                 tasks = plan.get("tasks", [])
                 for task in tasks:
@@ -389,36 +393,44 @@ class EnhancedAutonomousPlanner(BaseTool):
                         break
 
                 # Add event
-                self.state_manager.add_execution_event(plan_id, {
-                    "event_type": "task_revised",
-                    "data": {
-                        "task_id": task_id,
-                        "reasoning": reasoning
-                    }
-                })
+                self.state_manager.add_execution_event(
+                    plan_id,
+                    {
+                        "event_type": "task_revised",
+                        "data": {"task_id": task_id, "reasoning": reasoning},
+                    },
+                )
 
                 print(f"✅ Task {task_id} marked for revision")
 
             elif adjustment_type == "branch":
                 # Create alternative execution branch
                 if task_id is None or not new_tasks:
-                    return self.create_response("error", "adjust_execution_plan", {},
-                                              "task_id and new_tasks required for branch adjustment")
+                    return self.create_response(
+                        "error",
+                        "adjust_execution_plan",
+                        {},
+                        "task_id and new_tasks required for branch adjustment",
+                    )
 
                 branch_id = f"branch_{uuid.uuid4().hex[:8]}"
 
                 # Create branch with new tasks
-                self.state_manager.create_branch(plan_id, branch_id, {
-                    "branch_from_task": task_id,
-                    "tasks": new_tasks,
-                    "reasoning": reasoning
-                })
+                self.state_manager.create_branch(
+                    plan_id,
+                    branch_id,
+                    {"branch_from_task": task_id, "tasks": new_tasks, "reasoning": reasoning},
+                )
 
                 print(f"✅ Branch {branch_id} created from task {task_id}")
 
             else:
-                return self.create_response("error", "adjust_execution_plan", {},
-                                          f"Unknown adjustment type: {adjustment_type}")
+                return self.create_response(
+                    "error",
+                    "adjust_execution_plan",
+                    {},
+                    f"Unknown adjustment type: {adjustment_type}",
+                )
 
             # Save updated plan
             self.state_manager.save_plan(plan_id, plan)
@@ -426,28 +438,17 @@ class EnhancedAutonomousPlanner(BaseTool):
             return self.create_response(
                 "success",
                 "adjust_execution_plan",
-                {
-                    "plan_id": plan_id,
-                    "adjustment_type": adjustment_type,
-                    "updated_plan": plan
-                }
+                {"plan_id": plan_id, "adjustment_type": adjustment_type, "updated_plan": plan},
             )
 
         except Exception as e:
             logger.error(f"Plan adjustment failed: {str(e)}", exc_info=True)
             return self.create_response(
-                "error",
-                "adjust_execution_plan",
-                {},
-                f"Plan adjustment failed: {str(e)}"
+                "error", "adjust_execution_plan", {}, f"Plan adjustment failed: {str(e)}"
             )
 
     def update_task_status(
-        self,
-        plan_id: str,
-        task_id: int,
-        status: str,
-        result: Optional[Dict[str, Any]] = None
+        self, plan_id: str, task_id: int, status: str, result: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Update task status with visual feedback
@@ -461,8 +462,9 @@ class EnhancedAutonomousPlanner(BaseTool):
         try:
             plan = self.state_manager.get_plan(plan_id)
             if not plan:
-                return self.create_response("error", "update_task_status", {},
-                                          f"Plan {plan_id} not found")
+                return self.create_response(
+                    "error", "update_task_status", {}, f"Plan {plan_id} not found"
+                )
 
             # Find task
             task = None
@@ -472,8 +474,9 @@ class EnhancedAutonomousPlanner(BaseTool):
                     break
 
             if not task:
-                return self.create_response("error", "update_task_status", {},
-                                          f"Task {task_id} not found in plan")
+                return self.create_response(
+                    "error", "update_task_status", {}, f"Task {task_id} not found in plan"
+                )
 
             # Update status
             success = self.state_manager.update_task_status(plan_id, task_id, status, result)
@@ -491,20 +494,18 @@ class EnhancedAutonomousPlanner(BaseTool):
                         "plan_id": plan_id,
                         "task_id": task_id,
                         "status": status,
-                        "task": updated_task
-                    }
+                        "task": updated_task,
+                    },
                 )
             else:
-                return self.create_response("error", "update_task_status", {},
-                                          "Failed to update task status")
+                return self.create_response(
+                    "error", "update_task_status", {}, "Failed to update task status"
+                )
 
         except Exception as e:
             logger.error(f"Task status update failed: {str(e)}", exc_info=True)
             return self.create_response(
-                "error",
-                "update_task_status",
-                {},
-                f"Task status update failed: {str(e)}"
+                "error", "update_task_status", {}, f"Task status update failed: {str(e)}"
             )
 
     def get_plan_status(self, plan_id: str) -> Dict[str, Any]:
@@ -512,8 +513,9 @@ class EnhancedAutonomousPlanner(BaseTool):
         try:
             plan = self.state_manager.get_plan(plan_id)
             if not plan:
-                return self.create_response("error", "get_plan_status", {},
-                                          f"Plan {plan_id} not found")
+                return self.create_response(
+                    "error", "get_plan_status", {}, f"Plan {plan_id} not found"
+                )
 
             tasks = plan.get("tasks", [])
             total_tasks = len(tasks)
@@ -556,44 +558,43 @@ class EnhancedAutonomousPlanner(BaseTool):
                 "pending_tasks": pending,
                 "blocked_tasks": blocked,
                 "current_task": current_task,
-                "progress_percentage": round((completed / total_tasks * 100) if total_tasks > 0 else 0, 2),
+                "progress_percentage": round(
+                    (completed / total_tasks * 100) if total_tasks > 0 else 0, 2
+                ),
                 "execution_events": len(history),
                 "active_branches": len(branches),
                 "branch_ids": [b.get("branch_id") for b in branches],
                 "created_at": plan.get("created_at"),
-                "last_updated": plan.get("last_updated")
+                "last_updated": plan.get("last_updated"),
             }
 
             # Print visual status
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print(f"📊 PLAN STATUS: {plan_id}")
-            print("="*60)
+            print("=" * 60)
             print(f"Overall: {overall_status.upper()}")
-            print(f"Progress: {status_data['progress_percentage']}% ({completed}/{total_tasks} tasks)")
+            print(
+                f"Progress: {status_data['progress_percentage']}% ({completed}/{total_tasks} tasks)"
+            )
             if current_task:
                 print(f"Current: {current_task}")
-            print(f"✅ Completed: {completed} | 🔄 In Progress: {in_progress} | ⏳ Pending: {pending}")
+            print(
+                f"✅ Completed: {completed} | 🔄 In Progress: {in_progress} | ⏳ Pending: {pending}"
+            )
             if failed > 0:
                 print(f"❌ Failed: {failed}")
             if blocked > 0:
                 print(f"🚫 Blocked: {blocked}")
             if branches:
                 print(f"🌿 Branches: {len(branches)}")
-            print("="*60 + "\n")
+            print("=" * 60 + "\n")
 
-            return self.create_response(
-                "success",
-                "get_plan_status",
-                status_data
-            )
+            return self.create_response("success", "get_plan_status", status_data)
 
         except Exception as e:
             logger.error(f"Get plan status failed: {str(e)}", exc_info=True)
             return self.create_response(
-                "error",
-                "get_plan_status",
-                {},
-                f"Get plan status failed: {str(e)}"
+                "error", "get_plan_status", {}, f"Get plan status failed: {str(e)}"
             )
 
     def _create_replanning_prompt(
@@ -602,7 +603,7 @@ class EnhancedAutonomousPlanner(BaseTool):
         previous_plan: Dict[str, Any],
         execution_status: Dict[str, Any],
         feedback: str,
-        available_tools: List[str]
+        available_tools: List[str],
     ) -> Dict[str, Any]:
         """Create replanning prompt"""
         tool_list = "\n".join([f"- {tool}" for tool in available_tools])
@@ -669,7 +670,7 @@ class EnhancedAutonomousPlanner(BaseTool):
         previous_plan: Dict[str, Any],
         execution_status: Dict[str, Any],
         feedback: str,
-        available_tools: List[str]
+        available_tools: List[str],
     ) -> Dict[str, Any]:
         """
         Replan execution based on previous execution status and feedback
@@ -695,12 +696,14 @@ class EnhancedAutonomousPlanner(BaseTool):
             # Parse results
             if isinstance(result_data, str):
                 # Extract JSON from markdown code blocks if present
-                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_data, re.DOTALL)
+                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", result_data, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(1)
                 else:
                     # Try to find JSON object in the text
-                    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result_data, re.DOTALL)
+                    json_match = re.search(
+                        r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", result_data, re.DOTALL
+                    )
                     if json_match:
                         json_str = json_match.group(0)
                     else:
@@ -713,7 +716,9 @@ class EnhancedAutonomousPlanner(BaseTool):
                     print(f"⚠️ JSON parsing failed for replan: {e}")
                     print(f"Raw response: {result_data[:200]}...")
                     # If parsing fails, create simple replan
-                    plan_data = self._create_fallback_replan(original_request, available_tools, feedback)
+                    plan_data = self._create_fallback_replan(
+                        original_request, available_tools, feedback
+                    )
             else:
                 plan_data = result_data
 
@@ -730,36 +735,33 @@ class EnhancedAutonomousPlanner(BaseTool):
                 "plan_title": "Intelligent Replanning",
                 "original_request": original_request,
                 "previous_plan_summary": {
-                    "execution_mode": previous_plan.get('execution_mode'),
-                    "total_tasks": len(previous_plan.get('tasks', [])),
-                    "completed_tasks": execution_status.get('completed_tasks', 0)
+                    "execution_mode": previous_plan.get("execution_mode"),
+                    "total_tasks": len(previous_plan.get("tasks", [])),
+                    "completed_tasks": execution_status.get("completed_tasks", 0),
                 },
                 "feedback": feedback,
                 "available_tools": available_tools,
                 "total_tasks": len(plan_data.get("tasks", [])),
                 "created_at": datetime.utcnow().isoformat(),
                 "status": "replanned",
-                **plan_data
+                **plan_data,
             }
 
-            print(f"✅ Replanning completed, generated {len(plan_data.get('tasks', []))} improved tasks")
-
-            return self.create_response(
-                "success",
-                "replan_execution",
-                replan
+            print(
+                f"✅ Replanning completed, generated {len(plan_data.get('tasks', []))} improved tasks"
             )
+
+            return self.create_response("success", "replan_execution", replan)
 
         except Exception as e:
             logger.error(f"Replanning failed: {str(e)}", exc_info=True)
             return self.create_response(
-                "error",
-                "replan_execution",
-                {},
-                f"Replanning failed: {str(e)}"
+                "error", "replan_execution", {}, f"Replanning failed: {str(e)}"
             )
 
-    def _create_fallback_replan(self, request: str, available_tools: List[str], feedback: str) -> Dict[str, Any]:
+    def _create_fallback_replan(
+        self, request: str, available_tools: List[str], feedback: str
+    ) -> Dict[str, Any]:
         """Create fallback replan"""
         return {
             "solution_hypothesis": "Simplified execution approach based on feedback",
@@ -780,9 +782,9 @@ class EnhancedAutonomousPlanner(BaseTool):
                     "verification_criteria": "Task completes without errors",
                     "priority": "high",
                     "status": "pending",
-                    "changes_from_previous": "Simplified approach with fewer tools"
+                    "changes_from_previous": "Simplified approach with fewer tools",
                 }
-            ]
+            ],
         }
 
 
@@ -795,7 +797,7 @@ def register_plan_tools(mcp: FastMCP):
         guidance: str,
         request: str = "",
         available_tools: str = "",  # JSON string or comma-separated list (optional)
-        plan_id: str = None
+        plan_id: str = None,
     ) -> Dict[str, Any]:
         """
         Create enhanced execution plan with state tracking and hypothesis-driven planning
@@ -823,16 +825,16 @@ def register_plan_tools(mcp: FastMCP):
         tools_list = []
         if available_tools:
             try:
-                if available_tools.startswith('['):
+                if available_tools.startswith("["):
                     tools_list = json.loads(available_tools)
                 else:
-                    tools_list = [tool.strip() for tool in available_tools.split(',') if tool.strip()]
+                    tools_list = [
+                        tool.strip() for tool in available_tools.split(",") if tool.strip()
+                    ]
             except:
                 tools_list = [available_tools] if available_tools else []
 
-        return await planner.create_execution_plan(
-            guidance, tools_list, actual_request, plan_id
-        )
+        return await planner.create_execution_plan(guidance, tools_list, actual_request, plan_id)
 
     @mcp.tool()
     async def replan_execution(
@@ -840,7 +842,7 @@ def register_plan_tools(mcp: FastMCP):
         previous_plan: str,  # JSON string
         execution_status: str,  # JSON string
         feedback: str,
-        available_tools: str  # JSON string or comma-separated
+        available_tools: str,  # JSON string or comma-separated
     ) -> Dict[str, Any]:
         """
         Replan execution based on previous execution status and feedback
@@ -860,19 +862,22 @@ def register_plan_tools(mcp: FastMCP):
         """
         # Parse input parameters
         try:
-            prev_plan = json.loads(previous_plan) if isinstance(previous_plan, str) else previous_plan
-            exec_status = json.loads(execution_status) if isinstance(execution_status, str) else execution_status
+            prev_plan = (
+                json.loads(previous_plan) if isinstance(previous_plan, str) else previous_plan
+            )
+            exec_status = (
+                json.loads(execution_status)
+                if isinstance(execution_status, str)
+                else execution_status
+            )
 
-            if available_tools.startswith('['):
+            if available_tools.startswith("["):
                 tools_list = json.loads(available_tools)
             else:
-                tools_list = [tool.strip() for tool in available_tools.split(',')]
+                tools_list = [tool.strip() for tool in available_tools.split(",")]
         except json.JSONDecodeError as e:
             return planner.create_response(
-                "error",
-                "replan_execution",
-                {},
-                f"JSON parsing failed: {str(e)}"
+                "error", "replan_execution", {}, f"JSON parsing failed: {str(e)}"
             )
 
         return await planner.replan_execution(
@@ -885,7 +890,7 @@ def register_plan_tools(mcp: FastMCP):
         adjustment_type: str,
         task_id: int = None,
         new_tasks_json: str = None,
-        reasoning: str = ""
+        reasoning: str = "",
     ) -> Dict[str, Any]:
         """
         Dynamically adjust execution plan during execution
@@ -912,10 +917,7 @@ def register_plan_tools(mcp: FastMCP):
                 new_tasks = json.loads(new_tasks_json)
             except json.JSONDecodeError as e:
                 return planner.create_response(
-                    "error",
-                    "adjust_plan",
-                    {},
-                    f"Failed to parse new_tasks_json: {str(e)}"
+                    "error", "adjust_plan", {}, f"Failed to parse new_tasks_json: {str(e)}"
                 )
 
         return await planner.adjust_execution_plan(
@@ -924,10 +926,7 @@ def register_plan_tools(mcp: FastMCP):
 
     @mcp.tool()
     def update_task_status(
-        plan_id: str,
-        task_id: int,
-        status: str,
-        result_json: str = None
+        plan_id: str, task_id: int, status: str, result_json: str = None
     ) -> Dict[str, Any]:
         """
         Update task status in execution plan
@@ -950,10 +949,7 @@ def register_plan_tools(mcp: FastMCP):
                 result = json.loads(result_json)
             except json.JSONDecodeError as e:
                 return planner.create_response(
-                    "error",
-                    "update_task_status",
-                    {},
-                    f"Failed to parse result_json: {str(e)}"
+                    "error", "update_task_status", {}, f"Failed to parse result_json: {str(e)}"
                 )
 
         return planner.update_task_status(plan_id, task_id, status, result)
@@ -1001,18 +997,11 @@ def register_plan_tools(mcp: FastMCP):
             return planner.create_response(
                 "success",
                 "get_execution_history",
-                {
-                    "plan_id": plan_id,
-                    "event_count": len(history),
-                    "events": history
-                }
+                {"plan_id": plan_id, "event_count": len(history), "events": history},
             )
         except Exception as e:
             return planner.create_response(
-                "error",
-                "get_execution_history",
-                {},
-                f"Failed to get execution history: {str(e)}"
+                "error", "get_execution_history", {}, f"Failed to get execution history: {str(e)}"
             )
 
     @mcp.tool()
@@ -1029,19 +1018,11 @@ def register_plan_tools(mcp: FastMCP):
             plan_ids = planner.state_manager.list_active_plans()
 
             return planner.create_response(
-                "success",
-                "list_active_plans",
-                {
-                    "plan_count": len(plan_ids),
-                    "plan_ids": plan_ids
-                }
+                "success", "list_active_plans", {"plan_count": len(plan_ids), "plan_ids": plan_ids}
             )
         except Exception as e:
             return planner.create_response(
-                "error",
-                "list_active_plans",
-                {},
-                f"Failed to list active plans: {str(e)}"
+                "error", "list_active_plans", {}, f"Failed to list active plans: {str(e)}"
             )
 
     logger.debug(f"Plan tools registered with {type(planner.state_manager).__name__} backend")

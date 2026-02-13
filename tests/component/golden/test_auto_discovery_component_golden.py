@@ -4,9 +4,9 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of AutoDiscoverySystem component interactions.
 If these tests fail, it means auto-discovery component behavior has changed.
 """
+
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
 import tempfile
 import os
 
@@ -39,7 +39,7 @@ class TestAutoDiscoveryToolsComponentGolden:
 
             # Create __init__.py with tool decorator
             init_file = tools_dir / "__init__.py"
-            init_file.write_text('@mcp.tool()\ndef init_tool(): pass')
+            init_file.write_text("@mcp.tool()\ndef init_tool(): pass")
 
             system = AutoDiscoverySystem(base_dir=tmpdir)
             result = system.discover_tools()
@@ -160,8 +160,8 @@ class TestAutoDiscoveryFunctionParsingGolden:
         """discover_functions_in_file returns a list."""
         from core.auto_discovery import AutoDiscoverySystem
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('def test(): pass')
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("def test(): pass")
             temp_path = f.name
 
         try:
@@ -176,7 +176,7 @@ class TestAutoDiscoveryFunctionParsingGolden:
         """discover_functions_in_file finds @mcp.tool() decorated functions."""
         from core.auto_discovery import AutoDiscoverySystem
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write('''
 @mcp.tool()
 def my_tool():
@@ -199,7 +199,7 @@ def my_tool():
         """discover_functions_in_file extracts function docstring."""
         from core.auto_discovery import AutoDiscoverySystem
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write('''
 @mcp.tool()
 def documented_tool():
@@ -222,15 +222,15 @@ def documented_tool():
         """discover_functions_in_file ignores functions without @mcp.tool()."""
         from core.auto_discovery import AutoDiscoverySystem
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write('''
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write("""
 def regular_function():
     pass
 
 @mcp.tool()
 def tool_function():
     pass
-''')
+""")
             temp_path = f.name
 
         try:
@@ -267,5 +267,5 @@ class TestAutoDiscoveryRegistrationGolden:
         sig = inspect.signature(system.auto_register_with_mcp)
 
         params = list(sig.parameters.keys())
-        assert 'mcp' in params
-        assert 'config' in params
+        assert "mcp" in params
+        assert "config" in params

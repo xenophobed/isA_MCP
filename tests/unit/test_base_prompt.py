@@ -7,26 +7,27 @@ Run these tests to drive the implementation of BasePrompt.
 Run with: pytest tests/unit/test_base_prompt.py -v
 """
 
-import pytest
 from unittest.mock import Mock
-
 
 # =============================================================================
 # BasePrompt Core Tests
 # =============================================================================
+
 
 class TestBasePromptInit:
     """TDD: BasePrompt should initialize with empty state"""
 
     def test_init_creates_empty_registered_prompts_list(self):
         from prompts.base_prompt import BasePrompt
+
         bp = BasePrompt()
         assert bp.registered_prompts == []
 
     def test_init_has_default_category_attribute(self):
         from prompts.base_prompt import BasePrompt
+
         bp = BasePrompt()
-        assert hasattr(bp, 'default_category')
+        assert hasattr(bp, "default_category")
 
 
 class TestRegisterPrompt:
@@ -58,7 +59,7 @@ class TestRegisterPrompt:
         bp.register_prompt(mcp, my_prompt)
 
         assert len(bp.registered_prompts) == 1
-        assert bp.registered_prompts[0]['name'] == "my_prompt"
+        assert bp.registered_prompts[0]["name"] == "my_prompt"
 
     def test_register_prompt_with_custom_name(self):
         from prompts.base_prompt import BasePrompt
@@ -71,7 +72,7 @@ class TestRegisterPrompt:
             return "x"
 
         bp.register_prompt(mcp, func, name="custom_name")
-        assert bp.registered_prompts[0]['name'] == "custom_name"
+        assert bp.registered_prompts[0]["name"] == "custom_name"
 
     def test_register_prompt_with_category(self):
         from prompts.base_prompt import BasePrompt
@@ -84,7 +85,7 @@ class TestRegisterPrompt:
             return "x"
 
         bp.register_prompt(mcp, func, category="reasoning")
-        assert bp.registered_prompts[0]['category'] == "reasoning"
+        assert bp.registered_prompts[0]["category"] == "reasoning"
 
     def test_register_prompt_with_tags(self):
         from prompts.base_prompt import BasePrompt
@@ -97,7 +98,7 @@ class TestRegisterPrompt:
             return "x"
 
         bp.register_prompt(mcp, func, tags=["a", "b"])
-        assert bp.registered_prompts[0]['tags'] == ["a", "b"]
+        assert bp.registered_prompts[0]["tags"] == ["a", "b"]
 
 
 class TestRegisterAllPrompts:
@@ -119,6 +120,7 @@ class TestFormatPromptOutput:
 
     def test_format_string_unchanged(self):
         from prompts.base_prompt import BasePrompt
+
         bp = BasePrompt()
 
         result = bp.format_prompt_output("Hello")
@@ -126,12 +128,10 @@ class TestFormatPromptOutput:
 
     def test_format_with_sections(self):
         from prompts.base_prompt import BasePrompt
+
         bp = BasePrompt()
 
-        result = bp.format_prompt_output(sections={
-            "Context": "ctx",
-            "Task": "do it"
-        })
+        result = bp.format_prompt_output(sections={"Context": "ctx", "Task": "do it"})
 
         assert "## Context" in result
         assert "ctx" in result
@@ -139,12 +139,10 @@ class TestFormatPromptOutput:
 
     def test_format_with_variables(self):
         from prompts.base_prompt import BasePrompt
+
         bp = BasePrompt()
 
-        result = bp.format_prompt_output(
-            "Hello {name}",
-            variables={"name": "World"}
-        )
+        result = bp.format_prompt_output("Hello {name}", variables={"name": "World"})
         assert result == "Hello World"
 
 
@@ -160,6 +158,7 @@ class TestGetRegisteredPrompts:
 
         def p1() -> str:
             return "1"
+
         def p2() -> str:
             return "2"
 
@@ -177,6 +176,7 @@ class TestGetRegisteredPrompts:
 
         def p1() -> str:
             return "1"
+
         def p2() -> str:
             return "2"
 
@@ -185,12 +185,13 @@ class TestGetRegisteredPrompts:
 
         result = bp.get_registered_prompts(category="cat1")
         assert len(result) == 1
-        assert result[0]['category'] == "cat1"
+        assert result[0]["category"] == "cat1"
 
 
 # =============================================================================
 # simple_prompt Decorator Tests
 # =============================================================================
+
 
 class TestSimplePromptDecorator:
     """TDD: @simple_prompt decorator for quick prompt definition"""

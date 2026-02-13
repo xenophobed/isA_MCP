@@ -6,10 +6,9 @@ If these tests fail, it means behavior has changed unexpectedly.
 
 Service Under Test: services/search_service/search_service.py
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden
@@ -67,17 +66,23 @@ class TestSearchServiceGolden:
 
     @pytest.fixture
     def search_service(
-        self, mock_vector_repo, mock_tool_repo, mock_prompt_repo,
-        mock_resource_repo, mock_embedding_generator
+        self,
+        mock_vector_repo,
+        mock_tool_repo,
+        mock_prompt_repo,
+        mock_resource_repo,
+        mock_embedding_generator,
     ):
         """Create SearchService with mocked dependencies."""
         from services.search_service.search_service import SearchService
-        service = SearchService()
-        service.vector_repo = mock_vector_repo
-        service.tool_repo = mock_tool_repo
-        service.prompt_repo = mock_prompt_repo
-        service.resource_repo = mock_resource_repo
-        service.embedding_gen = mock_embedding_generator
+
+        service = SearchService(
+            vector_repo=mock_vector_repo,
+            embedding_gen=mock_embedding_generator,
+            tool_repo=mock_tool_repo,
+            prompt_repo=mock_prompt_repo,
+            resource_repo=mock_resource_repo,
+        )
         return service
 
     # ═══════════════════════════════════════════════════════════════
@@ -154,7 +159,7 @@ class TestSearchServiceGolden:
                 "description": "A test tool",
                 "db_id": 42,
                 "score": 0.95,
-                "metadata": {}
+                "metadata": {},
             }
         ]
 
@@ -164,10 +169,10 @@ class TestSearchServiceGolden:
             "name": "test_tool",
             "input_schema": {"type": "object", "properties": {}},
             "output_schema": {"type": "string"},
-            "annotations": {"category": "utility"}
+            "annotations": {"category": "utility"},
         }
 
-        result = await search_service.search("test query", item_type="tool")
+        await search_service.search("test query", item_type="tool")
 
         # Should fetch schema from PostgreSQL
         mock_tool_repo.get_tool_by_id.assert_called()
@@ -186,7 +191,7 @@ class TestSearchServiceGolden:
                 "description": "Tool in Qdrant but not PostgreSQL",
                 "db_id": 999,
                 "score": 0.9,
-                "metadata": {}
+                "metadata": {},
             }
         ]
 
@@ -202,9 +207,7 @@ class TestSearchServiceGolden:
     # Type-Specific Search Methods
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_search_tools_filters_by_tool_type(
-        self, search_service, mock_vector_repo
-    ):
+    async def test_search_tools_filters_by_tool_type(self, search_service, mock_vector_repo):
         """
         CURRENT BEHAVIOR: search_tools() passes item_type='tool' to search.
         """
@@ -215,9 +218,7 @@ class TestSearchServiceGolden:
         mock_vector_repo.search_vectors.assert_called_once()
         # Verify item_type filter was applied
 
-    async def test_search_prompts_filters_by_prompt_type(
-        self, search_service, mock_vector_repo
-    ):
+    async def test_search_prompts_filters_by_prompt_type(self, search_service, mock_vector_repo):
         """
         CURRENT BEHAVIOR: search_prompts() passes item_type='prompt' to search.
         """
@@ -274,7 +275,7 @@ class TestSearchServiceGolden:
         expected_stats = {
             "collection": "mcp_unified_search",
             "total_points": 1000,
-            "vector_dimension": 1536
+            "vector_dimension": 1536,
         }
         mock_vector_repo.get_stats.return_value = expected_stats
 
@@ -293,7 +294,9 @@ class TestSearchServiceGolden:
         """
         CURRENT BEHAVIOR: Returns empty list on error (graceful degradation).
         """
-        mock_embedding_generator.embed_single.side_effect = Exception("Embedding service unavailable")
+        mock_embedding_generator.embed_single.side_effect = Exception(
+            "Embedding service unavailable"
+        )
 
         result = await search_service.search("test query")
 
@@ -324,7 +327,7 @@ class TestSearchResultGolden:
             metadata={},
             inputSchema={"type": "object"},
             outputSchema=None,
-            annotations=None
+            annotations=None,
         )
 
         assert result.id == "test_1"
@@ -351,7 +354,7 @@ class TestSearchResultGolden:
             metadata={},
             inputSchema=None,
             outputSchema=None,
-            annotations=None
+            annotations=None,
         )
 
         assert result.inputSchema is None

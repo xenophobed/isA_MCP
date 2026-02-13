@@ -5,32 +5,31 @@ Knowledge Management Application Prompts - Document Analysis Enhancement Templat
 
 from mcp.server.fastmcp import FastMCP
 
+
 def register_knowledge_prompts(mcp: FastMCP):
     """Register knowledge management prompts for document analysis enhancement"""
-    
+
     @mcp.prompt()
     def knowledge_analyze_prompt(
-        prompt: str = "",
-        file_url: str = "",
-        depth: str = "comprehensive"
+        prompt: str = "", file_url: str = "", depth: str = "comprehensive"
     ) -> str:
         """
         Knowledge document analysis prompt enhancer for user requests
-        
-        Transforms simple user document analysis requests into comprehensive, 
+
+        Transforms simple user document analysis requests into comprehensive,
         professional knowledge extraction inquiries with proper information
         synthesis and insight generation focus.
-        
+
         Keywords: knowledge, document-analysis, prompt-enhancement, insights, synthesis
         Category: knowledge-management
         """
-        
+
         depth_modifiers = {
             "basic": "Focus on key information extraction and main concepts",
-            "comprehensive": "Conduct thorough analysis with insights synthesis and knowledge connections", 
-            "advanced": "Perform deep knowledge analysis with critical evaluation and strategic implications"
+            "comprehensive": "Conduct thorough analysis with insights synthesis and knowledge connections",
+            "advanced": "Perform deep knowledge analysis with critical evaluation and strategic implications",
         }.get(depth.lower(), "Conduct thorough analysis with insights synthesis")
-        
+
         return f"""Analyze the document at {file_url} based on this request: "{prompt}"
 
 {depth_modifiers}. Please provide:
@@ -58,6 +57,7 @@ def register_knowledge_prompts(mcp: FastMCP):
 Focus on extracting maximum value from the document content while maintaining clarity and practical utility."""
 
     # Registration complete (debug-level event)
+
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

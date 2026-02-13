@@ -4,13 +4,15 @@ Mock for asyncpg database pool.
 Provides a mock implementation of asyncpg connection pool
 for testing without a real database connection.
 """
+
 from typing import Any, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
 class QueryRecord:
     """Record of a query execution."""
+
     method: str
     query: str
     args: Tuple[Any, ...]
@@ -65,9 +67,7 @@ class MockAsyncpgPool:
         for args in args_list:
             self._record_query("executemany", query, args)
 
-    async def copy_records_to_table(
-        self, table_name: str, records: List[Tuple], **kwargs
-    ) -> str:
+    async def copy_records_to_table(self, table_name: str, records: List[Tuple], **kwargs) -> str:
         """Copy records to table."""
         self._record_query("copy", f"COPY TO {table_name}", tuple(records))
         return f"COPY {len(records)}"
@@ -176,21 +176,13 @@ class MockDuckDBConnection:
 
     def execute(self, query: str, parameters: Tuple = None) -> "MockDuckDBResult":
         """Execute a query."""
-        self.queries.append(QueryRecord(
-            method="execute",
-            query=query,
-            args=parameters or ()
-        ))
+        self.queries.append(QueryRecord(method="execute", query=query, args=parameters or ()))
         return MockDuckDBResult(self._responses.get("execute", []))
 
     def executemany(self, query: str, parameters: List[Tuple]) -> None:
         """Execute query with multiple parameter sets."""
         for params in parameters:
-            self.queries.append(QueryRecord(
-                method="executemany",
-                query=query,
-                args=params
-            ))
+            self.queries.append(QueryRecord(method="executemany", query=query, args=params))
 
     def set_response(self, method: str, data: Any) -> None:
         """Set mock response."""
@@ -222,7 +214,7 @@ class MockDuckDBResult:
 
     def fetchmany(self, size: int) -> List[Tuple]:
         """Fetch many rows."""
-        result = self._data[self._index:self._index + size]
+        result = self._data[self._index : self._index + size]
         self._index += size
         return result
 
@@ -230,6 +222,7 @@ class MockDuckDBResult:
         """Return as pandas DataFrame."""
         try:
             import pandas as pd
+
             return pd.DataFrame(self._data)
         except ImportError:
             raise ImportError("pandas not installed")

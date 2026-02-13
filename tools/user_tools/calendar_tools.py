@@ -42,24 +42,34 @@ logger = get_logger(__name__)
 # Pydantic Models
 # ============================================================================
 
+
 class CalendarEventRequest(BaseModel):
     """Calendar event creation/update request"""
+
     title: str = Field(..., description="Event title")
     description: Optional[str] = Field(None, description="Event description")
     location: Optional[str] = Field(None, description="Event location")
     start_time: str = Field(..., description="Start time in ISO format (e.g., 2025-10-23T10:00:00)")
     end_time: str = Field(..., description="End time in ISO format (e.g., 2025-10-23T11:00:00)")
     all_day: bool = Field(False, description="Whether this is an all-day event")
-    category: Optional[str] = Field(None, description="Event category: work, personal, meeting, reminder, holiday, birthday, other")
+    category: Optional[str] = Field(
+        None,
+        description="Event category: work, personal, meeting, reminder, holiday, birthday, other",
+    )
     color: Optional[str] = Field(None, description="Event color in hex format (e.g., #FF5733)")
-    reminders: Optional[List[int]] = Field(None, description="Reminder times in minutes before event (e.g., [15, 60])")
-    recurrence_type: Optional[str] = Field(None, description="Recurrence type: none, daily, weekly, monthly, yearly")
+    reminders: Optional[List[int]] = Field(
+        None, description="Reminder times in minutes before event (e.g., [15, 60])"
+    )
+    recurrence_type: Optional[str] = Field(
+        None, description="Recurrence type: none, daily, weekly, monthly, yearly"
+    )
     is_shared: bool = Field(False, description="Whether event is shared with others")
 
 
 # ============================================================================
 # Calendar Tools Class
 # ============================================================================
+
 
 class CalendarTools(BaseTool):
     """Calendar management tools for event creation and management"""
@@ -80,7 +90,7 @@ class CalendarTools(BaseTool):
             description="Create calendar event meeting appointment reminder schedule add new",
             security_level=SecurityLevel.MEDIUM,
             timeout=30.0,
-            annotations=ToolAnnotations(readOnlyHint=False)
+            annotations=ToolAnnotations(readOnlyHint=False),
         )
 
         # 2. Get calendar event
@@ -91,7 +101,7 @@ class CalendarTools(BaseTool):
             description="Get retrieve fetch calendar event details information by id",
             security_level=SecurityLevel.LOW,
             timeout=10.0,
-            annotations=ToolAnnotations(readOnlyHint=True)
+            annotations=ToolAnnotations(readOnlyHint=True),
         )
 
         # 3. List calendar events
@@ -102,7 +112,7 @@ class CalendarTools(BaseTool):
             description="List query search filter calendar events by date range category",
             security_level=SecurityLevel.LOW,
             timeout=30.0,
-            annotations=ToolAnnotations(readOnlyHint=True)
+            annotations=ToolAnnotations(readOnlyHint=True),
         )
 
         # 4. Update calendar event
@@ -113,7 +123,7 @@ class CalendarTools(BaseTool):
             description="Update modify edit change calendar event details time location",
             security_level=SecurityLevel.MEDIUM,
             timeout=30.0,
-            annotations=ToolAnnotations(readOnlyHint=False)
+            annotations=ToolAnnotations(readOnlyHint=False),
         )
 
         # 5. Delete calendar event
@@ -124,7 +134,7 @@ class CalendarTools(BaseTool):
             description="Delete remove cancel calendar event",
             security_level=SecurityLevel.MEDIUM,
             timeout=10.0,
-            annotations=ToolAnnotations(readOnlyHint=False)
+            annotations=ToolAnnotations(readOnlyHint=False),
         )
 
         # 6. Get upcoming events
@@ -135,7 +145,7 @@ class CalendarTools(BaseTool):
             description="Get retrieve upcoming future calendar events next days",
             security_level=SecurityLevel.LOW,
             timeout=10.0,
-            annotations=ToolAnnotations(readOnlyHint=True)
+            annotations=ToolAnnotations(readOnlyHint=True),
         )
 
         # 7. Get today's events
@@ -146,7 +156,7 @@ class CalendarTools(BaseTool):
             description="Get retrieve today's calendar events schedule appointments",
             security_level=SecurityLevel.LOW,
             timeout=10.0,
-            annotations=ToolAnnotations(readOnlyHint=True)
+            annotations=ToolAnnotations(readOnlyHint=True),
         )
 
         # 8. Sync external calendar
@@ -157,7 +167,7 @@ class CalendarTools(BaseTool):
             description="Sync synchronize external calendar Google Apple Outlook calendar integration",
             security_level=SecurityLevel.MEDIUM,
             timeout=60.0,
-            annotations=ToolAnnotations(readOnlyHint=False)
+            annotations=ToolAnnotations(readOnlyHint=False),
         )
 
         # 9. Get sync status
@@ -168,7 +178,7 @@ class CalendarTools(BaseTool):
             description="Get retrieve calendar sync status external calendar synchronization",
             security_level=SecurityLevel.LOW,
             timeout=10.0,
-            annotations=ToolAnnotations(readOnlyHint=True)
+            annotations=ToolAnnotations(readOnlyHint=True),
         )
 
         logger.debug(f"Registered {len(self.registered_tools)} calendar management tools")
@@ -179,18 +189,35 @@ class CalendarTools(BaseTool):
 
     async def create_calendar_event_impl(
         self,
-        title: Annotated[str, Field(description="Event title (e.g., 'Team Meeting', 'Doctor Appointment')")],
-        start_time: Annotated[str, Field(description="Start time in ISO format (e.g., '2025-10-23T10:00:00')")],
-        end_time: Annotated[str, Field(description="End time in ISO format (e.g., '2025-10-23T11:00:00')")],
+        title: Annotated[
+            str, Field(description="Event title (e.g., 'Team Meeting', 'Doctor Appointment')")
+        ],
+        start_time: Annotated[
+            str, Field(description="Start time in ISO format (e.g., '2025-10-23T10:00:00')")
+        ],
+        end_time: Annotated[
+            str, Field(description="End time in ISO format (e.g., '2025-10-23T11:00:00')")
+        ],
         description: Annotated[Optional[str], Field(description="Event description")] = None,
         location: Annotated[Optional[str], Field(description="Event location")] = None,
-        category: Annotated[Optional[str], Field(description="Category: work, personal, meeting, reminder, holiday, birthday, other")] = None,
+        category: Annotated[
+            Optional[str],
+            Field(
+                description="Category: work, personal, meeting, reminder, holiday, birthday, other"
+            ),
+        ] = None,
         all_day: Annotated[bool, Field(description="Whether this is an all-day event")] = False,
-        reminders: Annotated[Optional[List[int]], Field(description="Reminder times in minutes before event (e.g., [15, 60])")] = None,
-        recurrence_type: Annotated[Optional[str], Field(description="Recurrence type: none, daily, weekly, monthly, yearly")] = None,
+        reminders: Annotated[
+            Optional[List[int]],
+            Field(description="Reminder times in minutes before event (e.g., [15, 60])"),
+        ] = None,
+        recurrence_type: Annotated[
+            Optional[str],
+            Field(description="Recurrence type: none, daily, weekly, monthly, yearly"),
+        ] = None,
         is_shared: Annotated[bool, Field(description="Whether event is shared")] = False,
         user_id: str = "default",
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """
         Create a calendar event
@@ -205,26 +232,33 @@ class CalendarTools(BaseTool):
 
         # Validate date format
         try:
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-            
+            start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+
             if end_dt <= start_dt:
                 return self.create_response(
-                    "error", "create_calendar_event",
-                    {"error": "End time must be after start time"}
+                    "error", "create_calendar_event", {"error": "End time must be after start time"}
                 )
         except ValueError as e:
             return self.create_response(
-                "error", "create_calendar_event",
-                {"error": f"Invalid date format: {str(e)}"}
+                "error", "create_calendar_event", {"error": f"Invalid date format: {str(e)}"}
             )
 
         # Validate category
-        valid_categories = ["work", "personal", "meeting", "reminder", "holiday", "birthday", "other"]
+        valid_categories = [
+            "work",
+            "personal",
+            "meeting",
+            "reminder",
+            "holiday",
+            "birthday",
+            "other",
+        ]
         if category and category not in valid_categories:
             return self.create_response(
-                "error", "create_calendar_event",
-                {"error": f"Category must be one of: {', '.join(valid_categories)}"}
+                "error",
+                "create_calendar_event",
+                {"error": f"Category must be one of: {', '.join(valid_categories)}"},
             )
 
         await self.report_progress(ctx, 2, 3, "Creating event in calendar service")
@@ -236,7 +270,7 @@ class CalendarTools(BaseTool):
             "start_time": start_time,
             "end_time": end_time,
             "all_day": all_day,
-            "is_shared": is_shared
+            "is_shared": is_shared,
         }
 
         if description:
@@ -255,7 +289,7 @@ class CalendarTools(BaseTool):
             response = await self.http_client.post(
                 f"{self.calendar_service_url}/api/v1/calendar/events",
                 json=event_data,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
 
             if response.status_code == 201:
@@ -266,36 +300,33 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Calendar event created: {event_id}")
 
                 return self.create_response(
-                    "success", "create_calendar_event",
+                    "success",
+                    "create_calendar_event",
                     {
                         "event_id": event_id,
                         "title": title,
                         "start_time": start_time,
                         "end_time": end_time,
                         "category": category or "other",
-                        "status": "created"
-                    }
+                        "status": "created",
+                    },
                 )
             else:
                 error_msg = response.text
                 await self.log_error(ctx, f"Failed to create event: {error_msg}")
                 return self.create_response(
-                    "error", "create_calendar_event",
-                    {"error": f"Creation failed: {error_msg}"}
+                    "error", "create_calendar_event", {"error": f"Creation failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error creating calendar event: {e}")
-            return self.create_response(
-                "error", "create_calendar_event",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "create_calendar_event", {"error": str(e)})
 
     async def get_calendar_event_impl(
         self,
         event_id: Annotated[str, Field(description="Event ID to retrieve")],
         user_id: str = "default",
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Get calendar event details"""
         await self.log_info(ctx, f"Getting calendar event: {event_id}")
@@ -303,7 +334,7 @@ class CalendarTools(BaseTool):
         try:
             response = await self.http_client.get(
                 f"{self.calendar_service_url}/api/v1/calendar/events/{event_id}",
-                params={"user_id": user_id}
+                params={"user_id": user_id},
             )
 
             if response.status_code == 200:
@@ -311,50 +342,41 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Retrieved event: {event.get('title')}")
 
                 return self.create_response(
-                    "success", "get_calendar_event",
-                    {
-                        "event": event,
-                        "event_id": event_id
-                    }
+                    "success", "get_calendar_event", {"event": event, "event_id": event_id}
                 )
             elif response.status_code == 404:
                 return self.create_response(
-                    "error", "get_calendar_event",
-                    {"error": "Event not found"}
+                    "error", "get_calendar_event", {"error": "Event not found"}
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "get_calendar_event",
-                    {"error": f"Query failed: {error_msg}"}
+                    "error", "get_calendar_event", {"error": f"Query failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error getting calendar event: {e}")
-            return self.create_response(
-                "error", "get_calendar_event",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "get_calendar_event", {"error": str(e)})
 
     async def list_calendar_events_impl(
         self,
         user_id: str = "default",
-        start_date: Annotated[Optional[str], Field(description="Start date in ISO format (e.g., '2025-10-01')")] = None,
-        end_date: Annotated[Optional[str], Field(description="End date in ISO format (e.g., '2025-10-31')")] = None,
+        start_date: Annotated[
+            Optional[str], Field(description="Start date in ISO format (e.g., '2025-10-01')")
+        ] = None,
+        end_date: Annotated[
+            Optional[str], Field(description="End date in ISO format (e.g., '2025-10-31')")
+        ] = None,
         category: Annotated[Optional[str], Field(description="Filter by category")] = None,
         limit: Annotated[int, Field(description="Max events to return", ge=1, le=1000)] = 100,
         offset: Annotated[int, Field(description="Offset for pagination", ge=0)] = 0,
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """List calendar events with optional filters"""
         await self.log_info(ctx, f"Listing calendar events for user {user_id}")
 
         try:
-            params = {
-                "user_id": user_id,
-                "limit": limit,
-                "offset": offset
-            }
+            params = {"user_id": user_id, "limit": limit, "offset": offset}
             if start_date:
                 params["start_date"] = start_date
             if end_date:
@@ -363,8 +385,7 @@ class CalendarTools(BaseTool):
                 params["category"] = category
 
             response = await self.http_client.get(
-                f"{self.calendar_service_url}/api/v1/calendar/events",
-                params=params
+                f"{self.calendar_service_url}/api/v1/calendar/events", params=params
             )
 
             if response.status_code == 200:
@@ -375,7 +396,8 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Found {total} events")
 
                 return self.create_response(
-                    "success", "list_calendar_events",
+                    "success",
+                    "list_calendar_events",
                     {
                         "total": total,
                         "count": len(events),
@@ -383,23 +405,19 @@ class CalendarTools(BaseTool):
                         "filters": {
                             "start_date": start_date,
                             "end_date": end_date,
-                            "category": category
-                        }
-                    }
+                            "category": category,
+                        },
+                    },
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "list_calendar_events",
-                    {"error": f"Query failed: {error_msg}"}
+                    "error", "list_calendar_events", {"error": f"Query failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error listing calendar events: {e}")
-            return self.create_response(
-                "error", "list_calendar_events",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "list_calendar_events", {"error": str(e)})
 
     async def update_calendar_event_impl(
         self,
@@ -408,10 +426,12 @@ class CalendarTools(BaseTool):
         title: Annotated[Optional[str], Field(description="New event title")] = None,
         description: Annotated[Optional[str], Field(description="New event description")] = None,
         location: Annotated[Optional[str], Field(description="New event location")] = None,
-        start_time: Annotated[Optional[str], Field(description="New start time in ISO format")] = None,
+        start_time: Annotated[
+            Optional[str], Field(description="New start time in ISO format")
+        ] = None,
         end_time: Annotated[Optional[str], Field(description="New end time in ISO format")] = None,
         category: Annotated[Optional[str], Field(description="New category")] = None,
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Update calendar event"""
         await self.log_info(ctx, f"Updating calendar event: {event_id}")
@@ -433,15 +453,14 @@ class CalendarTools(BaseTool):
 
         if not update_data:
             return self.create_response(
-                "error", "update_calendar_event",
-                {"error": "No fields to update"}
+                "error", "update_calendar_event", {"error": "No fields to update"}
             )
 
         try:
             response = await self.http_client.put(
                 f"{self.calendar_service_url}/api/v1/calendar/events/{event_id}",
                 json=update_data,
-                params={"user_id": user_id}
+                params={"user_id": user_id},
             )
 
             if response.status_code == 200:
@@ -449,37 +468,29 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Event updated: {event_id}")
 
                 return self.create_response(
-                    "success", "update_calendar_event",
-                    {
-                        "event_id": event_id,
-                        "event": event,
-                        "status": "updated"
-                    }
+                    "success",
+                    "update_calendar_event",
+                    {"event_id": event_id, "event": event, "status": "updated"},
                 )
             elif response.status_code == 404:
                 return self.create_response(
-                    "error", "update_calendar_event",
-                    {"error": "Event not found"}
+                    "error", "update_calendar_event", {"error": "Event not found"}
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "update_calendar_event",
-                    {"error": f"Update failed: {error_msg}"}
+                    "error", "update_calendar_event", {"error": f"Update failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error updating calendar event: {e}")
-            return self.create_response(
-                "error", "update_calendar_event",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "update_calendar_event", {"error": str(e)})
 
     async def delete_calendar_event_impl(
         self,
         event_id: Annotated[str, Field(description="Event ID to delete")],
         user_id: str = "default",
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Delete calendar event"""
         await self.log_info(ctx, f"Deleting calendar event: {event_id}")
@@ -487,37 +498,28 @@ class CalendarTools(BaseTool):
         try:
             response = await self.http_client.delete(
                 f"{self.calendar_service_url}/api/v1/calendar/events/{event_id}",
-                params={"user_id": user_id}
+                params={"user_id": user_id},
             )
 
             if response.status_code == 204:
                 await self.log_info(ctx, f"Event {event_id} deleted")
 
                 return self.create_response(
-                    "success", "delete_calendar_event",
-                    {
-                        "event_id": event_id,
-                        "status": "deleted"
-                    }
+                    "success", "delete_calendar_event", {"event_id": event_id, "status": "deleted"}
                 )
             elif response.status_code == 404:
                 return self.create_response(
-                    "error", "delete_calendar_event",
-                    {"error": "Event not found"}
+                    "error", "delete_calendar_event", {"error": "Event not found"}
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "delete_calendar_event",
-                    {"error": f"Delete failed: {error_msg}"}
+                    "error", "delete_calendar_event", {"error": f"Delete failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error deleting calendar event: {e}")
-            return self.create_response(
-                "error", "delete_calendar_event",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "delete_calendar_event", {"error": str(e)})
 
     # ========================================================================
     # Query Methods Implementation
@@ -527,7 +529,7 @@ class CalendarTools(BaseTool):
         self,
         user_id: str = "default",
         days: Annotated[int, Field(description="Number of days to look ahead", ge=1, le=365)] = 7,
-        ctx: Optional[Context] = None
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Get upcoming calendar events"""
         await self.log_info(ctx, f"Getting upcoming events for user {user_id} (next {days} days)")
@@ -535,7 +537,7 @@ class CalendarTools(BaseTool):
         try:
             response = await self.http_client.get(
                 f"{self.calendar_service_url}/api/v1/calendar/upcoming",
-                params={"user_id": user_id, "days": days}
+                params={"user_id": user_id, "days": days},
             )
 
             if response.status_code == 200:
@@ -543,39 +545,29 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Found {len(events)} upcoming events")
 
                 return self.create_response(
-                    "success", "get_upcoming_events",
-                    {
-                        "count": len(events),
-                        "days": days,
-                        "events": events
-                    }
+                    "success",
+                    "get_upcoming_events",
+                    {"count": len(events), "days": days, "events": events},
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "get_upcoming_events",
-                    {"error": f"Query failed: {error_msg}"}
+                    "error", "get_upcoming_events", {"error": f"Query failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error getting upcoming events: {e}")
-            return self.create_response(
-                "error", "get_upcoming_events",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "get_upcoming_events", {"error": str(e)})
 
     async def get_today_events_impl(
-        self,
-        user_id: str = "default",
-        ctx: Optional[Context] = None
+        self, user_id: str = "default", ctx: Optional[Context] = None
     ) -> Dict[str, Any]:
         """Get today's calendar events"""
         await self.log_info(ctx, f"Getting today's events for user {user_id}")
 
         try:
             response = await self.http_client.get(
-                f"{self.calendar_service_url}/api/v1/calendar/today",
-                params={"user_id": user_id}
+                f"{self.calendar_service_url}/api/v1/calendar/today", params={"user_id": user_id}
             )
 
             if response.status_code == 200:
@@ -583,25 +575,17 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Found {len(events)} events today")
 
                 return self.create_response(
-                    "success", "get_today_events",
-                    {
-                        "count": len(events),
-                        "events": events
-                    }
+                    "success", "get_today_events", {"count": len(events), "events": events}
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "get_today_events",
-                    {"error": f"Query failed: {error_msg}"}
+                    "error", "get_today_events", {"error": f"Query failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error getting today's events: {e}")
-            return self.create_response(
-                "error", "get_today_events",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "get_today_events", {"error": str(e)})
 
     # ========================================================================
     # External Calendar Sync Implementation
@@ -609,10 +593,14 @@ class CalendarTools(BaseTool):
 
     async def sync_external_calendar_impl(
         self,
-        provider: Annotated[str, Field(description="Calendar provider: google_calendar, apple_calendar, outlook")],
+        provider: Annotated[
+            str, Field(description="Calendar provider: google_calendar, apple_calendar, outlook")
+        ],
         user_id: str = "default",
-        credentials: Annotated[Optional[Dict[str, Any]], Field(description="OAuth credentials (optional)")] = None,
-        ctx: Optional[Context] = None
+        credentials: Annotated[
+            Optional[Dict[str, Any]], Field(description="OAuth credentials (optional)")
+        ] = None,
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Sync with external calendar"""
         await self.log_info(ctx, f"Syncing external calendar: {provider} for user {user_id}")
@@ -621,20 +609,18 @@ class CalendarTools(BaseTool):
         valid_providers = ["google_calendar", "apple_calendar", "outlook"]
         if provider not in valid_providers:
             return self.create_response(
-                "error", "sync_external_calendar",
-                {"error": f"Provider must be one of: {', '.join(valid_providers)}"}
+                "error",
+                "sync_external_calendar",
+                {"error": f"Provider must be one of: {', '.join(valid_providers)}"},
             )
 
         try:
-            params = {
-                "user_id": user_id,
-                "provider": provider
-            }
+            params = {"user_id": user_id, "provider": provider}
 
             response = await self.http_client.post(
                 f"{self.calendar_service_url}/api/v1/calendar/sync",
                 params=params,
-                json=credentials or {}
+                json=credentials or {},
             )
 
             if response.status_code == 200:
@@ -642,33 +628,32 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Calendar sync initiated: {provider}")
 
                 return self.create_response(
-                    "success", "sync_external_calendar",
+                    "success",
+                    "sync_external_calendar",
                     {
                         "provider": provider,
                         "status": result.get("status"),
                         "synced_events": result.get("synced_events", 0),
-                        "last_synced": result.get("last_synced")
-                    }
+                        "last_synced": result.get("last_synced"),
+                    },
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "sync_external_calendar",
-                    {"error": f"Sync failed: {error_msg}"}
+                    "error", "sync_external_calendar", {"error": f"Sync failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error syncing external calendar: {e}")
-            return self.create_response(
-                "error", "sync_external_calendar",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "sync_external_calendar", {"error": str(e)})
 
     async def get_sync_status_impl(
         self,
         user_id: str = "default",
-        provider: Annotated[Optional[str], Field(description="Calendar provider (optional)")] = None,
-        ctx: Optional[Context] = None
+        provider: Annotated[
+            Optional[str], Field(description="Calendar provider (optional)")
+        ] = None,
+        ctx: Optional[Context] = None,
     ) -> Dict[str, Any]:
         """Get calendar sync status"""
         await self.log_info(ctx, f"Getting sync status for user {user_id}")
@@ -679,8 +664,7 @@ class CalendarTools(BaseTool):
                 params["provider"] = provider
 
             response = await self.http_client.get(
-                f"{self.calendar_service_url}/api/v1/calendar/sync/status",
-                params=params
+                f"{self.calendar_service_url}/api/v1/calendar/sync/status", params=params
             )
 
             if response.status_code == 200:
@@ -688,29 +672,21 @@ class CalendarTools(BaseTool):
                 await self.log_info(ctx, f"Sync status retrieved: {status.get('status')}")
 
                 return self.create_response(
-                    "success", "get_calendar_sync_status",
-                    {
-                        "status": status
-                    }
+                    "success", "get_calendar_sync_status", {"status": status}
                 )
             elif response.status_code == 404:
                 return self.create_response(
-                    "error", "get_calendar_sync_status",
-                    {"error": "Sync status not found"}
+                    "error", "get_calendar_sync_status", {"error": "Sync status not found"}
                 )
             else:
                 error_msg = response.text
                 return self.create_response(
-                    "error", "get_calendar_sync_status",
-                    {"error": f"Query failed: {error_msg}"}
+                    "error", "get_calendar_sync_status", {"error": f"Query failed: {error_msg}"}
                 )
 
         except Exception as e:
             await self.log_error(ctx, f"Error getting sync status: {e}")
-            return self.create_response(
-                "error", "get_calendar_sync_status",
-                {"error": str(e)}
-            )
+            return self.create_response("error", "get_calendar_sync_status", {"error": str(e)})
 
     async def cleanup(self):
         """Cleanup resources"""
@@ -720,6 +696,7 @@ class CalendarTools(BaseTool):
 # ============================================================================
 # Registration - Auto-discovery
 # ============================================================================
+
 
 def register_calendar_tools(mcp):
     """
@@ -732,4 +709,3 @@ def register_calendar_tools(mcp):
     tool.register_tools(mcp)
     logger.debug(f"Calendar management tools registered successfully")
     return tool
-

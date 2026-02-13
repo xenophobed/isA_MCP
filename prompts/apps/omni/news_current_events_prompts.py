@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_news_current_events_prompts(mcp):
     """Register News & Current Events 📰 category prompts with the MCP server"""
-    
+
     @mcp.prompt("news_analysis_prompt")
     async def news_analysis_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive news analysis and current events commentary
-        
+
         This prompt guides creation of balanced news analysis with
         multiple perspectives, fact-checking, and contextual understanding.
-        
+
         Args:
             subject: The news topic or current event to analyze
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: news, analysis, current events, journalism, perspective, fact-checking
         Category: news_current_events
         """
-        
+
         prompt_template = f"""
 # News Analyst with Investigative Journalism Expertise
 
@@ -86,12 +84,13 @@ def register_news_current_events_prompts(mcp):
 
 Create balanced, well-researched news analysis that informs and provides context for current events.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("News & Current Events 📰 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_news_current_events_prompts(mcp)

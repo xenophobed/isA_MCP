@@ -4,8 +4,8 @@ TDD TESTS - Define new feature behavior
 Integration event tests for usage tracking.
 Tests that usage events are properly recorded across services.
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.integration
@@ -18,8 +18,9 @@ class TestToolUsageEvents:
         """
         try:
             from services.tool_service.tool_service import ToolService
+
             service = ToolService()
-            assert hasattr(service, 'record_tool_call')
+            assert hasattr(service, "record_tool_call")
         except Exception:
             pytest.skip("ToolService not available for testing")
 
@@ -29,8 +30,9 @@ class TestToolUsageEvents:
         """
         try:
             from services.tool_service.tool_service import ToolService
+
             service = ToolService()
-            assert hasattr(service, 'get_tool_statistics')
+            assert hasattr(service, "get_tool_statistics")
         except Exception:
             pytest.skip("ToolService not available for testing")
 
@@ -45,8 +47,9 @@ class TestPromptUsageEvents:
         """
         try:
             from services.prompt_service.prompt_service import PromptService
+
             service = PromptService()
-            assert hasattr(service, 'record_prompt_usage')
+            assert hasattr(service, "record_prompt_usage")
         except Exception:
             pytest.skip("PromptService not available for testing")
 
@@ -61,8 +64,9 @@ class TestResourceAccessEvents:
         """
         try:
             from services.resource_service.resource_service import ResourceService
+
             service = ResourceService()
-            assert hasattr(service, 'record_resource_access')
+            assert hasattr(service, "record_resource_access")
         except Exception:
             pytest.skip("ResourceService not available for testing")
 
@@ -81,11 +85,11 @@ class TestProgressEvents:
             manager = ProgressManager()
 
             # Should have core methods matching actual API
-            assert hasattr(manager, 'start_operation')
-            assert hasattr(manager, 'get_progress')
-            assert hasattr(manager, 'update_progress')
-            assert hasattr(manager, 'complete_operation')
-            assert hasattr(manager, 'fail_operation')
+            assert hasattr(manager, "start_operation")
+            assert hasattr(manager, "get_progress")
+            assert hasattr(manager, "update_progress")
+            assert hasattr(manager, "complete_operation")
+            assert hasattr(manager, "fail_operation")
         except ImportError:
             pytest.skip("ProgressManager not available")
 
@@ -102,9 +106,9 @@ class TestProgressEvents:
 
             # Should have required parameters
             params = list(sig.parameters.keys())
-            assert 'operation_id' in params
+            assert "operation_id" in params
             # metadata is the second parameter in current implementation
-            assert 'metadata' in params or 'operation_type' in params
+            assert "metadata" in params or "operation_type" in params
         except ImportError:
             pytest.skip("ProgressManager not available")
 
@@ -121,6 +125,6 @@ class TestProgressEvents:
 
             # Should have required parameters
             params = list(sig.parameters.keys())
-            assert 'operation_id' in params
+            assert "operation_id" in params
         except ImportError:
             pytest.skip("ProgressManager not available")

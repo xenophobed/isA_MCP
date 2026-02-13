@@ -26,9 +26,9 @@ class VectorRepository:
     # Type offsets to ensure unique Qdrant point IDs across different item types
     # Each type gets a 1M range to prevent ID collisions
     TYPE_OFFSETS = {
-        "tool": 0,           # IDs 0 - 999,999
+        "tool": 0,  # IDs 0 - 999,999
         "prompt": 1_000_000,  # IDs 1,000,000 - 1,999,999
-        "resource": 2_000_000, # IDs 2,000,000 - 2,999,999
+        "resource": 2_000_000,  # IDs 2,000,000 - 2,999,999
     }
 
     def _compute_point_id(self, item_type: str, db_id: int) -> int:
@@ -51,9 +51,7 @@ class VectorRepository:
 
         # Initialize Qdrant client
         try:
-            self.client = AsyncQdrantClient(
-                host=host, port=port, user_id="mcp-vector-service"
-            )
+            self.client = AsyncQdrantClient(host=host, port=port, user_id="mcp-vector-service")
             logger.debug(f"Connected to Qdrant at {host}:{port}")
         except Exception as e:
             logger.error(f"Failed to initialize Qdrant client: {e}")
@@ -94,6 +92,10 @@ class VectorRepository:
 
             # Index for active status filtering
             await self.client.create_field_index(self.collection_name, "is_active", "keyword")
+
+            # Multi-tenant indexes
+            await self.client.create_field_index(self.collection_name, "org_id", "keyword")
+            await self.client.create_field_index(self.collection_name, "is_global", "keyword")
 
             logger.info("Created field indexes for filtering")
 
@@ -146,6 +148,11 @@ class VectorRepository:
 
             # Add metadata if provided
             if metadata:
+                # Promote org_id and is_global to top-level payload for Qdrant filtering
+                if "org_id" in metadata:
+                    payload["org_id"] = metadata.pop("org_id")
+                if "is_global" in metadata:
+                    payload["is_global"] = metadata.pop("is_global")
                 payload["metadata"] = metadata
 
             # Compute unique point ID using type offset to prevent collisions
@@ -285,7 +292,7 @@ class VectorRepository:
             # AsyncBaseGRPCClient._ensure_connected() - no manual reconnect needed
             # See BR-002 in isa_common/tests/contracts/grpc_client/logic_contract.md
 
-            logger.info(f"🔎 [VectorRepo] Starting vector search...")
+            logger.info("🔎 [VectorRepo] Starting vector search...")
             logger.info(f"   Collection: {self.collection_name}")
             logger.info(f"   Type filter: {item_type}")
             logger.info(f"   Limit: {limit}, Threshold: {score_threshold}")
@@ -296,24 +303,20 @@ class VectorRepository:
                     f"❌ [VectorRepo] Dimension mismatch: expected {self.vector_dimension}, got {len(query_embedding)}"
                 )
                 return []
-            logger.info(
-                f"✅ [VectorRepo] Vector dimension validated: {self.vector_dimension}D"
-            )
+            logger.info(f"✅ [VectorRepo] Vector dimension validated: {self.vector_dimension}D")
 
             # Build filter conditions
             filter_conditions = None
 
             # Add type filter if specified
             if item_type:
-                filter_conditions = {
-                    "must": [{"field": "type", "match": {"keyword": item_type}}]
-                }
+                filter_conditions = {"must": [{"field": "type", "match": {"keyword": item_type}}]}
                 logger.info(f"🔧 [VectorRepo] Applied type filter: {item_type}")
 
             # Perform search
-            logger.info(f"🔌 [VectorRepo] Connecting to Qdrant...")
+            logger.info("🔌 [VectorRepo] Connecting to Qdrant...")
             try:
-                logger.info(f"📡 [VectorRepo] Sending search request to Qdrant...")
+                logger.info("📡 [VectorRepo] Sending search request to Qdrant...")
                 results = await self.client.search_with_filter(
                     self.collection_name,
                     query_embedding,
@@ -335,14 +338,14 @@ class VectorRepository:
             # Filter by score threshold and format results
             if results:
                 all_scores = [r.get("score", 0) for r in results]
-                logger.info(f"📊 [VectorRepo] Score distribution:")
+                logger.info("📊 [VectorRepo] Score distribution:")
                 logger.info(f"   All scores: {all_scores}")
                 logger.info(
                     f"   Max: {max(all_scores):.4f}, Min: {min(all_scores):.4f}, Avg: {sum(all_scores) / len(all_scores):.4f}"
                 )
                 logger.info(f"   Threshold: {score_threshold}")
             else:
-                logger.warning(f"⚠️  [VectorRepo] Qdrant returned empty results!")
+                logger.warning("⚠️  [VectorRepo] Qdrant returned empty results!")
                 return []
 
             search_results = []
@@ -396,9 +399,7 @@ class VectorRepository:
             # Ensure item_id is an integer for Qdrant
             point_id = int(item_id) if not isinstance(item_id, int) else item_id
 
-            operation_id = await self.client.delete_points(
-                self.collection_name, [point_id]
-            )
+            operation_id = await self.client.delete_points(self.collection_name, [point_id])
 
             if operation_id:
                 logger.info(f"Deleted vector: {point_id}")
@@ -448,9 +449,7 @@ class VectorRepository:
         """
         try:
             # Build filter conditions for isa_common QdrantClient
-            filter_conditions = {
-                "must": [{"field": "type", "match": {"keyword": item_type}}]
-            }
+            filter_conditions = {"must": [{"field": "type", "match": {"keyword": item_type}}]}
 
             # Scroll through all points of this type
             items = []
@@ -494,9 +493,7 @@ class VectorRepository:
                 if not offset_id:
                     break
 
-            logger.debug(
-                f"Retrieved {len(items)} items of type '{item_type}' from Qdrant"
-            )
+            logger.debug(f"Retrieved {len(items)} items of type '{item_type}' from Qdrant")
             return items
 
         except Exception as e:
@@ -526,7 +523,7 @@ class VectorRepository:
                 logger.info(f"Deleted {len(item_ids)} vectors")
                 return len(item_ids)
             else:
-                logger.error(f"Failed to delete vectors")
+                logger.error("Failed to delete vectors")
                 return 0
 
         except Exception as e:

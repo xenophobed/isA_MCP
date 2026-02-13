@@ -3,6 +3,7 @@ Tool Aggregator - Discovery and indexing of tools from external MCP servers.
 
 Handles tool discovery, namespacing, embedding generation, and skill classification.
 """
+
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -31,7 +32,7 @@ class ToolAggregator:
         tool_repository=None,
         vector_repository=None,
         skill_classifier=None,
-        model_client=None
+        model_client=None,
     ):
         """
         Initialize ToolAggregator.
@@ -79,7 +80,7 @@ class ToolAggregator:
         try:
             result = await session.list_tools()
             # ListToolsResult is a Pydantic model, access .tools attribute
-            external_tools = result.tools if hasattr(result, 'tools') else result.get("tools", [])
+            external_tools = result.tools if hasattr(result, "tools") else result.get("tools", [])
         except Exception as e:
             logger.error(f"Failed to discover tools from {server['name']}: {e}")
             raise
@@ -91,24 +92,31 @@ class ToolAggregator:
         for ext_tool in external_tools:
             try:
                 # Convert Tool Pydantic model to dict if needed
-                tool_data = ext_tool if isinstance(ext_tool, dict) else {
-                    "name": ext_tool.name,
-                    "description": ext_tool.description or "",
-                    "inputSchema": ext_tool.inputSchema if hasattr(ext_tool, 'inputSchema') else {},
-                }
+                tool_data = (
+                    ext_tool
+                    if isinstance(ext_tool, dict)
+                    else {
+                        "name": ext_tool.name,
+                        "description": ext_tool.description or "",
+                        "inputSchema": (
+                            ext_tool.inputSchema if hasattr(ext_tool, "inputSchema") else {}
+                        ),
+                    }
+                )
                 tool = await self._aggregate_tool(server, tool_data)
                 aggregated_tools.append(tool)
             except Exception as e:
-                tool_name = ext_tool.get('name') if isinstance(ext_tool, dict) else getattr(ext_tool, 'name', 'unknown')
+                tool_name = (
+                    ext_tool.get("name")
+                    if isinstance(ext_tool, dict)
+                    else getattr(ext_tool, "name", "unknown")
+                )
                 logger.error(f"Failed to aggregate tool {tool_name}: {e}")
                 continue
 
         # Update server tool count
         if self._server_registry:
-            await self._server_registry.update_tool_count(
-                server_id,
-                len(aggregated_tools)
-            )
+            await self._server_registry.update_tool_count(server_id, len(aggregated_tools))
 
         # Batch classify all discovered tools (same pattern as sync_service)
         if aggregated_tools and self._skill_classifier:
@@ -118,9 +126,7 @@ class ToolAggregator:
         return aggregated_tools
 
     async def _aggregate_tool(
-        self,
-        server: Dict[str, Any],
-        tool_data: Dict[str, Any]
+        self, server: Dict[str, Any], tool_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Process a single tool from external server.
@@ -133,6 +139,10 @@ class ToolAggregator:
         description = tool_data.get("description", "")
         input_schema = tool_data.get("inputSchema", {})
 
+        # Propagate org_id from server to tool (org-scoped servers → org-scoped tools)
+        server_org_id = server.get("org_id")
+        is_global = server.get("is_global", True)
+
         # Store in PostgreSQL (if repo available)
         tool_id = None
         if self._tool_repo:
@@ -142,6 +152,8 @@ class ToolAggregator:
                 input_schema=input_schema,
                 source_server_id=server["id"],
                 original_name=original_name,
+                org_id=server_org_id,
+                is_global=is_global,
             )
         else:
             # No storage - use hash as pseudo-ID for in-memory operation
@@ -163,8 +175,10 @@ class ToolAggregator:
                     "source_server_name": server["name"],
                     "original_name": original_name,
                     "is_external": True,
-                    "is_classified": False
-                }
+                    "is_classified": False,
+                    "org_id": server_org_id,
+                    "is_global": is_global,
+                },
             )
 
         # Note: Classification is done in batch after all tools are aggregated
@@ -180,6 +194,8 @@ class ToolAggregator:
             "source_server_name": server["name"],
             "is_external": True,
             "is_classified": False,
+            "org_id": server_org_id,
+            "is_global": is_global,
         }
 
     def namespace_tool(self, tool_name: str, server_name: str) -> str:
@@ -224,8 +240,7 @@ class ToolAggregator:
             try:
                 # Use OpenAI-compatible embeddings API (same as sync_service)
                 response = await self._model_client.embeddings.create(
-                    input=text,
-                    model="text-embedding-3-small"
+                    input=text, model="text-embedding-3-small"
                 )
                 return response.data[0].embedding
             except Exception as e:
@@ -250,11 +265,7 @@ class ToolAggregator:
 
         # Prepare batch format (same as sync_service)
         tools_for_batch = [
-            {
-                'tool_id': tool['id'],
-                'tool_name': tool['name'],
-                'description': tool['description']
-            }
+            {"tool_id": tool["id"], "tool_name": tool["name"], "description": tool["description"]}
             for tool in tools
         ]
 
@@ -264,17 +275,67 @@ class ToolAggregator:
             # Use the same batch classification as sync_service
             batch_results = await self._skill_classifier.classify_tools_batch(tools_for_batch)
 
-            classified = sum(1 for r in batch_results if r.get('primary_skill_id'))
+            classified = sum(1 for r in batch_results if r.get("primary_skill_id"))
             logger.info(f"✅ Classified {classified}/{len(tools_for_batch)} external tools")
 
             # Log individual results
             for result in batch_results:
-                if result.get('primary_skill_id'):
+                if result.get("primary_skill_id"):
                     logger.debug(f"  ✅ {result['tool_name']} -> {result['primary_skill_id']}")
 
         except Exception as e:
             logger.warning(f"Batch classification failed for external tools: {e}")
             # Tools remain searchable but unclassified
+
+    async def _classify_tool(self, tool_id: int) -> Dict[str, Any]:
+        """
+        Classify a single tool into skill categories.
+
+        Args:
+            tool_id: Tool database ID
+
+        Returns:
+            Classification result with assignments and primary_skill_id
+        """
+        if not self._tool_repo:
+            raise ValueError("No tool repository available")
+
+        tool = await self._tool_repo.get_tool(tool_id)
+        if not tool:
+            raise ValueError(f"Tool not found: {tool_id}")
+
+        if not self._skill_classifier:
+            return {"assignments": [], "primary_skill_id": None}
+
+        # Classify using skill classifier
+        result = await self._skill_classifier.classify_tool(
+            tool_id=tool_id,
+            tool_name=tool["name"],
+            tool_description=tool.get("description", ""),
+        )
+
+        # Update tool record
+        assignments = result.get("assignments", [])
+        primary_skill_id = result.get("primary_skill_id")
+        if assignments:
+            skill_ids = [a["skill_id"] for a in assignments if a.get("confidence", 0) >= 0.5]
+            await self._tool_repo.update_tool(
+                tool_id,
+                is_classified=True,
+                skill_ids=skill_ids,
+                primary_skill_id=primary_skill_id,
+            )
+
+        # Update vector repository if available
+        if self._vector_repo and assignments:
+            skill_ids = [a["skill_id"] for a in assignments if a.get("confidence", 0) >= 0.5]
+            await self._vector_repo.update_tool_skills(
+                tool_id=tool_id,
+                skill_ids=skill_ids,
+                primary_skill_id=primary_skill_id,
+            )
+
+        return result
 
     async def aggregate_tools(self) -> List[Dict[str, Any]]:
         """
@@ -299,10 +360,7 @@ class ToolAggregator:
         return all_tools
 
     async def search_tools(
-        self,
-        query: str,
-        server_filter: List[str] = None,
-        limit: int = 10
+        self, query: str, server_filter: List[str] = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Search across all aggregated tools.
@@ -330,9 +388,7 @@ class ToolAggregator:
         # Search in Qdrant
         if self._vector_repo:
             results = await self._vector_repo.search(
-                query_vector=query_embedding,
-                filter_conditions=filter_conditions,
-                limit=limit
+                query_vector=query_embedding, filter_conditions=filter_conditions, limit=limit
             )
             return results
 

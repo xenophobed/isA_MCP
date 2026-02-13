@@ -3,6 +3,7 @@ TDD TESTS - API Resources Endpoint Tests
 
 Tests for the MCP resources/list and resources/read endpoints.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -37,19 +38,16 @@ class TestResourcesListAPI:
                         "uri": "resource://test/1",
                         "name": "test_resource",
                         "description": "A test resource",
-                        "mimeType": "application/json"
+                        "mimeType": "application/json",
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "resources/list", "params": {}}
+        )
 
         data = response.json()
 
@@ -73,23 +71,13 @@ class TestResourcesListAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "resources": [
-                    {
-                        "uri": "resource://test/1",
-                        "name": "test_resource"
-                    }
-                ]
-            }
+            "result": {"resources": [{"uri": "resource://test/1", "name": "test_resource"}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "resources/list", "params": {}}
+        )
 
         data = response.json()
         resources = data["result"]["resources"]
@@ -109,21 +97,12 @@ class TestResourcesListAPI:
         """
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {
-                "resources": []
-            }
-        }
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"resources": []}}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "resources/list", "params": {}}
+        )
 
         data = response.json()
         assert data["result"]["resources"] == []
@@ -158,21 +137,22 @@ class TestResourcesReadAPI:
                     {
                         "uri": "resource://test/1",
                         "mimeType": "application/json",
-                        "text": '{"key": "value"}'
+                        "text": '{"key": "value"}',
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {
-                "uri": "resource://test/1"
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "resource://test/1"},
+            },
+        )
 
         data = response.json()
 
@@ -194,25 +174,19 @@ class TestResourcesReadAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "contents": [
-                    {
-                        "uri": "resource://test/1",
-                        "text": "Content"
-                    }
-                ]
-            }
+            "result": {"contents": [{"uri": "resource://test/1", "text": "Content"}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {
-                "uri": "resource://test/1"
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "resource://test/1"},
+            },
+        )
 
         data = response.json()
         contents = data["result"]["contents"]
@@ -236,21 +210,19 @@ class TestResourcesReadAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Resource not found: resource://nonexistent/1"
-            }
+            "error": {"code": -32602, "message": "Resource not found: resource://nonexistent/1"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {
-                "uri": "resource://nonexistent/1"
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "resource://nonexistent/1"},
+            },
+        )
 
         data = response.json()
 
@@ -275,21 +247,22 @@ class TestResourcesReadAPI:
                     {
                         "uri": "resource://image/1",
                         "mimeType": "image/png",
-                        "blob": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA..."
+                        "blob": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA...",
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {
-                "uri": "resource://image/1"
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "resource://image/1"},
+            },
+        )
 
         data = response.json()
         contents = data["result"]["contents"]
@@ -317,10 +290,10 @@ class TestResourcesAPIGolden:
                         "uri": "string",
                         "name": "string",
                         "description": "string (optional)",
-                        "mimeType": "string (optional)"
+                        "mimeType": "string (optional)",
                     }
                 ]
-            }
+            },
         }
 
         assert "result" in expected_schema
@@ -339,10 +312,10 @@ class TestResourcesAPIGolden:
                         "uri": "string",
                         "mimeType": "string (optional)",
                         "text": "string (for text content)",
-                        "blob": "string (base64, for binary content)"
+                        "blob": "string (base64, for binary content)",
                     }
                 ]
-            }
+            },
         }
 
         assert "result" in expected_schema

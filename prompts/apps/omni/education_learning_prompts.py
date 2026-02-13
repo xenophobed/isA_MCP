@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_education_learning_prompts(mcp):
     """Register Education & Learning 📚 category prompts with the MCP server"""
-    
+
     @mcp.prompt("tutorial_prompt")
     async def tutorial_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive tutorial creation
-        
+
         This prompt guides creation of step-by-step educational tutorials
         with practical examples and hands-on learning approaches.
-        
+
         Args:
             subject: The tutorial topic or skill to teach
             depth: Tutorial depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: tutorial, education, learning, step-by-step, practical, teaching
         Category: education_learning
         """
-        
+
         prompt_template = f"""
 # Educational Content Creator with Tutorial Expertise
 
@@ -71,32 +69,29 @@ def register_education_learning_prompts(mcp):
 
 Create an engaging, practical tutorial that facilitates effective learning.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("course_material_prompt")
     async def course_material_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive course material development
-        
+
         This prompt guides creation of structured educational course content
         with academic rigor and systematic learning progression.
-        
+
         Args:
             subject: The course topic or subject area
             depth: Course depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: course, curriculum, education, structured, academic, learning
         Category: education_learning
         """
-        
+
         prompt_template = f"""
 # Academic Course Designer with Curriculum Expertise
 
@@ -134,12 +129,13 @@ Create an engaging, practical tutorial that facilitates effective learning.
 
 Create structured course material that supports effective teaching and learning.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Education & Learning 📚 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_education_learning_prompts(mcp)

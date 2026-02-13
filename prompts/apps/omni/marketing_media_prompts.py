@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_marketing_media_prompts(mcp):
     """Register Marketing & Media 📢 category prompts with the MCP server"""
-    
+
     @mcp.prompt("campaign_strategy_prompt")
     async def campaign_strategy_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive marketing campaign strategy development
-        
+
         This prompt guides creation of strategic marketing campaigns with
         audience targeting, messaging, and performance optimization.
-        
+
         Args:
             subject: The campaign topic or product/service to promote
             depth: Campaign strategy depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: campaign, strategy, marketing, advertising, targeting, promotion
         Category: marketing_media
         """
-        
+
         prompt_template = f"""
 # Marketing Strategist with Campaign Development Expertise
 
@@ -71,32 +69,29 @@ def register_marketing_media_prompts(mcp):
 
 Create a strategic marketing campaign that drives measurable business results.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("content_marketing_prompt")
     async def content_marketing_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive content marketing strategy and execution
-        
+
         This prompt guides creation of content marketing strategies with
         audience engagement, brand building, and lead generation focus.
-        
+
         Args:
             subject: The content marketing topic or brand/industry focus
             depth: Content strategy depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: content, marketing, strategy, engagement, branding, lead generation
         Category: marketing_media
         """
-        
+
         prompt_template = f"""
 # Content Marketing Specialist with Digital Strategy Expertise
 
@@ -135,12 +130,13 @@ Create a strategic marketing campaign that drives measurable business results.
 
 Create a content marketing strategy that builds audience engagement and drives business growth.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Marketing & Media 📢 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_marketing_media_prompts(mcp)

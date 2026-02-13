@@ -7,6 +7,7 @@ Write tests BEFORE implementing the feature.
 Feature: Use batch embedding instead of concurrent individual requests
 Reason: ISA Model API has 100 req/min rate limit, batch avoids hitting it
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -33,7 +34,7 @@ class TestSyncServiceBatchEmbedding:
         mock_mcp_server = AsyncMock()
 
         # Patch at the module level where imports happen
-        with patch.object(SyncService, '__init__', lambda self, mcp_server=None: None):
+        with patch.object(SyncService, "__init__", lambda self, mcp_server=None: None):
             service = SyncService(mcp_server=mock_mcp_server)
 
         # Set attributes manually (since we bypassed __init__)
@@ -90,20 +91,21 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync tools
-        result = await service.sync_tools()
+        await service.sync_tools()
 
         # Then: embeddings.create should be called ONCE with a LIST of texts
-        assert mock_isa_model.embeddings.create.call_count == 1, \
-            f"Expected 1 batch call, got {mock_isa_model.embeddings.create.call_count} calls"
+        assert (
+            mock_isa_model.embeddings.create.call_count == 1
+        ), f"Expected 1 batch call, got {mock_isa_model.embeddings.create.call_count} calls"
 
         # Verify it was called with a list (batch), not individual strings
         call_args = mock_isa_model.embeddings.create.call_args
         input_arg = call_args.kwargs.get("input")
 
-        assert isinstance(input_arg, list), \
-            f"Expected input to be a list (batch), got {type(input_arg)}"
-        assert len(input_arg) == 5, \
-            f"Expected 5 texts in batch, got {len(input_arg)}"
+        assert isinstance(
+            input_arg, list
+        ), f"Expected input to be a list (batch), got {type(input_arg)}"
+        assert len(input_arg) == 5, f"Expected 5 texts in batch, got {len(input_arg)}"
 
     @pytest.mark.asyncio
     async def test_sync_tools_batch_embedding_maintains_order(self, sync_service_with_mocks):
@@ -126,13 +128,12 @@ class TestSyncServiceBatchEmbedding:
         mocks["mcp_server"].list_tools.return_value = mock_tools
 
         # Mock embedding response - each embedding is distinct (first value = index)
-        mock_embedding_data = [
-            MagicMock(embedding=[float(i)] * 1536) for i in range(3)
-        ]
+        mock_embedding_data = [MagicMock(embedding=[float(i)] * 1536) for i in range(3)]
         mock_isa_model.embeddings.create.return_value = MagicMock(data=mock_embedding_data)
 
         # Track which embedding is used for each tool
         upsert_calls = []
+
         async def track_upsert(**kwargs):
             upsert_calls.append(kwargs)
             return True
@@ -153,8 +154,9 @@ class TestSyncServiceBatchEmbedding:
         for i, call in enumerate(upsert_calls):
             embedding = call.get("embedding")
             # The i-th tool should get embedding with value [i, i, i, ...]
-            assert embedding[0] == float(i), \
-                f"Tool {i} got wrong embedding: expected {float(i)}, got {embedding[0]}"
+            assert embedding[0] == float(
+                i
+            ), f"Tool {i} got wrong embedding: expected {float(i)}, got {embedding[0]}"
 
     @pytest.mark.asyncio
     async def test_sync_tools_handles_empty_tools_list(self, sync_service_with_mocks):
@@ -173,8 +175,9 @@ class TestSyncServiceBatchEmbedding:
         result = await service.sync_tools()
 
         # Then: No embedding calls should be made
-        assert mock_isa_model.embeddings.create.call_count == 0, \
-            "Should not call embedding API when no tools to sync"
+        assert (
+            mock_isa_model.embeddings.create.call_count == 0
+        ), "Should not call embedding API when no tools to sync"
         assert result["total"] == 0
 
     @pytest.mark.asyncio
@@ -207,11 +210,12 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync prompts
-        result = await service.sync_prompts()
+        await service.sync_prompts()
 
         # Then: Should be ONE batch call
-        assert mock_isa_model.embeddings.create.call_count == 1, \
-            f"Expected 1 batch call for prompts, got {mock_isa_model.embeddings.create.call_count}"
+        assert (
+            mock_isa_model.embeddings.create.call_count == 1
+        ), f"Expected 1 batch call for prompts, got {mock_isa_model.embeddings.create.call_count}"
 
         # Verify batch input
         call_args = mock_isa_model.embeddings.create.call_args
@@ -250,11 +254,12 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync resources
-        result = await service.sync_resources()
+        await service.sync_resources()
 
         # Then: Should be ONE batch call
-        assert mock_isa_model.embeddings.create.call_count == 1, \
-            f"Expected 1 batch call for resources, got {mock_isa_model.embeddings.create.call_count}"
+        assert (
+            mock_isa_model.embeddings.create.call_count == 1
+        ), f"Expected 1 batch call for resources, got {mock_isa_model.embeddings.create.call_count}"
 
         # Verify batch input
         call_args = mock_isa_model.embeddings.create.call_args

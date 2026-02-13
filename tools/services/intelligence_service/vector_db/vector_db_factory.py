@@ -15,14 +15,16 @@ from .base_vector_db import BaseVectorDB
 
 logger = logging.getLogger(__name__)
 
+
 class VectorDBType(Enum):
     """Supported vector database types"""
+
     QDRANT = "qdrant"
     WEAVIATE = "weaviate"
 
+
 def get_vector_db(
-    db_type: Optional[VectorDBType] = None,
-    config: Optional[Dict[str, Any]] = None
+    db_type: Optional[VectorDBType] = None, config: Optional[Dict[str, Any]] = None
 ) -> BaseVectorDB:
     """
     Create vector database instance based on type and configuration.
@@ -40,7 +42,7 @@ def get_vector_db(
     """
     # Determine database type from environment or parameter
     if db_type is None:
-        env_db_type = os.getenv('VECTOR_DB_TYPE', 'qdrant').lower()
+        env_db_type = os.getenv("VECTOR_DB_TYPE", "qdrant").lower()
         try:
             db_type = VectorDBType(env_db_type)
         except ValueError:
@@ -53,6 +55,7 @@ def get_vector_db(
     if db_type == VectorDBType.QDRANT:
         try:
             from .qdrant_vector_db import QdrantVectorDB
+
             return QdrantVectorDB(config)
         except ImportError as e:
             logger.error(f"Qdrant dependencies missing: {e}")
@@ -66,6 +69,7 @@ def get_vector_db(
     elif db_type == VectorDBType.WEAVIATE:
         try:
             from .weaviate_vector_db import WeaviateVectorDB
+
             return WeaviateVectorDB(config)
         except ImportError as e:
             logger.error(f"Weaviate dependencies missing: {e}")
@@ -74,6 +78,7 @@ def get_vector_db(
 
     else:
         raise ValueError(f"Unsupported vector database type: {db_type}")
+
 
 def get_default_config(db_type: VectorDBType) -> Dict[str, Any]:
     """
@@ -87,31 +92,32 @@ def get_default_config(db_type: VectorDBType) -> Dict[str, Any]:
     """
     if db_type == VectorDBType.QDRANT:
         return {
-            'host': os.getenv('QDRANT_HOST', 'localhost'),
-            'port': int(os.getenv('QDRANT_PORT', '50062')),  # gRPC port
-            'collection_name': os.getenv('QDRANT_COLLECTION', 'user_knowledge'),
-            'vector_dimension': int(os.getenv('VECTOR_DIMENSION', '1536')),
-            'distance_metric': os.getenv('QDRANT_DISTANCE', 'Cosine')
+            "host": os.getenv("QDRANT_HOST", "localhost"),
+            "port": int(os.getenv("QDRANT_PORT", "50062")),  # gRPC port
+            "collection_name": os.getenv("QDRANT_COLLECTION", "user_knowledge"),
+            "vector_dimension": int(os.getenv("VECTOR_DIMENSION", "1536")),
+            "distance_metric": os.getenv("QDRANT_DISTANCE", "Cosine"),
         }
 
     elif db_type == VectorDBType.WEAVIATE:
         return {
-            'url': os.getenv('WEAVIATE_URL', 'http://localhost:8080'),
-            'api_key': os.getenv('WEAVIATE_API_KEY'),
-            'class_name': os.getenv('WEAVIATE_CLASS', 'UserKnowledge'),
-            'vector_dimension': int(os.getenv('VECTOR_DIMENSION', '1536')),
-            'timeout': 60
+            "url": os.getenv("WEAVIATE_URL", "http://localhost:8080"),
+            "api_key": os.getenv("WEAVIATE_API_KEY"),
+            "class_name": os.getenv("WEAVIATE_CLASS", "UserKnowledge"),
+            "vector_dimension": int(os.getenv("VECTOR_DIMENSION", "1536")),
+            "timeout": 60,
         }
 
     else:
         return {}
 
+
 # Global instance cache for singleton pattern
 _vector_db_instances: Dict[str, BaseVectorDB] = {}
 
+
 def get_singleton_vector_db(
-    db_type: Optional[VectorDBType] = None,
-    config: Optional[Dict[str, Any]] = None
+    db_type: Optional[VectorDBType] = None, config: Optional[Dict[str, Any]] = None
 ) -> BaseVectorDB:
     """
     Get singleton vector database instance.
@@ -125,7 +131,7 @@ def get_singleton_vector_db(
     """
     # Determine database type
     if db_type is None:
-        env_db_type = os.getenv('VECTOR_DB_TYPE', 'qdrant').lower()
+        env_db_type = os.getenv("VECTOR_DB_TYPE", "qdrant").lower()
         try:
             db_type = VectorDBType(env_db_type)
         except ValueError:
@@ -140,15 +146,17 @@ def get_singleton_vector_db(
 
     return _vector_db_instances[cache_key]
 
+
 def clear_vector_db_cache():
     """Clear the vector database instance cache."""
     global _vector_db_instances
     _vector_db_instances.clear()
 
+
 # Convenience function for backward compatibility
 def create_vector_db() -> BaseVectorDB:
     """Create vector database using environment configuration (defaults to Qdrant)."""
-    db_type_str = os.getenv('VECTOR_DB_TYPE', 'qdrant').lower()
+    db_type_str = os.getenv("VECTOR_DB_TYPE", "qdrant").lower()
     try:
         db_type = VectorDBType(db_type_str)
     except ValueError:

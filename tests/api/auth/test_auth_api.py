@@ -3,6 +3,7 @@ TDD TESTS - API Auth Endpoint Tests
 
 Tests for authentication and authorization in API requests.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -31,19 +32,12 @@ class TestAuthenticationAPI:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {"tools": []}
-        }
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"tools": []}}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         assert response.status_code == 200
 
@@ -62,16 +56,13 @@ class TestAuthenticationAPI:
         mock_response.status_code = 401
         mock_response.json.return_value = {
             "error": "Unauthorized",
-            "message": "Missing or invalid authorization header"
+            "message": "Missing or invalid authorization header",
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         # When auth is required, should return 401
         # Note: Actual behavior depends on auth config
@@ -89,18 +80,12 @@ class TestAuthenticationAPI:
 
         mock_response = MagicMock()
         mock_response.status_code = 401
-        mock_response.json.return_value = {
-            "error": "Unauthorized",
-            "message": "Invalid API key"
-        }
+        mock_response.json.return_value = {"error": "Unauthorized", "message": "Invalid API key"}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         # When auth is required with invalid key
         assert response.status_code in [200, 401]
@@ -119,16 +104,13 @@ class TestAuthenticationAPI:
         mock_response.status_code = 401
         mock_response.json.return_value = {
             "error": "Unauthorized",
-            "message": "Invalid authorization header format"
+            "message": "Invalid authorization header format",
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         assert response.status_code in [200, 401]
 
@@ -158,22 +140,19 @@ class TestAuthorizationAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "content": [{"type": "text", "text": "Success"}],
-                "isError": False
-            }
+            "result": {"content": [{"type": "text", "text": "Success"}], "isError": False},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "allowed_tool",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "allowed_tool", "arguments": {}},
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -191,19 +170,19 @@ class TestAuthorizationAPI:
         mock_response.status_code = 403
         mock_response.json.return_value = {
             "error": "Forbidden",
-            "message": "Insufficient permissions to call tool: restricted_tool"
+            "message": "Insufficient permissions to call tool: restricted_tool",
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "restricted_tool",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "restricted_tool", "arguments": {}},
+            },
+        )
 
         # 403 if authorization enforced, otherwise may succeed
         assert response.status_code in [200, 403]
@@ -220,10 +199,7 @@ class TestAuthorizationAPI:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "status": "success",
-            "result": {"synced": 10}
-        }
+        mock_response.json.return_value = {"status": "success", "result": {"synced": 10}}
         mock_mcp_client.post.return_value = mock_response
 
         response = await mock_mcp_client.post("/sync", json={})
@@ -255,15 +231,10 @@ class TestSearchAuthAPI:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "status": "success",
-            "results": []
-        }
+        mock_response.json.return_value = {"status": "success", "results": []}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/search", json={
-            "query": "test query"
-        })
+        response = await mock_mcp_client.post("/search", json={"query": "test query"})
 
         assert response.status_code == 200
 
@@ -277,15 +248,9 @@ class TestAuthAPIGolden:
         """
         Documents expected authentication error response schema.
         """
-        expected_401_schema = {
-            "error": "Unauthorized",
-            "message": "string"
-        }
+        expected_401_schema = {"error": "Unauthorized", "message": "string"}
 
-        expected_403_schema = {
-            "error": "Forbidden",
-            "message": "string"
-        }
+        expected_403_schema = {"error": "Forbidden", "message": "string"}
 
         assert "error" in expected_401_schema
         assert "error" in expected_403_schema
@@ -294,10 +259,7 @@ class TestAuthAPIGolden:
         """
         Documents expected Authorization header format.
         """
-        valid_formats = [
-            "Bearer <api_key>",
-            "Bearer <jwt_token>"
-        ]
+        valid_formats = ["Bearer <api_key>", "Bearer <jwt_token>"]
 
         # Header should start with "Bearer "
         for fmt in valid_formats:

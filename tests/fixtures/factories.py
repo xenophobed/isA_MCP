@@ -3,19 +3,23 @@ Factory Boy factories for generating test data.
 
 Provides factories for all major domain objects in isA_MCP.
 """
+
 try:
     import factory
-    from factory import fuzzy
+    from factory import fuzzy  # noqa: F401
+
     FACTORY_AVAILABLE = True
 except ImportError:
     FACTORY_AVAILABLE = False
+
     # Create mock factory class for when factory_boy isn't installed
     class MockFactory:
         class Meta:
             model = dict
+
     factory = None
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 import random
 import string
@@ -28,7 +32,7 @@ def generate_id(prefix: str = "") -> str:
 
 def generate_name(prefix: str = "item") -> str:
     """Generate a random name."""
-    suffix = ''.join(random.choices(string.ascii_lowercase, k=6))
+    suffix = "".join(random.choices(string.ascii_lowercase, k=6))
     return f"{prefix}_{suffix}"
 
 
@@ -42,6 +46,7 @@ def random_choice(choices: list):
 # ═══════════════════════════════════════════════════════════════
 
 if FACTORY_AVAILABLE:
+
     class ToolFactory(factory.Factory):
         """Factory for creating tool test data."""
 
@@ -55,44 +60,37 @@ if FACTORY_AVAILABLE:
         category = factory.LazyFunction(
             lambda: random_choice(["intelligence", "utility", "web", "data", "user"])
         )
-        input_schema = factory.LazyAttribute(lambda _: {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "The input to process"
-                }
-            },
-            "required": ["input"]
-        })
+        input_schema = factory.LazyAttribute(
+            lambda _: {
+                "type": "object",
+                "properties": {"input": {"type": "string", "description": "The input to process"}},
+                "required": ["input"],
+            }
+        )
         is_active = True
         created_at = factory.LazyFunction(datetime.utcnow)
         updated_at = factory.LazyFunction(datetime.utcnow)
 
         class Params:
             """Factory parameters for customization."""
+
             with_optional_args = factory.Trait(
                 input_schema={
                     "type": "object",
                     "properties": {
                         "input": {"type": "string", "description": "Required input"},
                         "max_length": {"type": "integer", "default": 100},
-                        "format": {"type": "string", "enum": ["text", "json", "xml"]}
+                        "format": {"type": "string", "enum": ["text", "json", "xml"]},
                     },
-                    "required": ["input"]
+                    "required": ["input"],
                 }
             )
 
             intelligence = factory.Trait(
-                category="intelligence",
-                description="An AI-powered tool for intelligent processing"
+                category="intelligence", description="An AI-powered tool for intelligent processing"
             )
 
-            web = factory.Trait(
-                category="web",
-                description="A web automation tool"
-            )
-
+            web = factory.Trait(category="web", description="A web automation tool")
 
     class PromptFactory(factory.Factory):
         """Factory for creating prompt test data."""
@@ -104,29 +102,23 @@ if FACTORY_AVAILABLE:
         description = factory.LazyFunction(
             lambda: f"A prompt for {random_choice(['writing', 'analyzing', 'coding', 'summarizing'])}"
         )
-        template = factory.LazyAttribute(
-            lambda obj: f"You are an assistant. {{{{task}}}}"
+        template = factory.LazyAttribute(lambda obj: "You are an assistant. {{task}}")
+        arguments = factory.LazyAttribute(
+            lambda _: [{"name": "task", "description": "The task to perform", "required": True}]
         )
-        arguments = factory.LazyAttribute(lambda _: [
-            {
-                "name": "task",
-                "description": "The task to perform",
-                "required": True
-            }
-        ])
         created_at = factory.LazyFunction(datetime.utcnow)
         updated_at = factory.LazyFunction(datetime.utcnow)
 
         class Params:
             """Factory parameters."""
+
             with_context = factory.Trait(
                 arguments=[
                     {"name": "task", "description": "The task", "required": True},
-                    {"name": "context", "description": "Additional context", "required": False}
+                    {"name": "context", "description": "Additional context", "required": False},
                 ],
-                template="You are an assistant. Context: {{context}}\n\nTask: {{task}}"
+                template="You are an assistant. Context: {{context}}\n\nTask: {{task}}",
             )
-
 
     class ResourceFactory(factory.Factory):
         """Factory for creating resource test data."""
@@ -146,7 +138,6 @@ if FACTORY_AVAILABLE:
         )
         created_at = factory.LazyFunction(datetime.utcnow)
 
-
     class UserFactory(factory.Factory):
         """Factory for creating user test data."""
 
@@ -154,9 +145,7 @@ if FACTORY_AVAILABLE:
             model = dict
 
         user_id = factory.LazyFunction(lambda: generate_id("usr_"))
-        email = factory.LazyFunction(
-            lambda: f"{generate_name('user')}@example.com"
-        )
+        email = factory.LazyFunction(lambda: f"{generate_name('user')}@example.com")
         api_key = factory.LazyFunction(lambda: generate_id("mcp_"))
         subscription_tier = factory.LazyFunction(
             lambda: random_choice(["free", "pro", "enterprise"])
@@ -166,11 +155,8 @@ if FACTORY_AVAILABLE:
 
         class Params:
             """Factory parameters."""
-            admin = factory.Trait(
-                subscription_tier="enterprise",
-                is_admin=True
-            )
 
+            admin = factory.Trait(subscription_tier="enterprise", is_admin=True)
 
     class SearchResultFactory(factory.Factory):
         """Factory for creating search result test data."""
@@ -182,12 +168,11 @@ if FACTORY_AVAILABLE:
         name = factory.LazyFunction(lambda: generate_name("item"))
         description = factory.LazyFunction(lambda: "A matching result")
         score = factory.LazyFunction(lambda: round(random.uniform(0.5, 1.0), 4))
-        category = factory.LazyFunction(
-            lambda: random_choice(["tool", "prompt", "resource"])
-        )
+        category = factory.LazyFunction(lambda: random_choice(["tool", "prompt", "resource"]))
 
         class Params:
             """Factory parameters."""
+
             high_relevance = factory.Trait(
                 score=factory.LazyFunction(lambda: round(random.uniform(0.85, 1.0), 4))
             )
@@ -195,7 +180,6 @@ if FACTORY_AVAILABLE:
             low_relevance = factory.Trait(
                 score=factory.LazyFunction(lambda: round(random.uniform(0.3, 0.5), 4))
             )
-
 
     class EmbeddingFactory(factory.Factory):
         """Factory for creating embedding test data."""
@@ -211,6 +195,7 @@ if FACTORY_AVAILABLE:
 
         class Params:
             """Factory parameters."""
+
             small_dimension = factory.Trait(
                 vector=factory.LazyFunction(lambda: [random.uniform(-1, 1) for _ in range(384)])
             )
@@ -326,6 +311,7 @@ else:
 # Batch Creation Helpers
 # ═══════════════════════════════════════════════════════════════
 
+
 def create_tool_batch(count: int = 5, **common_attrs) -> list:
     """Create multiple tools."""
     if FACTORY_AVAILABLE:
@@ -345,7 +331,11 @@ def create_search_results(count: int = 10, category: str = None) -> list:
     results = []
     for i in range(count):
         score = round(1.0 - (i * 0.05), 4)
-        result = SearchResultFactory.build(score=score) if FACTORY_AVAILABLE else SearchResultFactory.build(score=score)
+        result = (
+            SearchResultFactory.build(score=score)
+            if FACTORY_AVAILABLE
+            else SearchResultFactory.build(score=score)
+        )
         if category:
             result["category"] = category
         results.append(result)

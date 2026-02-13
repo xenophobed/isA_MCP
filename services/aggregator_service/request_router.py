@@ -3,9 +3,10 @@ Request Router - Routes tool execution requests to appropriate external servers.
 
 Handles namespacing resolution, server lookup, and request forwarding.
 """
+
 import asyncio
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import logging
 
 from tests.contracts.aggregator.data_contract import (
@@ -26,7 +27,7 @@ class RoutingContext:
         server_id: str,
         server_name: str,
         arguments: Dict[str, Any],
-        strategy: RoutingStrategy = RoutingStrategy.NAMESPACE_RESOLVED
+        strategy: RoutingStrategy = RoutingStrategy.NAMESPACE_RESOLVED,
     ):
         self.tool_name = tool_name
         self.original_name = original_name
@@ -50,12 +51,7 @@ class RequestRouter:
     - Handle timeouts and errors
     """
 
-    def __init__(
-        self,
-        session_manager=None,
-        server_registry=None,
-        tool_repository=None
-    ):
+    def __init__(self, session_manager=None, server_registry=None, tool_repository=None):
         """
         Initialize RequestRouter.
 
@@ -71,10 +67,7 @@ class RequestRouter:
         self._retry_on_disconnect = True
 
     async def route(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        server_id: str = None
+        self, tool_name: str, arguments: Dict[str, Any], server_id: str = None
     ) -> RoutingContext:
         """
         Resolve routing context for a tool execution request.
@@ -103,10 +96,7 @@ class RequestRouter:
             return await self._route_search(tool_name, arguments)
 
     async def _route_explicit(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        server_id: str
+        self, tool_name: str, arguments: Dict[str, Any], server_id: str
     ) -> RoutingContext:
         """Route with explicit server ID."""
         server = await self._server_registry.get(server_id)
@@ -129,14 +119,10 @@ class RequestRouter:
             server_id=server_id,
             server_name=server["name"],
             arguments=arguments,
-            strategy=RoutingStrategy.EXPLICIT_SERVER
+            strategy=RoutingStrategy.EXPLICIT_SERVER,
         )
 
-    async def _route_namespaced(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any]
-    ) -> RoutingContext:
+    async def _route_namespaced(self, tool_name: str, arguments: Dict[str, Any]) -> RoutingContext:
         """Route by parsing namespaced name."""
         # Parse namespaced name - only first dot separates server from tool
         parts = tool_name.split(".", 1)
@@ -157,14 +143,10 @@ class RequestRouter:
             server_id=server["id"],
             server_name=server_name,
             arguments=arguments,
-            strategy=RoutingStrategy.NAMESPACE_RESOLVED
+            strategy=RoutingStrategy.NAMESPACE_RESOLVED,
         )
 
-    async def _route_search(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any]
-    ) -> RoutingContext:
+    async def _route_search(self, tool_name: str, arguments: Dict[str, Any]) -> RoutingContext:
         """Route by searching for tool across servers."""
         if not self._tool_repo:
             raise ValueError(f"Tool not found: {tool_name}")
@@ -181,9 +163,7 @@ class RequestRouter:
             raise ValueError(f"Server not found for tool: {tool_name}")
 
         if server["status"] != ServerStatus.CONNECTED:
-            raise RuntimeError(
-                f"Server unavailable: {server['name']} ({server['status']})"
-            )
+            raise RuntimeError(f"Server unavailable: {server['name']} ({server['status']})")
 
         return RoutingContext(
             tool_name=tool_name,
@@ -191,7 +171,7 @@ class RequestRouter:
             server_id=server_id,
             server_name=server["name"],
             arguments=arguments,
-            strategy=RoutingStrategy.FALLBACK
+            strategy=RoutingStrategy.FALLBACK,
         )
 
     async def execute(self, context: RoutingContext) -> Dict[str, Any]:
@@ -215,9 +195,9 @@ class RequestRouter:
                 self._session_manager.call_tool(
                     server_id=context.server_id,
                     tool_name=context.original_name,
-                    arguments=context.arguments
+                    arguments=context.arguments,
                 ),
-                timeout=self._execution_timeout
+                timeout=self._execution_timeout,
             )
 
             context.execution_completed_at = datetime.now(timezone.utc)
@@ -227,7 +207,8 @@ class RequestRouter:
                 "is_error": result.get("isError", False),
                 "execution_time_ms": (
                     context.execution_completed_at - context.execution_started_at
-                ).total_seconds() * 1000,
+                ).total_seconds()
+                * 1000,
                 "server_id": context.server_id,
                 "server_name": context.server_name,
                 "tool_name": context.tool_name,
@@ -235,17 +216,11 @@ class RequestRouter:
             }
 
         except asyncio.TimeoutError:
-            logger.error(
-                f"Timeout executing {context.tool_name} on {context.server_name}"
-            )
-            raise RuntimeError(
-                f"Tool execution timed out after {self._execution_timeout}s"
-            )
+            logger.error(f"Timeout executing {context.tool_name} on {context.server_name}")
+            raise RuntimeError(f"Tool execution timed out after {self._execution_timeout}s")
 
         except Exception as e:
-            logger.error(
-                f"Error executing {context.tool_name} on {context.server_name}: {e}"
-            )
+            logger.error(f"Error executing {context.tool_name} on {context.server_name}: {e}")
 
             # Check if server disconnected
             if self._retry_on_disconnect:
@@ -258,10 +233,7 @@ class RequestRouter:
             raise RuntimeError(f"Tool execution failed: {e}")
 
     async def route_and_execute(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        server_id: str = None
+        self, tool_name: str, arguments: Dict[str, Any], server_id: str = None
     ) -> Dict[str, Any]:
         """
         Convenience method to route and execute in one call.
@@ -278,9 +250,7 @@ class RequestRouter:
         return await self.execute(context)
 
     async def validate_tool_exists(
-        self,
-        tool_name: str,
-        server_id: str = None
+        self, tool_name: str, server_id: str = None
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
         Check if a tool exists and is available.
