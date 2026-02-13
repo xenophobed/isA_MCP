@@ -173,8 +173,12 @@ jobs:
       - name: Run Tests with Coverage
         run: |
           source .venv/bin/activate
-          pytest tests/unit tests/component -v \
+          pytest tests/unit -v \
             --cov=services \
+            --cov-report=term-missing
+          pytest tests/component -v \
+            --cov=services \
+            --cov-append \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=70
