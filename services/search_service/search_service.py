@@ -41,21 +41,45 @@ class SearchService:
     4. 返回结果
     """
 
-    def __init__(self):
-        """Initialize search service"""
-        from services.vector_service import VectorRepository
-        from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
-        from services.tool_service.tool_repository import ToolRepository
-        from services.prompt_service.prompt_repository import PromptRepository
-        from services.resource_service.resource_repository import ResourceRepository
+    def __init__(
+        self,
+        vector_repo=None,
+        embedding_gen=None,
+        tool_repo=None,
+        prompt_repo=None,
+        resource_repo=None,
+    ):
+        """Initialize search service with optional dependency injection."""
+        if vector_repo is None:
+            from services.vector_service import VectorRepository
 
-        self.vector_repo = VectorRepository()
-        self.embedding_gen = EmbeddingGenerator()
+            vector_repo = VectorRepository()
+        if embedding_gen is None:
+            from tools.intelligent_tools.language.embedding_generator import (
+                EmbeddingGenerator,
+            )
 
-        # Add repositories to fetch full schemas
-        self.tool_repo = ToolRepository()
-        self.prompt_repo = PromptRepository()
-        self.resource_repo = ResourceRepository()
+            embedding_gen = EmbeddingGenerator()
+        if tool_repo is None:
+            from services.tool_service.tool_repository import ToolRepository
+
+            tool_repo = ToolRepository()
+        if prompt_repo is None:
+            from services.prompt_service.prompt_repository import PromptRepository
+
+            prompt_repo = PromptRepository()
+        if resource_repo is None:
+            from services.resource_service.resource_repository import (
+                ResourceRepository,
+            )
+
+            resource_repo = ResourceRepository()
+
+        self.vector_repo = vector_repo
+        self.embedding_gen = embedding_gen
+        self.tool_repo = tool_repo
+        self.prompt_repo = prompt_repo
+        self.resource_repo = resource_repo
 
         logger.info("SearchService initialized")
 

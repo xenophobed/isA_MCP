@@ -76,12 +76,13 @@ class TestSearchServiceGolden:
         """Create SearchService with mocked dependencies."""
         from services.search_service.search_service import SearchService
 
-        service = SearchService()
-        service.vector_repo = mock_vector_repo
-        service.tool_repo = mock_tool_repo
-        service.prompt_repo = mock_prompt_repo
-        service.resource_repo = mock_resource_repo
-        service.embedding_gen = mock_embedding_generator
+        service = SearchService(
+            vector_repo=mock_vector_repo,
+            embedding_gen=mock_embedding_generator,
+            tool_repo=mock_tool_repo,
+            prompt_repo=mock_prompt_repo,
+            resource_repo=mock_resource_repo,
+        )
         return service
 
     # ═══════════════════════════════════════════════════════════════
