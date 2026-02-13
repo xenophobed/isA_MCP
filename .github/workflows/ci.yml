@@ -67,7 +67,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/unit -v --tb=short \
             --junitxml=reports/unit-results.xml \
-            --cov=microservices \
+            --cov=services \
             --cov-report=xml:reports/unit-coverage.xml
 
       - name: Run Component Tests
@@ -75,7 +75,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/component -v --tb=short \
             --junitxml=reports/component-results.xml \
-            --cov=microservices \
+            --cov=services \
             --cov-report=xml:reports/component-coverage.xml
 
       - name: Upload Test Results
@@ -199,17 +199,17 @@ jobs:
       - name: Check formatting with Black
         run: |
           source .venv/bin/activate
-          black --check microservices/ tests/ --exclude migrations
+          black --check services/ tests/ --exclude migrations
 
       - name: Lint with Ruff
         run: |
           source .venv/bin/activate
-          ruff check microservices/ tests/
+          ruff check services/ tests/
 
       - name: Type check with mypy
         run: |
           source .venv/bin/activate
-          mypy microservices/ --ignore-missing-imports --no-error-summary || true
+          mypy services/ --ignore-missing-imports --no-error-summary || true
 
   # ===========================================================================
   # Contract Validation
@@ -248,7 +248,7 @@ jobs:
       - name: Check Contract Coverage
         run: |
           echo "Checking CDD Layer Coverage..."
-          for service in microservices/*_service; do
+          for service in services/*_service; do
             name=$(basename $service | sed 's/_service//')
             echo "Service: $name"
             [ -f "docs/domain/${name}_service.md" ] && echo "  L1: OK" || echo "  L1: MISSING"
@@ -281,7 +281,7 @@ jobs:
 
       - name: Build Service Images
         run: |
-          for service in microservices/*_service; do
+          for service in services/*_service; do
             name=$(basename $service)
             echo "Building $name..."
             # docker build -f deployment/k8s/Dockerfile.$name -t $name:${{ github.sha }} .

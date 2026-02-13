@@ -54,7 +54,7 @@ jobs:
           # Extract affected services
           SERVICES=""
           for file in $CHANGED_FILES; do
-            if [[ $file == microservices/*_service/* ]]; then
+            if [[ $file == services/*_service/* ]]; then
               service=$(echo $file | cut -d'/' -f2)
               if [[ ! "$SERVICES" =~ "$service" ]]; then
                 SERVICES="$SERVICES,$service"
@@ -174,7 +174,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pytest tests/unit tests/component -v \
-            --cov=microservices \
+            --cov=services \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=70
@@ -248,8 +248,8 @@ jobs:
             proto="❌"
             factory="❌"
 
-            [ -f "microservices/${service}/protocols.py" ] && proto="✅"
-            [ -f "microservices/${service}/factory.py" ] && factory="✅"
+            [ -f "services/${service}/protocols.py" ] && proto="✅"
+            [ -f "services/${service}/factory.py" ] && factory="✅"
 
             echo "| $service | $proto | $factory |" >> $GITHUB_STEP_SUMMARY
           done
