@@ -115,10 +115,9 @@ class MockQdrantSearchClient:
         for item in collection:
             payload = item.get("payload", {})
 
-            # Check is_active filter
             if filter_conditions:
                 must_conditions = filter_conditions.get("must", [])
-                passes_filter = True
+                passes_must = True
 
                 for condition in must_conditions:
                     field = condition.get("field")
@@ -126,18 +125,42 @@ class MockQdrantSearchClient:
 
                     if "keyword" in match:
                         if payload.get(field) != match["keyword"]:
-                            passes_filter = False
+                            passes_must = False
+                            break
+
+                    if "boolean" in match:
+                        if payload.get(field) != match["boolean"]:
+                            passes_must = False
                             break
 
                     if "any" in match:
                         # skill_ids contains any of the matched skills
                         item_skill_ids = payload.get(field, [])
                         if not any(sid in item_skill_ids for sid in match["any"]):
-                            passes_filter = False
+                            passes_must = False
                             break
 
-                if not passes_filter:
+                if not passes_must:
                     continue
+
+                # Handle "should" conditions (at least one must match)
+                should_conditions = filter_conditions.get("should", [])
+                if should_conditions:
+                    passes_should = False
+                    for condition in should_conditions:
+                        field = condition.get("field")
+                        match = condition.get("match", {})
+                        if "keyword" in match:
+                            if payload.get(field) == match["keyword"]:
+                                passes_should = True
+                                break
+                        if "any" in match:
+                            item_values = payload.get(field, [])
+                            if any(v in item_values for v in match["any"]):
+                                passes_should = True
+                                break
+                    if not passes_should:
+                        continue
 
             results.append(item)
 

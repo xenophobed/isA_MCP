@@ -366,6 +366,24 @@ class MockSkillClassifier:
         """Set the default skill for unclassified tools."""
         self._default_skill_id = skill_id
 
+    async def classify_tools_batch(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Batch classify tools."""
+        self._record_call("classify_tools_batch", tools=tools)
+        results = []
+        for tool in tools:
+            tool_name = tool.get("tool_name", "")
+            if tool_name in self._classification_results:
+                result = self._classification_results[tool_name]
+            else:
+                result = {
+                    "tool_id": tool.get("tool_id"),
+                    "tool_name": tool_name,
+                    "assignments": [{"skill_id": self._default_skill_id, "confidence": 0.75}],
+                    "primary_skill_id": self._default_skill_id,
+                }
+            results.append(result)
+        return results
+
     async def classify_tool(
         self, tool_id: int, tool_name: str, tool_description: str, **kwargs
     ) -> Dict[str, Any]:
@@ -542,6 +560,27 @@ class MockToolRepository:
         self.tools = {}
         self._calls = []
         self._next_id = 1
+
+    async def create_external_tool(
+        self,
+        name: str,
+        description: str,
+        input_schema: Dict,
+        source_server_id: str,
+        original_name: str,
+        is_external: bool = True,
+        org_id: str = None,
+        is_global: bool = True,
+    ) -> int:
+        """Create an external tool record (delegates to create_tool)."""
+        return await self.create_tool(
+            name=name,
+            description=description,
+            input_schema=input_schema,
+            source_server_id=source_server_id,
+            original_name=original_name,
+            is_external=is_external,
+        )
 
     async def create_tool(
         self,

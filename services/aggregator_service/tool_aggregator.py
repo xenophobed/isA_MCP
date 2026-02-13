@@ -287,6 +287,56 @@ class ToolAggregator:
             logger.warning(f"Batch classification failed for external tools: {e}")
             # Tools remain searchable but unclassified
 
+    async def _classify_tool(self, tool_id: int) -> Dict[str, Any]:
+        """
+        Classify a single tool into skill categories.
+
+        Args:
+            tool_id: Tool database ID
+
+        Returns:
+            Classification result with assignments and primary_skill_id
+        """
+        if not self._tool_repo:
+            raise ValueError("No tool repository available")
+
+        tool = await self._tool_repo.get_tool(tool_id)
+        if not tool:
+            raise ValueError(f"Tool not found: {tool_id}")
+
+        if not self._skill_classifier:
+            return {"assignments": [], "primary_skill_id": None}
+
+        # Classify using skill classifier
+        result = await self._skill_classifier.classify_tool(
+            tool_id=tool_id,
+            tool_name=tool["name"],
+            tool_description=tool.get("description", ""),
+        )
+
+        # Update tool record
+        assignments = result.get("assignments", [])
+        primary_skill_id = result.get("primary_skill_id")
+        if assignments:
+            skill_ids = [a["skill_id"] for a in assignments if a.get("confidence", 0) >= 0.5]
+            await self._tool_repo.update_tool(
+                tool_id,
+                is_classified=True,
+                skill_ids=skill_ids,
+                primary_skill_id=primary_skill_id,
+            )
+
+        # Update vector repository if available
+        if self._vector_repo and assignments:
+            skill_ids = [a["skill_id"] for a in assignments if a.get("confidence", 0) >= 0.5]
+            await self._vector_repo.update_tool_skills(
+                tool_id=tool_id,
+                skill_ids=skill_ids,
+                primary_skill_id=primary_skill_id,
+            )
+
+        return result
+
     async def aggregate_tools(self) -> List[Dict[str, Any]]:
         """
         Aggregate tools from all connected servers.

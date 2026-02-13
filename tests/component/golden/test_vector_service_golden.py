@@ -165,7 +165,7 @@ class TestVectorRepositoryGolden:
         points = call_args[0][1]
         assert len(points) == 1
         point = points[0]
-        assert point["id"] == 1
+        assert point["id"] == 42  # _compute_point_id("tool", 42) = TYPE_OFFSETS["tool"](0) + 42
         assert "vector" in point
         assert len(point["vector"]) == 1536
 
@@ -288,7 +288,7 @@ class TestVectorRepositoryGolden:
         result = await vector_repository.delete_vector("1")
 
         assert result is True
-        mock_qdrant_client.delete_points.assert_called_once_with("mcp_unified_search", ["1"])
+        mock_qdrant_client.delete_points.assert_called_once_with("mcp_unified_search", [1])
 
     async def test_delete_vector_returns_false_on_failure(
         self, vector_repository, mock_qdrant_client
