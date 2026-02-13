@@ -233,3 +233,4 @@ performance_*.json
 # Monitoring data
 metrics/
 traces/
+.isa/
