@@ -12,7 +12,6 @@ import logging
 from tests.contracts.aggregator.data_contract import (
     ServerTransportType,
     ServerStatus,
-    ServerRecordContract,
 )
 
 logger = logging.getLogger(__name__)

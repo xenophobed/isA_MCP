@@ -14,8 +14,7 @@ Repository Under Test: services/tool_service/tool_repository.py
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden
@@ -355,11 +354,6 @@ class TestToolRepositoryGolden:
         """
         # This tests that the repository handles JSON serialization
         # The actual implementation uses json.dumps() for these fields
-        tool_data = {
-            "name": "test_tool",
-            "input_schema": {"type": "object", "properties": {}},
-            "metadata": {"author": "test"},
-        }
 
         # The repository should serialize these to JSON strings before SQL insert
         # This is verified by checking the SQL parameters in actual implementation
@@ -369,7 +363,6 @@ class TestToolRepositoryGolden:
         CURRENT BEHAVIOR: id, created_at, updated_at are immutable on update.
         """
         # These fields should be excluded from UPDATE statements
-        immutable_fields = {"id", "created_at", "updated_at"}
 
         # Repository implementation filters these out before building UPDATE query
 

@@ -8,7 +8,7 @@ import random
 import string
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 def generate_random_string(length: int = 10, prefix: str = "") -> str:

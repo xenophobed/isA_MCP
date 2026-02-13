@@ -13,7 +13,7 @@ Service Under Test: tools/base_tool.py
 import pytest
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 
 @pytest.mark.golden

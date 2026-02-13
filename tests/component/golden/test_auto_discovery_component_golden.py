@@ -7,7 +7,6 @@ If these tests fail, it means auto-discovery component behavior has changed.
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
 import tempfile
 import os
 

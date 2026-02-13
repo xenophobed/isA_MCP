@@ -221,7 +221,7 @@ class RegistryFetcher:
 
         # Check for bin entry
         if "bin" in pkg_data:
-            bin_name = list(pkg_data["bin"].keys())[0] if pkg_data["bin"] else name
+            list(pkg_data["bin"].keys())[0] if pkg_data["bin"] else name
             return {
                 "transport": "stdio",
                 "command": "npx",

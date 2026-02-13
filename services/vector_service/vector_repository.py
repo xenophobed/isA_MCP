@@ -292,7 +292,7 @@ class VectorRepository:
             # AsyncBaseGRPCClient._ensure_connected() - no manual reconnect needed
             # See BR-002 in isa_common/tests/contracts/grpc_client/logic_contract.md
 
-            logger.info(f"🔎 [VectorRepo] Starting vector search...")
+            logger.info("🔎 [VectorRepo] Starting vector search...")
             logger.info(f"   Collection: {self.collection_name}")
             logger.info(f"   Type filter: {item_type}")
             logger.info(f"   Limit: {limit}, Threshold: {score_threshold}")
@@ -314,9 +314,9 @@ class VectorRepository:
                 logger.info(f"🔧 [VectorRepo] Applied type filter: {item_type}")
 
             # Perform search
-            logger.info(f"🔌 [VectorRepo] Connecting to Qdrant...")
+            logger.info("🔌 [VectorRepo] Connecting to Qdrant...")
             try:
-                logger.info(f"📡 [VectorRepo] Sending search request to Qdrant...")
+                logger.info("📡 [VectorRepo] Sending search request to Qdrant...")
                 results = await self.client.search_with_filter(
                     self.collection_name,
                     query_embedding,
@@ -338,14 +338,14 @@ class VectorRepository:
             # Filter by score threshold and format results
             if results:
                 all_scores = [r.get("score", 0) for r in results]
-                logger.info(f"📊 [VectorRepo] Score distribution:")
+                logger.info("📊 [VectorRepo] Score distribution:")
                 logger.info(f"   All scores: {all_scores}")
                 logger.info(
                     f"   Max: {max(all_scores):.4f}, Min: {min(all_scores):.4f}, Avg: {sum(all_scores) / len(all_scores):.4f}"
                 )
                 logger.info(f"   Threshold: {score_threshold}")
             else:
-                logger.warning(f"⚠️  [VectorRepo] Qdrant returned empty results!")
+                logger.warning("⚠️  [VectorRepo] Qdrant returned empty results!")
                 return []
 
             search_results = []
@@ -523,7 +523,7 @@ class VectorRepository:
                 logger.info(f"Deleted {len(item_ids)} vectors")
                 return len(item_ids)
             else:
-                logger.error(f"Failed to delete vectors")
+                logger.error("Failed to delete vectors")
                 return 0
 
         except Exception as e:

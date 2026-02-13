@@ -11,7 +11,7 @@ Provides:
 """
 
 import logging
-from typing import Optional
+from typing import Optional  # noqa: F401
 
 from .aggregator_service import AggregatorService
 from .server_registry import ServerRegistry

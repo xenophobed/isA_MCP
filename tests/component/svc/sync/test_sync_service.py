@@ -91,7 +91,7 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync tools
-        result = await service.sync_tools()
+        await service.sync_tools()
 
         # Then: embeddings.create should be called ONCE with a LIST of texts
         assert (
@@ -210,7 +210,7 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync prompts
-        result = await service.sync_prompts()
+        await service.sync_prompts()
 
         # Then: Should be ONE batch call
         assert (
@@ -254,7 +254,7 @@ class TestSyncServiceBatchEmbedding:
         mocks["vector_repo"].upsert_vector.return_value = True
 
         # When: Sync resources
-        result = await service.sync_resources()
+        await service.sync_resources()
 
         # Then: Should be ONE batch call
         assert (

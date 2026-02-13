@@ -6,7 +6,6 @@ Handles database operations for prompt registry
 import json
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
 
 from isa_common import AsyncPostgresClient
 from core.config import get_settings

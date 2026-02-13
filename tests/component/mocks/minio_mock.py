@@ -5,7 +5,7 @@ Provides a mock implementation of MinIO client
 for testing file storage operations without a real MinIO instance.
 """
 
-from typing import Any, Dict, List, Optional, BinaryIO, Iterator
+from typing import Dict, List, BinaryIO, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 import io

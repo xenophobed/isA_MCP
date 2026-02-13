@@ -7,7 +7,7 @@ If these tests fail, it means config integration has changed.
 
 import pytest
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 @pytest.mark.golden

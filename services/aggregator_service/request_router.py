@@ -6,7 +6,7 @@ Handles namespacing resolution, server lookup, and request forwarding.
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import logging
 
 from tests.contracts.aggregator.data_contract import (

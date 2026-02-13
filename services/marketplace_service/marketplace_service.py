@@ -13,11 +13,8 @@ import logging
 from tests.contracts.marketplace import (
     RegistrySource,
     InstallStatus,
-    UpdateChannel,
     PackageSpec,
     InstallResult,
-    SearchResult,
-    PackageRecordContract,
 )
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,6 @@ Layer 2: Service Integration Tests
 
 import pytest
 from typing import AsyncGenerator
-import os
 from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════

@@ -9,27 +9,16 @@ TDD Status: RED/GREEN PHASE - Implementation in progress.
 """
 
 import pytest
-import json
-from datetime import datetime, timezone
-from typing import List
 from pydantic import ValidationError
 
 # Import contracts
 from tests.contracts.aggregator.data_contract import (
     AggregatorTestDataFactory,
     ServerRegistrationRequestContract,
-    ServerRecordContract,
-    AggregatedToolContract,
-    ToolExecutionRequestContract,
-    ToolExecutionResponseContract,
-    ServerHealthContract,
-    AggregatorStateContract,
-    RoutingContextContract,
     ServerRegistrationBuilder,
     AggregatedToolBuilder,
     ServerTransportType,
     ServerStatus,
-    RoutingStrategy,
 )
 
 # Service imports - will be available once service is implemented

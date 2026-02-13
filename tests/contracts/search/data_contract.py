@@ -7,8 +7,6 @@ All tests MUST use these Pydantic models and factories for consistency.
 This is the SINGLE SOURCE OF TRUTH for search service test data.
 """
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum

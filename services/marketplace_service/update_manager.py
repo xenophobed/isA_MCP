@@ -7,7 +7,6 @@ Handles:
 - Rollback on failure
 """
 
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -190,7 +189,7 @@ class UpdateManager:
 
             # Prepare new config
             user_config = installation.get("install_config", {})
-            mcp_config = await self._installer.prepare_config(
+            await self._installer.prepare_config(
                 new_version.get("mcp_config", {}),
                 user_config,
             )
@@ -314,7 +313,6 @@ class UpdateManager:
 
     def _parse_version(self, version: str) -> tuple:
         """Parse version string to comparable tuple."""
-        import re
 
         # Remove prerelease suffix for comparison
         base = version.split("-")[0]

@@ -9,7 +9,7 @@ Run with: pytest tests/unit/golden/test_base_resource_golden.py -v
 
 import pytest
 import json
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 from datetime import datetime
 
 # =============================================================================
@@ -70,8 +70,8 @@ class TestSecurityManagerProperty:
 
     def test_security_manager_lazy_initialization(self, base_resource):
         """Security manager should be initialized on first access"""
-        # Access the property
-        sm = base_resource.security_manager
+        # Access the property to trigger lazy initialization
+        _ = base_resource.security_manager  # noqa: F841
         # Should no longer be None
         assert base_resource._security_manager is not None
 
@@ -233,7 +233,6 @@ class TestRegisterResource:
 
     def test_register_resource_calls_mcp_resource(self, base_resource, mock_mcp):
         """Should call mcp.resource() with the URI"""
-        from core.security import SecurityLevel
 
         async def test_func():
             return "test"
@@ -408,7 +407,7 @@ class TestCreateSimpleResourceRegistration:
 
     def test_creates_register_function_in_module(self):
         """Should create a register function in the caller's module"""
-        from resources.base_resource import create_simple_resource_registration, BaseResource
+        from resources.base_resource import create_simple_resource_registration
 
         # This is tricky to test in isolation since it modifies caller's globals
         # We'll test the decorator's basic structure

@@ -15,22 +15,10 @@ Configuration loaded from: deployment/test/config/.env.test (when ENV=test)
 import pytest
 import os
 import time
-from datetime import datetime, timezone
-from typing import List
-import uuid
-
-from tests.contracts.search.data_contract import (
-    SearchTestDataFactory,
-    HierarchicalSearchRequestContract,
-    HierarchicalSearchResponseContract,
-    HierarchicalSearchRequestBuilder,
-    SearchItemType,
-    SearchStrategy,
-)
 
 # Try to import skill data contract, skip if not available
 try:
-    from tests.contracts.skill.data_contract import SkillTestDataFactory
+    from tests.contracts.skill.data_contract import SkillTestDataFactory  # noqa: F401
 
     SKILL_CONTRACT_AVAILABLE = True
 except ImportError:

@@ -10,7 +10,7 @@ Focus: Business logic validation and rules (NOT database operations)
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden

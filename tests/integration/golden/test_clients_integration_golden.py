@@ -6,7 +6,7 @@ If these tests fail, it means client integration patterns have changed.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 import asyncio
 
 

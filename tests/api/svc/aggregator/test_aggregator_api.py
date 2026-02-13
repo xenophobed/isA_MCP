@@ -15,10 +15,6 @@ import uuid
 
 from tests.contracts.aggregator.data_contract import (
     AggregatorTestDataFactory,
-    ServerRegistrationRequestContract,
-    ServerRecordContract,
-    ServerTransportType,
-    ServerStatus,
 )
 
 # ============================================================================

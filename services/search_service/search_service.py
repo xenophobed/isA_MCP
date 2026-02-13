@@ -94,7 +94,7 @@ class SearchService:
             )
 
             # 1. 生成 query embedding
-            logger.info(f"📝 [SearchService] Step 1: Generating query embedding...")
+            logger.info("📝 [SearchService] Step 1: Generating query embedding...")
             try:
                 query_embedding = await self.embedding_gen.embed_single(query)
                 logger.info(
@@ -106,7 +106,7 @@ class SearchService:
                 raise
 
             # 2. Qdrant 语义搜索
-            logger.info(f"🔎 [SearchService] Step 2: Searching Qdrant...")
+            logger.info("🔎 [SearchService] Step 2: Searching Qdrant...")
             try:
                 results = await self.vector_repo.search_vectors(
                     query_embedding=query_embedding,
@@ -118,13 +118,13 @@ class SearchService:
                 if results:
                     logger.info(f"   Top 3 scores: {[r.get('score', 0) for r in results[:3]]}")
                 else:
-                    logger.warning(f"⚠️  [SearchService] No results from Qdrant!")
+                    logger.warning("⚠️  [SearchService] No results from Qdrant!")
             except Exception as e:
                 logger.error(f"❌ [SearchService] Qdrant search failed: {e}")
                 raise
 
             # 3. 转换为 SearchResult 对象并获取完整 schema
-            logger.info(f"📦 [SearchService] Step 3: Enriching results with full schemas...")
+            logger.info("📦 [SearchService] Step 3: Enriching results with full schemas...")
             search_results = []
             for i, r in enumerate(results):
                 try:

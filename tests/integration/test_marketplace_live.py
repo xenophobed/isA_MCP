@@ -194,7 +194,7 @@ class TestMarketplaceServiceLive:
                 force_full=False,
             )
 
-            logger.info(f"Sync results:")
+            logger.info("Sync results:")
             logger.info(f"  Discovered: {results['packages_discovered']}")
             logger.info(f"  Updated: {results['packages_updated']}")
             logger.info(f"  Errors: {len(results['errors'])}")

@@ -9,7 +9,7 @@ Repository Under Test: services/resource_service/resource_repository.py
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden

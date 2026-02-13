@@ -6,7 +6,6 @@ Tests that usage events are properly recorded across services.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.integration

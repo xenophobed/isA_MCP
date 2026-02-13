@@ -4,7 +4,7 @@ Mock API responses for testing.
 Provides pre-built responses that match the MCP protocol and API contracts.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # ═══════════════════════════════════════════════════════════════
 # MCP Protocol Responses

@@ -5,7 +5,7 @@ Provides a mock implementation of httpx AsyncClient
 for testing HTTP operations without real network calls.
 """
 
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any, Dict, List, Callable
 from dataclasses import dataclass, field
 import json
 

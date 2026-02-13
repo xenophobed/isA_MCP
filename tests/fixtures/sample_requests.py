@@ -4,7 +4,7 @@ Sample request payloads for testing.
 Provides pre-built request payloads that match the MCP protocol and API contracts.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # ═══════════════════════════════════════════════════════════════
 # MCP Protocol Requests

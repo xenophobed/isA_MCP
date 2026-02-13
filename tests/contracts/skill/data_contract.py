@@ -9,7 +9,7 @@ This is the SINGLE SOURCE OF TRUTH for skill service test data.
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 

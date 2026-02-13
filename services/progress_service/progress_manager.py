@@ -6,7 +6,6 @@ Uses isa_common RedisClient (gRPC) for storage
 """
 
 import json
-import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict

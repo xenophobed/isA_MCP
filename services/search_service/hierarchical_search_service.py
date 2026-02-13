@@ -11,11 +11,9 @@ import time
 import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 
 import json
-import re
 
 from core.config import get_settings
 from core.clients.model_client import get_model_client
@@ -409,7 +407,7 @@ class HierarchicalSearchService:
             List of matched tools
         """
         try:
-            vector_repo = await self._get_vector_repository()
+            await self._get_vector_repository()
 
             # Build filter conditions
             filter_conditions = {"must": []}

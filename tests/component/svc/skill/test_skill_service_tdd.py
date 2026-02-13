@@ -11,21 +11,15 @@ TDD Status: GREEN PHASE - Implementation complete, tests being enabled.
 import pytest
 import json
 from datetime import datetime, timezone
-from typing import List
 from pydantic import ValidationError
 
 # Import contracts
 from tests.contracts.skill.data_contract import (
     SkillTestDataFactory,
     SkillCategoryCreateRequestContract,
-    ToolClassificationRequestContract,
     ToolClassificationResponseContract,
-    SkillCategoryResponseContract,
     SkillAssignmentContract,
     SkillCategoryBuilder,
-    ToolClassificationBuilder,
-    AssignmentSource,
-    SkillStatus,
 )
 
 # Service imports - will be available once service is implemented
@@ -290,7 +284,7 @@ class TestBR001SkillCategoryCreationLegacy:
         pytest.skip("Migrated to TestBR001SkillCategoryCreation.test_create_skill_category_success")
 
         # Arrange
-        request = SkillTestDataFactory.make_skill_category(
+        SkillTestDataFactory.make_skill_category(
             id="calendar_management",
             name="Calendar Management",
             description="Tools for managing calendars, events, and scheduling",

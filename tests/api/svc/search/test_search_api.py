@@ -14,11 +14,7 @@ import httpx
 
 from tests.contracts.search.data_contract import (
     SearchTestDataFactory,
-    HierarchicalSearchRequestContract,
     HierarchicalSearchResponseContract,
-    HierarchicalSearchRequestBuilder,
-    SearchItemType,
-    SearchStrategy,
 )
 
 # ═══════════════════════════════════════════════════════════════

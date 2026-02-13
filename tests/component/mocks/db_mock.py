@@ -6,7 +6,7 @@ for testing without a real database connection.
 """
 
 from typing import Any, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

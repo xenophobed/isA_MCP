@@ -6,7 +6,7 @@ Provides mock repositories and clients for component tests.
 
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 class MockSkillRepository:

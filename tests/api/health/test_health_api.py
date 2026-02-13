@@ -5,7 +5,7 @@ Tests for the /health endpoint.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 @pytest.mark.api

@@ -4,23 +4,13 @@ Mock implementations for Aggregator Service testing.
 Provides mock sessions, registries, and external server behavior for component tests.
 """
 
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
 import uuid
 import asyncio
 
 from tests.contracts.aggregator.data_contract import (
-    ServerTransportType,
     ServerStatus,
-    RoutingStrategy,
-    ServerRecordContract,
-    AggregatedToolContract,
-    SourceServerContract,
-    ToolExecutionResponseContract,
-    ServerHealthContract,
-    AggregatorStateContract,
-    RoutingContextContract,
 )
 
 

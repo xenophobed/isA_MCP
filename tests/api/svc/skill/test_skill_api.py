@@ -14,9 +14,6 @@ import httpx
 
 from tests.contracts.skill.data_contract import (
     SkillTestDataFactory,
-    SkillCategoryCreateRequestContract,
-    SkillCategoryResponseContract,
-    ToolClassificationResponseContract,
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -46,7 +43,7 @@ async def created_skill(api_client):
     if response.status_code == 201:
         yield response.json()
         # Cleanup
-        await api_client.delete(f"/api/v1/skills/api_test_skill")
+        await api_client.delete("/api/v1/skills/api_test_skill")
     else:
         pytest.skip("Could not create test skill")
 

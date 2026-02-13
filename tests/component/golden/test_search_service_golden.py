@@ -8,9 +8,7 @@ Service Under Test: services/search_service/search_service.py
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.golden
@@ -173,7 +171,7 @@ class TestSearchServiceGolden:
             "annotations": {"category": "utility"},
         }
 
-        result = await search_service.search("test query", item_type="tool")
+        await search_service.search("test query", item_type="tool")
 
         # Should fetch schema from PostgreSQL
         mock_tool_repo.get_tool_by_id.assert_called()

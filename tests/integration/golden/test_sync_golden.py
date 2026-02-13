@@ -6,7 +6,7 @@ If these tests fail, it means the interface has changed unexpectedly.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 
 @pytest.mark.golden

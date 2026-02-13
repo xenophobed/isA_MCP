@@ -1358,7 +1358,7 @@ class SyncService:
                         classified += 1
                         logger.info(f"    ✅ Classified as: {result['primary_skill_id']}")
                     elif result.get("skipped"):
-                        logger.info(f"    ⏭️  Skipped (already classified)")
+                        logger.info("    ⏭️  Skipped (already classified)")
                     else:
                         logger.warning(f"    ⚠️  No skill matched for '{tool_name}'")
 

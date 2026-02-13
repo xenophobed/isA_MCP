@@ -7,7 +7,6 @@ If these tests fail, it means the auto-discovery interface has changed.
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 import tempfile
 import os
 

@@ -18,7 +18,7 @@ Example:
 """
 
 import logging
-from typing import Optional
+from typing import Optional  # noqa: F401
 
 from .marketplace_service import MarketplaceService
 from .package_repository import PackageRepository

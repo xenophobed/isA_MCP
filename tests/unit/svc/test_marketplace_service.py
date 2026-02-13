@@ -10,10 +10,9 @@ Tests:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
 
-from services.marketplace_service.marketplace_service import MarketplaceService
 from services.marketplace_service.package_repository import PackageRepository
 from services.marketplace_service.registry_fetcher import RegistryFetcher
 from services.marketplace_service.package_resolver import PackageResolver
@@ -23,7 +22,6 @@ from tests.contracts.marketplace import (
     PackageSpec,
     InstallStatus,
     RegistrySource,
-    UpdateChannel,
 )
 
 # ═══════════════════════════════════════════════════════════════

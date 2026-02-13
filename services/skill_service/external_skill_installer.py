@@ -18,15 +18,11 @@ A skill bundle contains:
 """
 
 import aiohttp
-import asyncio
-import json
 import logging
-import os
 import shutil
 import tarfile
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -183,7 +179,7 @@ class ExternalSkillInstaller:
             await self._write_skill_files(skill_path, skill_data)
 
             # Parse manifest for metadata
-            manifest = self._parse_manifest(skill_data.get("skill_md", ""))
+            self._parse_manifest(skill_data.get("skill_md", ""))
 
             # Count resources
             guides_count = len(skill_data.get("guides", {}))
@@ -639,7 +635,7 @@ async def search_npm_skills(query: str, limit: int = 20) -> List[Dict[str, Any]]
         List of matching skill packages
     """
     async with aiohttp.ClientSession() as session:
-        search_url = f"https://registry.npmjs.org/-/v1/search"
+        search_url = "https://registry.npmjs.org/-/v1/search"
         params = {
             "text": f"{query} keywords:claude-skill",
             "size": limit,

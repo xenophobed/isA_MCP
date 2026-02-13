@@ -7,9 +7,8 @@ If these tests fail, it means auto-discovery integration behavior has changed.
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 import tempfile
-import os
 
 
 @pytest.mark.golden

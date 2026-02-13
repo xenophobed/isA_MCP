@@ -11,14 +11,10 @@ Requirements:
 """
 
 import pytest
-import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 from tests.contracts.skill.data_contract import (
     SkillTestDataFactory,
-    SkillCategoryCreateRequestContract,
-    ToolClassificationRequestContract,
-    SkillCategoryBuilder,
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -222,7 +218,7 @@ class TestToolClassificationIntegration:
         tool = rows[0]
         tool_id = tool["id"]
 
-        result = await skill_service.classify_tool(
+        await skill_service.classify_tool(
             tool_id=tool_id,
             tool_name=tool["name"],
             tool_description=tool.get("description", "Event tool"),
@@ -272,7 +268,7 @@ class TestToolClassificationIntegration:
         tool = rows[0]
         tool_id = tool["id"]
 
-        result = await skill_service.classify_tool(
+        await skill_service.classify_tool(
             tool_id=tool_id,
             tool_name=tool["name"],
             tool_description=tool.get("description", "Search tool"),
@@ -722,7 +718,7 @@ class TestEntityClassificationIntegration:
             "description": prompt.get("description", "A test prompt"),
         }
 
-        results = await skill_service.classify_entities_batch([entity], entity_type="prompt")
+        await skill_service.classify_entities_batch([entity], entity_type="prompt")
 
         # Verify stored in database
         prompt_repo = PromptRepository()
@@ -772,7 +768,7 @@ class TestEntityClassificationIntegration:
             "description": resource.get("description", "A test resource"),
         }
 
-        results = await skill_service.classify_entities_batch([entity], entity_type="resource")
+        await skill_service.classify_entities_batch([entity], entity_type="resource")
 
         # Verify stored in database
         resource_repo = ResourceRepository()

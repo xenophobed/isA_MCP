@@ -8,7 +8,7 @@ Run with: pytest tests/unit/golden/test_base_prompt_golden.py -v
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 # =============================================================================
 # Test Fixtures

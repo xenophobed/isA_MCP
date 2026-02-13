@@ -11,8 +11,6 @@ Implementation should make these tests pass (GREEN phase).
 
 import pytest
 import time
-from datetime import datetime, timezone
-from typing import List
 from pydantic import ValidationError
 
 # Import contracts
@@ -20,12 +18,6 @@ from tests.contracts.search.data_contract import (
     SearchTestDataFactory,
     HierarchicalSearchRequestContract,
     HierarchicalSearchResponseContract,
-    SkillSearchRequestContract,
-    ToolSearchRequestContract,
-    SkillMatchContract,
-    ToolMatchContract,
-    EnrichedToolContract,
-    SearchMetadataContract,
     HierarchicalSearchRequestBuilder,
     SearchItemType,
     SearchStrategy,
@@ -157,7 +149,7 @@ class TestSearchDataContractValidation:
     def test_invalid_search_negative_threshold_rejected(self):
         """Test that negative threshold is rejected."""
         invalid_data = SearchTestDataFactory.make_invalid_search_negative_threshold()
-        with pytest.raises(ValidationError) as exc:
+        with pytest.raises(ValidationError):
             HierarchicalSearchRequestContract(**invalid_data)
 
     def test_builder_creates_valid_request(self):
@@ -891,7 +883,7 @@ class TestSearchEdgeCases:
         result_direct = await search_service.search(query="test", strategy="direct")
 
         # Assert - tool found in direct search
-        tool_ids_direct = [t.id for t in result_direct.tools]
+        [t.id for t in result_direct.tools]
         # May or may not be in results depending on mock data
 
 
@@ -998,7 +990,7 @@ class TestSearchPerformanceSLAs:
         import time
 
         start = time.time()
-        result = await search_service.search(query="test")
+        await search_service.search(query="test")
         elapsed_ms = (time.time() - start) * 1000
 
         # With mocks, should be very fast
@@ -1011,7 +1003,7 @@ class TestSearchPerformanceSLAs:
 
         start = time.time()
         result = await search_service.search(query="test")
-        elapsed_ms = (time.time() - start) * 1000
+        (time.time() - start) * 1000
 
         # With mocks, skill search should be fast
         assert (
@@ -1022,7 +1014,7 @@ class TestSearchPerformanceSLAs:
     async def test_tool_search_under_30ms(self, search_service):
         """Test that tool search (Stage 2) completes in < 30ms (target p95)."""
         start = time.time()
-        result = await search_service.search(query="test")
+        await search_service.search(query="test")
         elapsed_ms = (time.time() - start) * 1000
 
         # With mocks, should be very fast

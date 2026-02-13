@@ -18,7 +18,7 @@ class TestConfigServiceIntegrationGolden:
     def test_config_used_by_sync_service(self):
         """SyncService can be initialized with config values."""
         try:
-            from core.config import MCPConfig
+            from core.config import MCPConfig  # noqa: F401
             from services.sync_service.sync_service import SyncService
 
             with patch.dict(os.environ, {"ISA_API_URL": "http://test-isa:8082"}, clear=True):
@@ -34,7 +34,7 @@ class TestConfigServiceIntegrationGolden:
     def test_config_used_by_search_service(self):
         """SearchService can be initialized with config values."""
         try:
-            from core.config import MCPConfig
+            from core.config import MCPConfig  # noqa: F401
             from services.search_service.search_service import SearchService
 
             with patch.dict(os.environ, {}, clear=True):
@@ -46,7 +46,7 @@ class TestConfigServiceIntegrationGolden:
     def test_config_used_by_progress_manager(self):
         """ProgressManager can be initialized with config values."""
         try:
-            from core.config import InfraConfig
+            from core.config import InfraConfig  # noqa: F401
             from services.progress_service.progress_manager import ProgressManager
 
             with patch.dict(

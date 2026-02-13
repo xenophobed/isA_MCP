@@ -6,7 +6,7 @@ Provides factories for all major domain objects in isA_MCP.
 
 try:
     import factory
-    from factory import fuzzy
+    from factory import fuzzy  # noqa: F401
 
     FACTORY_AVAILABLE = True
 except ImportError:
@@ -19,7 +19,7 @@ except ImportError:
 
     factory = None
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 import random
 import string
@@ -102,7 +102,7 @@ if FACTORY_AVAILABLE:
         description = factory.LazyFunction(
             lambda: f"A prompt for {random_choice(['writing', 'analyzing', 'coding', 'summarizing'])}"
         )
-        template = factory.LazyAttribute(lambda obj: f"You are an assistant. {{{{task}}}}")
+        template = factory.LazyAttribute(lambda obj: "You are an assistant. {{task}}")
         arguments = factory.LazyAttribute(
             lambda _: [{"name": "task", "description": "The task to perform", "required": True}]
         )

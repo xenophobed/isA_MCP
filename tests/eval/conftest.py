@@ -8,8 +8,6 @@ Layer 5: LLM Quality Tests
 """
 
 import pytest
-import os
-from typing import Any
 
 # ═══════════════════════════════════════════════════════════════
 # DeepEval Configuration
@@ -17,7 +15,7 @@ from typing import Any
 
 # Try to import deepeval, skip tests if not available
 try:
-    from deepeval import evaluate
+    from deepeval import evaluate  # noqa: F401
     from deepeval.metrics import (
         AnswerRelevancyMetric,
         FaithfulnessMetric,

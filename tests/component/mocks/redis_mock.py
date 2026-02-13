@@ -5,10 +5,9 @@ Provides a mock implementation of Redis client
 for testing cache operations without a real Redis instance.
 """
 
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass
 import time
-import json
 
 
 @dataclass

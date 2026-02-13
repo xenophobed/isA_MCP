@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Dict, Any, Optional, List
-from datetime import datetime
 
 if TYPE_CHECKING:
     from .tool_repository import ToolRepository

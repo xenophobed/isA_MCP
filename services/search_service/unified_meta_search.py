@@ -14,7 +14,6 @@ Provides:
 - Combined scoring and ranking
 """
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -359,7 +358,7 @@ class UnifiedMetaSearch:
             normalized_score = min(raw_score / 2.0, 1.0)
 
             # Skills have lower threshold since they use keyword matching
-            skill_threshold = threshold * 0.5  # More lenient for skills
+            threshold * 0.5  # More lenient for skills
 
             if raw_score > 0:  # Any match is valid
                 entities.append(

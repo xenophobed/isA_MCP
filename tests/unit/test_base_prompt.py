@@ -7,7 +7,6 @@ Run these tests to drive the implementation of BasePrompt.
 Run with: pytest tests/unit/test_base_prompt.py -v
 """
 
-import pytest
 from unittest.mock import Mock
 
 # =============================================================================
