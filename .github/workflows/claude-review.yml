@@ -118,7 +118,7 @@ jobs:
           Keep the review concise and actionable. Focus on what matters."""
 
           response = client.messages.create(
-              model="claude-sonnet-4-5-20250929",
+              model="claude-haiku-4-5-20251001",
               max_tokens=2048,
               messages=[{"role": "user", "content": prompt}],
           )
@@ -139,7 +139,7 @@ jobs:
             const fs = require('fs');
             const reviewBody = fs.readFileSync('/tmp/review_body.txt', 'utf8');
             const marker = '<!-- claude-ai-review -->';
-            const body = `${marker}\n# AI Code Review\n\n${reviewBody}\n\n---\n_Reviewed by Claude Sonnet | [isA AI-SDLC](https://github.com/xenoISA)_`;
+            const body = `${marker}\n# AI Code Review\n\n${reviewBody}\n\n---\n_Reviewed by Claude Haiku | [isA AI-SDLC](https://github.com/xenoISA)_`;
 
             // Find existing comment
             const comments = await github.rest.issues.listComments({
