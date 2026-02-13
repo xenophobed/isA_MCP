@@ -13,38 +13,42 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 
-
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class ServerTransportType(str, Enum):
     """Transport types for external MCP servers."""
-    STDIO = "STDIO"              # Standard input/output (local process)
-    SSE = "SSE"                  # Server-Sent Events (HTTP streaming)
-    HTTP = "HTTP"                # Standard HTTP request/response
+
+    STDIO = "STDIO"  # Standard input/output (local process)
+    SSE = "SSE"  # Server-Sent Events (HTTP streaming)
+    HTTP = "HTTP"  # Standard HTTP request/response
     STREAMABLE_HTTP = "STREAMABLE_HTTP"  # MCP Streamable HTTP (bidirectional)
 
 
 class ServerStatus(str, Enum):
     """Connection status of external MCP server."""
-    CONNECTED = "CONNECTED"         # Server connected and healthy
-    DISCONNECTED = "DISCONNECTED"   # Server intentionally disconnected
-    ERROR = "ERROR"                 # Server unreachable or failing
-    CONNECTING = "CONNECTING"       # Connection in progress
-    DEGRADED = "DEGRADED"           # Connected but elevated errors
+
+    CONNECTED = "CONNECTED"  # Server connected and healthy
+    DISCONNECTED = "DISCONNECTED"  # Server intentionally disconnected
+    ERROR = "ERROR"  # Server unreachable or failing
+    CONNECTING = "CONNECTING"  # Connection in progress
+    DEGRADED = "DEGRADED"  # Connected but elevated errors
 
 
 class RoutingStrategy(str, Enum):
     """How routing decision was made."""
+
     NAMESPACE_RESOLVED = "namespace_resolved"  # Parsed from namespaced name
-    EXPLICIT_SERVER = "explicit_server"        # Server ID provided
-    FALLBACK = "fallback"                      # Using fallback server
+    EXPLICIT_SERVER = "explicit_server"  # Server ID provided
+    FALLBACK = "fallback"  # Using fallback server
 
 
 # ============================================================================
 # Request Contracts (Input Schemas)
 # ============================================================================
+
 
 class ServerRegistrationRequestContract(BaseModel):
     """
@@ -52,36 +56,29 @@ class ServerRegistrationRequestContract(BaseModel):
 
     Used for registering a new external MCP server.
     """
+
     name: str = Field(
         ...,
         min_length=1,
         max_length=255,
         pattern=r"^[a-z][a-z0-9_-]*$",
-        description="Unique server identifier (lowercase, hyphens allowed)"
+        description="Unique server identifier (lowercase, hyphens allowed)",
     )
     description: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Human-readable server description"
+        None, max_length=1000, description="Human-readable server description"
     )
     transport_type: ServerTransportType = Field(
-        ...,
-        description="Transport protocol for server connection"
+        ..., description="Transport protocol for server connection"
     )
     connection_config: Dict[str, Any] = Field(
-        ...,
-        description="Transport-specific connection configuration"
+        ..., description="Transport-specific connection configuration"
     )
     health_check_url: Optional[str] = Field(
-        None,
-        description="Optional HTTP endpoint for health checks"
+        None, description="Optional HTTP endpoint for health checks"
     )
-    auto_connect: bool = Field(
-        True,
-        description="Connect immediately after registration"
-    )
+    auto_connect: bool = Field(True, description="Connect immediately after registration")
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name_format(cls, v: str) -> str:
         """Validate server name format: lowercase, start with letter."""
@@ -89,8 +86,8 @@ class ServerRegistrationRequestContract(BaseModel):
             raise ValueError("Server name must start with a letter")
         return v.lower()
 
-    @model_validator(mode='after')
-    def validate_connection_config(self) -> 'ServerRegistrationRequestContract':
+    @model_validator(mode="after")
+    def validate_connection_config(self) -> "ServerRegistrationRequestContract":
         """Validate connection config matches transport type."""
         config = self.connection_config
         transport = self.transport_type
@@ -121,10 +118,10 @@ class ServerRegistrationRequestContract(BaseModel):
                 "transport_type": "SSE",
                 "connection_config": {
                     "url": "https://github-mcp.example.com/sse",
-                    "headers": {"Authorization": "Bearer ${GITHUB_TOKEN}"}
+                    "headers": {"Authorization": "Bearer ${GITHUB_TOKEN}"},
                 },
                 "health_check_url": "https://github-mcp.example.com/health",
-                "auto_connect": True
+                "auto_connect": True,
             }
         }
 
@@ -133,6 +130,7 @@ class ServerConnectionRequestContract(BaseModel):
     """
     Contract: Server connect/disconnect request schema.
     """
+
     server_id: str = Field(..., description="Server UUID")
     action: str = Field(..., pattern="^(connect|disconnect)$", description="Action to perform")
     force: bool = Field(False, description="Force action even if pending requests")
@@ -142,19 +140,13 @@ class AggregatedSearchRequestContract(BaseModel):
     """
     Contract: Search request including external servers.
     """
+
     query: str = Field(
-        ...,
-        min_length=1,
-        max_length=1000,
-        description="Natural language search query"
+        ..., min_length=1, max_length=1000, description="Natural language search query"
     )
-    include_external: bool = Field(
-        True,
-        description="Include tools from external servers"
-    )
+    include_external: bool = Field(True, description="Include tools from external servers")
     server_filter: Optional[List[str]] = Field(
-        None,
-        description="Limit to specific servers by name"
+        None, description="Limit to specific servers by name"
     )
     limit: int = Field(10, ge=1, le=50, description="Maximum results")
     skill_threshold: float = Field(0.4, ge=0.0, le=1.0, description="Skill match threshold")
@@ -166,7 +158,7 @@ class AggregatedSearchRequestContract(BaseModel):
                 "query": "create a GitHub issue",
                 "include_external": True,
                 "server_filter": ["github-mcp", "jira-mcp"],
-                "limit": 10
+                "limit": 10,
             }
         }
 
@@ -175,29 +167,18 @@ class ToolExecutionRequestContract(BaseModel):
     """
     Contract: Tool execution request for aggregated tools.
     """
-    name: str = Field(
-        ...,
-        min_length=1,
-        description="Tool name (namespaced or original)"
-    )
-    arguments: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Tool arguments"
-    )
+
+    name: str = Field(..., min_length=1, description="Tool name (namespaced or original)")
+    arguments: Dict[str, Any] = Field(default_factory=dict, description="Tool arguments")
     server_id: Optional[str] = Field(
-        None,
-        description="Explicit server ID (if not using namespaced name)"
+        None, description="Explicit server ID (if not using namespaced name)"
     )
 
     class Config:
         json_schema_extra = {
             "example": {
                 "name": "github-mcp.create_issue",
-                "arguments": {
-                    "repo": "owner/repo",
-                    "title": "Bug report",
-                    "body": "Description"
-                }
+                "arguments": {"repo": "owner/repo", "title": "Bug report", "body": "Description"},
             }
         }
 
@@ -206,10 +187,12 @@ class ToolExecutionRequestContract(BaseModel):
 # Response Contracts (Output Schemas)
 # ============================================================================
 
+
 class ServerRecordContract(BaseModel):
     """
     Contract: External server record response schema.
     """
+
     id: str = Field(..., description="Server UUID")
     name: str = Field(..., description="Server name")
     description: Optional[str] = Field(None, description="Server description")
@@ -232,7 +215,7 @@ class ServerRecordContract(BaseModel):
                 "status": "CONNECTED",
                 "tool_count": 15,
                 "registered_at": "2025-01-08T10:00:00Z",
-                "connected_at": "2025-01-08T10:00:05Z"
+                "connected_at": "2025-01-08T10:00:05Z",
             }
         }
 
@@ -241,6 +224,7 @@ class SourceServerContract(BaseModel):
     """
     Contract: Source server info embedded in tool response.
     """
+
     id: str = Field(..., description="Server UUID")
     name: str = Field(..., description="Server name")
     status: ServerStatus = Field(..., description="Current status")
@@ -250,6 +234,7 @@ class AggregatedToolContract(BaseModel):
     """
     Contract: Aggregated tool response schema.
     """
+
     id: str = Field(..., description="Internal tool ID")
     name: str = Field(..., description="Namespaced tool name")
     original_name: str = Field(..., description="Original tool name from server")
@@ -269,14 +254,10 @@ class AggregatedToolContract(BaseModel):
                 "original_name": "create_issue",
                 "description": "Create a new GitHub issue",
                 "score": 0.95,
-                "source_server": {
-                    "id": "uuid-1234",
-                    "name": "github-mcp",
-                    "status": "CONNECTED"
-                },
+                "source_server": {"id": "uuid-1234", "name": "github-mcp", "status": "CONNECTED"},
                 "skill_ids": ["code_management", "issue_tracking"],
                 "primary_skill_id": "issue_tracking",
-                "is_classified": True
+                "is_classified": True,
             }
         }
 
@@ -285,6 +266,7 @@ class RoutingContextContract(BaseModel):
     """
     Contract: Routing decision context.
     """
+
     tool_name: str = Field(..., description="Requested tool name")
     resolved_server_id: str = Field(..., description="Target server UUID")
     resolved_server_name: str = Field(..., description="Target server name")
@@ -297,31 +279,21 @@ class ToolExecutionResponseContract(BaseModel):
     """
     Contract: Tool execution response from external server.
     """
-    content: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="Tool response content"
-    )
+
+    content: List[Dict[str, Any]] = Field(default_factory=list, description="Tool response content")
     is_error: bool = Field(False, description="Whether execution resulted in error")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Execution metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Execution metadata")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "{\"issue_number\": 123}"
-                    }
-                ],
+                "content": [{"type": "text", "text": '{"issue_number": 123}'}],
                 "is_error": False,
                 "metadata": {
                     "routed_to": "github-mcp",
                     "routing_time_ms": 12.5,
-                    "execution_time_ms": 450.2
-                }
+                    "execution_time_ms": 450.2,
+                },
             }
         }
 
@@ -330,6 +302,7 @@ class ServerHealthContract(BaseModel):
     """
     Contract: Server health check response.
     """
+
     server_id: str = Field(..., description="Server UUID")
     server_name: str = Field(..., description="Server name")
     status: ServerStatus = Field(..., description="Health status")
@@ -343,6 +316,7 @@ class AggregatorStateContract(BaseModel):
     """
     Contract: Current state of the aggregator.
     """
+
     total_servers: int = Field(..., ge=0, description="Total registered servers")
     connected_servers: int = Field(..., ge=0, description="Currently connected servers")
     disconnected_servers: int = Field(..., ge=0, description="Disconnected servers")
@@ -362,7 +336,7 @@ class AggregatorStateContract(BaseModel):
                 "total_tools": 125,
                 "classified_tools": 120,
                 "unclassified_tools": 5,
-                "last_sync": "2025-01-08T10:00:00Z"
+                "last_sync": "2025-01-08T10:00:00Z",
             }
         }
 
@@ -370,6 +344,7 @@ class AggregatorStateContract(BaseModel):
 # ============================================================================
 # Test Data Factory
 # ============================================================================
+
 
 class AggregatorTestDataFactory:
     """
@@ -412,7 +387,7 @@ class AggregatorTestDataFactory:
         Returns:
             ServerRegistrationRequestContract for STDIO transport
         """
-        name = overrides.pop('name', None) or AggregatorTestDataFactory.make_server_name()
+        name = overrides.pop("name", None) or AggregatorTestDataFactory.make_server_name()
         defaults = {
             "name": name,
             "description": f"Test STDIO MCP Server: {name}",
@@ -420,10 +395,10 @@ class AggregatorTestDataFactory:
             "connection_config": {
                 "command": "python",
                 "args": ["-m", "test_mcp_server"],
-                "env": {"MCP_MODE": "test"}
+                "env": {"MCP_MODE": "test"},
             },
             "health_check_url": None,
-            "auto_connect": True
+            "auto_connect": True,
         }
         defaults.update(overrides)
         return ServerRegistrationRequestContract(**defaults)
@@ -439,17 +414,17 @@ class AggregatorTestDataFactory:
         Returns:
             ServerRegistrationRequestContract for SSE transport
         """
-        name = overrides.pop('name', None) or AggregatorTestDataFactory.make_server_name()
+        name = overrides.pop("name", None) or AggregatorTestDataFactory.make_server_name()
         defaults = {
             "name": name,
             "description": f"Test SSE MCP Server: {name}",
             "transport_type": ServerTransportType.SSE,
             "connection_config": {
                 "url": f"https://{name}.example.com/sse",
-                "headers": {"Authorization": "Bearer test-token"}
+                "headers": {"Authorization": "Bearer test-token"},
             },
             "health_check_url": f"https://{name}.example.com/health",
-            "auto_connect": True
+            "auto_connect": True,
         }
         defaults.update(overrides)
         return ServerRegistrationRequestContract(**defaults)
@@ -465,17 +440,17 @@ class AggregatorTestDataFactory:
         Returns:
             ServerRegistrationRequestContract for HTTP transport
         """
-        name = overrides.pop('name', None) or AggregatorTestDataFactory.make_server_name()
+        name = overrides.pop("name", None) or AggregatorTestDataFactory.make_server_name()
         defaults = {
             "name": name,
             "description": f"Test HTTP MCP Server: {name}",
             "transport_type": ServerTransportType.HTTP,
             "connection_config": {
                 "base_url": f"https://{name}.example.com/api",
-                "headers": {"X-API-Key": "test-key"}
+                "headers": {"X-API-Key": "test-key"},
             },
             "health_check_url": f"https://{name}.example.com/health",
-            "auto_connect": True
+            "auto_connect": True,
         }
         defaults.update(overrides)
         return ServerRegistrationRequestContract(**defaults)
@@ -495,8 +470,8 @@ class AggregatorTestDataFactory:
         Returns:
             ServerRecordContract with valid data
         """
-        server_id = overrides.pop('id', None) or AggregatorTestDataFactory.make_server_id()
-        name = overrides.pop('name', None) or "test-server"
+        server_id = overrides.pop("id", None) or AggregatorTestDataFactory.make_server_id()
+        name = overrides.pop("name", None) or "test-server"
         defaults = {
             "id": server_id,
             "name": name,
@@ -508,7 +483,7 @@ class AggregatorTestDataFactory:
             "tool_count": 10,
             "error_message": None,
             "registered_at": datetime.now(timezone.utc),
-            "connected_at": datetime.now(timezone.utc)
+            "connected_at": datetime.now(timezone.utc),
         }
         defaults.update(overrides)
         return ServerRecordContract(**defaults)
@@ -528,9 +503,9 @@ class AggregatorTestDataFactory:
         Returns:
             AggregatedToolContract with valid data
         """
-        tool_id = overrides.pop('id', None) or str(AggregatorTestDataFactory.make_tool_id())
-        server_name = overrides.pop('server_name', "github-mcp")
-        original_name = overrides.pop('original_name', "create_issue")
+        tool_id = overrides.pop("id", None) or str(AggregatorTestDataFactory.make_tool_id())
+        server_name = overrides.pop("server_name", "github-mcp")
+        original_name = overrides.pop("original_name", "create_issue")
 
         defaults = {
             "id": tool_id,
@@ -541,17 +516,12 @@ class AggregatorTestDataFactory:
             "source_server": SourceServerContract(
                 id=AggregatorTestDataFactory.make_server_id(),
                 name=server_name,
-                status=ServerStatus.CONNECTED
+                status=ServerStatus.CONNECTED,
             ),
             "skill_ids": ["code_management"],
             "primary_skill_id": "code_management",
             "is_classified": True,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "param1": {"type": "string"}
-                }
-            }
+            "input_schema": {"type": "object", "properties": {"param1": {"type": "string"}}},
         }
         defaults.update(overrides)
         return AggregatedToolContract(**defaults)
@@ -569,7 +539,7 @@ class AggregatorTestDataFactory:
             "server_filter": None,
             "limit": 10,
             "skill_threshold": 0.4,
-            "tool_threshold": 0.3
+            "tool_threshold": 0.3,
         }
         defaults.update(overrides)
         return AggregatedSearchRequestContract(**defaults)
@@ -579,12 +549,8 @@ class AggregatorTestDataFactory:
         """Create valid tool execution request."""
         defaults = {
             "name": "github-mcp.create_issue",
-            "arguments": {
-                "repo": "owner/repo",
-                "title": "Test issue",
-                "body": "Test description"
-            },
-            "server_id": None
+            "arguments": {"repo": "owner/repo", "title": "Test issue", "body": "Test description"},
+            "server_id": None,
         }
         defaults.update(overrides)
         return ToolExecutionRequestContract(**defaults)
@@ -593,15 +559,13 @@ class AggregatorTestDataFactory:
     def make_tool_execution_response(**overrides) -> ToolExecutionResponseContract:
         """Create valid tool execution response."""
         defaults = {
-            "content": [
-                {"type": "text", "text": '{"issue_number": 123}'}
-            ],
+            "content": [{"type": "text", "text": '{"issue_number": 123}'}],
             "is_error": False,
             "metadata": {
                 "routed_to": "github-mcp",
                 "routing_time_ms": 15.2,
-                "execution_time_ms": 320.5
-            }
+                "execution_time_ms": 320.5,
+            },
         }
         defaults.update(overrides)
         return ToolExecutionResponseContract(**defaults)
@@ -621,7 +585,7 @@ class AggregatorTestDataFactory:
             "total_tools": 125,
             "classified_tools": 120,
             "unclassified_tools": 5,
-            "last_sync": datetime.now(timezone.utc)
+            "last_sync": datetime.now(timezone.utc),
         }
         defaults.update(overrides)
         return AggregatorStateContract(**defaults)
@@ -629,7 +593,7 @@ class AggregatorTestDataFactory:
     @staticmethod
     def make_server_health(**overrides) -> ServerHealthContract:
         """Create valid server health record."""
-        server_id = overrides.pop('server_id', None) or AggregatorTestDataFactory.make_server_id()
+        server_id = overrides.pop("server_id", None) or AggregatorTestDataFactory.make_server_id()
         defaults = {
             "server_id": server_id,
             "server_name": "test-server",
@@ -637,7 +601,7 @@ class AggregatorTestDataFactory:
             "last_check": datetime.now(timezone.utc),
             "response_time_ms": 45.5,
             "consecutive_failures": 0,
-            "error_message": None
+            "error_message": None,
         }
         defaults.update(overrides)
         return ServerHealthContract(**defaults)
@@ -660,9 +624,9 @@ class AggregatorTestDataFactory:
                 transport_type=ServerTransportType.SSE,
                 connection_config={
                     "url": "https://github-mcp.example.com/sse",
-                    "headers": {"Authorization": "Bearer ${GITHUB_TOKEN}"}
+                    "headers": {"Authorization": "Bearer ${GITHUB_TOKEN}"},
                 },
-                health_check_url="https://github-mcp.example.com/health"
+                health_check_url="https://github-mcp.example.com/health",
             ),
             ServerRegistrationRequestContract(
                 name="slack-mcp",
@@ -670,9 +634,9 @@ class AggregatorTestDataFactory:
                 transport_type=ServerTransportType.SSE,
                 connection_config={
                     "url": "https://slack-mcp.example.com/sse",
-                    "headers": {"Authorization": "Bearer ${SLACK_TOKEN}"}
+                    "headers": {"Authorization": "Bearer ${SLACK_TOKEN}"},
                 },
-                health_check_url="https://slack-mcp.example.com/health"
+                health_check_url="https://slack-mcp.example.com/health",
             ),
             ServerRegistrationRequestContract(
                 name="local-tools",
@@ -681,8 +645,8 @@ class AggregatorTestDataFactory:
                 connection_config={
                     "command": "python",
                     "args": ["-m", "local_mcp_server"],
-                    "env": {}
-                }
+                    "env": {},
+                },
             ),
         ]
 
@@ -696,7 +660,7 @@ class AggregatorTestDataFactory:
         return {
             "name": "",
             "transport_type": "SSE",
-            "connection_config": {"url": "https://example.com/sse"}
+            "connection_config": {"url": "https://example.com/sse"},
         }
 
     @staticmethod
@@ -705,7 +669,7 @@ class AggregatorTestDataFactory:
         return {
             "name": "123-invalid",
             "transport_type": "SSE",
-            "connection_config": {"url": "https://example.com/sse"}
+            "connection_config": {"url": "https://example.com/sse"},
         }
 
     @staticmethod
@@ -714,7 +678,7 @@ class AggregatorTestDataFactory:
         return {
             "name": "invalid server name",
             "transport_type": "SSE",
-            "connection_config": {"url": "https://example.com/sse"}
+            "connection_config": {"url": "https://example.com/sse"},
         }
 
     @staticmethod
@@ -723,7 +687,7 @@ class AggregatorTestDataFactory:
         return {
             "name": "valid-name",
             "transport_type": "SSE",
-            "connection_config": {}  # Missing 'url' for SSE
+            "connection_config": {},  # Missing 'url' for SSE
         }
 
     @staticmethod
@@ -732,29 +696,24 @@ class AggregatorTestDataFactory:
         return {
             "name": "stdio-server",
             "transport_type": "STDIO",
-            "connection_config": {"args": ["-m", "test"]}  # Missing 'command'
+            "connection_config": {"args": ["-m", "test"]},  # Missing 'command'
         }
 
     @staticmethod
     def make_invalid_tool_execution_empty_name() -> dict:
         """Generate tool execution with empty name."""
-        return {
-            "name": "",
-            "arguments": {}
-        }
+        return {"name": "", "arguments": {}}
 
     @staticmethod
     def make_invalid_search_negative_threshold() -> dict:
         """Generate search with negative threshold."""
-        return {
-            "query": "test query",
-            "skill_threshold": -0.5
-        }
+        return {"query": "test query", "skill_threshold": -0.5}
 
 
 # ============================================================================
 # Request Builders (for complex test scenarios)
 # ============================================================================
+
 
 class ServerRegistrationBuilder:
     """
@@ -778,7 +737,7 @@ class ServerRegistrationBuilder:
             "transport_type": ServerTransportType.SSE,
             "connection_config": {"url": "https://test.example.com/sse"},
             "health_check_url": None,
-            "auto_connect": True
+            "auto_connect": True,
         }
 
     def with_name(self, name: str) -> "ServerRegistrationBuilder":
@@ -793,44 +752,27 @@ class ServerRegistrationBuilder:
         return self
 
     def with_stdio_transport(
-        self,
-        command: str,
-        args: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None
+        self, command: str, args: Optional[List[str]] = None, env: Optional[Dict[str, str]] = None
     ) -> "ServerRegistrationBuilder":
         """Configure STDIO transport."""
         self._data["transport_type"] = ServerTransportType.STDIO
-        self._data["connection_config"] = {
-            "command": command,
-            "args": args or [],
-            "env": env or {}
-        }
+        self._data["connection_config"] = {"command": command, "args": args or [], "env": env or {}}
         return self
 
     def with_sse_transport(
-        self,
-        url: str,
-        headers: Optional[Dict[str, str]] = None
+        self, url: str, headers: Optional[Dict[str, str]] = None
     ) -> "ServerRegistrationBuilder":
         """Configure SSE transport."""
         self._data["transport_type"] = ServerTransportType.SSE
-        self._data["connection_config"] = {
-            "url": url,
-            "headers": headers or {}
-        }
+        self._data["connection_config"] = {"url": url, "headers": headers or {}}
         return self
 
     def with_http_transport(
-        self,
-        base_url: str,
-        headers: Optional[Dict[str, str]] = None
+        self, base_url: str, headers: Optional[Dict[str, str]] = None
     ) -> "ServerRegistrationBuilder":
         """Configure HTTP transport."""
         self._data["transport_type"] = ServerTransportType.HTTP
-        self._data["connection_config"] = {
-            "base_url": base_url,
-            "headers": headers or {}
-        }
+        self._data["connection_config"] = {"base_url": base_url, "headers": headers or {}}
         return self
 
     def with_health_check(self, url: str) -> "ServerRegistrationBuilder":
@@ -874,14 +816,14 @@ class AggregatedToolBuilder:
             "skill_ids": [],
             "primary_skill_id": None,
             "is_classified": False,
-            "input_schema": None
+            "input_schema": None,
         }
 
     def from_server(
         self,
         name: str,
         server_id: Optional[str] = None,
-        status: ServerStatus = ServerStatus.CONNECTED
+        status: ServerStatus = ServerStatus.CONNECTED,
     ) -> "AggregatedToolBuilder":
         """Set source server."""
         self._server_name = name
@@ -900,9 +842,7 @@ class AggregatedToolBuilder:
         return self
 
     def with_skills(
-        self,
-        skill_ids: List[str],
-        primary: Optional[str] = None
+        self, skill_ids: List[str], primary: Optional[str] = None
     ) -> "AggregatedToolBuilder":
         """Set skill assignments."""
         self._data["skill_ids"] = skill_ids
@@ -938,12 +878,12 @@ class AggregatedToolBuilder:
             source_server=SourceServerContract(
                 id=self._server_id,
                 name=self._server_name,
-                status=getattr(self, '_server_status', ServerStatus.CONNECTED)
+                status=getattr(self, "_server_status", ServerStatus.CONNECTED),
             ),
             skill_ids=self._data["skill_ids"],
             primary_skill_id=self._data["primary_skill_id"],
             is_classified=self._data["is_classified"],
-            input_schema=self._data["input_schema"]
+            input_schema=self._data["input_schema"],
         )
 
 
@@ -956,13 +896,11 @@ __all__ = [
     "ServerTransportType",
     "ServerStatus",
     "RoutingStrategy",
-
     # Request Contracts
     "ServerRegistrationRequestContract",
     "ServerConnectionRequestContract",
     "AggregatedSearchRequestContract",
     "ToolExecutionRequestContract",
-
     # Response Contracts
     "ServerRecordContract",
     "SourceServerContract",
@@ -971,10 +909,8 @@ __all__ = [
     "AggregatorStateContract",
     "ToolExecutionResponseContract",
     "ServerHealthContract",
-
     # Factory
     "AggregatorTestDataFactory",
-
     # Builders
     "ServerRegistrationBuilder",
     "AggregatedToolBuilder",

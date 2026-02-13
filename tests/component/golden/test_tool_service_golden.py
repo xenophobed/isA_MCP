@@ -12,6 +12,7 @@ Before updating these tests:
 Service Under Test: services/tool_service/tool_service.py
 Repository Under Test: services/tool_service/tool_repository.py
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
@@ -51,6 +52,7 @@ class TestToolServiceGolden:
     def tool_service(self, mock_repository):
         """Create ToolService with mocked repository."""
         from services.tool_service.tool_service import ToolService
+
         return ToolService(repository=mock_repository)
 
     # ═══════════════════════════════════════════════════════════════
@@ -71,10 +73,7 @@ class TestToolServiceGolden:
         CURRENT BEHAVIOR: register_tool raises ValueError for duplicate names.
         """
         # Setup: Tool with same name already exists
-        mock_repository.get_tool_by_name.return_value = {
-            "id": 1,
-            "name": "existing_tool"
-        }
+        mock_repository.get_tool_by_name.return_value = {"id": 1, "name": "existing_tool"}
 
         with pytest.raises(ValueError) as exc_info:
             await tool_service.register_tool({"name": "existing_tool"})
@@ -89,13 +88,10 @@ class TestToolServiceGolden:
         mock_repository.create_tool.return_value = {
             "id": 42,
             "name": "new_tool",
-            "description": "A new tool"
+            "description": "A new tool",
         }
 
-        result = await tool_service.register_tool({
-            "name": "new_tool",
-            "description": "A new tool"
-        })
+        result = await tool_service.register_tool({"name": "new_tool", "description": "A new tool"})
 
         assert isinstance(result, dict)
         assert "id" in result
@@ -173,7 +169,7 @@ class TestToolServiceGolden:
         """
         mock_repository.list_tools.return_value = [
             {"id": 1, "name": "tool1"},
-            {"id": 2, "name": "tool2"}
+            {"id": 2, "name": "tool2"},
         ]
 
         result = await tool_service.list_tools()
@@ -185,12 +181,7 @@ class TestToolServiceGolden:
         """
         CURRENT BEHAVIOR: Filters are passed to repository method.
         """
-        await tool_service.list_tools(
-            category="intelligence",
-            active_only=True,
-            limit=10,
-            offset=5
-        )
+        await tool_service.list_tools(category="intelligence", active_only=True, limit=10, offset=5)
 
         mock_repository.list_tools.assert_called_once()
         call_kwargs = mock_repository.list_tools.call_args
@@ -259,9 +250,7 @@ class TestToolServiceGolden:
         mock_repository.increment_call_count.return_value = True
 
         result = await tool_service.record_tool_call(
-            tool_identifier=1,
-            success=True,
-            response_time_ms=150
+            tool_identifier=1, success=True, response_time_ms=150
         )
 
         assert result is True
@@ -277,7 +266,7 @@ class TestToolServiceGolden:
             "success_count": 95,
             "failure_count": 5,
             "avg_response_time_ms": 120,
-            "success_rate": 0.95
+            "success_rate": 0.95,
         }
 
         result = await tool_service.get_tool_statistics(1)
@@ -312,7 +301,7 @@ class TestToolServiceGolden:
         # Repository returns pre-ranked results
         mock_repository.search_tools.return_value = [
             {"id": 1, "name": "text_gen", "description": "Other"},  # Name match
-            {"id": 2, "name": "other", "description": "text generation"}  # Desc match
+            {"id": 2, "name": "other", "description": "text generation"},  # Desc match
         ]
 
         result = await tool_service.search_tools("text", limit=10)
@@ -330,7 +319,7 @@ class TestToolServiceGolden:
         """
         mock_repository.list_tools.return_value = [
             {"id": 1, "name": "popular", "call_count": 1000},
-            {"id": 2, "name": "less_popular", "call_count": 100}
+            {"id": 2, "name": "less_popular", "call_count": 100},
         ]
 
         result = await tool_service.get_popular_tools(limit=10)
@@ -369,7 +358,7 @@ class TestToolRepositoryGolden:
         tool_data = {
             "name": "test_tool",
             "input_schema": {"type": "object", "properties": {}},
-            "metadata": {"author": "test"}
+            "metadata": {"author": "test"},
         }
 
         # The repository should serialize these to JSON strings before SQL insert

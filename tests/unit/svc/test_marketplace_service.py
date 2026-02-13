@@ -8,6 +8,7 @@ Tests:
 - Update management
 - Registry fetching
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
@@ -25,10 +26,10 @@ from tests.contracts.marketplace import (
     UpdateChannel,
 )
 
-
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_package():
@@ -101,23 +102,30 @@ def mock_repository():
 def mock_aggregator():
     """Mock AggregatorService."""
     aggregator = AsyncMock()
-    aggregator.register_server = AsyncMock(return_value={
-        "id": "srv-001",
-        "name": "anthropic-mcp-server-filesystem",
-        "status": "connected",
-    })
-    aggregator.discover_tools = AsyncMock(return_value=[
-        {
-            "name": "read_file",
-            "description": "Read file contents",
-            "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
-        },
-        {
-            "name": "write_file",
-            "description": "Write file contents",
-            "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
-        },
-    ])
+    aggregator.register_server = AsyncMock(
+        return_value={
+            "id": "srv-001",
+            "name": "anthropic-mcp-server-filesystem",
+            "status": "connected",
+        }
+    )
+    aggregator.discover_tools = AsyncMock(
+        return_value=[
+            {
+                "name": "read_file",
+                "description": "Read file contents",
+                "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}},
+            },
+            {
+                "name": "write_file",
+                "description": "Write file contents",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                },
+            },
+        ]
+    )
     aggregator.remove_server = AsyncMock()
     aggregator.connect_server = AsyncMock()
     aggregator.disconnect_server = AsyncMock()
@@ -153,6 +161,7 @@ def mock_vector_repository():
 # PackageRepository Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestPackageRepository:
     """Tests for PackageRepository (in-memory mode)."""
 
@@ -161,11 +170,13 @@ class TestPackageRepository:
         """Test creating a package."""
         repo = PackageRepository(db_pool=None)
 
-        package = await repo.create_package({
-            "name": "test-package",
-            "display_name": "Test Package",
-            "description": "A test package",
-        })
+        package = await repo.create_package(
+            {
+                "name": "test-package",
+                "display_name": "Test Package",
+                "description": "A test package",
+            }
+        )
 
         assert package["name"] == "test-package"
         assert package["display_name"] == "Test Package"
@@ -178,10 +189,12 @@ class TestPackageRepository:
         repo = PackageRepository(db_pool=None)
 
         # Create package
-        created = await repo.create_package({
-            "name": "test-package",
-            "description": "Test",
-        })
+        created = await repo.create_package(
+            {
+                "name": "test-package",
+                "description": "Test",
+            }
+        )
 
         # Retrieve by name
         found = await repo.get_package_by_name("test-package")
@@ -208,14 +221,16 @@ class TestPackageRepository:
         package = await repo.create_package({"name": "test-pkg"})
 
         # Create version
-        version = await repo.create_version({
-            "package_id": package["id"],
-            "version": "1.0.0",
-            "version_major": 1,
-            "version_minor": 0,
-            "version_patch": 0,
-            "mcp_config": {"transport": "stdio"},
-        })
+        version = await repo.create_version(
+            {
+                "package_id": package["id"],
+                "version": "1.0.0",
+                "version_major": 1,
+                "version_minor": 0,
+                "version_patch": 0,
+                "mcp_config": {"transport": "stdio"},
+            }
+        )
 
         assert version["version"] == "1.0.0"
         assert version["package_id"] == package["id"]
@@ -242,6 +257,7 @@ class TestPackageRepository:
 # ═══════════════════════════════════════════════════════════════
 # PackageResolver Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestPackageResolver:
     """Tests for PackageResolver."""
@@ -280,20 +296,24 @@ class TestPackageResolver:
 
         # Setup: create package with multiple versions
         await repo.create_package(mock_package)
-        await repo.create_version({
-            "package_id": mock_package["id"],
-            "version": "1.0.0",
-            "version_major": 1,
-            "version_minor": 0,
-            "version_patch": 0,
-        })
-        await repo.create_version({
-            "package_id": mock_package["id"],
-            "version": "1.1.0",
-            "version_major": 1,
-            "version_minor": 1,
-            "version_patch": 0,
-        })
+        await repo.create_version(
+            {
+                "package_id": mock_package["id"],
+                "version": "1.0.0",
+                "version_major": 1,
+                "version_minor": 0,
+                "version_patch": 0,
+            }
+        )
+        await repo.create_version(
+            {
+                "package_id": mock_package["id"],
+                "version": "1.1.0",
+                "version_major": 1,
+                "version_minor": 1,
+                "version_patch": 0,
+            }
+        )
 
         # Resolve specific version
         spec = PackageSpec(name=mock_package["name"], version="1.0.0")
@@ -345,6 +365,7 @@ class TestPackageResolver:
 # InstallManager Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestInstallManager:
     """Tests for InstallManager."""
 
@@ -361,11 +382,13 @@ class TestInstallManager:
     ):
         """Test successful package installation."""
         # Setup mocks
-        mock_repository.create_installation = AsyncMock(return_value={
-            "id": "inst-001",
-            "package_id": mock_package["id"],
-            "version_id": mock_version["id"],
-        })
+        mock_repository.create_installation = AsyncMock(
+            return_value={
+                "id": "inst-001",
+                "package_id": mock_package["id"],
+                "version_id": mock_version["id"],
+            }
+        )
         mock_repository.create_tool_mappings = AsyncMock()
 
         manager = InstallManager(
@@ -398,11 +421,13 @@ class TestInstallManager:
         mock_repository,
     ):
         """Test installation without aggregator service."""
-        mock_repository.create_installation = AsyncMock(return_value={
-            "id": "inst-001",
-            "package_id": mock_package["id"],
-            "version_id": mock_version["id"],
-        })
+        mock_repository.create_installation = AsyncMock(
+            return_value={
+                "id": "inst-001",
+                "package_id": mock_package["id"],
+                "version_id": mock_version["id"],
+            }
+        )
 
         manager = InstallManager(
             repository=mock_repository,
@@ -491,6 +516,7 @@ class TestInstallManager:
 # UpdateManager Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestUpdateManager:
     """Tests for UpdateManager."""
 
@@ -533,6 +559,7 @@ class TestUpdateManager:
 # ═══════════════════════════════════════════════════════════════
 # RegistryFetcher Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestRegistryFetcher:
     """Tests for RegistryFetcher."""
@@ -621,6 +648,7 @@ class TestRegistryFetcher:
 # Integration Tests (In-Memory)
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestMarketplaceIntegration:
     """Integration tests using in-memory repositories."""
 
@@ -631,26 +659,30 @@ class TestMarketplaceIntegration:
         repo = PackageRepository(db_pool=None)
 
         # Create package
-        package = await repo.create_package({
-            "name": "@test/mcp-server",
-            "display_name": "Test MCP Server",
-            "description": "A test server",
-            "latest_version": "1.0.0",
-        })
+        package = await repo.create_package(
+            {
+                "name": "@test/mcp-server",
+                "display_name": "Test MCP Server",
+                "description": "A test server",
+                "latest_version": "1.0.0",
+            }
+        )
 
         # Create version
-        version = await repo.create_version({
-            "package_id": package["id"],
-            "version": "1.0.0",
-            "version_major": 1,
-            "version_minor": 0,
-            "version_patch": 0,
-            "mcp_config": {
-                "transport": "stdio",
-                "command": "npx",
-                "args": ["-y", "@test/mcp-server"],
-            },
-        })
+        version = await repo.create_version(
+            {
+                "package_id": package["id"],
+                "version": "1.0.0",
+                "version_major": 1,
+                "version_minor": 0,
+                "version_patch": 0,
+                "mcp_config": {
+                    "transport": "stdio",
+                    "command": "npx",
+                    "args": ["-y", "@test/mcp-server"],
+                },
+            }
+        )
 
         # Create install manager without external deps
         manager = InstallManager(
@@ -684,21 +716,27 @@ class TestMarketplaceIntegration:
         repo = PackageRepository(db_pool=None)
 
         # Create multiple packages
-        await repo.create_package({
-            "name": "@anthropic/filesystem",
-            "description": "Filesystem access",
-            "tags": ["filesystem", "io"],
-        })
-        await repo.create_package({
-            "name": "@anthropic/database",
-            "description": "Database access",
-            "tags": ["database", "sql"],
-        })
-        await repo.create_package({
-            "name": "@other/tool",
-            "description": "Other tool",
-            "tags": ["utility"],
-        })
+        await repo.create_package(
+            {
+                "name": "@anthropic/filesystem",
+                "description": "Filesystem access",
+                "tags": ["filesystem", "io"],
+            }
+        )
+        await repo.create_package(
+            {
+                "name": "@anthropic/database",
+                "description": "Database access",
+                "tags": ["database", "sql"],
+            }
+        )
+        await repo.create_package(
+            {
+                "name": "@other/tool",
+                "description": "Other tool",
+                "tags": ["utility"],
+            }
+        )
 
         # Search - returns dict with 'packages' key
         results = await repo.search_packages(query="anthropic")

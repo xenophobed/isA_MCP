@@ -12,15 +12,16 @@ import json
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def base_resource():
     """Create a BaseResource instance for testing"""
     from resources.base_resource import BaseResource
+
     return BaseResource()
 
 
@@ -37,12 +38,14 @@ def mock_mcp():
 def mock_security_manager():
     """Create a mock security manager"""
     from resources.base_resource import MockSecurityManager
+
     return MockSecurityManager()
 
 
 # =============================================================================
 # BaseResource.__init__ Tests
 # =============================================================================
+
 
 class TestBaseResourceInit:
     """Tests for BaseResource initialization"""
@@ -61,6 +64,7 @@ class TestBaseResourceInit:
 # BaseResource.security_manager Property Tests
 # =============================================================================
 
+
 class TestSecurityManagerProperty:
     """Tests for the security_manager lazy-loading property"""
 
@@ -75,7 +79,9 @@ class TestSecurityManagerProperty:
         """Should return MockSecurityManager when real one unavailable"""
         from resources.base_resource import MockSecurityManager
 
-        with patch('resources.base_resource.get_security_manager', side_effect=Exception("Not available")):
+        with patch(
+            "resources.base_resource.get_security_manager", side_effect=Exception("Not available")
+        ):
             sm = base_resource.security_manager
             assert isinstance(sm, MockSecurityManager)
 
@@ -89,6 +95,7 @@ class TestSecurityManagerProperty:
 # =============================================================================
 # BaseResource.create_success_response Tests
 # =============================================================================
+
 
 class TestCreateSuccessResponse:
     """Tests for success response creation"""
@@ -145,6 +152,7 @@ class TestCreateSuccessResponse:
 # BaseResource.create_error_response Tests
 # =============================================================================
 
+
 class TestCreateErrorResponse:
     """Tests for error response creation"""
 
@@ -182,6 +190,7 @@ class TestCreateErrorResponse:
 # BaseResource.create_not_found_response Tests
 # =============================================================================
 
+
 class TestCreateNotFoundResponse:
     """Tests for not found response creation"""
 
@@ -218,6 +227,7 @@ class TestCreateNotFoundResponse:
 # BaseResource.register_resource Tests
 # =============================================================================
 
+
 class TestRegisterResource:
     """Tests for resource registration"""
 
@@ -239,19 +249,17 @@ class TestRegisterResource:
             return "test"
 
         base_resource.register_resource(
-            mock_mcp,
-            "memory://test/{id}",
-            test_func,
-            security_level=SecurityLevel.LOW
+            mock_mcp, "memory://test/{id}", test_func, security_level=SecurityLevel.LOW
         )
 
         assert len(base_resource.registered_resources) == 1
-        assert base_resource.registered_resources[0]['uri'] == "memory://test/{id}"
-        assert base_resource.registered_resources[0]['function'] == "test_func"
-        assert base_resource.registered_resources[0]['security_level'] == "LOW"
+        assert base_resource.registered_resources[0]["uri"] == "memory://test/{id}"
+        assert base_resource.registered_resources[0]["function"] == "test_func"
+        assert base_resource.registered_resources[0]["security_level"] == "LOW"
 
     def test_register_resource_multiple_registrations(self, base_resource, mock_mcp):
         """Should track multiple resource registrations"""
+
         async def func1():
             return "1"
 
@@ -265,26 +273,24 @@ class TestRegisterResource:
 
     def test_register_resource_passes_kwargs_to_mcp(self, base_resource, mock_mcp):
         """Should pass additional kwargs to mcp.resource()"""
+
         async def test_func():
             return "test"
 
         base_resource.register_resource(
-            mock_mcp,
-            "memory://test",
-            test_func,
-            name="Test Resource",
-            description="A test"
+            mock_mcp, "memory://test", test_func, name="Test Resource", description="A test"
         )
 
         # Check that mcp.resource was called with the extra kwargs
         call_kwargs = mock_mcp.resource.call_args[1]
-        assert call_kwargs.get('name') == "Test Resource"
-        assert call_kwargs.get('description') == "A test"
+        assert call_kwargs.get("name") == "Test Resource"
+        assert call_kwargs.get("description") == "A test"
 
 
 # =============================================================================
 # BaseResource.register_all_resources Tests
 # =============================================================================
+
 
 class TestRegisterAllResources:
     """Tests for the template method"""
@@ -301,11 +307,13 @@ class TestRegisterAllResources:
 # MockSecurityManager Tests
 # =============================================================================
 
+
 class TestMockSecurityManager:
     """Tests for the MockSecurityManager fallback class"""
 
     def test_security_check_returns_original_function(self, mock_security_manager):
         """security_check should return the function unchanged"""
+
         def original():
             return "test"
 
@@ -314,6 +322,7 @@ class TestMockSecurityManager:
 
     def test_require_authorization_returns_original_function(self, mock_security_manager):
         """require_authorization should return a decorator that returns the function unchanged"""
+
         def original():
             return "test"
 
@@ -323,6 +332,7 @@ class TestMockSecurityManager:
 
     def test_require_authorization_accepts_any_level(self, mock_security_manager):
         """require_authorization should accept any security level"""
+
         def original():
             return "test"
 
@@ -337,6 +347,7 @@ class TestMockSecurityManager:
 # simple_resource Decorator Tests
 # =============================================================================
 
+
 class TestSimpleResourceDecorator:
     """Tests for the @simple_resource decorator"""
 
@@ -348,7 +359,7 @@ class TestSimpleResourceDecorator:
         async def get_test(id: str):
             return f"Test {id}"
 
-        assert hasattr(get_test, '_resource_uri')
+        assert hasattr(get_test, "_resource_uri")
         assert get_test._resource_uri == "memory://test/{id}"
 
     def test_simple_resource_adds_security_level_attribute(self):
@@ -360,7 +371,7 @@ class TestSimpleResourceDecorator:
         async def get_test():
             return "test"
 
-        assert hasattr(get_test, '_security_level')
+        assert hasattr(get_test, "_security_level")
         assert get_test._security_level == SecurityLevel.HIGH
 
     def test_simple_resource_default_security_level(self):
@@ -391,6 +402,7 @@ class TestSimpleResourceDecorator:
 # create_simple_resource_registration Decorator Tests
 # =============================================================================
 
+
 class TestCreateSimpleResourceRegistration:
     """Tests for the create_simple_resource_registration class decorator"""
 
@@ -416,6 +428,7 @@ class TestCreateSimpleResourceRegistration:
 # Integration Tests
 # =============================================================================
 
+
 class TestBaseResourceIntegration:
     """Integration tests for BaseResource with subclasses"""
 
@@ -434,7 +447,7 @@ class TestBaseResourceIntegration:
         resource.register_all_resources(mock_mcp)
 
         assert len(resource.registered_resources) == 1
-        assert resource.registered_resources[0]['uri'] == "memory://item/{id}"
+        assert resource.registered_resources[0]["uri"] == "memory://item/{id}"
 
     def test_response_helpers_work_in_subclass(self, mock_mcp):
         """Response helper methods should work correctly in subclasses"""

@@ -4,6 +4,7 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of core client integrations.
 If these tests fail, it means client integration patterns have changed.
 """
+
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 import asyncio
@@ -21,7 +22,7 @@ class TestPostgresClientGolden:
 
             # Should export these if isa_common available
             if __all__:
-                assert 'get_postgres_client' in __all__
+                assert "get_postgres_client" in __all__
         except ImportError:
             pytest.skip("isa_common not available")
 
@@ -29,7 +30,7 @@ class TestPostgresClientGolden:
         """get_postgres_client function exists."""
         from core.clients import postgres_client
 
-        assert hasattr(postgres_client, 'get_postgres_client')
+        assert hasattr(postgres_client, "get_postgres_client")
         assert callable(postgres_client.get_postgres_client)
 
     def test_get_postgres_client_is_async(self):
@@ -59,7 +60,7 @@ class TestQdrantClientGolden:
             from core.clients.qdrant_client import __all__
 
             if __all__:
-                assert 'get_qdrant_client' in __all__
+                assert "get_qdrant_client" in __all__
         except ImportError:
             pytest.skip("isa_common not available")
 
@@ -67,7 +68,7 @@ class TestQdrantClientGolden:
         """get_qdrant_client function exists."""
         from core.clients import qdrant_client
 
-        assert hasattr(qdrant_client, 'get_qdrant_client')
+        assert hasattr(qdrant_client, "get_qdrant_client")
         assert callable(qdrant_client.get_qdrant_client)
 
     def test_get_qdrant_client_is_async(self):
@@ -84,9 +85,9 @@ class TestQdrantClientGolden:
         sig = inspect.signature(get_qdrant_client)
         params = list(sig.parameters.keys())
 
-        assert 'collection_name' in params
-        assert 'vector_dimension' in params
-        assert 'config' in params
+        assert "collection_name" in params
+        assert "vector_dimension" in params
+        assert "config" in params
 
     def test_get_qdrant_client_default_collection(self):
         """get_qdrant_client has default collection_name."""
@@ -94,7 +95,7 @@ class TestQdrantClientGolden:
         from core.clients.qdrant_client import get_qdrant_client
 
         sig = inspect.signature(get_qdrant_client)
-        default = sig.parameters['collection_name'].default
+        default = sig.parameters["collection_name"].default
 
         assert default == "user_knowledge"
 
@@ -104,7 +105,7 @@ class TestQdrantClientGolden:
         from core.clients.qdrant_client import get_qdrant_client
 
         sig = inspect.signature(get_qdrant_client)
-        default = sig.parameters['vector_dimension'].default
+        default = sig.parameters["vector_dimension"].default
 
         assert default == 1536
 
@@ -125,9 +126,11 @@ class TestModelClientGolden:
         from core.clients import model_client
 
         # Should have a way to get ISA model client
-        assert hasattr(model_client, 'get_isa_client') or \
-               hasattr(model_client, 'ModelClient') or \
-               hasattr(model_client, 'AsyncModelClient')
+        assert (
+            hasattr(model_client, "get_isa_client")
+            or hasattr(model_client, "ModelClient")
+            or hasattr(model_client, "AsyncModelClient")
+        )
 
 
 @pytest.mark.golden
@@ -160,11 +163,12 @@ class TestClientsSingletonPatternGolden:
             from core.clients.postgres_client import get_postgres_client
 
             # Mock the client to avoid actual connection
-            with patch('core.clients.postgres_client.AsyncPostgresClient') as mock:
+            with patch("core.clients.postgres_client.AsyncPostgresClient") as mock:
                 mock.return_value = MagicMock()
 
                 # Reset global state
                 import core.clients.postgres_client as pg_module
+
                 pg_module._postgres_client = None
 
                 # Get client twice
@@ -182,11 +186,12 @@ class TestClientsSingletonPatternGolden:
             from core.clients.qdrant_client import get_qdrant_client
 
             # Mock the client to avoid actual connection
-            with patch('core.clients.qdrant_client.AsyncQdrantClient') as mock:
+            with patch("core.clients.qdrant_client.AsyncQdrantClient") as mock:
                 mock.return_value = MagicMock()
 
                 # Reset global state
                 import core.clients.qdrant_client as qd_module
+
                 qd_module._qdrant_client = None
 
                 # Get client twice
@@ -210,9 +215,7 @@ class TestClientsImportErrorHandlingGolden:
 
         if postgres_client.AsyncPostgresClient is None:
             with pytest.raises(ImportError):
-                asyncio.get_event_loop().run_until_complete(
-                    postgres_client.get_postgres_client()
-                )
+                asyncio.get_event_loop().run_until_complete(postgres_client.get_postgres_client())
         else:
             pytest.skip("isa_common is available")
 
@@ -222,8 +225,6 @@ class TestClientsImportErrorHandlingGolden:
 
         if qdrant_client.AsyncQdrantClient is None:
             with pytest.raises(ImportError):
-                asyncio.get_event_loop().run_until_complete(
-                    qdrant_client.get_qdrant_client()
-                )
+                asyncio.get_event_loop().run_until_complete(qdrant_client.get_qdrant_client())
         else:
             pytest.skip("isa_common is available")

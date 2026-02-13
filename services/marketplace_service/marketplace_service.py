@@ -4,6 +4,7 @@ Marketplace Service - Main service for MCP package management.
 Coordinates package discovery, installation, and lifecycle management.
 Transforms isA Context Portal into a unified skill marketplace.
 """
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -141,14 +142,10 @@ class MarketplaceService:
 
         # If few results, trigger background registry search
         if results["total"] < limit:
-            asyncio.create_task(
-                self._background_registry_search(query, category, tags)
-            )
+            asyncio.create_task(self._background_registry_search(query, category, tags))
 
         # Calculate search time
-        search_time_ms = int(
-            (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
-        )
+        search_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
         results["search_time_ms"] = search_time_ms
         results["query"] = query
 
@@ -335,10 +332,7 @@ class MarketplaceService:
             >>> for r in results:
             ...     print(f"{r.package_name}: {'OK' if r.success else r.error}")
         """
-        tasks = [
-            self.install(spec, user_id=user_id, org_id=org_id)
-            for spec in specs
-        ]
+        tasks = [self.install(spec, user_id=user_id, org_id=org_id) for spec in specs]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -346,13 +340,15 @@ class MarketplaceService:
         processed = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                processed.append(InstallResult(
-                    success=False,
-                    package_id="",
-                    package_name=specs[i].name,
-                    version="",
-                    error=str(result),
-                ))
+                processed.append(
+                    InstallResult(
+                        success=False,
+                        package_id="",
+                        package_name=specs[i].name,
+                        version="",
+                        error=str(result),
+                    )
+                )
             else:
                 processed.append(result)
 
@@ -560,6 +556,7 @@ class MarketplaceService:
 
     async def start_background_sync(self) -> asyncio.Task:
         """Start background registry synchronization."""
+
         async def _sync_loop():
             while True:
                 try:

@@ -6,13 +6,14 @@ Layer 3: Component Tests
 - Uses mocked dependencies (DB, Qdrant, external APIs)
 - Fast execution with controlled inputs
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ═══════════════════════════════════════════════════════════════
 # Service Mocks
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_tool_service():
@@ -86,6 +87,7 @@ def mock_progress_manager():
 # Repository Mocks
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_tool_repo(mock_db_pool):
     """Mock tool repository."""
@@ -138,6 +140,7 @@ def mock_vector_repo(mock_qdrant_client):
 # Client Mocks
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_postgres_client(mock_db_pool):
     """Mock PostgreSQL client."""
@@ -164,16 +167,15 @@ def mock_qdrant_manager(mock_qdrant_client):
 # Auth Mocks
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_auth_service():
     """Mock authentication service."""
     service = AsyncMock()
     service.validate_token = AsyncMock(return_value=True)
-    service.get_user_from_token = AsyncMock(return_value={
-        "user_id": "test_user",
-        "email": "test@example.com",
-        "roles": ["user"]
-    })
+    service.get_user_from_token = AsyncMock(
+        return_value={"user_id": "test_user", "email": "test@example.com", "roles": ["user"]}
+    )
     service.validate_api_key = AsyncMock(return_value=True)
     return service
 
@@ -183,10 +185,9 @@ def mock_auth_middleware(mock_auth_service):
     """Mock authentication middleware."""
     middleware = MagicMock()
     middleware.auth_service = mock_auth_service
-    middleware.authenticate = AsyncMock(return_value={
-        "authenticated": True,
-        "user_id": "test_user"
-    })
+    middleware.authenticate = AsyncMock(
+        return_value={"authenticated": True, "user_id": "test_user"}
+    )
     return middleware
 
 
@@ -203,6 +204,7 @@ def mock_authorization_client():
 # ═══════════════════════════════════════════════════════════════
 # Intelligence Service Mocks
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_text_generator():
@@ -226,11 +228,13 @@ def mock_embedding_generator():
 def mock_vision_analyzer():
     """Mock vision analyzer."""
     analyzer = AsyncMock()
-    analyzer.analyze = AsyncMock(return_value={
-        "description": "Image description",
-        "objects": ["object1", "object2"],
-        "text": []
-    })
+    analyzer.analyze = AsyncMock(
+        return_value={
+            "description": "Image description",
+            "objects": ["object1", "object2"],
+            "text": [],
+        }
+    )
     analyzer.ocr = AsyncMock(return_value={"text": "Extracted text"})
     return analyzer
 
@@ -248,6 +252,7 @@ def mock_audio_analyzer():
 # Helper Functions
 # ═══════════════════════════════════════════════════════════════
 
+
 def create_mock_tool(name: str = "test_tool", **kwargs):
     """Create a mock tool object."""
     default = {
@@ -256,12 +261,10 @@ def create_mock_tool(name: str = "test_tool", **kwargs):
         "category": "utility",
         "input_schema": {
             "type": "object",
-            "properties": {
-                "input": {"type": "string"}
-            },
-            "required": ["input"]
+            "properties": {"input": {"type": "string"}},
+            "required": ["input"],
         },
-        "is_active": True
+        "is_active": True,
     }
     default.update(kwargs)
     return default
@@ -273,9 +276,7 @@ def create_mock_prompt(name: str = "test_prompt", **kwargs):
         "name": name,
         "description": f"Description for {name}",
         "template": "This is a template for {input}",
-        "arguments": [
-            {"name": "input", "description": "Input argument", "required": True}
-        ]
+        "arguments": [{"name": "input", "description": "Input argument", "required": True}],
     }
     default.update(kwargs)
     return default
@@ -287,7 +288,7 @@ def create_mock_resource(uri: str = "resource://test/1", **kwargs):
         "uri": uri,
         "name": "test_resource",
         "description": "A test resource",
-        "mime_type": "application/json"
+        "mime_type": "application/json",
     }
     default.update(kwargs)
     return default
@@ -299,5 +300,5 @@ def mock_creators():
     return {
         "tool": create_mock_tool,
         "prompt": create_mock_prompt,
-        "resource": create_mock_resource
+        "resource": create_mock_resource,
     }

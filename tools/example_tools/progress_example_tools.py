@@ -8,6 +8,7 @@ Provides MCP tools for:
 - Getting results
 - Cancelling operations
 """
+
 import uuid
 import asyncio
 from datetime import datetime
@@ -39,7 +40,7 @@ class ProgressTools(BaseTool):
             self.start_long_task_impl,
             name="start_long_task",
             description="Start long-running task return operation ID for progress tracking monitoring",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
         # Get progress
@@ -48,7 +49,7 @@ class ProgressTools(BaseTool):
             self.get_task_progress_impl,
             name="get_task_progress",
             description="Get current progress status percentage message of long-running task operation",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
         # Get result
@@ -57,7 +58,7 @@ class ProgressTools(BaseTool):
             self.get_task_result_impl,
             name="get_task_result",
             description="Get final result output data of completed long-running task operation",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
         # Cancel operation
@@ -66,7 +67,7 @@ class ProgressTools(BaseTool):
             self.cancel_task_impl,
             name="cancel_task",
             description="Cancel abort stop running long-running task operation by ID",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
         # List operations
@@ -75,7 +76,7 @@ class ProgressTools(BaseTool):
             self.list_operations_impl,
             name="list_operations",
             description="List all tracked operations tasks with status progress filter",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
         logger.debug(f"Registered {len(self.registered_tools)} progress tracking tools")
@@ -86,10 +87,16 @@ class ProgressTools(BaseTool):
 
     async def start_long_task_impl(
         self,
-        task_type: Annotated[str, Field(description="Type of task to run (e.g., 'data_analysis', 'web_scraping')")],
-        duration_seconds: Annotated[int, Field(description="Task duration in seconds", ge=5, le=300)] = 30,
+        task_type: Annotated[
+            str, Field(description="Type of task to run (e.g., 'data_analysis', 'web_scraping')")
+        ],
+        duration_seconds: Annotated[
+            int, Field(description="Task duration in seconds", ge=5, le=300)
+        ] = 30,
         steps: Annotated[int, Field(description="Number of processing steps", ge=1, le=100)] = 10,
-        metadata: Annotated[Optional[Dict[str, Any]], Field(description="Optional task metadata")] = None
+        metadata: Annotated[
+            Optional[Dict[str, Any]], Field(description="Optional task metadata")
+        ] = None,
     ) -> Dict[str, Any]:
         """
         Start a long-running task and return operation ID for tracking
@@ -115,14 +122,12 @@ class ProgressTools(BaseTool):
                 "task_type": task_type,
                 "duration_seconds": duration_seconds,
                 "steps": steps,
-                **(metadata or {})
-            }
+                **(metadata or {}),
+            },
         )
 
         # Start background task
-        asyncio.create_task(
-            self._run_long_task(operation_id, task_type, duration_seconds, steps)
-        )
+        asyncio.create_task(self._run_long_task(operation_id, task_type, duration_seconds, steps))
 
         logger.info(f"Started long task: {operation_id} ({task_type}, {duration_seconds}s)")
 
@@ -135,13 +140,12 @@ class ProgressTools(BaseTool):
                 "task_type": task_type,
                 "duration_seconds": duration_seconds,
                 "steps": steps,
-                "message": f"Task started. Poll get_task_progress('{operation_id}') to track progress."
-            }
+                "message": f"Task started. Poll get_task_progress('{operation_id}') to track progress.",
+            },
         )
 
     async def get_task_progress_impl(
-        self,
-        operation_id: Annotated[str, Field(description="Operation ID from start_long_task")]
+        self, operation_id: Annotated[str, Field(description="Operation ID from start_long_task")]
     ) -> Dict[str, Any]:
         """
         Get current progress of a long-running task
@@ -160,11 +164,8 @@ class ProgressTools(BaseTool):
             return self.create_response(
                 "error",
                 "get_task_progress",
-                {
-                    "error": "Operation not found",
-                    "operation_id": operation_id
-                },
-                error_code="NOT_FOUND"
+                {"error": "Operation not found", "operation_id": operation_id},
+                error_code="NOT_FOUND",
             )
 
         return self.create_response(
@@ -180,13 +181,12 @@ class ProgressTools(BaseTool):
                 "started_at": progress.started_at,
                 "updated_at": progress.updated_at,
                 "metadata": progress.metadata,
-                "error": progress.error
-            }
+                "error": progress.error,
+            },
         )
 
     async def get_task_result_impl(
-        self,
-        operation_id: Annotated[str, Field(description="Operation ID from start_long_task")]
+        self, operation_id: Annotated[str, Field(description="Operation ID from start_long_task")]
     ) -> Dict[str, Any]:
         """
         Get final result of a completed task
@@ -206,11 +206,8 @@ class ProgressTools(BaseTool):
             return self.create_response(
                 "error",
                 "get_task_result",
-                {
-                    "error": "Operation not found",
-                    "operation_id": operation_id
-                },
-                error_code="NOT_FOUND"
+                {"error": "Operation not found", "operation_id": operation_id},
+                error_code="NOT_FOUND",
             )
 
         if progress.status != "completed":
@@ -221,9 +218,9 @@ class ProgressTools(BaseTool):
                     "error": f"Task not completed yet. Current status: {progress.status}",
                     "operation_id": operation_id,
                     "progress": progress.progress,
-                    "message": progress.message
+                    "message": progress.message,
                 },
-                error_code="NOT_READY"
+                error_code="NOT_READY",
             )
 
         # Get result
@@ -234,22 +231,17 @@ class ProgressTools(BaseTool):
                 "error",
                 "get_task_result",
                 {"error": "Result not found", "operation_id": operation_id},
-                error_code="RESULT_NOT_FOUND"
+                error_code="RESULT_NOT_FOUND",
             )
 
         return self.create_response(
             "success",
             "get_task_result",
-            {
-                "operation_id": operation_id,
-                "result": result,
-                "completed_at": progress.completed_at
-            }
+            {"operation_id": operation_id, "result": result, "completed_at": progress.completed_at},
         )
 
     async def cancel_task_impl(
-        self,
-        operation_id: Annotated[str, Field(description="Operation ID to cancel")]
+        self, operation_id: Annotated[str, Field(description="Operation ID to cancel")]
     ) -> Dict[str, Any]:
         """
         Cancel a running task
@@ -268,27 +260,23 @@ class ProgressTools(BaseTool):
             return self.create_response(
                 "error",
                 "cancel_task",
-                {
-                    "error": "Operation not found",
-                    "operation_id": operation_id
-                },
-                error_code="NOT_FOUND"
+                {"error": "Operation not found", "operation_id": operation_id},
+                error_code="NOT_FOUND",
             )
 
         return self.create_response(
             "success",
             "cancel_task",
-            {
-                "operation_id": operation_id,
-                "status": progress.status,
-                "message": progress.message
-            }
+            {"operation_id": operation_id, "status": progress.status, "message": progress.message},
         )
 
     async def list_operations_impl(
         self,
-        status: Annotated[Optional[str], Field(description="Filter by status: running, completed, failed, cancelled")] = None,
-        limit: Annotated[int, Field(description="Maximum number of results", ge=1, le=100)] = 20
+        status: Annotated[
+            Optional[str],
+            Field(description="Filter by status: running, completed, failed, cancelled"),
+        ] = None,
+        limit: Annotated[int, Field(description="Maximum number of results", ge=1, le=100)] = 20,
     ) -> Dict[str, Any]:
         """
         List all tracked operations
@@ -313,15 +301,12 @@ class ProgressTools(BaseTool):
                     "list_operations",
                     {
                         "error": f"Invalid status: {status}",
-                        "valid_statuses": [s.value for s in OperationStatus]
+                        "valid_statuses": [s.value for s in OperationStatus],
                     },
-                    error_code="INVALID_STATUS"
+                    error_code="INVALID_STATUS",
                 )
 
-        operations = await self.progress_manager.list_operations(
-            status=status_enum,
-            limit=limit
-        )
+        operations = await self.progress_manager.list_operations(status=status_enum, limit=limit)
 
         return self.create_response(
             "success",
@@ -335,13 +320,13 @@ class ProgressTools(BaseTool):
                         "message": op.message,
                         "started_at": op.started_at,
                         "updated_at": op.updated_at,
-                        "metadata": op.metadata
+                        "metadata": op.metadata,
                     }
                     for op in operations
                 ],
                 "count": len(operations),
-                "filter_status": status
-            }
+                "filter_status": status,
+            },
         )
 
     # ========================================================================
@@ -349,11 +334,7 @@ class ProgressTools(BaseTool):
     # ========================================================================
 
     async def _run_long_task(
-        self,
-        operation_id: str,
-        task_type: str,
-        duration_seconds: int,
-        steps: int
+        self, operation_id: str, task_type: str, duration_seconds: int, steps: int
     ):
         """
         Background task that simulates long-running work with progress updates
@@ -385,7 +366,7 @@ class ProgressTools(BaseTool):
                     current=step,
                     total=steps,
                     message=message,
-                    metadata={"last_step_time": datetime.now().isoformat()}
+                    metadata={"last_step_time": datetime.now().isoformat()},
                 )
 
                 logger.debug(f"Task {operation_id}: {progress_pct:.1f}% - {message}")
@@ -400,13 +381,11 @@ class ProgressTools(BaseTool):
                 "steps_completed": steps,
                 "status": "success",
                 "completed_at": datetime.now().isoformat(),
-                "summary": f"Successfully completed {steps} steps of {task_type}"
+                "summary": f"Successfully completed {steps} steps of {task_type}",
             }
 
             await self.progress_manager.complete_operation(
-                operation_id,
-                result=result,
-                message=f"Completed {steps} steps successfully"
+                operation_id, result=result, message=f"Completed {steps} steps successfully"
             )
 
             logger.info(f"Task {operation_id} completed successfully")
@@ -414,15 +393,14 @@ class ProgressTools(BaseTool):
         except Exception as e:
             logger.error(f"Task {operation_id} failed: {e}", exc_info=True)
             await self.progress_manager.fail_operation(
-                operation_id,
-                error=str(e),
-                message="Task failed with error"
+                operation_id, error=str(e), message="Task failed with error"
             )
 
 
 # ============================================================================
 # Auto-discovery Registration
 # ============================================================================
+
 
 def register_progress_example_tools(mcp):
     """

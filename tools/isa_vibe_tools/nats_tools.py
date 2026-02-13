@@ -23,6 +23,7 @@ from tools.base_tool import BaseTool
 # Optional isa_common import
 try:
     from isa_common import AsyncNATSClient
+
     NATS_CLIENT_AVAILABLE = True
 except ImportError:
     NATS_CLIENT_AVAILABLE = False
@@ -37,13 +38,31 @@ NATS_PORT = int(os.getenv("NATS_PORT", "4222"))
 
 # Known isA Platform streams for fallback
 KNOWN_STREAMS = [
-    "billing-stream", "session-stream", "order-stream", "wallet-stream",
-    "user-stream", "device-stream", "payment-stream", "organization-stream",
-    "notification-stream", "storage-stream", "album-stream", "task-stream",
-    "memory-stream", "product-stream", "vault-stream", "event-stream",
-    "media-stream", "calendar-stream", "location-stream", "telemetry-stream",
-    "weather-stream", "invitation-stream", "authorization-stream",
-    "compliance-stream", "ota-stream"
+    "billing-stream",
+    "session-stream",
+    "order-stream",
+    "wallet-stream",
+    "user-stream",
+    "device-stream",
+    "payment-stream",
+    "organization-stream",
+    "notification-stream",
+    "storage-stream",
+    "album-stream",
+    "task-stream",
+    "memory-stream",
+    "product-stream",
+    "vault-stream",
+    "event-stream",
+    "media-stream",
+    "calendar-stream",
+    "location-stream",
+    "telemetry-stream",
+    "weather-stream",
+    "invitation-stream",
+    "authorization-stream",
+    "compliance-stream",
+    "ota-stream",
 ]
 
 
@@ -52,10 +71,7 @@ async def get_client() -> "AsyncNATSClient":
     if not NATS_CLIENT_AVAILABLE:
         raise ImportError("isa_common not installed. Install with: pip install isa_common")
     client = AsyncNATSClient(
-        host=NATS_HOST,
-        port=NATS_PORT,
-        user_id="mcp_agent",
-        organization_id="isa-platform"
+        host=NATS_HOST, port=NATS_PORT, user_id="mcp_agent", organization_id="isa-platform"
     )
     await client.__aenter__()
     return client
@@ -79,16 +95,13 @@ def register_nats_tools(mcp: FastMCP):
             return tools.create_response(
                 status="success",
                 action="nats_health_check",
-                data=health or {"error": "Health check failed"}
+                data=health or {"error": "Health check failed"},
             )
 
         except Exception as e:
             logger.error(f"Error in nats_health_check: {e}")
             return tools.create_response(
-                status="error",
-                action="nats_health_check",
-                data={},
-                error_message=str(e)
+                status="error", action="nats_health_check", data={}, error_message=str(e)
             )
         finally:
             if client:
@@ -110,10 +123,7 @@ def register_nats_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="nats_list_streams",
-                    data={
-                        "streams": result or [],
-                        "count": len(result) if result else 0
-                    }
+                    data={"streams": result or [], "count": len(result) if result else 0},
                 )
             except AttributeError:
                 # Fallback: return known stream names
@@ -123,17 +133,14 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "streams": KNOWN_STREAMS,
                         "count": len(KNOWN_STREAMS),
-                        "note": "List based on known isA Platform streams (client.list_streams not available)"
-                    }
+                        "note": "List based on known isA Platform streams (client.list_streams not available)",
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Error in nats_list_streams: {e}")
             return tools.create_response(
-                status="error",
-                action="nats_list_streams",
-                data={},
-                error_message=str(e)
+                status="error", action="nats_list_streams", data={}, error_message=str(e)
             )
         finally:
             if client:
@@ -158,7 +165,7 @@ def register_nats_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="nats_get_stream_info",
-                    data=result or {"error": "Stream not found"}
+                    data=result or {"error": "Stream not found"},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -167,8 +174,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream_name": stream_name,
                         "note": "get_stream_info not available in client",
-                        "hint": "Use NATS CLI: nats stream info " + stream_name
-                    }
+                        "hint": "Use NATS CLI: nats stream info " + stream_name,
+                    },
                 )
 
         except Exception as e:
@@ -177,7 +184,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_get_stream_info",
                 data={"stream_name": stream_name},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -205,8 +212,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream": stream_name,
                         "consumers": result or [],
-                        "count": len(result) if result else 0
-                    }
+                        "count": len(result) if result else 0,
+                    },
                 )
             except AttributeError:
                 return tools.create_response(
@@ -215,8 +222,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream": stream_name,
                         "note": "list_consumers not available in client",
-                        "hint": "Use NATS CLI: nats consumer ls " + stream_name
-                    }
+                        "hint": "Use NATS CLI: nats consumer ls " + stream_name,
+                    },
                 )
 
         except Exception as e:
@@ -225,7 +232,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_list_consumers",
                 data={"stream_name": stream_name},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -251,7 +258,7 @@ def register_nats_tools(mcp: FastMCP):
                 return tools.create_response(
                     status="success",
                     action="nats_get_consumer_info",
-                    data=result or {"error": "Consumer not found"}
+                    data=result or {"error": "Consumer not found"},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -261,8 +268,8 @@ def register_nats_tools(mcp: FastMCP):
                         "stream": stream_name,
                         "consumer": consumer_name,
                         "note": "get_consumer_info not available in client",
-                        "hint": f"Use NATS CLI: nats consumer info {stream_name} {consumer_name}"
-                    }
+                        "hint": f"Use NATS CLI: nats consumer info {stream_name} {consumer_name}",
+                    },
                 )
 
         except Exception as e:
@@ -271,7 +278,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_get_consumer_info",
                 data={"stream_name": stream_name, "consumer_name": consumer_name},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -279,9 +286,7 @@ def register_nats_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def nats_peek_messages(
-        stream_name: str,
-        count: int = 5,
-        start_sequence: Optional[int] = None
+        stream_name: str, count: int = 5, start_sequence: Optional[int] = None
     ) -> dict:
         """Peek at recent messages in a stream (read-only, does not consume)
 
@@ -307,23 +312,21 @@ def register_nats_tools(mcp: FastMCP):
                             data = msg.get("data", b"")
                             if isinstance(data, bytes):
                                 data = json.loads(data.decode())
-                            messages.append({
-                                "sequence": msg.get("sequence"),
-                                "subject": msg.get("subject"),
-                                "data": data,
-                                "timestamp": msg.get("timestamp")
-                            })
+                            messages.append(
+                                {
+                                    "sequence": msg.get("sequence"),
+                                    "subject": msg.get("subject"),
+                                    "data": data,
+                                    "timestamp": msg.get("timestamp"),
+                                }
+                            )
                         except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
                             messages.append(msg)
 
                 return tools.create_response(
                     status="success",
                     action="nats_peek_messages",
-                    data={
-                        "stream": stream_name,
-                        "messages": messages,
-                        "count": len(messages)
-                    }
+                    data={"stream": stream_name, "messages": messages, "count": len(messages)},
                 )
             except AttributeError:
                 return tools.create_response(
@@ -332,8 +335,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream": stream_name,
                         "note": "peek_messages not available in client",
-                        "hint": f"Use NATS CLI: nats stream get {stream_name} --last={count}"
-                    }
+                        "hint": f"Use NATS CLI: nats stream get {stream_name} --last={count}",
+                    },
                 )
 
         except Exception as e:
@@ -342,7 +345,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_peek_messages",
                 data={"stream_name": stream_name},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -370,8 +373,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream": stream_name,
                         "subjects": result or [],
-                        "count": len(result) if result else 0
-                    }
+                        "count": len(result) if result else 0,
+                    },
                 )
             except AttributeError:
                 # Return known subjects based on stream name
@@ -382,8 +385,8 @@ def register_nats_tools(mcp: FastMCP):
                     data={
                         "stream": stream_name,
                         "subjects_pattern": f"{prefix}.>",
-                        "note": "get_stream_subjects not available, showing pattern"
-                    }
+                        "note": "get_stream_subjects not available, showing pattern",
+                    },
                 )
 
         except Exception as e:
@@ -392,7 +395,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_get_subjects",
                 data={"stream_name": stream_name},
-                error_message=str(e)
+                error_message=str(e),
             )
         finally:
             if client:
@@ -409,7 +412,7 @@ def register_nats_tools(mcp: FastMCP):
             Dict with stream info and hints for checking subscriptions
         """
         try:
-            prefix = event_pattern.split('.')[0]
+            prefix = event_pattern.split(".")[0]
             stream_name = f"{prefix}-stream"
 
             return tools.create_response(
@@ -419,8 +422,8 @@ def register_nats_tools(mcp: FastMCP):
                     "event_pattern": event_pattern,
                     "stream": stream_name,
                     "note": "To verify active subscriptions, check the consumer list",
-                    "hint": f"Use: nats_list_consumers('{stream_name}')"
-                }
+                    "hint": f"Use: nats_list_consumers('{stream_name}')",
+                },
             )
 
         except Exception as e:
@@ -429,7 +432,7 @@ def register_nats_tools(mcp: FastMCP):
                 status="error",
                 action="nats_check_subscription",
                 data={"event_pattern": event_pattern},
-                error_message=str(e)
+                error_message=str(e),
             )
 
     logger.debug("Registered 8 NATS tools")

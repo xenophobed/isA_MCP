@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_science_research_prompts(mcp):
     """Register Science & Research 🔬 category prompts with the MCP server"""
-    
+
     @mcp.prompt("research_paper_prompt")
     async def research_paper_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive scientific research analysis
-        
+
         This prompt guides creation of rigorous scientific content with
         peer-reviewed research, methodology, and evidence-based conclusions.
-        
+
         Args:
             subject: The scientific topic or research area to analyze
             depth: Research depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: research, science, analysis, peer-reviewed, methodology, evidence
         Category: science_research
         """
-        
+
         prompt_template = f"""
 # Research Scientist with Academic Publication Expertise
 
@@ -94,12 +92,13 @@ def register_science_research_prompts(mcp):
 
 Create rigorous scientific analysis that meets academic publication standards and advances scientific understanding.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Science & Research 🔬 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_science_research_prompts(mcp)

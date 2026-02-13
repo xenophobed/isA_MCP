@@ -6,10 +6,10 @@ Layer 5: LLM Quality Tests
 - Uses real AI models
 - Evaluates semantic relevance, coherence, accuracy
 """
+
 import pytest
 import os
 from typing import Any
-
 
 # ═══════════════════════════════════════════════════════════════
 # DeepEval Configuration
@@ -40,9 +40,7 @@ except ImportError:
 
 def pytest_configure(config):
     """Configure pytest for DeepEval tests."""
-    config.addinivalue_line(
-        "markers", "eval: mark test as DeepEval LLM quality test"
-    )
+    config.addinivalue_line("markers", "eval: mark test as DeepEval LLM quality test")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -55,6 +53,7 @@ def check_deepeval():
 # ═══════════════════════════════════════════════════════════════
 # Metric Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def relevancy_metric():
@@ -97,7 +96,7 @@ def coherence_metric():
         name="Coherence",
         criteria="Is the output coherent and well-structured?",
         evaluation_params=["coherence", "fluency"],
-        threshold=0.7
+        threshold=0.7,
     )
 
 
@@ -110,13 +109,14 @@ def grammar_metric():
         name="Grammar",
         criteria="Is the output grammatically correct?",
         evaluation_params=["grammar", "spelling"],
-        threshold=0.8
+        threshold=0.8,
     )
 
 
 # ═══════════════════════════════════════════════════════════════
 # Test Case Builders
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def create_test_case():
@@ -129,15 +129,16 @@ def create_test_case():
         actual_output: str,
         expected_output: str = None,
         context: list = None,
-        retrieval_context: list = None
+        retrieval_context: list = None,
     ) -> LLMTestCase:
         return LLMTestCase(
             input=input,
             actual_output=actual_output,
             expected_output=expected_output,
             context=context or [],
-            retrieval_context=retrieval_context or []
+            retrieval_context=retrieval_context or [],
         )
+
     return _create
 
 
@@ -145,11 +146,13 @@ def create_test_case():
 # Intelligence Service Fixtures (Real for Eval)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 async def text_generator_tool():
     """Provide real text generator tool for evaluation."""
     try:
         from tools.intelligent_tools.language.text_generator import TextGenerator
+
         return TextGenerator()
     except ImportError:
         pytest.skip("Text generator not available")
@@ -160,6 +163,7 @@ async def summarizer_tool():
     """Provide real summarizer tool for evaluation."""
     try:
         from tools.intelligent_tools.language.text_summarizer import TextSummarizer
+
         return TextSummarizer()
     except ImportError:
         pytest.skip("Summarizer not available")
@@ -170,6 +174,7 @@ async def embedding_generator():
     """Provide real embedding generator for evaluation."""
     try:
         from tools.intelligent_tools.language.embedding_generator import EmbeddingGenerator
+
         return EmbeddingGenerator()
     except ImportError:
         pytest.skip("Embedding generator not available")
@@ -180,6 +185,7 @@ async def vision_analyzer():
     """Provide real vision analyzer for evaluation."""
     try:
         from tools.intelligent_tools.vision.image_analyzer import ImageAnalyzer
+
         return ImageAnalyzer()
     except ImportError:
         pytest.skip("Vision analyzer not available")
@@ -190,6 +196,7 @@ async def audio_analyzer():
     """Provide real audio analyzer for evaluation."""
     try:
         from tools.intelligent_tools.audio.audio_analyzer import AudioAnalyzer
+
         return AudioAnalyzer()
     except ImportError:
         pytest.skip("Audio analyzer not available")
@@ -214,6 +221,7 @@ async def search_service():
 # Benchmark Data Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def text_generation_benchmark():
     """Provide text generation benchmark data."""
@@ -222,20 +230,20 @@ def text_generation_benchmark():
             "prompt": "Write a professional email requesting a meeting",
             "expected_elements": ["greeting", "purpose", "availability", "closing"],
             "min_length": 50,
-            "max_length": 500
+            "max_length": 500,
         },
         {
             "prompt": "Explain quantum computing in simple terms",
             "expected_elements": ["qubits", "superposition", "practical"],
             "min_length": 100,
-            "max_length": 1000
+            "max_length": 1000,
         },
         {
             "prompt": "Generate a product description for wireless headphones",
             "expected_elements": ["features", "benefits", "call-to-action"],
             "min_length": 50,
-            "max_length": 300
-        }
+            "max_length": 300,
+        },
     ]
 
 
@@ -253,7 +261,7 @@ def summarization_benchmark():
             advances, challenges remain around ethics, bias, and job displacement.
             """,
             "max_summary_length": 100,
-            "required_topics": ["industries", "applications", "challenges"]
+            "required_topics": ["industries", "applications", "challenges"],
         }
     ]
 
@@ -265,18 +273,18 @@ def tool_search_benchmark():
         {
             "query": "I need to analyze an image and extract text",
             "expected_tools": ["vision_analyzer", "ocr_extractor", "image_processor"],
-            "min_relevance_score": 0.7
+            "min_relevance_score": 0.7,
         },
         {
             "query": "Generate embeddings for semantic search",
             "expected_tools": ["embedding_generator", "vector_store"],
-            "min_relevance_score": 0.7
+            "min_relevance_score": 0.7,
         },
         {
             "query": "Create calendar events and reminders",
             "expected_tools": ["calendar_tools", "event_tools"],
-            "min_relevance_score": 0.7
-        }
+            "min_relevance_score": 0.7,
+        },
     ]
 
 
@@ -286,7 +294,7 @@ def vision_analysis_samples(test_data_path):
     samples_dir = test_data_path / "documents"
     return {
         "document": samples_dir / "test_document.pdf" if samples_dir.exists() else None,
-        "image": samples_dir / "test_image.jpg" if samples_dir.exists() else None
+        "image": samples_dir / "test_image.jpg" if samples_dir.exists() else None,
     }
 
 
@@ -294,6 +302,7 @@ def vision_analysis_samples(test_data_path):
 def test_data_path():
     """Provide path to test data directory."""
     from pathlib import Path
+
     return Path(__file__).parent.parent / "test_data"
 
 
@@ -301,17 +310,14 @@ def test_data_path():
 # Evaluation Helpers
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def evaluate_with_metrics():
     """Provide evaluation helper function."""
     if not DEEPEVAL_AVAILABLE:
         pytest.skip("DeepEval not available")
 
-    async def _evaluate(
-        test_case: LLMTestCase,
-        metrics: list,
-        min_scores: dict = None
-    ) -> dict:
+    async def _evaluate(test_case: LLMTestCase, metrics: list, min_scores: dict = None) -> dict:
         """
         Evaluate a test case with multiple metrics.
 
@@ -331,16 +337,14 @@ def evaluate_with_metrics():
                 result = metric.measure(test_case)
                 results[metric.__class__.__name__] = {
                     "score": result.score,
-                    "passed": result.score >= min_scores.get(
-                        metric.__class__.__name__, 0.0
-                    ),
-                    "reason": getattr(result, "reason", None)
+                    "passed": result.score >= min_scores.get(metric.__class__.__name__, 0.0),
+                    "reason": getattr(result, "reason", None),
                 }
             except Exception as e:
                 results[metric.__class__.__name__] = {
                     "score": 0.0,
                     "passed": False,
-                    "error": str(e)
+                    "error": str(e),
                 }
 
         return results
@@ -351,6 +355,7 @@ def evaluate_with_metrics():
 @pytest.fixture
 def calculate_precision_recall():
     """Provide precision/recall calculation helper."""
+
     def _calculate(predictions: list, ground_truth: list) -> dict:
         """
         Calculate precision and recall.
@@ -371,16 +376,15 @@ def calculate_precision_recall():
 
         precision = (
             true_positives / (true_positives + false_positives)
-            if (true_positives + false_positives) > 0 else 0.0
+            if (true_positives + false_positives) > 0
+            else 0.0
         )
         recall = (
             true_positives / (true_positives + false_negatives)
-            if (true_positives + false_negatives) > 0 else 0.0
+            if (true_positives + false_negatives) > 0
+            else 0.0
         )
-        f1 = (
-            2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0 else 0.0
-        )
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
         return {
             "precision": precision,
@@ -388,7 +392,7 @@ def calculate_precision_recall():
             "f1": f1,
             "true_positives": true_positives,
             "false_positives": false_positives,
-            "false_negatives": false_negatives
+            "false_negatives": false_negatives,
         }
 
     return _calculate

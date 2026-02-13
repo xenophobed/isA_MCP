@@ -6,6 +6,7 @@ Layer 1: API Contract Tests (E2E)
 - Runs against real MCP server
 - No mocks (integration with real services)
 """
+
 import pytest
 from typing import AsyncGenerator
 import os
@@ -50,18 +51,21 @@ class MCPProtocolHelper:
             "jsonrpc": "2.0",
             "id": self.request_id,
             "method": method,
-            "params": params or {}
+            "params": params or {},
         }
         response = await self.client.post("/", json=payload)
         return response.json()
 
     async def initialize(self) -> dict:
         """Initialize MCP connection."""
-        return await self.send_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "test_client", "version": "1.0.0"}
-        })
+        return await self.send_request(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test_client", "version": "1.0.0"},
+            },
+        )
 
     async def list_tools(self) -> dict:
         """List available tools."""
@@ -69,10 +73,7 @@ class MCPProtocolHelper:
 
     async def call_tool(self, name: str, arguments: dict) -> dict:
         """Call a tool."""
-        return await self.send_request("tools/call", {
-            "name": name,
-            "arguments": arguments
-        })
+        return await self.send_request("tools/call", {"name": name, "arguments": arguments})
 
     async def list_prompts(self) -> dict:
         """List available prompts."""
@@ -80,10 +81,7 @@ class MCPProtocolHelper:
 
     async def get_prompt(self, name: str, arguments: dict = None) -> dict:
         """Get a prompt."""
-        return await self.send_request("prompts/get", {
-            "name": name,
-            "arguments": arguments or {}
-        })
+        return await self.send_request("prompts/get", {"name": name, "arguments": arguments or {}})
 
     async def list_resources(self) -> dict:
         """List available resources."""
@@ -91,9 +89,7 @@ class MCPProtocolHelper:
 
     async def read_resource(self, uri: str) -> dict:
         """Read a resource."""
-        return await self.send_request("resources/read", {
-            "uri": uri
-        })
+        return await self.send_request("resources/read", {"uri": uri})
 
 
 @pytest.fixture
@@ -118,8 +114,8 @@ TOOL_SCHEMA = {
     "properties": {
         "name": {"type": "string"},
         "description": {"type": "string"},
-        "inputSchema": {"type": "object"}
-    }
+        "inputSchema": {"type": "object"},
+    },
 }
 
 PROMPT_SCHEMA = {
@@ -128,8 +124,8 @@ PROMPT_SCHEMA = {
     "properties": {
         "name": {"type": "string"},
         "description": {"type": "string"},
-        "arguments": {"type": "array"}
-    }
+        "arguments": {"type": "array"},
+    },
 }
 
 RESOURCE_SCHEMA = {
@@ -139,8 +135,8 @@ RESOURCE_SCHEMA = {
         "uri": {"type": "string"},
         "name": {"type": "string"},
         "description": {"type": "string"},
-        "mimeType": {"type": "string"}
-    }
+        "mimeType": {"type": "string"},
+    },
 }
 
 ERROR_SCHEMA = {
@@ -149,8 +145,8 @@ ERROR_SCHEMA = {
     "properties": {
         "code": {"type": "integer"},
         "message": {"type": "string"},
-        "data": {"type": "object"}
-    }
+        "data": {"type": "object"},
+    },
 }
 
 
@@ -161,5 +157,5 @@ def expected_schemas():
         "tool": TOOL_SCHEMA,
         "prompt": PROMPT_SCHEMA,
         "resource": RESOURCE_SCHEMA,
-        "error": ERROR_SCHEMA
+        "error": ERROR_SCHEMA,
     }

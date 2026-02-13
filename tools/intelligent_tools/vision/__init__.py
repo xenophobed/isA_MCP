@@ -10,9 +10,4 @@ from .image_analyzer import ImageAnalyzer, analyze
 from .ui_detector import UIDetector
 from .ocr_extractor import OCRExtractor
 
-__all__ = [
-    "ImageAnalyzer", 
-    "UIDetector",
-    "OCRExtractor",
-    "analyze"
-]
+__all__ = ["ImageAnalyzer", "UIDetector", "OCRExtractor", "analyze"]

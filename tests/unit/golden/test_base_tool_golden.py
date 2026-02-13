@@ -9,6 +9,7 @@ Changes here affect every tool implementation.
 
 Service Under Test: tools/base_tool.py
 """
+
 import pytest
 from datetime import datetime
 from decimal import Decimal
@@ -29,6 +30,7 @@ class TestBaseToolResponseCreationGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_success_response_structure(self, base_tool):
@@ -36,9 +38,7 @@ class TestBaseToolResponseCreationGolden:
         CURRENT BEHAVIOR: Success response has specific structure.
         """
         response = base_tool.create_response(
-            status="success",
-            action="test_action",
-            data={"result": "ok"}
+            status="success", action="test_action", data={"result": "ok"}
         )
 
         assert response["status"] == "success"
@@ -50,11 +50,7 @@ class TestBaseToolResponseCreationGolden:
         """
         CURRENT BEHAVIOR: Success response has exactly these keys.
         """
-        response = base_tool.create_response(
-            status="success",
-            action="test",
-            data={}
-        )
+        response = base_tool.create_response(status="success", action="test", data={})
 
         expected_keys = {"status", "action", "data", "timestamp"}
         assert set(response.keys()) == expected_keys
@@ -67,7 +63,7 @@ class TestBaseToolResponseCreationGolden:
             status="error",
             action="test_action",
             data={"context": "info"},
-            error_message="Something went wrong"
+            error_message="Something went wrong",
         )
 
         assert response["status"] == "error"
@@ -85,7 +81,7 @@ class TestBaseToolResponseCreationGolden:
             action="test_action",
             data={},
             error_message="Not found",
-            error_code="NOT_FOUND"
+            error_code="NOT_FOUND",
         )
 
         assert response["error_code"] == "NOT_FOUND"
@@ -94,11 +90,7 @@ class TestBaseToolResponseCreationGolden:
         """
         CURRENT BEHAVIOR: Error without message defaults to "Unknown error".
         """
-        response = base_tool.create_response(
-            status="error",
-            action="test",
-            data={}
-        )
+        response = base_tool.create_response(status="error", action="test", data={})
 
         assert response["error"] == "Unknown error"
 
@@ -106,11 +98,7 @@ class TestBaseToolResponseCreationGolden:
         """
         CURRENT BEHAVIOR: Timestamp is ISO 8601 format.
         """
-        response = base_tool.create_response(
-            status="success",
-            action="test",
-            data={}
-        )
+        response = base_tool.create_response(status="success", action="test", data={})
 
         # Should be parseable as datetime
         timestamp = response["timestamp"]
@@ -132,6 +120,7 @@ class TestBaseToolHILAuthorizationGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_authorization_response_structure(self, base_tool):
@@ -139,9 +128,7 @@ class TestBaseToolHILAuthorizationGolden:
         CURRENT BEHAVIOR: Authorization request has specific structure.
         """
         response = base_tool.request_authorization(
-            action="Delete database",
-            reason="Remove deprecated data",
-            risk_level="high"
+            action="Delete database", reason="Remove deprecated data", risk_level="high"
         )
 
         assert response["status"] == "authorization_requested"
@@ -157,10 +144,7 @@ class TestBaseToolHILAuthorizationGolden:
         """
         CURRENT BEHAVIOR: Authorization has approve/reject options.
         """
-        response = base_tool.request_authorization(
-            action="Test action",
-            reason="Test reason"
-        )
+        response = base_tool.request_authorization(action="Test action", reason="Test reason")
 
         assert response["options"] == ["approve", "reject"]
 
@@ -169,9 +153,7 @@ class TestBaseToolHILAuthorizationGolden:
         CURRENT BEHAVIOR: Risk level is included in context.
         """
         response = base_tool.request_authorization(
-            action="Test",
-            reason="Test",
-            risk_level="critical"
+            action="Test", reason="Test", risk_level="critical"
         )
 
         assert response["context"]["risk_level"] == "critical"
@@ -181,9 +163,7 @@ class TestBaseToolHILAuthorizationGolden:
         CURRENT BEHAVIOR: Data field contains authorization details.
         """
         response = base_tool.request_authorization(
-            action="Delete files",
-            reason="Cleanup",
-            risk_level="high"
+            action="Delete files", reason="Cleanup", risk_level="high"
         )
 
         data = response["data"]
@@ -196,10 +176,7 @@ class TestBaseToolHILAuthorizationGolden:
         """
         CURRENT BEHAVIOR: Default risk level is "high".
         """
-        response = base_tool.request_authorization(
-            action="Test",
-            reason="Test"
-        )
+        response = base_tool.request_authorization(action="Test", reason="Test")
 
         assert response["data"]["risk_level"] == "high"
 
@@ -207,10 +184,7 @@ class TestBaseToolHILAuthorizationGolden:
         """
         CURRENT BEHAVIOR: Default timeout is 300 seconds (5 minutes).
         """
-        response = base_tool.request_authorization(
-            action="Test",
-            reason="Test"
-        )
+        response = base_tool.request_authorization(action="Test", reason="Test")
 
         assert response["timeout"] == 300
 
@@ -229,6 +203,7 @@ class TestBaseToolHILInputGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_input_response_structure(self, base_tool):
@@ -236,9 +211,7 @@ class TestBaseToolHILInputGolden:
         CURRENT BEHAVIOR: Input request has specific structure.
         """
         response = base_tool.request_input(
-            input_type="text",
-            prompt="Enter API key",
-            description="Provide your API key"
+            input_type="text", prompt="Enter API key", description="Provide your API key"
         )
 
         assert response["status"] == "human_input_requested"
@@ -249,11 +222,7 @@ class TestBaseToolHILInputGolden:
         """
         CURRENT BEHAVIOR: Input has submit/skip/cancel options.
         """
-        response = base_tool.request_input(
-            input_type="text",
-            prompt="Test",
-            description="Test"
-        )
+        response = base_tool.request_input(input_type="text", prompt="Test", description="Test")
 
         assert response["options"] == ["submit", "skip", "cancel"]
 
@@ -265,7 +234,7 @@ class TestBaseToolHILInputGolden:
             input_type="credentials",
             prompt="Enter password",
             description="Provide database password",
-            schema={"type": "string", "minLength": 8}
+            schema={"type": "string", "minLength": 8},
         )
 
         data = response["data"]
@@ -282,7 +251,7 @@ class TestBaseToolHILInputGolden:
             input_type="selection",
             prompt="Choose env",
             description="Select environment",
-            suggestions=["dev", "staging", "prod"]
+            suggestions=["dev", "staging", "prod"],
         )
 
         assert response["data"]["suggestions"] == ["dev", "staging", "prod"]
@@ -297,7 +266,7 @@ class TestBaseToolHILInputGolden:
             input_type="augmentation",
             prompt="Add more",
             description="Augment data",
-            current_data=current
+            current_data=current,
         )
 
         assert response["data"]["current_data"] == current
@@ -318,6 +287,7 @@ class TestBaseToolHILReviewGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_review_response_structure(self, base_tool):
@@ -327,7 +297,7 @@ class TestBaseToolHILReviewGolden:
         response = base_tool.request_review(
             content={"plan": ["step1", "step2"]},
             content_type="execution_plan",
-            instructions="Review this plan"
+            instructions="Review this plan",
         )
 
         assert response["status"] == "human_input_requested"
@@ -339,10 +309,7 @@ class TestBaseToolHILReviewGolden:
         CURRENT BEHAVIOR: Editable review has approve/edit/reject options.
         """
         response = base_tool.request_review(
-            content="code here",
-            content_type="code",
-            instructions="Review",
-            editable=True
+            content="code here", content_type="code", instructions="Review", editable=True
         )
 
         assert response["options"] == ["approve", "edit", "reject"]
@@ -352,10 +319,7 @@ class TestBaseToolHILReviewGolden:
         CURRENT BEHAVIOR: Read-only review has approve/reject options only.
         """
         response = base_tool.request_review(
-            content="config",
-            content_type="config",
-            instructions="Review",
-            editable=False
+            content="config", content_type="config", instructions="Review", editable=False
         )
 
         assert response["options"] == ["approve", "reject"]
@@ -366,9 +330,7 @@ class TestBaseToolHILReviewGolden:
         """
         content = {"steps": [1, 2, 3]}
         response = base_tool.request_review(
-            content=content,
-            content_type="plan",
-            instructions="Check this"
+            content=content, content_type="plan", instructions="Check this"
         )
 
         data = response["data"]
@@ -382,9 +344,7 @@ class TestBaseToolHILReviewGolden:
         CURRENT BEHAVIOR: Default timeout is 600 seconds (10 minutes).
         """
         response = base_tool.request_review(
-            content="test",
-            content_type="code",
-            instructions="Review"
+            content="test", content_type="code", instructions="Review"
         )
 
         assert response["timeout"] == 600
@@ -404,6 +364,7 @@ class TestBaseToolContextExtractionGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_extract_none_context(self, base_tool):
@@ -452,6 +413,7 @@ class TestBaseToolProgressTrackingGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_create_progress_operation_method_exists(self, base_tool):
@@ -459,7 +421,8 @@ class TestBaseToolProgressTrackingGolden:
         CURRENT BEHAVIOR: Has create_progress_operation method.
         """
         import inspect
-        assert hasattr(base_tool, 'create_progress_operation')
+
+        assert hasattr(base_tool, "create_progress_operation")
         assert inspect.iscoroutinefunction(base_tool.create_progress_operation)
 
     def test_update_progress_operation_method_exists(self, base_tool):
@@ -467,7 +430,8 @@ class TestBaseToolProgressTrackingGolden:
         CURRENT BEHAVIOR: Has update_progress_operation method.
         """
         import inspect
-        assert hasattr(base_tool, 'update_progress_operation')
+
+        assert hasattr(base_tool, "update_progress_operation")
         assert inspect.iscoroutinefunction(base_tool.update_progress_operation)
 
     def test_complete_progress_operation_method_exists(self, base_tool):
@@ -475,7 +439,8 @@ class TestBaseToolProgressTrackingGolden:
         CURRENT BEHAVIOR: Has complete_progress_operation method.
         """
         import inspect
-        assert hasattr(base_tool, 'complete_progress_operation')
+
+        assert hasattr(base_tool, "complete_progress_operation")
         assert inspect.iscoroutinefunction(base_tool.complete_progress_operation)
 
     def test_fail_progress_operation_method_exists(self, base_tool):
@@ -483,7 +448,8 @@ class TestBaseToolProgressTrackingGolden:
         CURRENT BEHAVIOR: Has fail_progress_operation method.
         """
         import inspect
-        assert hasattr(base_tool, 'fail_progress_operation')
+
+        assert hasattr(base_tool, "fail_progress_operation")
         assert inspect.iscoroutinefunction(base_tool.fail_progress_operation)
 
     def test_report_progress_method_exists(self, base_tool):
@@ -491,7 +457,8 @@ class TestBaseToolProgressTrackingGolden:
         CURRENT BEHAVIOR: Has backward-compatible report_progress method.
         """
         import inspect
-        assert hasattr(base_tool, 'report_progress')
+
+        assert hasattr(base_tool, "report_progress")
         assert inspect.iscoroutinefunction(base_tool.report_progress)
 
 
@@ -507,6 +474,7 @@ class TestBaseToolLoggingMethodsGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_log_info_method_exists(self, base_tool):
@@ -514,7 +482,8 @@ class TestBaseToolLoggingMethodsGolden:
         CURRENT BEHAVIOR: Has log_info method.
         """
         import inspect
-        assert hasattr(base_tool, 'log_info')
+
+        assert hasattr(base_tool, "log_info")
         assert inspect.iscoroutinefunction(base_tool.log_info)
 
     def test_log_debug_method_exists(self, base_tool):
@@ -522,7 +491,8 @@ class TestBaseToolLoggingMethodsGolden:
         CURRENT BEHAVIOR: Has log_debug method.
         """
         import inspect
-        assert hasattr(base_tool, 'log_debug')
+
+        assert hasattr(base_tool, "log_debug")
         assert inspect.iscoroutinefunction(base_tool.log_debug)
 
     def test_log_warning_method_exists(self, base_tool):
@@ -530,7 +500,8 @@ class TestBaseToolLoggingMethodsGolden:
         CURRENT BEHAVIOR: Has log_warning method.
         """
         import inspect
-        assert hasattr(base_tool, 'log_warning')
+
+        assert hasattr(base_tool, "log_warning")
         assert inspect.iscoroutinefunction(base_tool.log_warning)
 
     def test_log_error_method_exists(self, base_tool):
@@ -538,7 +509,8 @@ class TestBaseToolLoggingMethodsGolden:
         CURRENT BEHAVIOR: Has log_error method.
         """
         import inspect
-        assert hasattr(base_tool, 'log_error')
+
+        assert hasattr(base_tool, "log_error")
         assert inspect.iscoroutinefunction(base_tool.log_error)
 
 
@@ -555,6 +527,7 @@ class TestBaseToolInitializationGolden:
         CURRENT BEHAVIOR: ISA client is None initially (lazy loading).
         """
         from tools.base_tool import BaseTool
+
         tool = BaseTool()
 
         assert tool._isa_client is None
@@ -564,6 +537,7 @@ class TestBaseToolInitializationGolden:
         CURRENT BEHAVIOR: registered_tools starts as empty list.
         """
         from tools.base_tool import BaseTool
+
         tool = BaseTool()
 
         assert tool.registered_tools == []
@@ -573,6 +547,7 @@ class TestBaseToolInitializationGolden:
         CURRENT BEHAVIOR: Rate limiters dict starts empty.
         """
         from tools.base_tool import BaseTool
+
         tool = BaseTool()
 
         assert tool._rate_limiters == {}
@@ -582,6 +557,7 @@ class TestBaseToolInitializationGolden:
         CURRENT BEHAVIOR: Active operations dict starts empty.
         """
         from tools.base_tool import BaseTool
+
         tool = BaseTool()
 
         assert tool._active_operations == {}
@@ -599,20 +575,21 @@ class TestBaseToolRegistrationGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_register_tool_method_exists(self, base_tool):
         """
         CURRENT BEHAVIOR: Has register_tool method.
         """
-        assert hasattr(base_tool, 'register_tool')
+        assert hasattr(base_tool, "register_tool")
         assert callable(base_tool.register_tool)
 
     def test_register_all_tools_method_exists(self, base_tool):
         """
         CURRENT BEHAVIOR: Has register_all_tools template method.
         """
-        assert hasattr(base_tool, 'register_all_tools')
+        assert hasattr(base_tool, "register_all_tools")
         assert callable(base_tool.register_all_tools)
 
     def test_register_tool_signature(self, base_tool):
@@ -620,15 +597,16 @@ class TestBaseToolRegistrationGolden:
         CURRENT BEHAVIOR: register_tool accepts specific parameters.
         """
         import inspect
+
         sig = inspect.signature(base_tool.register_tool)
         params = list(sig.parameters.keys())
 
-        assert 'mcp' in params
-        assert 'func' in params
-        assert 'security_level' in params
-        assert 'timeout' in params
-        assert 'rate_limit_calls' in params
-        assert 'rate_limit_period' in params
+        assert "mcp" in params
+        assert "func" in params
+        assert "security_level" in params
+        assert "timeout" in params
+        assert "rate_limit_calls" in params
+        assert "rate_limit_period" in params
 
 
 @pytest.mark.golden
@@ -672,7 +650,7 @@ class TestJsonSerializerGolden:
 
         # Create mock with Context class name
         mock_ctx = MagicMock()
-        mock_ctx.__class__.__name__ = 'Context'
+        mock_ctx.__class__.__name__ = "Context"
 
         result = json_serializer(mock_ctx)
 
@@ -707,6 +685,7 @@ class TestBaseToolISAClientGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_get_isa_client_method_exists(self, base_tool):
@@ -714,7 +693,8 @@ class TestBaseToolISAClientGolden:
         CURRENT BEHAVIOR: Has async get_isa_client method.
         """
         import inspect
-        assert hasattr(base_tool, 'get_isa_client')
+
+        assert hasattr(base_tool, "get_isa_client")
         assert inspect.iscoroutinefunction(base_tool.get_isa_client)
 
     def test_call_isa_with_events_method_exists(self, base_tool):
@@ -722,7 +702,8 @@ class TestBaseToolISAClientGolden:
         CURRENT BEHAVIOR: Has async call_isa_with_events method.
         """
         import inspect
-        assert hasattr(base_tool, 'call_isa_with_events')
+
+        assert hasattr(base_tool, "call_isa_with_events")
         assert inspect.iscoroutinefunction(base_tool.call_isa_with_events)
 
     def test_invoke_isa_model_method_exists(self, base_tool):
@@ -730,7 +711,8 @@ class TestBaseToolISAClientGolden:
         CURRENT BEHAVIOR: Has async _invoke_isa_model adapter method.
         """
         import inspect
-        assert hasattr(base_tool, '_invoke_isa_model')
+
+        assert hasattr(base_tool, "_invoke_isa_model")
         assert inspect.iscoroutinefunction(base_tool._invoke_isa_model)
 
 
@@ -746,6 +728,7 @@ class TestBaseToolTimeoutAndCancellationGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_with_timeout_method_exists(self, base_tool):
@@ -753,7 +736,8 @@ class TestBaseToolTimeoutAndCancellationGolden:
         CURRENT BEHAVIOR: Has async with_timeout method.
         """
         import inspect
-        assert hasattr(base_tool, 'with_timeout')
+
+        assert hasattr(base_tool, "with_timeout")
         assert inspect.iscoroutinefunction(base_tool.with_timeout)
 
     def test_track_operation_method_exists(self, base_tool):
@@ -761,24 +745,27 @@ class TestBaseToolTimeoutAndCancellationGolden:
         CURRENT BEHAVIOR: Has async context manager track_operation.
         """
         import inspect
-        assert hasattr(base_tool, 'track_operation')
+
+        assert hasattr(base_tool, "track_operation")
         # It's an async context manager
-        assert inspect.isasyncgenfunction(base_tool.track_operation.__wrapped__) or \
-               hasattr(base_tool.track_operation, '__aenter__')
+        assert inspect.isasyncgenfunction(base_tool.track_operation.__wrapped__) or hasattr(
+            base_tool.track_operation, "__aenter__"
+        )
 
     def test_cancel_operation_method_exists(self, base_tool):
         """
         CURRENT BEHAVIOR: Has async cancel_operation method.
         """
         import inspect
-        assert hasattr(base_tool, 'cancel_operation')
+
+        assert hasattr(base_tool, "cancel_operation")
         assert inspect.iscoroutinefunction(base_tool.cancel_operation)
 
     def test_rate_limit_decorator_exists(self, base_tool):
         """
         CURRENT BEHAVIOR: Has rate_limit decorator factory.
         """
-        assert hasattr(base_tool, 'rate_limit')
+        assert hasattr(base_tool, "rate_limit")
         assert callable(base_tool.rate_limit)
 
 
@@ -794,6 +781,7 @@ class TestBaseToolStreamingGolden:
     def base_tool(self):
         """Create BaseTool instance."""
         from tools.base_tool import BaseTool
+
         return BaseTool()
 
     def test_stream_response_method_exists(self, base_tool):
@@ -801,7 +789,8 @@ class TestBaseToolStreamingGolden:
         CURRENT BEHAVIOR: Has async stream_response method.
         """
         import inspect
-        assert hasattr(base_tool, 'stream_response')
+
+        assert hasattr(base_tool, "stream_response")
         assert inspect.iscoroutinefunction(base_tool.stream_response)
 
     def test_stream_generator_method_exists(self, base_tool):
@@ -809,11 +798,12 @@ class TestBaseToolStreamingGolden:
         CURRENT BEHAVIOR: Has async stream_generator method.
         """
         import inspect
-        assert hasattr(base_tool, 'stream_generator')
+
+        assert hasattr(base_tool, "stream_generator")
         assert inspect.isasyncgenfunction(base_tool.stream_generator)
 
     def test_resource_cleanup_method_exists(self, base_tool):
         """
         CURRENT BEHAVIOR: Has async context manager resource_cleanup.
         """
-        assert hasattr(base_tool, 'resource_cleanup')
+        assert hasattr(base_tool, "resource_cleanup")

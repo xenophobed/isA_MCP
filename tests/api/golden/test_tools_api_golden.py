@@ -4,6 +4,7 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of the API.
 If these tests fail, it means the API contract has changed.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -47,19 +48,16 @@ class TestToolsAPIGolden:
                     {
                         "name": "test_tool",
                         "description": "A test tool",
-                        "inputSchema": {"type": "object"}
+                        "inputSchema": {"type": "object"},
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        )
 
         actual = response.json()
 
@@ -73,8 +71,9 @@ class TestToolsAPIGolden:
         if actual["result"]["tools"]:
             tool = actual["result"]["tools"][0]
             required_keys = {"name", "description", "inputSchema"}
-            assert required_keys.issubset(set(tool.keys())), \
-                f"Tool missing required keys. Has: {tool.keys()}, needs: {required_keys}"
+            assert required_keys.issubset(
+                set(tool.keys())
+            ), f"Tool missing required keys. Has: {tool.keys()}, needs: {required_keys}"
 
     async def test_tools_call_success_response_structure(self, mock_mcp_client):
         """
@@ -95,19 +94,19 @@ class TestToolsAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "content": [{"type": "text", "text": "Result"}],
-                "isError": False
-            }
+            "result": {"content": [{"type": "text", "text": "Result"}], "isError": False},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": "test_tool", "arguments": {}}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "test_tool", "arguments": {}},
+            },
+        )
 
         actual = response.json()
 
@@ -135,19 +134,19 @@ class TestToolsAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Tool not found"
-            }
+            "error": {"code": -32602, "message": "Tool not found"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": "__nonexistent_tool__", "arguments": {}}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "__nonexistent_tool__", "arguments": {}},
+            },
+        )
 
         actual = response.json()
 
@@ -187,23 +186,13 @@ class TestPromptsAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "prompts": [
-                    {
-                        "name": "test_prompt",
-                        "description": "A test prompt"
-                    }
-                ]
-            }
+            "result": {"prompts": [{"name": "test_prompt", "description": "A test prompt"}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "prompts/list", "params": {}}
+        )
 
         actual = response.json()
 
@@ -230,20 +219,19 @@ class TestPromptsAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "messages": [
-                    {"role": "user", "content": {"type": "text", "text": "Test"}}
-                ]
-            }
+            "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "Test"}}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {"name": "test_prompt", "arguments": {}}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {"name": "test_prompt", "arguments": {}},
+            },
+        )
 
         actual = response.json()
 
@@ -282,23 +270,13 @@ class TestResourcesAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "resources": [
-                    {
-                        "uri": "resource://test/1",
-                        "name": "test_resource"
-                    }
-                ]
-            }
+            "result": {"resources": [{"uri": "resource://test/1", "name": "test_resource"}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "resources/list", "params": {}}
+        )
 
         actual = response.json()
 
@@ -325,20 +303,19 @@ class TestResourcesAPIGolden:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "result": {
-                "contents": [
-                    {"uri": "resource://test/1", "text": "Content"}
-                ]
-            }
+            "result": {"contents": [{"uri": "resource://test/1", "text": "Content"}]},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "resources/read",
-            "params": {"uri": "resource://test/1"}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "resource://test/1"},
+            },
+        )
 
         actual = response.json()
 
@@ -383,15 +360,13 @@ class TestSearchAPIGolden:
                     "type": "tool",
                     "name": "test_tool",
                     "description": "A test tool",
-                    "score": 0.85
+                    "score": 0.85,
                 }
-            ]
+            ],
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/search", json={
-            "query": "test query"
-        })
+        response = await mock_mcp_client.post("/search", json={"query": "test query"})
 
         actual = response.json()
 

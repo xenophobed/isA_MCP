@@ -17,16 +17,17 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SearchResult:
     """搜索结果"""
-    id: str                    # 唯一标识
-    type: str                  # tool/prompt/resource
-    name: str                  # 名称
-    description: str           # 描述
-    score: float               # 相似度得分 (0-1)
-    db_id: int                 # PostgreSQL ID
-    metadata: Dict[str, Any]   # 额外元数据
-    inputSchema: Optional[Dict[str, Any]] = None    # Tool input schema (for tool calling)
-    outputSchema: Optional[Dict[str, Any]] = None   # Tool output schema
-    annotations: Optional[Dict[str, Any]] = None     # MCP annotations
+
+    id: str  # 唯一标识
+    type: str  # tool/prompt/resource
+    name: str  # 名称
+    description: str  # 描述
+    score: float  # 相似度得分 (0-1)
+    db_id: int  # PostgreSQL ID
+    metadata: Dict[str, Any]  # 额外元数据
+    inputSchema: Optional[Dict[str, Any]] = None  # Tool input schema (for tool calling)
+    outputSchema: Optional[Dict[str, Any]] = None  # Tool output schema
+    annotations: Optional[Dict[str, Any]] = None  # MCP annotations
 
 
 class SearchService:
@@ -72,7 +73,7 @@ class SearchService:
         query: str,
         item_type: Optional[str] = None,
         limit: int = 10,
-        score_threshold: float = 0.3  # Reasonable threshold for description-only embeddings
+        score_threshold: float = 0.3,  # Reasonable threshold for description-only embeddings
     ) -> List[SearchResult]:
         """
         搜索工具/提示词/资源
@@ -88,13 +89,17 @@ class SearchService:
         """
         try:
             logger.info(f"🔍 [SearchService] Starting search for: '{query}'")
-            logger.info(f"   Parameters: type={item_type}, limit={limit}, threshold={score_threshold}")
+            logger.info(
+                f"   Parameters: type={item_type}, limit={limit}, threshold={score_threshold}"
+            )
 
             # 1. 生成 query embedding
             logger.info(f"📝 [SearchService] Step 1: Generating query embedding...")
             try:
                 query_embedding = await self.embedding_gen.embed_single(query)
-                logger.info(f"✅ [SearchService] Embedding generated: {len(query_embedding)}D vector")
+                logger.info(
+                    f"✅ [SearchService] Embedding generated: {len(query_embedding)}D vector"
+                )
                 logger.debug(f"   First 5 values: {query_embedding[:5]}")
             except Exception as e:
                 logger.error(f"❌ [SearchService] Embedding generation failed: {e}")
@@ -107,7 +112,7 @@ class SearchService:
                     query_embedding=query_embedding,
                     item_type=item_type,
                     limit=limit,
-                    score_threshold=score_threshold
+                    score_threshold=score_threshold,
                 )
                 logger.info(f"✅ [SearchService] Qdrant returned {len(results)} raw results")
                 if results:
@@ -123,52 +128,60 @@ class SearchService:
             search_results = []
             for i, r in enumerate(results):
                 try:
-                    item_type = r['type']
-                    db_id = r['db_id']
+                    item_type = r["type"]
+                    db_id = r["db_id"]
 
                     # Fetch full schema from PostgreSQL based on type
                     inputSchema = None
                     outputSchema = None
                     annotations = None
 
-                    if item_type == 'tool' and db_id:
+                    if item_type == "tool" and db_id:
                         tool_data = await self.tool_repo.get_tool_by_id(db_id)
                         if tool_data:
-                            inputSchema = tool_data.get('input_schema')
-                            outputSchema = tool_data.get('output_schema')
-                            annotations = tool_data.get('annotations')
-                            logger.debug(f"   ✅ Fetched schema for tool '{r['name']}' (id={db_id})")
+                            inputSchema = tool_data.get("input_schema")
+                            outputSchema = tool_data.get("output_schema")
+                            annotations = tool_data.get("annotations")
+                            logger.debug(
+                                f"   ✅ Fetched schema for tool '{r['name']}' (id={db_id})"
+                            )
                         else:
-                            logger.warning(f"   ⚠️  Tool '{r['name']}' not found in PostgreSQL (id={db_id})")
-                    elif item_type == 'prompt' and db_id:
+                            logger.warning(
+                                f"   ⚠️  Tool '{r['name']}' not found in PostgreSQL (id={db_id})"
+                            )
+                    elif item_type == "prompt" and db_id:
                         prompt_data = await self.prompt_repo.get_prompt_by_id(db_id)
                         if prompt_data:
                             # Prompts may have different schema structure
-                            annotations = prompt_data.get('annotations')
-                    elif item_type == 'resource' and db_id:
+                            annotations = prompt_data.get("annotations")
+                    elif item_type == "resource" and db_id:
                         resource_data = await self.resource_repo.get_resource_by_id(db_id)
                         if resource_data:
-                            annotations = resource_data.get('annotations')
+                            annotations = resource_data.get("annotations")
 
-                    search_results.append(SearchResult(
-                        id=r['id'],
-                        type=r['type'],
-                        name=r['name'],
-                        description=r['description'],
-                        score=r['score'],
-                        db_id=r['db_id'],
-                        metadata=r.get('metadata', {}),
-                        inputSchema=inputSchema,
-                        outputSchema=outputSchema,
-                        annotations=annotations
-                    ))
+                    search_results.append(
+                        SearchResult(
+                            id=r["id"],
+                            type=r["type"],
+                            name=r["name"],
+                            description=r["description"],
+                            score=r["score"],
+                            db_id=r["db_id"],
+                            metadata=r.get("metadata", {}),
+                            inputSchema=inputSchema,
+                            outputSchema=outputSchema,
+                            annotations=annotations,
+                        )
+                    )
                 except Exception as e:
                     logger.error(f"   Failed to enrich result {i}: {e}, data: {r}")
 
             logger.info(f"✅ [SearchService] Final result: {len(search_results)} items")
             for i, r in enumerate(search_results[:3]):
                 has_schema = "✓" if r.inputSchema else "✗"
-                logger.info(f"   {i+1}. {r.name} ({r.type}): score={r.score:.3f}, schema={has_schema}")
+                logger.info(
+                    f"   {i+1}. {r.name} ({r.type}): score={r.score:.3f}, schema={has_schema}"
+                )
 
             return search_results
 
@@ -177,10 +190,7 @@ class SearchService:
             return []
 
     async def search_tools(
-        self,
-        query: str,
-        limit: int = 10,
-        score_threshold: float = 0.3
+        self, query: str, limit: int = 10, score_threshold: float = 0.3
     ) -> List[SearchResult]:
         """
         只搜索工具
@@ -194,38 +204,23 @@ class SearchService:
             工具搜索结果
         """
         return await self.search(
-            query=query,
-            item_type='tool',
-            limit=limit,
-            score_threshold=score_threshold
+            query=query, item_type="tool", limit=limit, score_threshold=score_threshold
         )
 
     async def search_prompts(
-        self,
-        query: str,
-        limit: int = 10,
-        score_threshold: float = 0.5
+        self, query: str, limit: int = 10, score_threshold: float = 0.5
     ) -> List[SearchResult]:
         """只搜索提示词"""
         return await self.search(
-            query=query,
-            item_type='prompt',
-            limit=limit,
-            score_threshold=score_threshold
+            query=query, item_type="prompt", limit=limit, score_threshold=score_threshold
         )
 
     async def search_resources(
-        self,
-        query: str,
-        limit: int = 10,
-        score_threshold: float = 0.5
+        self, query: str, limit: int = 10, score_threshold: float = 0.5
     ) -> List[SearchResult]:
         """只搜索资源"""
         return await self.search(
-            query=query,
-            item_type='resource',
-            limit=limit,
-            score_threshold=score_threshold
+            query=query, item_type="resource", limit=limit, score_threshold=score_threshold
         )
 
     async def get_stats(self) -> Dict[str, Any]:

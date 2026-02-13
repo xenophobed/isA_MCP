@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_business_commerce_prompts(mcp):
     """Register Business & Commerce 💼 category prompts with the MCP server"""
-    
+
     @mcp.prompt("market_analysis_prompt")
     async def market_analysis_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive market analysis and competitive intelligence
-        
+
         This prompt guides creation of investment-grade market research with
         data-driven insights for business strategy and investment decisions.
-        
+
         Args:
             subject: The market or industry to analyze
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: market, analysis, competitive, intelligence, investment, strategy
         Category: business_commerce
         """
-        
+
         prompt_template = f"""
 # Market Research Analyst with Industry Intelligence
 
@@ -70,32 +68,29 @@ def register_business_commerce_prompts(mcp):
 
 Create a professional market analysis that meets investment-grade standards.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("business_strategy_prompt")
     async def business_strategy_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for strategic business planning and development
-        
+
         This prompt guides creation of McKinsey/BCG-level strategic consulting
         deliverables with actionable recommendations.
-        
+
         Args:
             subject: The business strategy topic or challenge
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: strategy, business, planning, consulting, framework, strategic
         Category: business_commerce
         """
-        
+
         prompt_template = f"""
 # Business Strategy Consultant with Strategic Planning Expertise
 
@@ -133,32 +128,29 @@ Create a professional market analysis that meets investment-grade standards.
 
 Create a professional business strategy document that meets consulting standards.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("financial_analysis_prompt")
     async def financial_analysis_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive financial analysis and modeling
-        
+
         This prompt guides creation of detailed financial assessments with
         quantitative analysis and investment recommendations.
-        
+
         Args:
             subject: The financial analysis topic or entity
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: financial, analysis, modeling, investment, valuation, metrics
         Category: business_commerce
         """
-        
+
         prompt_template = f"""
 # Financial Analyst with Investment Expertise
 
@@ -196,12 +188,13 @@ Create a professional business strategy document that meets consulting standards
 
 Create a professional financial analysis that meets investment-grade standards.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Business & Commerce 💼 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_business_commerce_prompts(mcp)

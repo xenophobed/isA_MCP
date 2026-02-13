@@ -29,7 +29,7 @@ class PromptRepository:
         host = host or settings.infrastructure.postgres_grpc_host
         port = port or settings.infrastructure.postgres_grpc_port
 
-        self.db = AsyncPostgresClient(host=host, port=port, user_id='mcp-prompt-service')
+        self.db = AsyncPostgresClient(host=host, port=port, user_id="mcp-prompt-service")
         self.schema = "mcp"
         self.table = "prompts"
 
@@ -38,8 +38,7 @@ class PromptRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.table} WHERE id = $1",
-                    params=[prompt_id]
+                    f"SELECT * FROM {self.schema}.{self.table} WHERE id = $1", params=[prompt_id]
                 )
             return result
         except Exception as e:
@@ -51,8 +50,7 @@ class PromptRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.table} WHERE name = $1",
-                    params=[name]
+                    f"SELECT * FROM {self.schema}.{self.table} WHERE name = $1", params=[name]
                 )
             return result
         except Exception as e:
@@ -66,7 +64,7 @@ class PromptRepository:
         tags: Optional[List[str]] = None,
         limit: int = 100,
         offset: int = 0,
-        org_id: Optional[str] = None
+        org_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """List prompts with optional filters"""
         try:
@@ -119,43 +117,49 @@ class PromptRepository:
         """Create a new prompt (internal or external)"""
         try:
             # Serialize complex types to JSON strings for gRPC compatibility
-            arguments = prompt_data.get('arguments', [])
-            metadata = prompt_data.get('metadata', {})
-            tags = prompt_data.get('tags', [])
+            arguments = prompt_data.get("arguments", [])
+            metadata = prompt_data.get("metadata", {})
+            tags = prompt_data.get("tags", [])
 
             # Handle skill_ids
-            skill_ids = prompt_data.get('skill_ids', [])
+            skill_ids = prompt_data.get("skill_ids", [])
             if not isinstance(skill_ids, list):
                 skill_ids = []
 
             record = {
-                'name': prompt_data['name'],
-                'description': prompt_data.get('description'),
-                'category': prompt_data.get('category'),
-                'content': prompt_data['content'],
-                'arguments': json.dumps(arguments) if isinstance(arguments, (list, dict)) else arguments,  # jsonb field
-                'metadata': json.dumps(metadata) if isinstance(metadata, dict) else metadata,  # jsonb field
-                'tags': tags if isinstance(tags, list) else [],  # array field - pass as list, not JSON string
-                'version': prompt_data.get('version', '1.0.0'),
-                'is_active': prompt_data.get('is_active', True),
+                "name": prompt_data["name"],
+                "description": prompt_data.get("description"),
+                "category": prompt_data.get("category"),
+                "content": prompt_data["content"],
+                "arguments": (
+                    json.dumps(arguments) if isinstance(arguments, (list, dict)) else arguments
+                ),  # jsonb field
+                "metadata": (
+                    json.dumps(metadata) if isinstance(metadata, dict) else metadata
+                ),  # jsonb field
+                "tags": (
+                    tags if isinstance(tags, list) else []
+                ),  # array field - pass as list, not JSON string
+                "version": prompt_data.get("version", "1.0.0"),
+                "is_active": prompt_data.get("is_active", True),
                 # External prompt fields
-                'source_server_id': prompt_data.get('source_server_id'),
-                'original_name': prompt_data.get('original_name'),
-                'is_external': prompt_data.get('is_external', False),
+                "source_server_id": prompt_data.get("source_server_id"),
+                "original_name": prompt_data.get("original_name"),
+                "is_external": prompt_data.get("is_external", False),
                 # Skill classification fields (hierarchical search)
-                'skill_ids': skill_ids,
-                'primary_skill_id': prompt_data.get('primary_skill_id'),
-                'is_classified': prompt_data.get('is_classified', False),
+                "skill_ids": skill_ids,
+                "primary_skill_id": prompt_data.get("primary_skill_id"),
+                "is_classified": prompt_data.get("is_classified", False),
                 # Multi-tenant fields
-                'org_id': prompt_data.get('org_id'),
-                'is_global': prompt_data.get('is_global', True),
+                "org_id": prompt_data.get("org_id"),
+                "is_global": prompt_data.get("is_global", True),
             }
 
             async with self.db:
                 count = await self.db.insert_into(self.table, [record], schema=self.schema)
 
             if count and count > 0:
-                return await self.get_prompt_by_name(prompt_data['name'])
+                return await self.get_prompt_by_name(prompt_data["name"])
             return None
         except Exception as e:
             logger.error(f"Failed to create prompt: {e}")
@@ -168,7 +172,7 @@ class PromptRepository:
         content: str,
         arguments: List[Dict[str, Any]],
         source_server_id: str,
-        original_name: str
+        original_name: str,
     ) -> Optional[int]:
         """
         Create an external prompt from an MCP server.
@@ -185,17 +189,17 @@ class PromptRepository:
             Prompt ID if created, None on failure
         """
         prompt_data = {
-            'name': name,
-            'description': description,
-            'content': content,
-            'arguments': arguments,
-            'source_server_id': source_server_id,
-            'original_name': original_name,
-            'is_external': True,
-            'is_active': True,
+            "name": name,
+            "description": description,
+            "content": content,
+            "arguments": arguments,
+            "source_server_id": source_server_id,
+            "original_name": original_name,
+            "is_external": True,
+            "is_active": True,
         }
         result = await self.create_prompt(prompt_data)
-        return result.get('id') if result else None
+        return result.get("id") if result else None
 
     async def update_prompt(self, prompt_id: int, updates: Dict[str, Any]) -> bool:
         """Update prompt"""
@@ -206,12 +210,12 @@ class PromptRepository:
 
             # Serialize complex types to JSON strings for gRPC compatibility
             for key, value in updates.items():
-                if key not in ['id', 'created_at', 'updated_at']:
+                if key not in ["id", "created_at", "updated_at"]:
                     # Serialize complex types
-                    if key in ['arguments', 'metadata']:  # jsonb fields
+                    if key in ["arguments", "metadata"]:  # jsonb fields
                         if isinstance(value, (list, dict)):
                             value = json.dumps(value)
-                    elif key == 'tags':  # array field - keep as list
+                    elif key == "tags":  # array field - keep as list
                         if not isinstance(value, list):
                             value = []
 
@@ -240,7 +244,7 @@ class PromptRepository:
     async def delete_prompt(self, prompt_id: int) -> bool:
         """Delete prompt (soft delete)"""
         try:
-            return await self.update_prompt(prompt_id, {'is_active': False})
+            return await self.update_prompt(prompt_id, {"is_active": False})
         except Exception as e:
             logger.error(f"Failed to delete prompt {prompt_id}: {e}")
             return False
@@ -318,7 +322,7 @@ class PromptRepository:
         server_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        org_id: Optional[str] = None
+        org_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         List external prompts with optional filters.
@@ -387,7 +391,7 @@ class PromptRepository:
             async with self.db:
                 results = await self.db.query(sql, params=[server_id])
 
-            return [row['id'] for row in results] if results else []
+            return [row["id"] for row in results] if results else []
         except Exception as e:
             logger.error(f"Failed to get prompt IDs for server {server_id}: {e}")
             return []
@@ -410,7 +414,7 @@ class PromptRepository:
             """
             async with self.db:
                 result = await self.db.query_row(count_sql, params=[server_id])
-                count = result.get('count', 0) if result else 0
+                count = result.get("count", 0) if result else 0
 
                 # Delete the prompts
                 delete_sql = f"""
@@ -430,10 +434,7 @@ class PromptRepository:
     # =========================================================================
 
     async def update_prompt_skills(
-        self,
-        prompt_id: int,
-        skill_ids: List[str],
-        primary_skill_id: Optional[str] = None
+        self, prompt_id: int, skill_ids: List[str], primary_skill_id: Optional[str] = None
     ) -> bool:
         """
         Update skill classification for a prompt.
@@ -456,22 +457,21 @@ class PromptRepository:
                 WHERE id = $4
             """
             async with self.db:
-                await self.db.execute(sql, params=[
-                    skill_ids,
-                    primary_skill_id or (skill_ids[0] if skill_ids else None),
-                    len(skill_ids) > 0,
-                    prompt_id
-                ])
+                await self.db.execute(
+                    sql,
+                    params=[
+                        skill_ids,
+                        primary_skill_id or (skill_ids[0] if skill_ids else None),
+                        len(skill_ids) > 0,
+                        prompt_id,
+                    ],
+                )
             return True
         except Exception as e:
             logger.error(f"Failed to update prompt skills for {prompt_id}: {e}")
             return False
 
-    async def get_prompts_by_skill(
-        self,
-        skill_id: str,
-        limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    async def get_prompts_by_skill(self, skill_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get prompts belonging to a skill category.
 

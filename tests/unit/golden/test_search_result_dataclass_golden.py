@@ -8,6 +8,7 @@ Service Under Test: services/search_service/search_service.py
 
 Focus: SearchResult dataclass and interface contracts (NOT service initialization)
 """
+
 import pytest
 
 
@@ -28,19 +29,19 @@ class TestSearchResultDataclassGolden:
         from services.search_service.search_service import SearchResult
 
         result = SearchResult(
-            id='test_1',
-            type='tool',
-            name='test_tool',
-            description='A test tool',
+            id="test_1",
+            type="tool",
+            name="test_tool",
+            description="A test tool",
             score=0.95,
             db_id=42,
-            metadata={}
+            metadata={},
         )
 
-        assert result.id == 'test_1'
-        assert result.type == 'tool'
-        assert result.name == 'test_tool'
-        assert result.description == 'A test tool'
+        assert result.id == "test_1"
+        assert result.type == "tool"
+        assert result.name == "test_tool"
+        assert result.description == "A test tool"
         assert result.score == 0.95
         assert result.db_id == 42
 
@@ -51,13 +52,13 @@ class TestSearchResultDataclassGolden:
         from services.search_service.search_service import SearchResult
 
         result = SearchResult(
-            id='test_1',
-            type='tool',
-            name='test_tool',
-            description='Test',
+            id="test_1",
+            type="tool",
+            name="test_tool",
+            description="Test",
             score=0.9,
             db_id=1,
-            metadata={}
+            metadata={},
         )
 
         assert result.inputSchema is None
@@ -70,21 +71,21 @@ class TestSearchResultDataclassGolden:
         """
         from services.search_service.search_service import SearchResult
 
-        input_schema = {'type': 'object', 'properties': {'input': {'type': 'string'}}}
-        output_schema = {'type': 'string'}
-        annotations = {'category': 'utility'}
+        input_schema = {"type": "object", "properties": {"input": {"type": "string"}}}
+        output_schema = {"type": "string"}
+        annotations = {"category": "utility"}
 
         result = SearchResult(
-            id='test_1',
-            type='tool',
-            name='test_tool',
-            description='Test',
+            id="test_1",
+            type="tool",
+            name="test_tool",
+            description="Test",
             score=0.9,
             db_id=1,
             metadata={},
             inputSchema=input_schema,
             outputSchema=output_schema,
-            annotations=annotations
+            annotations=annotations,
         )
 
         assert result.inputSchema == input_schema
@@ -107,15 +108,15 @@ class TestSearchResultDataclassGolden:
         from services.search_service.search_service import SearchResult
 
         # These should all be valid
-        for item_type in ['tool', 'prompt', 'resource']:
+        for item_type in ["tool", "prompt", "resource"]:
             result = SearchResult(
-                id='test_1',
+                id="test_1",
                 type=item_type,
-                name='test',
-                description='Test',
+                name="test",
+                description="Test",
                 score=0.9,
                 db_id=1,
-                metadata={}
+                metadata={},
             )
             assert result.type == item_type
 
@@ -137,7 +138,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'search')
+        assert hasattr(SearchService, "search")
         assert inspect.iscoroutinefunction(SearchService.search)
 
     def test_search_service_has_search_tools_method(self):
@@ -147,7 +148,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'search_tools')
+        assert hasattr(SearchService, "search_tools")
         assert inspect.iscoroutinefunction(SearchService.search_tools)
 
     def test_search_service_has_search_prompts_method(self):
@@ -157,7 +158,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'search_prompts')
+        assert hasattr(SearchService, "search_prompts")
         assert inspect.iscoroutinefunction(SearchService.search_prompts)
 
     def test_search_service_has_search_resources_method(self):
@@ -167,7 +168,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'search_resources')
+        assert hasattr(SearchService, "search_resources")
         assert inspect.iscoroutinefunction(SearchService.search_resources)
 
     def test_search_service_has_get_stats_method(self):
@@ -177,7 +178,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'get_stats')
+        assert hasattr(SearchService, "get_stats")
         assert inspect.iscoroutinefunction(SearchService.get_stats)
 
     def test_search_service_has_initialize_method(self):
@@ -187,7 +188,7 @@ class TestSearchServiceInterfaceGolden:
         from services.search_service.search_service import SearchService
         import inspect
 
-        assert hasattr(SearchService, 'initialize')
+        assert hasattr(SearchService, "initialize")
         assert inspect.iscoroutinefunction(SearchService.initialize)
 
     def test_search_method_signature(self):
@@ -200,10 +201,10 @@ class TestSearchServiceInterfaceGolden:
         sig = inspect.signature(SearchService.search)
         params = list(sig.parameters.keys())
 
-        assert 'query' in params
-        assert 'item_type' in params
-        assert 'limit' in params
-        assert 'score_threshold' in params
+        assert "query" in params
+        assert "item_type" in params
+        assert "limit" in params
+        assert "score_threshold" in params
 
     def test_search_default_parameters(self):
         """
@@ -215,6 +216,6 @@ class TestSearchServiceInterfaceGolden:
         sig = inspect.signature(SearchService.search)
 
         # Check defaults
-        assert sig.parameters['item_type'].default is None
-        assert sig.parameters['limit'].default == 10
-        assert sig.parameters['score_threshold'].default == 0.3
+        assert sig.parameters["item_type"].default is None
+        assert sig.parameters["limit"].default == 10
+        assert sig.parameters["score_threshold"].default == 0.3

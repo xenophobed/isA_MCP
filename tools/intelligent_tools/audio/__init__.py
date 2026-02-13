@@ -8,6 +8,4 @@ and audio analysis using ISA audio services.
 
 from .audio_analyzer import AudioAnalyzer
 
-__all__ = [
-    "AudioAnalyzer"
-]
+__all__ = ["AudioAnalyzer"]

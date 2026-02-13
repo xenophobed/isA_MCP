@@ -55,6 +55,7 @@ async def _get_search_service():
     global _search_service
     if _search_service is None:
         from services.search_service.hierarchical_search_service import HierarchicalSearchService
+
         _search_service = HierarchicalSearchService()
     return _search_service
 
@@ -62,6 +63,7 @@ async def _get_search_service():
 async def _get_unified_search():
     """Get the unified meta search service."""
     from services.search_service.unified_meta_search import UnifiedMetaSearch
+
     return UnifiedMetaSearch()
 
 
@@ -80,9 +82,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
 
     @mcp.tool()
     async def discover(
-        query: str,
-        item_type: Optional[str] = None,
-        limit: int = 5
+        query: str, item_type: Optional[str] = None, limit: int = 5
     ) -> Dict[str, Any]:
         """
         🔍 UNIFIED SEARCH - Search across tools, prompts, resources, AND skills.
@@ -155,7 +155,9 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                     "name": e.name,
                     "type": e.entity_type.value,
                     "source": e.source,
-                    "description": e.description[:100] + "..." if len(e.description) > 100 else e.description,
+                    "description": (
+                        e.description[:100] + "..." if len(e.description) > 100 else e.description
+                    ),
                     "score": round(e.score, 3),
                     "skill": e.primary_skill_id,
                     "uri": e.uri,  # For skills/resources
@@ -172,7 +174,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                 "skills_matched": skills_matched,
                 "total_found": len(matches),
                 "by_type": result.metadata.get("results_by_type", {}),
-                "hint": "For tools: get_tool_schema() then execute(). For skills: read_resource(uri)"
+                "hint": "For tools: get_tool_schema() then execute(). For skills: read_resource(uri)",
             }
 
         except Exception as e:
@@ -220,13 +222,15 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                     return {
                         "name": tool.name,
                         "description": tool.description or "",
-                        "input_schema": tool.inputSchema if hasattr(tool, 'inputSchema') else tool.input_schema,
+                        "input_schema": (
+                            tool.inputSchema if hasattr(tool, "inputSchema") else tool.input_schema
+                        ),
                     }
 
             # Tool not found - suggest discovery
             return {
                 "error": f"Tool '{tool_name}' not found",
-                "hint": "Use discover(query) to find available tools"
+                "hint": "Use discover(query) to find available tools",
             }
 
         except Exception as e:
@@ -234,10 +238,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {"error": str(e)}
 
     @mcp.tool()
-    async def execute(
-        tool_name: str,
-        parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
         ▶️ EXECUTE TOOL - Run a discovered tool with parameters.
 
@@ -273,7 +274,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             if not tool_exists:
                 return {
                     "error": f"Tool '{tool_name}' not found",
-                    "hint": "Use discover(query) to find available tools"
+                    "hint": "Use discover(query) to find available tools",
                 }
 
             # Execute the tool using the tool manager
@@ -283,12 +284,12 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             logger.info(f"execute('{tool_name}') completed successfully")
 
             # Handle different result types
-            if hasattr(result, 'content'):
+            if hasattr(result, "content"):
                 # MCP ToolResult format
                 content = result.content
                 if isinstance(content, list) and len(content) > 0:
                     # Extract text from TextContent
-                    if hasattr(content[0], 'text'):
+                    if hasattr(content[0], "text"):
                         try:
                             return json.loads(content[0].text)
                         except json.JSONDecodeError:
@@ -304,7 +305,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {
                 "error": str(e),
                 "tool_name": tool_name,
-                "hint": "Check parameters match the schema from get_tool_schema()"
+                "hint": "Check parameters match the schema from get_tool_schema()",
             }
 
     @mcp.tool()
@@ -333,7 +334,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             settings = get_settings()
             repo = SkillRepository(
                 host=settings.infrastructure.postgres_grpc_host,
-                port=settings.infrastructure.postgres_grpc_port
+                port=settings.infrastructure.postgres_grpc_port,
             )
 
             skills = await repo.list_skills(is_active=True, limit=100)
@@ -343,7 +344,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                     "id": s.get("id"),
                     "name": s.get("name"),
                     "description": s.get("description", "")[:100],
-                    "tool_count": s.get("tool_count", 0)
+                    "tool_count": s.get("tool_count", 0),
                 }
                 for s in skills
             ]
@@ -354,7 +355,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                 "skills": skill_list,
                 "total_skills": len(skill_list),
                 "total_tools": total_tools,
-                "hint": "Use discover(query) to find tools within a skill domain"
+                "hint": "Use discover(query) to find tools within a skill domain",
             }
 
         except Exception as e:
@@ -401,10 +402,10 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                         {
                             "name": arg.name,
                             "description": arg.description or "",
-                            "required": arg.required if hasattr(arg, 'required') else False
+                            "required": arg.required if hasattr(arg, "required") else False,
                         }
                         for arg in (p.arguments or [])
-                    ]
+                    ],
                 }
                 for p in prompts
             ]
@@ -414,7 +415,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {
                 "prompts": prompt_list,
                 "total_prompts": len(prompt_list),
-                "hint": "Use get_prompt(name, arguments) to render a prompt"
+                "hint": "Use get_prompt(name, arguments) to render a prompt",
             }
 
         except Exception as e:
@@ -422,10 +423,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {"error": str(e), "prompts": []}
 
     @mcp.tool()
-    async def get_prompt(
-        prompt_name: str,
-        arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def get_prompt(prompt_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         📄 GET PROMPT - Render a prompt template with arguments.
 
@@ -471,29 +469,25 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             for msg in messages:
                 content = msg.content
                 # Handle different content types
-                if hasattr(content, 'text'):
+                if hasattr(content, "text"):
                     content_text = content.text
                 elif isinstance(content, str):
                     content_text = content
                 else:
                     content_text = str(content)
 
-                formatted_messages.append({
-                    "role": msg.role if hasattr(msg, 'role') else "user",
-                    "content": content_text
-                })
+                formatted_messages.append(
+                    {"role": msg.role if hasattr(msg, "role") else "user", "content": content_text}
+                )
 
-            return {
-                "name": prompt_name,
-                "messages": formatted_messages
-            }
+            return {"name": prompt_name, "messages": formatted_messages}
 
         except Exception as e:
             logger.error(f"get_prompt('{prompt_name}') failed: {e}")
             return {
                 "error": str(e),
                 "prompt_name": prompt_name,
-                "hint": "Use list_prompts() to see available prompts and their arguments"
+                "hint": "Use list_prompts() to see available prompts and their arguments",
             }
 
     # =========================================================================
@@ -534,7 +528,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                     "uri": str(r.uri),
                     "name": r.name,
                     "description": r.description or "",
-                    "mime_type": r.mimeType if hasattr(r, 'mimeType') else "application/json"
+                    "mime_type": r.mimeType if hasattr(r, "mimeType") else "application/json",
                 }
                 for r in resources
             ]
@@ -544,7 +538,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {
                 "resources": resource_list,
                 "total_resources": len(resource_list),
-                "hint": "Use read_resource(uri) to get resource content"
+                "hint": "Use read_resource(uri) to get resource content",
             }
 
         except Exception as e:
@@ -598,7 +592,7 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                         for segment in ["/guides/", "/templates/", "/scripts/"]:
                             if segment in uri:
                                 prefix, suffix = uri.split(segment, 1)
-                                encoded_suffix = urllib.parse.quote(suffix, safe='')
+                                encoded_suffix = urllib.parse.quote(suffix, safe="")
                                 encoded_uri = f"{prefix}{segment}{encoded_suffix}"
                                 try:
                                     resource = await resource_manager.get_resource(encoded_uri)
@@ -610,18 +604,19 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             if resource is None:
                 return {
                     "error": f"Resource '{uri}' not found",
-                    "hint": "Use list_resources() to see available resource URIs. For paths with slashes, they are auto-encoded."
+                    "hint": "Use list_resources() to see available resource URIs. For paths with slashes, they are auto-encoded.",
                 }
 
             logger.info(f"read_resource('{uri}') completed successfully")
 
             # Get the content by calling the resource function if it's callable
-            if hasattr(resource, 'fn') and callable(resource.fn):
+            if hasattr(resource, "fn") and callable(resource.fn):
                 import asyncio
+
                 content = resource.fn()
                 if asyncio.iscoroutine(content):
                     content = await content
-            elif hasattr(resource, 'text'):
+            elif hasattr(resource, "text"):
                 content = resource.text
             else:
                 content = str(resource)
@@ -633,13 +628,13 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
                 except json.JSONDecodeError:
                     pass
 
-            mime_type = resource.mimeType if hasattr(resource, 'mimeType') else "application/json"
+            mime_type = resource.mimeType if hasattr(resource, "mimeType") else "application/json"
 
             return {
                 "uri": uri,
-                "name": resource.name if hasattr(resource, 'name') else uri,
+                "name": resource.name if hasattr(resource, "name") else uri,
                 "content": content,
-                "mime_type": mime_type
+                "mime_type": mime_type,
             }
 
         except Exception as e:
@@ -647,7 +642,9 @@ def register_discovery_tools(mcp: FastMCP, internal_mcp: Optional[FastMCP] = Non
             return {
                 "error": str(e),
                 "uri": uri,
-                "hint": "Use list_resources() to see available resource URIs"
+                "hint": "Use list_resources() to see available resource URIs",
             }
 
-    logger.debug("✅ Discovery meta-tools registered: discover, get_tool_schema, execute, list_skills, list_prompts, get_prompt, list_resources, read_resource")
+    logger.debug(
+        "✅ Discovery meta-tools registered: discover, get_tool_schema, execute, list_skills, list_prompts, get_prompt, list_resources, read_resource"
+    )

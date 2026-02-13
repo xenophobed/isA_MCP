@@ -8,30 +8,29 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_dream_prompts(mcp):
     """Register Dream 🎨 category prompts with the MCP server"""
-    
+
     @mcp.prompt("text_to_image_prompt")
     async def text_to_image_prompt(
-        prompt: str = "",
-        style_preset: str = "photorealistic",
-        quality: str = "high"
+        prompt: str = "", style_preset: str = "photorealistic", quality: str = "high"
     ) -> str:
         """
         Generate a prompt for text-to-image generation with professional photography quality
-        
+
         This prompt creates high-quality photorealistic images from text descriptions
         with professional camera settings and composition.
-        
+
         Args:
             prompt: The main image description
             style_preset: Visual style (photorealistic, artistic, cinematic)
             quality: Image quality level (high, ultra, standard)
-        
+
         Keywords: text-to-image, photography, professional, realistic, creative
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Professional Image Generation Expert
 
@@ -50,30 +49,28 @@ def register_dream_prompts(mcp):
 
 Generate a professional-quality image that meets these specifications.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("image_to_image_prompt")
     async def image_to_image_prompt(
-        prompt: str = "",
-        style_preset: str = "enhanced",
-        strength: str = "medium"
+        prompt: str = "", style_preset: str = "enhanced", strength: str = "medium"
     ) -> str:
         """
         Generate a prompt for image-to-image transformation while preserving composition
-        
+
         This prompt transforms existing images while maintaining original composition
         and key features with enhanced visual quality.
-        
+
         Args:
             prompt: The transformation description
             style_preset: Transformation style (enhanced, artistic, dramatic)
             strength: Transformation intensity (light, medium, strong)
-        
+
         Keywords: image-to-image, transformation, enhancement, composition, style
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Image Transformation Specialist
 
@@ -92,30 +89,28 @@ Transform this image: {prompt}, maintaining the original composition and subject
 
 Transform the image while preserving its core composition and identity.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("style_transfer_prompt")
     async def style_transfer_prompt(
-        prompt: str = "",
-        style_preset: str = "impressionist",
-        strength: str = "medium"
+        prompt: str = "", style_preset: str = "impressionist", strength: str = "medium"
     ) -> str:
         """
         Generate a prompt for artistic style transfer with authentic art movement characteristics
-        
+
         This prompt applies artistic styles from famous art movements while preserving
         the original subject matter and composition.
-        
+
         Args:
             prompt: The artistic style description
             style_preset: Art movement style (impressionist, renaissance, abstract)
             strength: Style application intensity (subtle, medium, strong)
-        
+
         Keywords: style-transfer, artistic, art-movement, painting, creative
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Artistic Style Transfer Master
 
@@ -134,28 +129,25 @@ Apply {prompt} artistic style to this image, {style_preset} art movement charact
 
 Create an artistic masterpiece while honoring the original composition.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("face_swap_prompt")
-    async def face_swap_prompt(
-        hair_source: str = "preserve",
-        quality: str = "professional"
-    ) -> str:
+    async def face_swap_prompt(hair_source: str = "preserve", quality: str = "professional") -> str:
         """
         Generate a prompt for seamless face swapping with natural blending
-        
+
         This prompt enables high-quality face swapping while maintaining
         natural appearance and lighting consistency.
-        
+
         Args:
             hair_source: Hair handling (preserve, adapt, blend)
             quality: Output quality (professional, standard, high)
-        
+
         Keywords: face-swap, portrait, blending, natural, seamless
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Professional Face Swap Specialist
 
@@ -172,30 +164,28 @@ Seamlessly swap face from source image onto target image body, natural skin tone
 
 Create a seamless face swap that looks completely natural.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("professional_headshot_prompt")
     async def professional_headshot_prompt(
-        prompt: str = "",
-        industry: str = "corporate",
-        quality: str = "executive"
+        prompt: str = "", industry: str = "corporate", quality: str = "executive"
     ) -> str:
         """
         Generate a prompt for professional business headshot transformation
-        
+
         This prompt transforms casual photos into professional business headshots
         suitable for LinkedIn and corporate use.
-        
+
         Args:
             prompt: The headshot description
             industry: Industry context (corporate, creative, tech, healthcare)
             quality: Professional level (executive, standard, premium)
-        
+
         Keywords: headshot, professional, business, corporate, LinkedIn
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Professional Headshot Photographer
 
@@ -214,32 +204,32 @@ Transform casual photo into professional business headshot: {prompt}, {industry}
 
 Create a professional headshot that commands respect and trust.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("emoji_generation_prompt")
     async def emoji_generation_prompt(
         prompt: str = "",
         expression: str = "happy",
         style_preset: str = "kawaii",
-        color_scheme: str = "vibrant"
+        color_scheme: str = "vibrant",
     ) -> str:
         """
         Generate a prompt for custom emoji creation with scalable design
-        
+
         This prompt creates custom emojis with clear features optimized
         for digital platforms and social media use.
-        
+
         Args:
             prompt: The emoji description
             expression: Emotional expression (happy, sad, excited, surprised)
             style_preset: Design style (kawaii, modern, classic, minimal)
             color_scheme: Color palette (vibrant, pastel, monochrome, rainbow)
-        
+
         Keywords: emoji, sticker, cute, scalable, social-media
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Custom Emoji Designer
 
@@ -260,30 +250,28 @@ Create custom emoji: {prompt}, {expression} emotional expression with clear read
 
 Design an emoji that communicates emotion instantly and universally.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("photo_inpainting_prompt")
     async def photo_inpainting_prompt(
-        prompt: str = "",
-        fill_method: str = "content_aware",
-        strength: str = "seamless"
+        prompt: str = "", fill_method: str = "content_aware", strength: str = "seamless"
     ) -> str:
         """
         Generate a prompt for photo inpainting and object removal
-        
+
         This prompt removes unwanted elements from photos with seamless
         texture synthesis and natural blending.
-        
+
         Args:
             prompt: The inpainting description
             fill_method: Filling technique (content_aware, texture_synthesis, smart_fill)
             strength: Blending intensity (seamless, natural, enhanced)
-        
+
         Keywords: inpainting, removal, restoration, seamless, healing
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Photo Restoration and Inpainting Expert
 
@@ -302,30 +290,28 @@ Remove unwanted elements: {prompt}, seamless object removal with professional ph
 
 Restore the photo with invisible, professional-quality inpainting.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("photo_outpainting_prompt")
     async def photo_outpainting_prompt(
-        prompt: str = "",
-        direction: str = "all_sides",
-        strength: str = "natural"
+        prompt: str = "", direction: str = "all_sides", strength: str = "natural"
     ) -> str:
         """
         Generate a prompt for photo outpainting and boundary expansion
-        
+
         This prompt expands image boundaries with natural scene continuation
         and environmental logic while maintaining perspective.
-        
+
         Args:
             prompt: The outpainting description
             direction: Expansion direction (all_sides, horizontal, vertical, specific)
             strength: Expansion intensity (natural, enhanced, dramatic)
-        
+
         Keywords: outpainting, expansion, panoramic, scene-extension, perspective
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Photo Outpainting and Scene Extension Specialist
 
@@ -344,30 +330,28 @@ Expand image boundaries: {prompt}, {direction} extension with natural scene cont
 
 Expand the scene naturally while maintaining photographic integrity.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("sticker_generation_prompt")
     async def sticker_generation_prompt(
-        prompt: str = "",
-        style_preset: str = "kawaii",
-        theme: str = "cute_animal"
+        prompt: str = "", style_preset: str = "kawaii", theme: str = "cute_animal"
     ) -> str:
         """
         Generate a prompt for cute sticker design creation
-        
+
         This prompt creates adorable sticker designs optimized for digital
         platforms with scalable vector graphics and universal appeal.
-        
+
         Args:
             prompt: The sticker description
             style_preset: Design style (kawaii, chibi, modern, vintage)
             theme: Sticker theme (cute_animal, food, nature, emoji)
-        
+
         Keywords: sticker, cute, kawaii, scalable, digital, social-media
         Category: dream
         """
-        
+
         prompt_template = f"""
 # Cute Sticker Design Artist
 
@@ -386,12 +370,13 @@ Create cute sticker design: {prompt}, {style_preset} kawaii aesthetic with adora
 
 Design an irresistibly cute sticker that spreads joy and positivity.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Dream 🎨 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_dream_prompts(mcp)

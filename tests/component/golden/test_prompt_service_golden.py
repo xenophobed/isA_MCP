@@ -7,6 +7,7 @@ If these tests fail, it means behavior has changed unexpectedly.
 Service Under Test: services/prompt_service/prompt_service.py
 Repository Under Test: services/prompt_service/prompt_repository.py
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -43,6 +44,7 @@ class TestPromptServiceGolden:
     def prompt_service(self, mock_repository):
         """Create PromptService with mocked repository."""
         from services.prompt_service.prompt_service import PromptService
+
         return PromptService(repository=mock_repository)
 
     # ═══════════════════════════════════════════════════════════════
@@ -54,9 +56,7 @@ class TestPromptServiceGolden:
         CURRENT BEHAVIOR: register_prompt raises ValueError if name is missing.
         """
         with pytest.raises(ValueError) as exc_info:
-            await prompt_service.register_prompt({
-                "content": "Some content"
-            })
+            await prompt_service.register_prompt({"content": "Some content"})
 
         assert "name" in str(exc_info.value).lower()
 
@@ -65,9 +65,7 @@ class TestPromptServiceGolden:
         CURRENT BEHAVIOR: register_prompt raises ValueError if content is missing.
         """
         with pytest.raises(ValueError) as exc_info:
-            await prompt_service.register_prompt({
-                "name": "test_prompt"
-            })
+            await prompt_service.register_prompt({"name": "test_prompt"})
 
         assert "content" in str(exc_info.value).lower()
 
@@ -75,16 +73,10 @@ class TestPromptServiceGolden:
         """
         CURRENT BEHAVIOR: register_prompt raises ValueError for duplicate names.
         """
-        mock_repository.get_prompt_by_name.return_value = {
-            "id": 1,
-            "name": "existing_prompt"
-        }
+        mock_repository.get_prompt_by_name.return_value = {"id": 1, "name": "existing_prompt"}
 
         with pytest.raises(ValueError):
-            await prompt_service.register_prompt({
-                "name": "existing_prompt",
-                "content": "Content"
-            })
+            await prompt_service.register_prompt({"name": "existing_prompt", "content": "Content"})
 
     async def test_register_prompt_returns_dict_with_id(self, prompt_service, mock_repository):
         """
@@ -94,13 +86,12 @@ class TestPromptServiceGolden:
         mock_repository.create_prompt.return_value = {
             "id": 42,
             "name": "new_prompt",
-            "content": "Prompt content"
+            "content": "Prompt content",
         }
 
-        result = await prompt_service.register_prompt({
-            "name": "new_prompt",
-            "content": "Prompt content"
-        })
+        result = await prompt_service.register_prompt(
+            {"name": "new_prompt", "content": "Prompt content"}
+        )
 
         assert isinstance(result, dict)
         assert "id" in result
@@ -157,7 +148,7 @@ class TestPromptServiceGolden:
         """
         mock_repository.search_by_tags.return_value = [
             {"id": 1, "name": "prompt1", "tags": ["python", "coding"]},
-            {"id": 2, "name": "prompt2", "tags": ["python", "data"]}
+            {"id": 2, "name": "prompt2", "tags": ["python", "data"]},
         ]
 
         result = await prompt_service.search_by_tags(["python"], limit=10)
@@ -177,8 +168,7 @@ class TestPromptServiceGolden:
         mock_repository.increment_usage_count.return_value = True
 
         result = await prompt_service.record_prompt_usage(
-            prompt_identifier=1,
-            generation_time_ms=200
+            prompt_identifier=1, generation_time_ms=200
         )
 
         assert result is True
@@ -188,7 +178,9 @@ class TestPromptServiceGolden:
     # Search Behavior
     # ═══════════════════════════════════════════════════════════════
 
-    async def test_search_prompts_searches_name_description_content(self, prompt_service, mock_repository):
+    async def test_search_prompts_searches_name_description_content(
+        self, prompt_service, mock_repository
+    ):
         """
         CURRENT BEHAVIOR: Search queries name, description, AND content fields.
         """

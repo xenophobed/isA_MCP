@@ -8,6 +8,7 @@ Requirements:
     - Running MCP server
     - TEST_MCP_URL environment variable set
 """
+
 import pytest
 import httpx
 
@@ -20,17 +21,16 @@ from tests.contracts.search.data_contract import (
     SearchStrategy,
 )
 
-
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 async def api_client(test_config):
     """Create async HTTP client for API tests."""
     async with httpx.AsyncClient(
-        base_url=test_config.get("mcp_url", "http://localhost:8081"),
-        timeout=30.0
+        base_url=test_config.get("mcp_url", "http://localhost:8081"), timeout=30.0
     ) as client:
         yield client
 
@@ -38,6 +38,7 @@ async def api_client(test_config):
 # ═══════════════════════════════════════════════════════════════
 # POST /api/v1/search - Hierarchical Search
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.search
@@ -158,6 +159,7 @@ class TestHierarchicalSearchAPI:
 # GET /api/v1/search/skills - Search Skills Only
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.api
 @pytest.mark.search
 class TestSearchSkillsAPI:
@@ -167,8 +169,7 @@ class TestSearchSkillsAPI:
     async def test_skill_search_returns_200(self, api_client):
         """Test that skill-only search returns 200 OK."""
         response = await api_client.get(
-            "/api/v1/search/skills",
-            params={"query": "calendar scheduling"}
+            "/api/v1/search/skills", params={"query": "calendar scheduling"}
         )
         assert response.status_code == 200
         data = response.json()
@@ -178,8 +179,7 @@ class TestSearchSkillsAPI:
     async def test_skill_search_respects_limit(self, api_client):
         """Test that skill search respects limit parameter."""
         response = await api_client.get(
-            "/api/v1/search/skills",
-            params={"query": "test", "limit": 2}
+            "/api/v1/search/skills", params={"query": "test", "limit": 2}
         )
         assert response.status_code == 200
         assert len(response.json()) <= 2
@@ -188,8 +188,7 @@ class TestSearchSkillsAPI:
     async def test_skill_search_respects_threshold(self, api_client):
         """Test that skill search respects threshold parameter."""
         response = await api_client.get(
-            "/api/v1/search/skills",
-            params={"query": "test", "threshold": 0.8}
+            "/api/v1/search/skills", params={"query": "test", "threshold": 0.8}
         )
         assert response.status_code == 200
         # All scores should be >= threshold
@@ -201,6 +200,7 @@ class TestSearchSkillsAPI:
 # GET /api/v1/search/tools - Search Tools Only
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.api
 @pytest.mark.search
 class TestSearchToolsAPI:
@@ -209,10 +209,7 @@ class TestSearchToolsAPI:
     @pytest.mark.asyncio
     async def test_tool_search_returns_200(self, api_client):
         """Test that tool search returns 200 OK."""
-        response = await api_client.get(
-            "/api/v1/search/tools",
-            params={"query": "create event"}
-        )
+        response = await api_client.get("/api/v1/search/tools", params={"query": "create event"})
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -222,10 +219,7 @@ class TestSearchToolsAPI:
         """Test that tool search can filter by skill IDs."""
         response = await api_client.get(
             "/api/v1/search/tools",
-            params={
-                "query": "create",
-                "skill_ids": "calendar-management,search-retrieval"
-            }
+            params={"query": "create", "skill_ids": "calendar-management,search-retrieval"},
         )
         assert response.status_code == 200
 
@@ -233,8 +227,7 @@ class TestSearchToolsAPI:
     async def test_tool_search_with_item_type(self, api_client):
         """Test that tool search can filter by item type."""
         response = await api_client.get(
-            "/api/v1/search/tools",
-            params={"query": "test", "item_type": "tool"}
+            "/api/v1/search/tools", params={"query": "test", "item_type": "tool"}
         )
         assert response.status_code == 200
         for item in response.json():
@@ -244,6 +237,7 @@ class TestSearchToolsAPI:
 # ═══════════════════════════════════════════════════════════════
 # Error Handling Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.api
 @pytest.mark.search
@@ -275,6 +269,7 @@ class TestSearchErrorHandling:
 # Performance Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.api
 @pytest.mark.search
 @pytest.mark.slow
@@ -301,10 +296,7 @@ class TestSearchAPIPerformance:
         import asyncio
 
         async def make_search(query):
-            return await api_client.post(
-                "/api/v1/search",
-                json={"query": query}
-            )
+            return await api_client.post("/api/v1/search", json={"query": query})
 
         queries = ["schedule meeting", "query data", "send email", "read file", "search web"]
 

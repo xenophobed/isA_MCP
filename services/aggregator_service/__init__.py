@@ -9,6 +9,7 @@ Provides:
 - RequestRouter: Routing requests to external servers
 - create_aggregator_service: Factory function with all dependencies wired
 """
+
 import logging
 from typing import Optional
 
@@ -21,19 +22,17 @@ from .request_router import RequestRouter
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'AggregatorService',
-    'ServerRegistry',
-    'SessionManager',
-    'ToolAggregator',
-    'RequestRouter',
-    'create_aggregator_service',
+    "AggregatorService",
+    "ServerRegistry",
+    "SessionManager",
+    "ToolAggregator",
+    "RequestRouter",
+    "create_aggregator_service",
 ]
 
 
 async def create_aggregator_service(
-    db_pool=None,
-    enable_classification: bool = True,
-    model_client=None
+    db_pool=None, enable_classification: bool = True, model_client=None
 ) -> AggregatorService:
     """
     Factory function to create a fully configured AggregatorService.
@@ -74,6 +73,7 @@ async def create_aggregator_service(
     # Create database pool if not provided
     if db_pool is None:
         import asyncpg
+
         db_pool = await asyncpg.create_pool(
             host=settings.infrastructure.postgres_host,
             port=settings.infrastructure.postgres_port,
@@ -81,7 +81,7 @@ async def create_aggregator_service(
             password=settings.infrastructure.postgres_password,
             database=settings.infrastructure.postgres_db,
             min_size=2,
-            max_size=10
+            max_size=10,
         )
         logger.info("Created asyncpg pool for AggregatorService")
 
@@ -97,10 +97,7 @@ async def create_aggregator_service(
             from services.skill_service.skill_repository import SkillRepository
 
             skill_repo = SkillRepository()
-            skill_classifier = SkillService(
-                repository=skill_repo,
-                model_client=model_client
-            )
+            skill_classifier = SkillService(repository=skill_repo, model_client=model_client)
             logger.info("SkillService initialized for automatic tool classification")
         except Exception as e:
             logger.warning(f"Failed to initialize SkillService: {e}. Classification disabled.")
@@ -109,6 +106,7 @@ async def create_aggregator_service(
     if model_client is None:
         try:
             from core.clients.model_client import get_model_client
+
             model_client = await get_model_client()
         except Exception as e:
             logger.warning(f"Failed to get model client: {e}. Using mock embeddings.")
@@ -119,7 +117,7 @@ async def create_aggregator_service(
         vector_repository=vector_repo,
         skill_classifier=skill_classifier,
         model_client=model_client,
-        db_pool=db_pool
+        db_pool=db_pool,
     )
 
     logger.info(

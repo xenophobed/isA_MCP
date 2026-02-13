@@ -19,27 +19,34 @@ New features in isA_Data/services/vector_service:
 """
 
 import warnings
+
 warnings.warn(
     "tools.services.intelligence_service.vector_db is deprecated and has been "
     "migrated to isA_Data. Use 'from services.vector_service import ...' in isA_Data instead. "
     "This module will be removed in a future release.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
-from .base_vector_db import BaseVectorDB, SearchResult, VectorSearchConfig, SearchMode, RankingMethod
+from .base_vector_db import (
+    BaseVectorDB,
+    SearchResult,
+    VectorSearchConfig,
+    SearchMode,
+    RankingMethod,
+)
 from .vector_db_factory import get_vector_db, VectorDBType, create_vector_db, get_default_config
 from .qdrant_vector_db import QdrantVectorDB
 
 __all__ = [
-    'BaseVectorDB',
-    'SearchResult',
-    'VectorSearchConfig',
-    'SearchMode',
-    'RankingMethod',
-    'get_vector_db',
-    'VectorDBType',
-    'create_vector_db',
-    'get_default_config',
-    'QdrantVectorDB'
+    "BaseVectorDB",
+    "SearchResult",
+    "VectorSearchConfig",
+    "SearchMode",
+    "RankingMethod",
+    "get_vector_db",
+    "VectorDBType",
+    "create_vector_db",
+    "get_default_config",
+    "QdrantVectorDB",
 ]

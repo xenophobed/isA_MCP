@@ -26,9 +26,9 @@ class VectorRepository:
     # Type offsets to ensure unique Qdrant point IDs across different item types
     # Each type gets a 1M range to prevent ID collisions
     TYPE_OFFSETS = {
-        "tool": 0,           # IDs 0 - 999,999
+        "tool": 0,  # IDs 0 - 999,999
         "prompt": 1_000_000,  # IDs 1,000,000 - 1,999,999
-        "resource": 2_000_000, # IDs 2,000,000 - 2,999,999
+        "resource": 2_000_000,  # IDs 2,000,000 - 2,999,999
     }
 
     def _compute_point_id(self, item_type: str, db_id: int) -> int:
@@ -51,9 +51,7 @@ class VectorRepository:
 
         # Initialize Qdrant client
         try:
-            self.client = AsyncQdrantClient(
-                host=host, port=port, user_id="mcp-vector-service"
-            )
+            self.client = AsyncQdrantClient(host=host, port=port, user_id="mcp-vector-service")
             logger.debug(f"Connected to Qdrant at {host}:{port}")
         except Exception as e:
             logger.error(f"Failed to initialize Qdrant client: {e}")
@@ -305,18 +303,14 @@ class VectorRepository:
                     f"❌ [VectorRepo] Dimension mismatch: expected {self.vector_dimension}, got {len(query_embedding)}"
                 )
                 return []
-            logger.info(
-                f"✅ [VectorRepo] Vector dimension validated: {self.vector_dimension}D"
-            )
+            logger.info(f"✅ [VectorRepo] Vector dimension validated: {self.vector_dimension}D")
 
             # Build filter conditions
             filter_conditions = None
 
             # Add type filter if specified
             if item_type:
-                filter_conditions = {
-                    "must": [{"field": "type", "match": {"keyword": item_type}}]
-                }
+                filter_conditions = {"must": [{"field": "type", "match": {"keyword": item_type}}]}
                 logger.info(f"🔧 [VectorRepo] Applied type filter: {item_type}")
 
             # Perform search
@@ -405,9 +399,7 @@ class VectorRepository:
             # Ensure item_id is an integer for Qdrant
             point_id = int(item_id) if not isinstance(item_id, int) else item_id
 
-            operation_id = await self.client.delete_points(
-                self.collection_name, [point_id]
-            )
+            operation_id = await self.client.delete_points(self.collection_name, [point_id])
 
             if operation_id:
                 logger.info(f"Deleted vector: {point_id}")
@@ -457,9 +449,7 @@ class VectorRepository:
         """
         try:
             # Build filter conditions for isa_common QdrantClient
-            filter_conditions = {
-                "must": [{"field": "type", "match": {"keyword": item_type}}]
-            }
+            filter_conditions = {"must": [{"field": "type", "match": {"keyword": item_type}}]}
 
             # Scroll through all points of this type
             items = []
@@ -503,9 +493,7 @@ class VectorRepository:
                 if not offset_id:
                     break
 
-            logger.debug(
-                f"Retrieved {len(items)} items of type '{item_type}' from Qdrant"
-            )
+            logger.debug(f"Retrieved {len(items)} items of type '{item_type}' from Qdrant")
             return items
 
         except Exception as e:

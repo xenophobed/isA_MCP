@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_custom_prompts(mcp):
     """Register Custom ⚡ category prompts with the MCP server"""
-    
+
     @mcp.prompt("general_content_prompt")
     async def general_content_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for general content creation with research capabilities
-        
+
         This prompt guides content creation for comprehensive, well-researched content
         on any topic with proper citations and professional quality.
-        
+
         Args:
             subject: The main topic or subject for content creation
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: general, content, research, comprehensive, professional, citations
         Category: custom
         """
-        
+
         prompt_template = f"""
 # Expert Content Creator with Research Capabilities
 
@@ -67,32 +65,29 @@ def register_custom_prompts(mcp):
 
 Create comprehensive, well-sourced content that meets these specifications.
 """
-        
+
         return prompt_template.strip()
-    
+
     @mcp.prompt("research_report_prompt")
     async def research_report_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for detailed research analysis and academic-style reports
-        
+
         This prompt guides creation of comprehensive research reports with
         academic rigor and detailed analysis.
-        
+
         Args:
             subject: The research topic or subject
             depth: Analysis depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: research, report, academic, analysis, detailed, scholarly
         Category: custom
         """
-        
+
         prompt_template = f"""
 # Research Analyst with Academic Expertise
 
@@ -129,12 +124,13 @@ Create comprehensive, well-sourced content that meets these specifications.
 
 Create a professional research report that meets academic standards.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Custom ⚡ prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_custom_prompts(mcp)

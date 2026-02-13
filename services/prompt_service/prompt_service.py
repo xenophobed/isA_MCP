@@ -19,13 +19,13 @@ class PromptService:
 
     async def register_prompt(self, prompt_data: Dict[str, Any]) -> Dict[str, Any]:
         """Register a new prompt"""
-        if not prompt_data.get('name'):
+        if not prompt_data.get("name"):
             raise ValueError("Prompt name is required")
 
-        if not prompt_data.get('content'):
+        if not prompt_data.get("content"):
             raise ValueError("Prompt content is required")
 
-        existing = await self.repository.get_prompt_by_name(prompt_data['name'])
+        existing = await self.repository.get_prompt_by_name(prompt_data["name"])
         if existing:
             raise ValueError(f"Prompt '{prompt_data['name']}' already exists")
 
@@ -51,7 +51,7 @@ class PromptService:
         active_only: bool = True,
         tags: Optional[List[str]] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """List prompts with filters"""
         return await self.repository.list_prompts(
@@ -59,23 +59,21 @@ class PromptService:
             is_active=active_only if active_only else None,
             tags=tags,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
 
     async def update_prompt(
-        self,
-        prompt_identifier: Any,
-        updates: Dict[str, Any]
+        self, prompt_identifier: Any, updates: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update prompt information"""
         prompt = await self.get_prompt(prompt_identifier)
         if not prompt:
             raise ValueError(f"Prompt not found: {prompt_identifier}")
 
-        prompt_id = prompt['id']
+        prompt_id = prompt["id"]
 
-        if 'name' in updates and updates['name'] != prompt['name']:
-            existing = await self.repository.get_prompt_by_name(updates['name'])
+        if "name" in updates and updates["name"] != prompt["name"]:
+            existing = await self.repository.get_prompt_by_name(updates["name"])
             if existing:
                 raise ValueError(f"Prompt name '{updates['name']}' already exists")
 
@@ -93,26 +91,19 @@ class PromptService:
         if not prompt:
             raise ValueError(f"Prompt not found: {prompt_identifier}")
 
-        success = await self.repository.delete_prompt(prompt['id'])
+        success = await self.repository.delete_prompt(prompt["id"])
         if success:
             logger.info(f"Deleted prompt: {prompt['name']}")
         return success
 
-    async def record_prompt_usage(
-        self,
-        prompt_identifier: Any,
-        generation_time_ms: int
-    ) -> bool:
+    async def record_prompt_usage(self, prompt_identifier: Any, generation_time_ms: int) -> bool:
         """Record prompt usage"""
         prompt = await self.get_prompt(prompt_identifier)
         if not prompt:
             logger.warning(f"Cannot record usage for unknown prompt: {prompt_identifier}")
             return False
 
-        return await self.repository.increment_usage_count(
-            prompt['id'],
-            generation_time_ms
-        )
+        return await self.repository.increment_usage_count(prompt["id"], generation_time_ms)
 
     async def search_prompts(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search prompts"""
@@ -125,5 +116,5 @@ class PromptService:
     async def get_popular_prompts(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get most popular prompts"""
         all_prompts = await self.repository.list_prompts(is_active=True, limit=1000)
-        sorted_prompts = sorted(all_prompts, key=lambda p: p.get('usage_count', 0), reverse=True)
+        sorted_prompts = sorted(all_prompts, key=lambda p: p.get("usage_count", 0), reverse=True)
         return sorted_prompts[:limit]

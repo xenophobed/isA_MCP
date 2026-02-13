@@ -4,7 +4,7 @@ Intelligence Service - Foundational AI/ML capabilities for ISA MCP
 
 This service provides reusable AI/ML capabilities that all other services can consume:
 - Vision: UI detection, image analysis, OCR, visual classification
-- Language: Entity extraction, text classification, summarization, content generation  
+- Language: Entity extraction, text classification, summarization, content generation
 - Multimodal: Document understanding, VLM processing
 - Reasoning: Pattern recognition, decision making, causal inference
 

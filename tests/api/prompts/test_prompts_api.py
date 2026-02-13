@@ -3,6 +3,7 @@ TDD TESTS - API Prompts Endpoint Tests
 
 Tests for the MCP prompts/list and prompts/get endpoints.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -38,19 +39,16 @@ class TestPromptsListAPI:
                         "description": "A test prompt",
                         "arguments": [
                             {"name": "topic", "required": True, "description": "The topic"}
-                        ]
+                        ],
                     }
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "prompts/list", "params": {}}
+        )
 
         data = response.json()
 
@@ -75,22 +73,15 @@ class TestPromptsListAPI:
             "id": 1,
             "result": {
                 "prompts": [
-                    {
-                        "name": "test_prompt",
-                        "description": "A test prompt",
-                        "arguments": []
-                    }
+                    {"name": "test_prompt", "description": "A test prompt", "arguments": []}
                 ]
-            }
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "prompts/list", "params": {}}
+        )
 
         data = response.json()
         prompts = data["result"]["prompts"]
@@ -110,21 +101,12 @@ class TestPromptsListAPI:
         """
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {
-                "prompts": []
-            }
-        }
+        mock_response.json.return_value = {"jsonrpc": "2.0", "id": 1, "result": {"prompts": []}}
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/list",
-            "params": {}
-        })
+        response = await mock_mcp_client.post(
+            "/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "prompts/list", "params": {}}
+        )
 
         data = response.json()
         assert data["result"]["prompts"] == []
@@ -159,25 +141,22 @@ class TestPromptsGetAPI:
                 "messages": [
                     {
                         "role": "user",
-                        "content": {
-                            "type": "text",
-                            "text": "Write about Python programming"
-                        }
+                        "content": {"type": "text", "text": "Write about Python programming"},
                     }
-                ]
-            }
+                ],
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {
-                "name": "test_prompt",
-                "arguments": {"topic": "Python programming"}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {"name": "test_prompt", "arguments": {"topic": "Python programming"}},
+            },
+        )
 
         data = response.json()
 
@@ -199,28 +178,20 @@ class TestPromptsGetAPI:
             "jsonrpc": "2.0",
             "id": 1,
             "result": {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": {
-                            "type": "text",
-                            "text": "Test content"
-                        }
-                    }
-                ]
-            }
+                "messages": [{"role": "user", "content": {"type": "text", "text": "Test content"}}]
+            },
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {
-                "name": "test_prompt",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {"name": "test_prompt", "arguments": {}},
+            },
+        )
 
         data = response.json()
         messages = data["result"]["messages"]
@@ -243,22 +214,19 @@ class TestPromptsGetAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Prompt not found: nonexistent_prompt"
-            }
+            "error": {"code": -32602, "message": "Prompt not found: nonexistent_prompt"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {
-                "name": "nonexistent_prompt",
-                "arguments": {}
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {"name": "nonexistent_prompt", "arguments": {}},
+            },
+        )
 
         data = response.json()
 
@@ -278,22 +246,22 @@ class TestPromptsGetAPI:
         mock_response.json.return_value = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {
-                "code": -32602,
-                "message": "Missing required argument: topic"
-            }
+            "error": {"code": -32602, "message": "Missing required argument: topic"},
         }
         mock_mcp_client.post.return_value = mock_response
 
-        response = await mock_mcp_client.post("/mcp", json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "prompts/get",
-            "params": {
-                "name": "test_prompt",
-                "arguments": {}  # Missing required 'topic' argument
-            }
-        })
+        response = await mock_mcp_client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "prompts/get",
+                "params": {
+                    "name": "test_prompt",
+                    "arguments": {},  # Missing required 'topic' argument
+                },
+            },
+        )
 
         data = response.json()
 
@@ -321,12 +289,12 @@ class TestPromptsAPIGolden:
                             {
                                 "name": "string",
                                 "description": "string (optional)",
-                                "required": "boolean (optional)"
+                                "required": "boolean (optional)",
                             }
-                        ]
+                        ],
                     }
                 ]
-            }
+            },
         }
 
         assert "result" in expected_schema
@@ -341,16 +309,8 @@ class TestPromptsAPIGolden:
             "id": "integer",
             "result": {
                 "description": "string (optional)",
-                "messages": [
-                    {
-                        "role": "string",
-                        "content": {
-                            "type": "string",
-                            "text": "string"
-                        }
-                    }
-                ]
-            }
+                "messages": [{"role": "string", "content": {"type": "string", "text": "string"}}],
+            },
         }
 
         assert "result" in expected_schema

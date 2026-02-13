@@ -8,6 +8,7 @@ Key Design:
 - Supports STDIO, SSE, HTTP, and STREAMABLE_HTTP transports
 - Proper cleanup on disconnect via manual __aexit__ calls
 """
+
 import asyncio
 import traceback
 from dataclasses import dataclass
@@ -31,12 +32,13 @@ class ManagedConnection:
     Stores the context manager to prevent it from being garbage collected,
     which would close the underlying transport.
     """
+
     server_id: str
     transport_type: ServerTransportType
     context_manager: Any  # The async context manager (keeps transport alive)
-    read_stream: Any      # MemoryObjectReceiveStream
-    write_stream: Any     # MemoryObjectSendStream
-    session: Any          # ClientSession
+    read_stream: Any  # MemoryObjectReceiveStream
+    write_stream: Any  # MemoryObjectSendStream
+    session: Any  # ClientSession
     session_context: Any  # ClientSession context manager (for proper cleanup)
     connected_at: datetime
     get_session_id: Optional[Any] = None  # For streamable HTTP
@@ -111,30 +113,21 @@ class SessionManager:
         for attempt in range(self._retry_attempts):
             try:
                 # Create transport and session
-                session = await self._create_session(
-                    server_id,
-                    transport_type,
-                    connection_config
-                )
+                session = await self._create_session(server_id, transport_type, connection_config)
 
                 # Store session for quick access
                 self._sessions[server_id] = session
 
                 # Update status to CONNECTED
                 if self._server_registry:
-                    await self._server_registry.update_status(
-                        server_id,
-                        ServerStatus.CONNECTED
-                    )
+                    await self._server_registry.update_status(server_id, ServerStatus.CONNECTED)
 
                 logger.info(f"Connected to server {server_id}")
                 return session
 
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Connection attempt {attempt + 1} failed for {server_id}: {e}"
-                )
+                logger.warning(f"Connection attempt {attempt + 1} failed for {server_id}: {e}")
 
                 # Clean up any partial connection
                 await self._cleanup_connection(server_id)
@@ -148,18 +141,13 @@ class SessionManager:
 
         if self._server_registry:
             await self._server_registry.update_status(
-                server_id,
-                ServerStatus.ERROR,
-                str(last_error)
+                server_id, ServerStatus.ERROR, str(last_error)
             )
 
         raise ConnectionError(error_msg)
 
     async def _create_session(
-        self,
-        server_id: str,
-        transport_type: ServerTransportType,
-        connection_config: Dict[str, Any]
+        self, server_id: str, transport_type: ServerTransportType, connection_config: Dict[str, Any]
     ) -> Any:
         """
         Create transport and session based on transport type.
@@ -204,11 +192,7 @@ class SessionManager:
             return self._create_mock_session(server_id)
 
     async def _create_stdio_session(
-        self,
-        server_id: str,
-        connection_config: Dict[str, Any],
-        stdio_client,
-        ClientSession
+        self, server_id: str, connection_config: Dict[str, Any], stdio_client, ClientSession
     ) -> Any:
         """
         Create STDIO transport session with proper lifecycle management.
@@ -256,8 +240,7 @@ class SessionManager:
                     async with session:
                         # Initialize the MCP protocol
                         await asyncio.wait_for(
-                            session.initialize(),
-                            timeout=self._connection_timeout
+                            session.initialize(), timeout=self._connection_timeout
                         )
 
                         # Store session for caller
@@ -327,11 +310,7 @@ class SessionManager:
         return session
 
     async def _create_sse_session(
-        self,
-        server_id: str,
-        connection_config: Dict[str, Any],
-        sse_client,
-        ClientSession
+        self, server_id: str, connection_config: Dict[str, Any], sse_client, ClientSession
     ) -> Any:
         """Create SSE transport session with proper lifecycle management."""
         url = connection_config["url"]
@@ -351,10 +330,7 @@ class SessionManager:
 
             await session_cm.__aenter__()
 
-            await asyncio.wait_for(
-                session.initialize(),
-                timeout=self._connection_timeout
-            )
+            await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
 
             self._connections[server_id] = ManagedConnection(
                 server_id=server_id,
@@ -364,7 +340,7 @@ class SessionManager:
                 write_stream=write_stream,
                 session=session,
                 session_context=session_cm,
-                connected_at=datetime.now(timezone.utc)
+                connected_at=datetime.now(timezone.utc),
             )
 
             logger.info(f"SSE session created for {server_id}")
@@ -379,7 +355,7 @@ class SessionManager:
         server_id: str,
         connection_config: Dict[str, Any],
         streamablehttp_client,
-        ClientSession
+        ClientSession,
     ) -> Any:
         """Create Streamable HTTP transport session with proper lifecycle management."""
         # Support both 'url' and 'base_url' for flexibility
@@ -393,10 +369,7 @@ class SessionManager:
 
         # Create the context manager
         transport_cm = streamablehttp_client(
-            url=url,
-            headers=headers,
-            timeout=timeout,
-            sse_read_timeout=sse_read_timeout
+            url=url, headers=headers, timeout=timeout, sse_read_timeout=sse_read_timeout
         )
 
         # Manually enter the transport context
@@ -410,10 +383,7 @@ class SessionManager:
 
             await session_cm.__aenter__()
 
-            await asyncio.wait_for(
-                session.initialize(),
-                timeout=self._connection_timeout
-            )
+            await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
 
             self._connections[server_id] = ManagedConnection(
                 server_id=server_id,
@@ -424,11 +394,13 @@ class SessionManager:
                 session=session,
                 session_context=session_cm,
                 connected_at=datetime.now(timezone.utc),
-                get_session_id=get_session_id
+                get_session_id=get_session_id,
             )
 
             session_id = get_session_id() if get_session_id else None
-            logger.info(f"Streamable HTTP session created for {server_id} (session_id: {session_id})")
+            logger.info(
+                f"Streamable HTTP session created for {server_id} (session_id: {session_id})"
+            )
             return session
 
         except Exception as e:
@@ -456,15 +428,19 @@ class SessionManager:
 
             async def list_tools(self):
                 """Return mock tools result."""
+
                 class MockToolsResult:
                     tools = []
+
                 return MockToolsResult()
 
             async def call_tool(self, name: str, arguments: Dict) -> Any:
                 """Return mock tool result."""
+
                 class MockToolResult:
                     content = []
                     isError = False
+
                 return MockToolResult()
 
             async def close(self) -> None:
@@ -485,7 +461,7 @@ class SessionManager:
             write_stream=None,
             session=session,
             session_context=session,
-            connected_at=datetime.now(timezone.utc)
+            connected_at=datetime.now(timezone.utc),
         )
 
         logger.debug(f"Mock session created for {server_id}")
@@ -535,10 +511,7 @@ class SessionManager:
         await self._cleanup_connection(server_id)
 
         if self._server_registry:
-            await self._server_registry.update_status(
-                server_id,
-                ServerStatus.DISCONNECTED
-            )
+            await self._server_registry.update_status(server_id, ServerStatus.DISCONNECTED)
 
         logger.info(f"Disconnected from server {server_id}")
         return True
@@ -587,19 +560,23 @@ class SessionManager:
                 try:
                     result = await session.list_tools()
                     # Handle both dict and object responses
-                    if hasattr(result, 'tools'):
+                    if hasattr(result, "tools"):
                         tools = result.tools
                     else:
                         tools = result.get("tools", [])
 
                     # Convert Tool objects to dicts
                     for tool in tools:
-                        if hasattr(tool, 'name'):
-                            all_tools.append({
-                                "name": tool.name,
-                                "description": tool.description or "",
-                                "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
-                            })
+                        if hasattr(tool, "name"):
+                            all_tools.append(
+                                {
+                                    "name": tool.name,
+                                    "description": tool.description or "",
+                                    "inputSchema": (
+                                        tool.inputSchema if hasattr(tool, "inputSchema") else {}
+                                    ),
+                                }
+                            )
                         else:
                             all_tools.append(tool)
                 except Exception as e:
@@ -608,19 +585,23 @@ class SessionManager:
             for sid, session in self._sessions.items():
                 try:
                     result = await session.list_tools()
-                    if hasattr(result, 'tools'):
+                    if hasattr(result, "tools"):
                         tools = result.tools
                     else:
                         tools = result.get("tools", [])
 
                     for tool in tools:
-                        if hasattr(tool, 'name'):
-                            all_tools.append({
-                                "name": tool.name,
-                                "description": tool.description or "",
-                                "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {},
-                                "server_id": sid
-                            })
+                        if hasattr(tool, "name"):
+                            all_tools.append(
+                                {
+                                    "name": tool.name,
+                                    "description": tool.description or "",
+                                    "inputSchema": (
+                                        tool.inputSchema if hasattr(tool, "inputSchema") else {}
+                                    ),
+                                    "server_id": sid,
+                                }
+                            )
                         else:
                             tool["server_id"] = sid
                             all_tools.append(tool)
@@ -630,10 +611,7 @@ class SessionManager:
         return all_tools
 
     async def call_tool(
-        self,
-        server_id: str,
-        tool_name: str,
-        arguments: Dict[str, Any]
+        self, server_id: str, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Call a tool on an external server.
@@ -657,13 +635,17 @@ class SessionManager:
             result = await session.call_tool(tool_name, arguments)
 
             # Normalize result to dict
-            if hasattr(result, 'content'):
+            if hasattr(result, "content"):
                 return {
-                    "content": [
-                        {"type": c.type, "text": getattr(c, 'text', str(c))}
-                        for c in result.content
-                    ] if result.content else [],
-                    "isError": getattr(result, 'isError', False)
+                    "content": (
+                        [
+                            {"type": c.type, "text": getattr(c, "text", str(c))}
+                            for c in result.content
+                        ]
+                        if result.content
+                        else []
+                    ),
+                    "isError": getattr(result, "isError", False),
                 }
             return result
         except Exception as e:
@@ -712,7 +694,7 @@ class SessionManager:
 
         conn = self._connections.get(server_id)
         if conn and conn.session:
-            if hasattr(conn.session, 'is_connected'):
+            if hasattr(conn.session, "is_connected"):
                 return conn.session.is_connected
 
         return True
@@ -744,5 +726,5 @@ class SessionManager:
             "server_id": conn.server_id,
             "transport_type": conn.transport_type.value,
             "connected_at": conn.connected_at.isoformat(),
-            "session_id": conn.get_session_id() if conn.get_session_id else None
+            "session_id": conn.get_session_id() if conn.get_session_id else None,
         }

@@ -4,6 +4,7 @@ Mock for Redis client.
 Provides a mock implementation of Redis client
 for testing cache operations without a real Redis instance.
 """
+
 from typing import Any, Dict, List, Optional, Set, Union
 from dataclasses import dataclass
 import time
@@ -13,6 +14,7 @@ import json
 @dataclass
 class MockRedisValue:
     """Represents a cached value with optional TTL."""
+
     value: Any
     expire_at: Optional[float] = None
 
@@ -68,7 +70,7 @@ class MockRedisClient:
         ex: int = None,
         px: int = None,
         nx: bool = False,
-        xx: bool = False
+        xx: bool = False,
     ) -> bool:
         """Set a string value."""
         # Handle nx (only set if not exists)
@@ -174,6 +176,7 @@ class MockRedisClient:
         """Get keys matching pattern."""
         self._cleanup_expired()
         import fnmatch
+
         return [k for k in self._data.keys() if fnmatch.fnmatch(k, pattern)]
 
     # ═══════════════════════════════════════════════════════════════
@@ -186,7 +189,9 @@ class MockRedisClient:
             return None
         return self._hashes[name].get(key)
 
-    async def hset(self, name: str, key: str = None, value: str = None, mapping: Dict = None) -> int:
+    async def hset(
+        self, name: str, key: str = None, value: str = None, mapping: Dict = None
+    ) -> int:
         """Set hash field(s)."""
         if name not in self._hashes:
             self._hashes[name] = {}
@@ -285,7 +290,7 @@ class MockRedisClient:
             return []
         if end == -1:
             return self._lists[name][start:]
-        return self._lists[name][start:end + 1]
+        return self._lists[name][start : end + 1]
 
     async def llen(self, name: str) -> int:
         """Get list length."""

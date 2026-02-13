@@ -8,6 +8,7 @@ Coordinates:
 - Installation record management
 - Integration with existing tool infrastructure (mcp.tools)
 """
+
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -269,7 +270,7 @@ class InstallManager:
         # Resolve environment variable placeholders
         if "env" in config:
             resolved_env = {}
-            placeholder_pattern = re.compile(r'\{\{(\w+)\}\}')
+            placeholder_pattern = re.compile(r"\{\{(\w+)\}\}")
 
             for key, value in config["env"].items():
                 if isinstance(value, str):
@@ -279,8 +280,7 @@ class InstallManager:
                     for match in matches:
                         if match in user_config:
                             resolved_value = resolved_value.replace(
-                                f"{{{{{match}}}}}",
-                                user_config[match]
+                                f"{{{{{match}}}}}", user_config[match]
                             )
 
                     resolved_env[key] = resolved_value
@@ -458,11 +458,13 @@ class InstallManager:
             tool_data = []
             for tool in tools:
                 if tool.get("id"):
-                    tool_data.append({
-                        "id": tool["id"],
-                        "name": tool.get("name", ""),
-                        "description": tool.get("description", ""),
-                    })
+                    tool_data.append(
+                        {
+                            "id": tool["id"],
+                            "name": tool.get("name", ""),
+                            "description": tool.get("description", ""),
+                        }
+                    )
 
             if not tool_data:
                 return

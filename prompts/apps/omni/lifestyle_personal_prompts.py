@@ -8,32 +8,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def register_lifestyle_personal_prompts(mcp):
     """Register Lifestyle & Personal 🌟 category prompts with the MCP server"""
-    
+
     @mcp.prompt("productivity_guide_prompt")
     async def productivity_guide_prompt(
-        subject: str = "",
-        depth: str = "deep",
-        reference_urls: str = "",
-        reference_text: str = ""
+        subject: str = "", depth: str = "deep", reference_urls: str = "", reference_text: str = ""
     ) -> str:
         """
         Generate a prompt for comprehensive productivity guide creation
-        
+
         This prompt guides creation of practical productivity systems with
         time management, efficiency optimization, and goal achievement strategies.
-        
+
         Args:
             subject: The productivity topic or area to optimize
             depth: Guide depth (shallow, deep)
             reference_urls: URLs to analyze for reference
             reference_text: Additional context and reference materials
-        
+
         Keywords: productivity, efficiency, time management, optimization, goals, systems
         Category: lifestyle_personal
         """
-        
+
         prompt_template = f"""
 # Productivity Expert with Personal Development Expertise
 
@@ -79,12 +77,13 @@ def register_lifestyle_personal_prompts(mcp):
 
 Create a practical productivity guide that delivers measurable improvement in efficiency and goal achievement.
 """
-        
+
         return prompt_template.strip()
 
     logger.debug("Lifestyle & Personal 🌟 prompts registered successfully")
 
-# For compatibility with auto-discovery  
+
+# For compatibility with auto-discovery
 def register_prompts(mcp):
     """Legacy function name for auto-discovery"""
     register_lifestyle_personal_prompts(mcp)

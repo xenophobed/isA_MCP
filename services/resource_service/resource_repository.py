@@ -29,7 +29,7 @@ class ResourceRepository:
         host = host or settings.infrastructure.postgres_grpc_host
         port = port or settings.infrastructure.postgres_grpc_port
 
-        self.db = AsyncPostgresClient(host=host, port=port, user_id='mcp-resource-service')
+        self.db = AsyncPostgresClient(host=host, port=port, user_id="mcp-resource-service")
         self.schema = "mcp"
         self.table = "resources"
 
@@ -38,8 +38,7 @@ class ResourceRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.table} WHERE id = $1",
-                    params=[resource_id]
+                    f"SELECT * FROM {self.schema}.{self.table} WHERE id = $1", params=[resource_id]
                 )
             return result
         except Exception as e:
@@ -51,8 +50,7 @@ class ResourceRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.table} WHERE uri = $1",
-                    params=[uri]
+                    f"SELECT * FROM {self.schema}.{self.table} WHERE uri = $1", params=[uri]
                 )
             return result
         except Exception as e:
@@ -68,7 +66,7 @@ class ResourceRepository:
         tags: Optional[List[str]] = None,
         limit: int = 100,
         offset: int = 0,
-        org_id: Optional[str] = None
+        org_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """List resources with filters"""
         try:
@@ -130,45 +128,45 @@ class ResourceRepository:
         """Create a new resource (internal or external)"""
         try:
             # Serialize metadata dict to JSON string for PostgreSQL jsonb
-            metadata = resource_data.get('metadata', {})
+            metadata = resource_data.get("metadata", {})
             metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else metadata
 
             # Handle skill_ids - ensure it's a list
-            skill_ids = resource_data.get('skill_ids', [])
+            skill_ids = resource_data.get("skill_ids", [])
             if not isinstance(skill_ids, list):
                 skill_ids = []
 
             record = {
-                'uri': resource_data['uri'],
-                'name': resource_data['name'],
-                'description': resource_data.get('description'),
-                'resource_type': resource_data.get('resource_type'),
-                'mime_type': resource_data.get('mime_type'),
-                'size_bytes': resource_data.get('size_bytes', 0),
-                'metadata': metadata_json,
-                'tags': resource_data.get('tags', []),
-                'is_public': resource_data.get('is_public', False),
-                'owner_id': resource_data.get('owner_id'),
-                'allowed_users': resource_data.get('allowed_users', []),
-                'is_active': resource_data.get('is_active', True),
+                "uri": resource_data["uri"],
+                "name": resource_data["name"],
+                "description": resource_data.get("description"),
+                "resource_type": resource_data.get("resource_type"),
+                "mime_type": resource_data.get("mime_type"),
+                "size_bytes": resource_data.get("size_bytes", 0),
+                "metadata": metadata_json,
+                "tags": resource_data.get("tags", []),
+                "is_public": resource_data.get("is_public", False),
+                "owner_id": resource_data.get("owner_id"),
+                "allowed_users": resource_data.get("allowed_users", []),
+                "is_active": resource_data.get("is_active", True),
                 # External resource fields
-                'source_server_id': resource_data.get('source_server_id'),
-                'original_name': resource_data.get('original_name'),
-                'original_uri': resource_data.get('original_uri'),
-                'is_external': resource_data.get('is_external', False),
+                "source_server_id": resource_data.get("source_server_id"),
+                "original_name": resource_data.get("original_name"),
+                "original_uri": resource_data.get("original_uri"),
+                "is_external": resource_data.get("is_external", False),
                 # Skill classification fields (hierarchical search)
-                'skill_ids': skill_ids,
-                'primary_skill_id': resource_data.get('primary_skill_id'),
-                'is_classified': resource_data.get('is_classified', False),
+                "skill_ids": skill_ids,
+                "primary_skill_id": resource_data.get("primary_skill_id"),
+                "is_classified": resource_data.get("is_classified", False),
                 # Multi-tenant field
-                'org_id': resource_data.get('org_id'),
+                "org_id": resource_data.get("org_id"),
             }
 
             async with self.db:
                 count = await self.db.insert_into(self.table, [record], schema=self.schema)
 
             if count and count > 0:
-                return await self.get_resource_by_uri(resource_data['uri'])
+                return await self.get_resource_by_uri(resource_data["uri"])
             return None
         except Exception as e:
             logger.error(f"Failed to create resource: {e}")
@@ -202,20 +200,20 @@ class ResourceRepository:
             Resource ID if created, None on failure
         """
         resource_data = {
-            'uri': uri,
-            'name': name,
-            'description': description,
-            'source_server_id': source_server_id,
-            'original_name': original_name,
-            'original_uri': original_uri,
-            'mime_type': mime_type,
-            'resource_type': resource_type,
-            'is_external': True,
-            'is_active': True,
-            'is_public': True,  # External resources are typically public
+            "uri": uri,
+            "name": name,
+            "description": description,
+            "source_server_id": source_server_id,
+            "original_name": original_name,
+            "original_uri": original_uri,
+            "mime_type": mime_type,
+            "resource_type": resource_type,
+            "is_external": True,
+            "is_active": True,
+            "is_public": True,  # External resources are typically public
         }
         result = await self.create_resource(resource_data)
-        return result.get('id') if result else None
+        return result.get("id") if result else None
 
     async def update_resource(self, resource_id: int, updates: Dict[str, Any]) -> bool:
         """Update resource"""
@@ -225,9 +223,9 @@ class ResourceRepository:
             param_idx = 1
 
             for key, value in updates.items():
-                if key not in ['id', 'created_at', 'updated_at']:
+                if key not in ["id", "created_at", "updated_at"]:
                     # Serialize dict/list to JSON for jsonb columns
-                    if key == 'metadata' and isinstance(value, dict):
+                    if key == "metadata" and isinstance(value, dict):
                         value = json.dumps(value)
                     set_parts.append(f"{key} = ${param_idx}")
                     params.append(value)
@@ -254,7 +252,7 @@ class ResourceRepository:
     async def delete_resource(self, resource_id: int) -> bool:
         """Delete resource (soft delete)"""
         try:
-            return await self.update_resource(resource_id, {'is_active': False})
+            return await self.update_resource(resource_id, {"is_active": False})
         except Exception as e:
             logger.error(f"Failed to delete resource {resource_id}: {e}")
             return False
@@ -283,7 +281,7 @@ class ResourceRepository:
             sql = f"SELECT {self.schema}.user_has_resource_access($1, $2) as has_access"
             async with self.db:
                 result = await self.db.query_row(sql, params=[uri, user_id])
-            return result.get('has_access', False) if result else False
+            return result.get("has_access", False) if result else False
         except Exception as e:
             logger.error(f"Failed to check user access: {e}")
             return False
@@ -349,10 +347,7 @@ class ResourceRepository:
     # =========================================================================
 
     async def list_external_resources(
-        self,
-        server_id: Optional[str] = None,
-        limit: int = 100,
-        offset: int = 0
+        self, server_id: Optional[str] = None, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         List external resources with optional filters.
@@ -412,7 +407,7 @@ class ResourceRepository:
             async with self.db:
                 results = await self.db.query(sql, params=[server_id])
 
-            return [row['id'] for row in results] if results else []
+            return [row["id"] for row in results] if results else []
         except Exception as e:
             logger.error(f"Failed to get resource IDs for server {server_id}: {e}")
             return []
@@ -435,7 +430,7 @@ class ResourceRepository:
             """
             async with self.db:
                 result = await self.db.query_row(count_sql, params=[server_id])
-                count = result.get('count', 0) if result else 0
+                count = result.get("count", 0) if result else 0
 
                 # Delete the resources
                 delete_sql = f"""
@@ -455,8 +450,7 @@ class ResourceRepository:
         try:
             async with self.db:
                 result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.table} WHERE name = $1",
-                    params=[name]
+                    f"SELECT * FROM {self.schema}.{self.table} WHERE name = $1", params=[name]
                 )
             return result
         except Exception as e:
@@ -468,10 +462,7 @@ class ResourceRepository:
     # =========================================================================
 
     async def update_resource_skills(
-        self,
-        resource_id: int,
-        skill_ids: List[str],
-        primary_skill_id: Optional[str] = None
+        self, resource_id: int, skill_ids: List[str], primary_skill_id: Optional[str] = None
     ) -> bool:
         """
         Update skill classification for a resource.
@@ -494,22 +485,21 @@ class ResourceRepository:
                 WHERE id = $4
             """
             async with self.db:
-                await self.db.execute(sql, params=[
-                    skill_ids,
-                    primary_skill_id or (skill_ids[0] if skill_ids else None),
-                    len(skill_ids) > 0,
-                    resource_id
-                ])
+                await self.db.execute(
+                    sql,
+                    params=[
+                        skill_ids,
+                        primary_skill_id or (skill_ids[0] if skill_ids else None),
+                        len(skill_ids) > 0,
+                        resource_id,
+                    ],
+                )
             return True
         except Exception as e:
             logger.error(f"Failed to update resource skills for {resource_id}: {e}")
             return False
 
-    async def get_resources_by_skill(
-        self,
-        skill_id: str,
-        limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    async def get_resources_by_skill(self, skill_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get resources belonging to a skill category.
 
@@ -570,7 +560,7 @@ class ResourceRepository:
         Returns:
             The created/updated resource record
         """
-        uri = resource_data.get('uri')
+        uri = resource_data.get("uri")
         if not uri:
             logger.error("Cannot upsert resource without URI")
             return None
@@ -578,7 +568,7 @@ class ResourceRepository:
         existing = await self.get_resource_by_uri(uri)
         if existing:
             # Update existing resource
-            await self.update_resource(existing['id'], resource_data)
+            await self.update_resource(existing["id"], resource_data)
             return await self.get_resource_by_uri(uri)
         else:
             # Create new resource

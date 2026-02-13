@@ -8,8 +8,8 @@ from .memory_client import MemoryServiceClient, get_memory_client, MemoryService
 from .memory_tools import register_memory_tools
 
 __all__ = [
-    'MemoryServiceClient',
-    'get_memory_client',
-    'MemoryServiceConfig',
-    'register_memory_tools'
+    "MemoryServiceClient",
+    "get_memory_client",
+    "MemoryServiceConfig",
+    "register_memory_tools",
 ]

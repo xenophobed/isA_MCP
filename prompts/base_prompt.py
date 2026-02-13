@@ -27,7 +27,7 @@ class BasePrompt:
         description: Optional[str] = None,
         category: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Register a prompt to MCP server with metadata tracking.
@@ -43,22 +43,24 @@ class BasePrompt:
         """
         prompt_name = name or func.__name__
         prompt_description = description or func.__doc__ or ""
-        prompt_category = category or getattr(func, '_prompt_category', self.default_category)
-        prompt_tags = tags or getattr(func, '_prompt_tags', [])
+        prompt_category = category or getattr(func, "_prompt_category", self.default_category)
+        prompt_tags = tags or getattr(func, "_prompt_tags", [])
 
         # Register with MCP
         if name:
-            kwargs['name'] = name
+            kwargs["name"] = name
         decorated_func = mcp.prompt(**kwargs)(func)
 
         # Track registration
-        self.registered_prompts.append({
-            'name': prompt_name,
-            'function': func.__name__,
-            'description': prompt_description,
-            'category': prompt_category,
-            'tags': prompt_tags
-        })
+        self.registered_prompts.append(
+            {
+                "name": prompt_name,
+                "function": func.__name__,
+                "description": prompt_description,
+                "category": prompt_category,
+                "tags": prompt_tags,
+            }
+        )
 
         logger.info(f"Registered prompt: {prompt_name}")
         return decorated_func
@@ -74,7 +76,7 @@ class BasePrompt:
         self,
         content: Optional[str] = None,
         sections: Optional[Dict[str, str]] = None,
-        variables: Optional[Dict[str, Any]] = None
+        variables: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Format prompt output with optional sections and variable substitution.
@@ -106,7 +108,7 @@ class BasePrompt:
         self,
         role: str,
         capabilities: Optional[List[str]] = None,
-        constraints: Optional[List[str]] = None
+        constraints: Optional[List[str]] = None,
     ) -> str:
         """
         Create a structured system prompt.
@@ -134,9 +136,7 @@ class BasePrompt:
         return "\n".join(parts)
 
     def get_registered_prompts(
-        self,
-        category: Optional[str] = None,
-        tags: Optional[List[str]] = None
+        self, category: Optional[str] = None, tags: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """
         Get registered prompts with optional filtering.
@@ -151,18 +151,15 @@ class BasePrompt:
         result = self.registered_prompts
 
         if category:
-            result = [p for p in result if p.get('category') == category]
+            result = [p for p in result if p.get("category") == category]
 
         if tags:
-            result = [p for p in result if any(t in p.get('tags', []) for t in tags)]
+            result = [p for p in result if any(t in p.get("tags", []) for t in tags)]
 
         return result
 
 
-def simple_prompt(
-    category: str = "default",
-    tags: Optional[List[str]] = None
-):
+def simple_prompt(category: str = "default", tags: Optional[List[str]] = None):
     """
     Decorator for quick prompt definition with metadata.
 
@@ -171,10 +168,12 @@ def simple_prompt(
         def my_prompt(message: str = "") -> str:
             return f"Analyze: {message}"
     """
+
     def decorator(func: Callable) -> Callable:
         func._prompt_category = category
         func._prompt_tags = tags or []
         return func
+
     return decorator
 
 
@@ -188,6 +187,7 @@ def create_simple_prompt_registration(register_func_name: str = "register_prompt
     Returns:
         Class decorator
     """
+
     def decorator(prompt_class):
         def register_function(mcp):
             try:

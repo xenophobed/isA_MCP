@@ -3,6 +3,7 @@ TDD TESTS - API Health Endpoint Tests
 
 Tests for the /health endpoint.
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -34,11 +35,7 @@ class TestHealthAPI:
             "status": "healthy",
             "service": "Smart MCP Server",
             "uptime": "5m 30s",
-            "capabilities": {
-                "tools": 10,
-                "prompts": 5,
-                "resources": 3
-            }
+            "capabilities": {"tools": 10, "prompts": 5, "resources": 3},
         }
         mock_httpx_client.get.return_value = mock_response
 
@@ -63,11 +60,7 @@ class TestHealthAPI:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "status": "healthy",
-            "capabilities": {
-                "tools": 10,
-                "prompts": 5,
-                "resources": 3
-            }
+            "capabilities": {"tools": 10, "prompts": 5, "resources": 3},
         }
         mock_httpx_client.get.return_value = mock_response
 
@@ -89,10 +82,7 @@ class TestHealthAPI:
         """
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "status": "healthy",
-            "uptime": "10m 45s"
-        }
+        mock_response.json.return_value = {"status": "healthy", "uptime": "10m 45s"}
         mock_httpx_client.get.return_value = mock_response
 
         response = await mock_httpx_client.get("/health")
@@ -110,9 +100,7 @@ class TestHealthAPI:
         """
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "status": "initializing"
-        }
+        mock_response.json.return_value = {"status": "initializing"}
         mock_httpx_client.get.return_value = mock_response
 
         response = await mock_httpx_client.get("/health")

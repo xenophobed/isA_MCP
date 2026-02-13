@@ -4,6 +4,7 @@ Progress Manager - Track progress for long-running operations
 
 Uses isa_common RedisClient (gRPC) for storage
 """
+
 import json
 import asyncio
 from datetime import datetime, timedelta
@@ -17,6 +18,7 @@ from core.logging import get_logger
 # Import isa_common RedisClient
 try:
     from isa_common.redis_client import RedisClient
+
     REDIS_CLIENT_AVAILABLE = True
 except ImportError:
     REDIS_CLIENT_AVAILABLE = False
@@ -27,6 +29,7 @@ logger = get_logger(__name__)
 
 class OperationStatus(str, Enum):
     """Operation status enum"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -37,6 +40,7 @@ class OperationStatus(str, Enum):
 @dataclass
 class ProgressData:
     """Progress data structure"""
+
     operation_id: str
     status: OperationStatus
     progress: float  # 0-100
@@ -52,7 +56,9 @@ class ProgressData:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         data = asdict(self)
-        data['status'] = self.status.value if isinstance(self.status, OperationStatus) else self.status
+        data["status"] = (
+            self.status.value if isinstance(self.status, OperationStatus) else self.status
+        )
         return data
 
 
@@ -86,11 +92,11 @@ class ProgressManager:
         # Initialize RedisClient
         if REDIS_CLIENT_AVAILABLE:
             self.redis = RedisClient(
-                host=self.redis_host,
-                port=self.redis_port,
-                user_id='progress-manager'
+                host=self.redis_host, port=self.redis_port, user_id="progress-manager"
             )
-            logger.debug(f"ProgressManager initialized with RedisClient at {self.redis_host}:{self.redis_port}")
+            logger.debug(
+                f"ProgressManager initialized with RedisClient at {self.redis_host}:{self.redis_port}"
+            )
         else:
             # Use in-memory fallback
             self.redis = None
@@ -98,9 +104,7 @@ class ProgressManager:
             logger.debug("ProgressManager using in-memory storage (Redis not available)")
 
     async def start_operation(
-        self,
-        operation_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, operation_id: str, metadata: Optional[Dict[str, Any]] = None
     ) -> ProgressData:
         """
         Start tracking a new operation
@@ -119,7 +123,7 @@ class ProgressManager:
             message="Starting...",
             started_at=datetime.now().isoformat(),
             updated_at=datetime.now().isoformat(),
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         await self._save_progress(progress)
@@ -133,7 +137,7 @@ class ProgressManager:
         current: Optional[int] = None,
         total: Optional[int] = None,
         message: str = "",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[ProgressData]:
         """
         Update operation progress
@@ -177,10 +181,7 @@ class ProgressManager:
         return existing
 
     async def complete_operation(
-        self,
-        operation_id: str,
-        result: Optional[Dict[str, Any]] = None,
-        message: str = "Completed"
+        self, operation_id: str, result: Optional[Dict[str, Any]] = None, message: str = "Completed"
     ) -> Optional[ProgressData]:
         """
         Mark operation as completed
@@ -213,10 +214,7 @@ class ProgressManager:
         return existing
 
     async def fail_operation(
-        self,
-        operation_id: str,
-        error: str,
-        message: str = "Failed"
+        self, operation_id: str, error: str, message: str = "Failed"
     ) -> Optional[ProgressData]:
         """
         Mark operation as failed
@@ -331,9 +329,7 @@ class ProgressManager:
             return None
 
     async def list_operations(
-        self,
-        status: Optional[OperationStatus] = None,
-        limit: int = 100
+        self, status: Optional[OperationStatus] = None, limit: int = 100
     ) -> List[ProgressData]:
         """
         List all tracked operations
@@ -354,7 +350,7 @@ class ProgressManager:
                 keys = [k for k in self._memory_store.keys() if k.startswith("progress:")]
 
             operations = []
-            for key in keys[:limit * 2]:  # Get more keys in case we need to filter
+            for key in keys[: limit * 2]:  # Get more keys in case we need to filter
                 op_id = key.replace("progress:", "")
                 progress = await self.get_progress(op_id)
                 if progress:
@@ -390,10 +386,9 @@ class ProgressManager:
                 try:
                     if self.redis:
                         with self.redis:
-                            self.redis.delete_multiple([
-                                f"progress:{op.operation_id}",
-                                f"result:{op.operation_id}"
-                            ])
+                            self.redis.delete_multiple(
+                                [f"progress:{op.operation_id}", f"result:{op.operation_id}"]
+                            )
                     else:
                         # In-memory fallback
                         self._memory_store.pop(f"progress:{op.operation_id}", None)

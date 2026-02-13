@@ -7,6 +7,7 @@ and use data structures from tests/contracts/skill/data_contract.py.
 
 TDD Status: GREEN PHASE - Implementation complete, tests being enabled.
 """
+
 import pytest
 import json
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ try:
         MockAsyncQdrantClient,
         MockModelClient,
     )
+
     SERVICE_AVAILABLE = True
 except ImportError as e:
     # Service not yet available or path issue - tests will be skipped
@@ -46,6 +48,7 @@ except ImportError as e:
     MockModelClient = None
     SERVICE_AVAILABLE = False
     import warnings
+
     warnings.warn(f"SkillService not available for testing: {e}")
 
 
@@ -53,6 +56,7 @@ except ImportError as e:
 # Contract Validation Tests (Data Contract)
 # These tests validate that the data contracts themselves work correctly
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.unit
@@ -150,6 +154,7 @@ class TestDataContractValidation:
 # Fixtures for Skill Service Testing
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def mock_skill_repository():
     """Provide mock skill repository for testing."""
@@ -182,7 +187,7 @@ def skill_service(mock_skill_repository, mock_skill_qdrant, mock_skill_model):
     service = SkillService(
         repository=mock_skill_repository,
         qdrant_client=mock_skill_qdrant,
-        model_client=mock_skill_model
+        model_client=mock_skill_model,
     )
     return service
 
@@ -190,6 +195,7 @@ def skill_service(mock_skill_repository, mock_skill_qdrant, mock_skill_model):
 # ═══════════════════════════════════════════════════════════════
 # BR-001: Skill Category Creation
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -252,9 +258,7 @@ class TestBR001SkillCategoryCreation:
         assert "already exists" in str(exc.value)
 
     @pytest.mark.asyncio
-    async def test_create_skill_generates_embedding(
-        self, skill_service, mock_skill_model
-    ):
+    async def test_create_skill_generates_embedding(self, skill_service, mock_skill_model):
         """Test that creating a skill generates description embedding."""
         # Arrange
         skill_data = {
@@ -350,6 +354,7 @@ class TestBR001SkillCategoryCreationLegacy:
 # BR-002: Tool Classification (LLM)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.skill
@@ -372,26 +377,36 @@ class TestBR002ToolClassification:
     ):
         """Test that tool classification returns skill assignments."""
         # Arrange - seed a skill category first
-        await mock_skill_repository.create_skill_category({
-            "id": "calendar-management",
-            "name": "Calendar Management",
-            "description": "Tools for managing calendars and events",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "calendar-management",
+                "name": "Calendar Management",
+                "description": "Tools for managing calendars and events",
+            }
+        )
 
         # Mock LLM response for classification
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "calendar-management", "confidence": 0.95, "reasoning": "Creates calendar events"},
-            ],
-            "primary_skill_id": "calendar-management",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": "calendar-management",
+                            "confidence": 0.95,
+                            "reasoning": "Creates calendar events",
+                        },
+                    ],
+                    "primary_skill_id": "calendar-management",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
             tool_id=1,
             tool_name="create_calendar_event",
-            tool_description="Create a new event on the calendar with title and time"
+            tool_description="Create a new event on the calendar with title and time",
         )
 
         # Assert
@@ -407,27 +422,35 @@ class TestBR002ToolClassification:
         """Test that classification returns max 3 skill assignments."""
         # Arrange - seed multiple skills
         for i in range(5):
-            await mock_skill_repository.create_skill_category({
-                "id": f"skill_{i}",
-                "name": f"Skill {i}",
-                "description": f"Description for skill {i}",
-            })
+            await mock_skill_repository.create_skill_category(
+                {
+                    "id": f"skill_{i}",
+                    "name": f"Skill {i}",
+                    "description": f"Description for skill {i}",
+                }
+            )
 
         # Mock LLM returning 5 assignments
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": f"skill_{i}", "confidence": 0.9 - i * 0.1, "reasoning": f"Reason {i}"}
-                for i in range(5)
-            ],
-            "primary_skill_id": "skill_0",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": f"skill_{i}",
+                            "confidence": 0.9 - i * 0.1,
+                            "reasoning": f"Reason {i}",
+                        }
+                        for i in range(5)
+                    ],
+                    "primary_skill_id": "skill_0",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test_tool",
-            tool_description="A tool that does many things"
+            tool_id=1, tool_name="test_tool", tool_description="A tool that does many things"
         )
 
         # Assert - should be limited to 3
@@ -439,26 +462,34 @@ class TestBR002ToolClassification:
     ):
         """Test that assignments with confidence < 0.5 are filtered out."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "calendar-management",
-            "name": "Calendar Management",
-            "description": "Tools for calendars",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "calendar-management",
+                "name": "Calendar Management",
+                "description": "Tools for calendars",
+            }
+        )
 
         # Mock LLM returning low confidence
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "calendar-management", "confidence": 0.3, "reasoning": "Maybe related"},
-            ],
-            "primary_skill_id": None,
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": "calendar-management",
+                            "confidence": 0.3,
+                            "reasoning": "Maybe related",
+                        },
+                    ],
+                    "primary_skill_id": None,
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="random_tool",
-            tool_description="A tool that does random things"
+            tool_id=1, tool_name="random_tool", tool_description="A tool that does random things"
         )
 
         # Assert - low confidence assignment filtered out
@@ -470,28 +501,32 @@ class TestBR002ToolClassification:
     ):
         """Test that LLM suggests new skill when no existing skill matches."""
         # Arrange - no matching skills
-        await mock_skill_repository.create_skill_category({
-            "id": "calendar-management",
-            "name": "Calendar Management",
-            "description": "Calendar tools only",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "calendar-management",
+                "name": "Calendar Management",
+                "description": "Calendar tools only",
+            }
+        )
 
         # Mock LLM suggesting new skill
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [],
-            "primary_skill_id": None,
-            "suggested_new_skill": {
-                "name": "Video Processing",
-                "description": "Tools for processing and editing video content",
-                "reasoning": "Tool handles video, no existing category",
-            },
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [],
+                    "primary_skill_id": None,
+                    "suggested_new_skill": {
+                        "name": "Video Processing",
+                        "description": "Tools for processing and editing video content",
+                        "reasoning": "Tool handles video, no existing category",
+                    },
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="video_editor",
-            tool_description="Edit and process video files"
+            tool_id=1, tool_name="video_editor", tool_description="Edit and process video files"
         )
 
         # Assert
@@ -508,24 +543,24 @@ class TestBR002ToolClassification:
     ):
         """Test that tools with human override are skipped."""
         # Arrange - tool already has human override assignment
-        await mock_skill_repository.create_skill_category({
-            "id": "calendar-management",
-            "name": "Calendar Management",
-            "description": "Calendar tools",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "calendar-management",
+                "name": "Calendar Management",
+                "description": "Calendar tools",
+            }
+        )
         await mock_skill_repository.create_assignment(
             tool_id=1,
             skill_id="calendar-management",
             confidence=1.0,
             is_primary=True,
-            source="human_override"
+            source="human_override",
         )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test_tool",
-            tool_description="Test tool"
+            tool_id=1, tool_name="test_tool", tool_description="Test tool"
         )
 
         # Assert - skipped, returns existing
@@ -538,39 +573,40 @@ class TestBR002ToolClassification:
     ):
         """Test that force_reclassify overrides existing classification."""
         # Arrange - tool already classified
-        await mock_skill_repository.create_skill_category({
-            "id": "old-skill",
-            "name": "Old Skill",
-            "description": "Old skill category",
-        })
-        await mock_skill_repository.create_skill_category({
-            "id": "new-skill",
-            "name": "New Skill",
-            "description": "New skill category",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "old-skill",
+                "name": "Old Skill",
+                "description": "Old skill category",
+            }
+        )
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "new-skill",
+                "name": "New Skill",
+                "description": "New skill category",
+            }
+        )
         await mock_skill_repository.create_assignment(
-            tool_id=1,
-            skill_id="old-skill",
-            confidence=0.9,
-            is_primary=True,
-            source="llm_auto"
+            tool_id=1, skill_id="old-skill", confidence=0.9, is_primary=True, source="llm_auto"
         )
 
         # Mock LLM returning new assignment
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "new-skill", "confidence": 0.95, "reasoning": "Better match"},
-            ],
-            "primary_skill_id": "new-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "new-skill", "confidence": 0.95, "reasoning": "Better match"},
+                    ],
+                    "primary_skill_id": "new-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act with force_reclassify
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test_tool",
-            tool_description="Test tool",
-            force_reclassify=True
+            tool_id=1, tool_name="test_tool", tool_description="Test tool", force_reclassify=True
         )
 
         # Assert - new classification applied
@@ -581,6 +617,7 @@ class TestBR002ToolClassification:
 # ═══════════════════════════════════════════════════════════════
 # BR-003: Skill Assignment Storage
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -603,25 +640,29 @@ class TestBR003SkillAssignmentStorage:
     ):
         """Test that assignments are stored in database."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "test-skill",
-            "name": "Test Skill",
-            "description": "A test skill category",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "test-skill",
+                "name": "Test Skill",
+                "description": "A test skill category",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "test-skill", "confidence": 0.9, "reasoning": "Matches"},
-            ],
-            "primary_skill_id": "test-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "test-skill", "confidence": 0.9, "reasoning": "Matches"},
+                    ],
+                    "primary_skill_id": "test-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         await skill_service.classify_tool(
-            tool_id=42,
-            tool_name="test_tool",
-            tool_description="A test tool"
+            tool_id=42, tool_name="test_tool", tool_description="A test tool"
         )
 
         # Assert - verify assignment was created
@@ -636,38 +677,39 @@ class TestBR003SkillAssignmentStorage:
     ):
         """Test that re-classification replaces existing assignments."""
         # Arrange - create skill and existing assignment
-        await mock_skill_repository.create_skill_category({
-            "id": "old-skill",
-            "name": "Old Skill",
-            "description": "Old skill",
-        })
-        await mock_skill_repository.create_skill_category({
-            "id": "new-skill",
-            "name": "New Skill",
-            "description": "New skill",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "old-skill",
+                "name": "Old Skill",
+                "description": "Old skill",
+            }
+        )
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "new-skill",
+                "name": "New Skill",
+                "description": "New skill",
+            }
+        )
         await mock_skill_repository.create_assignment(
-            tool_id=1,
-            skill_id="old-skill",
-            confidence=0.8,
-            is_primary=True,
-            source="llm_auto"
+            tool_id=1, skill_id="old-skill", confidence=0.8, is_primary=True, source="llm_auto"
         )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "new-skill", "confidence": 0.95, "reasoning": "Better match"},
-            ],
-            "primary_skill_id": "new-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "new-skill", "confidence": 0.95, "reasoning": "Better match"},
+                    ],
+                    "primary_skill_id": "new-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act - force reclassify
         await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test_tool",
-            tool_description="Test",
-            force_reclassify=True
+            tool_id=1, tool_name="test_tool", tool_description="Test", force_reclassify=True
         )
 
         # Assert - old assignments deleted
@@ -680,26 +722,28 @@ class TestBR003SkillAssignmentStorage:
     ):
         """Test that skill tool_count is incremented on assignment."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "test-skill",
-            "name": "Test Skill",
-            "description": "A test skill",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "test-skill",
+                "name": "Test Skill",
+                "description": "A test skill",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "test-skill", "confidence": 0.9, "reasoning": "Match"},
-            ],
-            "primary_skill_id": "test-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "test-skill", "confidence": 0.9, "reasoning": "Match"},
+                    ],
+                    "primary_skill_id": "test-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
-        await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test",
-            tool_description="Test tool"
-        )
+        await skill_service.classify_tool(tool_id=1, tool_name="test", tool_description="Test tool")
 
         # Assert - tool count incremented
         increment_calls = mock_skill_repository.get_calls("increment_tool_count")
@@ -710,6 +754,7 @@ class TestBR003SkillAssignmentStorage:
 # ═══════════════════════════════════════════════════════════════
 # BR-004: Skill Embedding Generation (Aggregated)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -727,9 +772,7 @@ class TestBR004SkillEmbeddingGeneration:
     """
 
     @pytest.mark.asyncio
-    async def test_skill_embedding_generated_on_creation(
-        self, skill_service, mock_skill_model
-    ):
+    async def test_skill_embedding_generated_on_creation(self, skill_service, mock_skill_model):
         """Test that skill embedding is generated when skill is created."""
         # Arrange
         skill_data = {
@@ -744,7 +787,10 @@ class TestBR004SkillEmbeddingGeneration:
         # Assert - embedding was generated
         embedding_calls = mock_skill_model.embeddings._calls
         assert len(embedding_calls) >= 1
-        assert "embedding generation" in embedding_calls[0]["input"] or len(embedding_calls[0]["input"]) > 0
+        assert (
+            "embedding generation" in embedding_calls[0]["input"]
+            or len(embedding_calls[0]["input"]) > 0
+        )
 
     @pytest.mark.asyncio
     async def test_skill_embedding_updated_on_description_change(
@@ -752,11 +798,13 @@ class TestBR004SkillEmbeddingGeneration:
     ):
         """Test that skill embedding is updated when description changes."""
         # Arrange - create skill first
-        await mock_skill_repository.create_skill_category({
-            "id": "update_test_skill",
-            "name": "Update Test",
-            "description": "Original description",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "update_test_skill",
+                "name": "Update Test",
+                "description": "Original description",
+            }
+        )
 
         # Clear previous embedding calls
         mock_skill_model.embeddings._calls.clear()
@@ -764,7 +812,7 @@ class TestBR004SkillEmbeddingGeneration:
         # Act - update description
         await skill_service.update_skill_category(
             skill_id="update_test_skill",
-            updates={"description": "New updated description for the skill"}
+            updates={"description": "New updated description for the skill"},
         )
 
         # Assert - new embedding generated
@@ -777,28 +825,36 @@ class TestBR004SkillEmbeddingGeneration:
     ):
         """Test that skill embedding is triggered when tool is assigned."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "embed-trigger-skill",
-            "name": "Embed Trigger Skill",
-            "description": "Skill for testing embedding trigger",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "embed-trigger-skill",
+                "name": "Embed Trigger Skill",
+                "description": "Skill for testing embedding trigger",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "embed-trigger-skill", "confidence": 0.9, "reasoning": "Match"},
-            ],
-            "primary_skill_id": "embed-trigger-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": "embed-trigger-skill",
+                            "confidence": 0.9,
+                            "reasoning": "Match",
+                        },
+                    ],
+                    "primary_skill_id": "embed-trigger-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Clear previous calls
         mock_skill_model.embeddings._calls.clear()
 
         # Act - classify tool (triggers embedding update)
         await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test_tool",
-            tool_description="Test tool"
+            tool_id=1, tool_name="test_tool", tool_description="Test tool"
         )
 
         # Assert - embedding was triggered (may be called multiple times)
@@ -810,6 +866,7 @@ class TestBR004SkillEmbeddingGeneration:
 # ═══════════════════════════════════════════════════════════════
 # BR-006: Manual Assignment Override
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -827,27 +884,29 @@ class TestBR006ManualAssignmentOverride:
     """
 
     @pytest.mark.asyncio
-    async def test_manual_assignment_overwrites_llm(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_manual_assignment_overwrites_llm(self, skill_service, mock_skill_repository):
         """Test that manual assignment replaces LLM assignments."""
         # Arrange - create skills and LLM assignment
-        await mock_skill_repository.create_skill_category({
-            "id": "llm-assigned-skill",
-            "name": "LLM Assigned",
-            "description": "Originally assigned by LLM",
-        })
-        await mock_skill_repository.create_skill_category({
-            "id": "manual-skill",
-            "name": "Manual Skill",
-            "description": "Manually assigned skill",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "llm-assigned-skill",
+                "name": "LLM Assigned",
+                "description": "Originally assigned by LLM",
+            }
+        )
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "manual-skill",
+                "name": "Manual Skill",
+                "description": "Manually assigned skill",
+            }
+        )
         await mock_skill_repository.create_assignment(
             tool_id=1,
             skill_id="llm-assigned-skill",
             confidence=0.8,
             is_primary=True,
-            source="llm_auto"
+            source="llm_auto",
         )
 
         # Act - manual assignment
@@ -855,7 +914,7 @@ class TestBR006ManualAssignmentOverride:
             tool_id=1,
             skill_ids=["manual-skill"],
             primary_skill_id="manual-skill",
-            source="human_override"
+            source="human_override",
         )
 
         # Assert
@@ -873,18 +932,20 @@ class TestBR006ManualAssignmentOverride:
     ):
         """Test that manual assignments have source=human_manual."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "manual-test-skill",
-            "name": "Manual Test Skill",
-            "description": "Skill for manual assignment test",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "manual-test-skill",
+                "name": "Manual Test Skill",
+                "description": "Skill for manual assignment test",
+            }
+        )
 
         # Act
         result = await skill_service.assign_tool_to_skills(
             tool_id=1,
             skill_ids=["manual-test-skill"],
             primary_skill_id="manual-test-skill",
-            source="human_manual"
+            source="human_manual",
         )
 
         # Assert
@@ -899,9 +960,7 @@ class TestBR006ManualAssignmentOverride:
         # Act & Assert
         with pytest.raises(ValueError) as exc:
             await skill_service.assign_tool_to_skills(
-                tool_id=1,
-                skill_ids=["nonexistent-skill"],
-                primary_skill_id="nonexistent-skill"
+                tool_id=1, skill_ids=["nonexistent-skill"], primary_skill_id="nonexistent-skill"
             )
         assert "not found" in str(exc.value)
 
@@ -909,6 +968,7 @@ class TestBR006ManualAssignmentOverride:
 # ═══════════════════════════════════════════════════════════════
 # BR-007: Skill Listing and Filtering
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -931,12 +991,14 @@ class TestBR007SkillListingFiltering:
     ):
         """Test that list_skills returns only active skills by default."""
         # Arrange - create active and inactive skills
-        await mock_skill_repository.create_skill_category({
-            "id": "active-skill",
-            "name": "Active Skill",
-            "description": "An active skill",
-            "is_active": True,
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "active-skill",
+                "name": "Active Skill",
+                "description": "An active skill",
+                "is_active": True,
+            }
+        )
         # Directly modify to set inactive
         mock_skill_repository.skills["inactive-skill"] = {
             "id": "inactive-skill",
@@ -954,23 +1016,25 @@ class TestBR007SkillListingFiltering:
         assert result[0]["id"] == "active-skill"
 
     @pytest.mark.asyncio
-    async def test_list_skills_filters_by_parent_domain(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_list_skills_filters_by_parent_domain(self, skill_service, mock_skill_repository):
         """Test that skills can be filtered by parent_domain."""
         # Arrange - create skills in different domains
-        await mock_skill_repository.create_skill_category({
-            "id": "productivity-skill",
-            "name": "Productivity Skill",
-            "description": "A productivity skill",
-            "parent_domain": "productivity",
-        })
-        await mock_skill_repository.create_skill_category({
-            "id": "development-skill",
-            "name": "Development Skill",
-            "description": "A development skill",
-            "parent_domain": "development",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "productivity-skill",
+                "name": "Productivity Skill",
+                "description": "A productivity skill",
+                "parent_domain": "productivity",
+            }
+        )
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "development-skill",
+                "name": "Development Skill",
+                "description": "A development skill",
+                "parent_domain": "development",
+            }
+        )
 
         # Act - filter by productivity
         result = await skill_service.list_skills(parent_domain="productivity")
@@ -980,16 +1044,16 @@ class TestBR007SkillListingFiltering:
         assert result[0]["id"] == "productivity-skill"
 
     @pytest.mark.asyncio
-    async def test_list_skills_includes_tool_count(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_list_skills_includes_tool_count(self, skill_service, mock_skill_repository):
         """Test that each skill includes tool_count."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "counted-skill",
-            "name": "Counted Skill",
-            "description": "A skill with tool count",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "counted-skill",
+                "name": "Counted Skill",
+                "description": "A skill with tool count",
+            }
+        )
         # Increment tool count
         await mock_skill_repository.increment_tool_count("counted-skill", 5)
 
@@ -1002,17 +1066,17 @@ class TestBR007SkillListingFiltering:
         assert result[0]["tool_count"] == 5
 
     @pytest.mark.asyncio
-    async def test_list_skills_with_pagination(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_list_skills_with_pagination(self, skill_service, mock_skill_repository):
         """Test that list_skills supports pagination."""
         # Arrange - create multiple skills
         for i in range(5):
-            await mock_skill_repository.create_skill_category({
-                "id": f"skill_{i:02d}",
-                "name": f"Skill {i}",
-                "description": f"Description for skill {i}",
-            })
+            await mock_skill_repository.create_skill_category(
+                {
+                    "id": f"skill_{i:02d}",
+                    "name": f"Skill {i}",
+                    "description": f"Description for skill {i}",
+                }
+            )
 
         # Act - get second page
         result = await skill_service.list_skills(limit=2, offset=2)
@@ -1024,6 +1088,7 @@ class TestBR007SkillListingFiltering:
 # ═══════════════════════════════════════════════════════════════
 # BR-008: Get Tools by Skill
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1041,29 +1106,21 @@ class TestBR008GetToolsBySkill:
     """
 
     @pytest.mark.asyncio
-    async def test_get_tools_by_skill_success(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_get_tools_by_skill_success(self, skill_service, mock_skill_repository):
         """Test successful retrieval of tools by skill."""
         # Arrange - create skill with tool assignments
-        await mock_skill_repository.create_skill_category({
-            "id": "tools-skill",
-            "name": "Tools Skill",
-            "description": "A skill with tools",
-        })
-        await mock_skill_repository.create_assignment(
-            tool_id=1,
-            skill_id="tools-skill",
-            confidence=0.9,
-            is_primary=True,
-            source="llm_auto"
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "tools-skill",
+                "name": "Tools Skill",
+                "description": "A skill with tools",
+            }
         )
         await mock_skill_repository.create_assignment(
-            tool_id=2,
-            skill_id="tools-skill",
-            confidence=0.7,
-            is_primary=False,
-            source="llm_auto"
+            tool_id=1, skill_id="tools-skill", confidence=0.9, is_primary=True, source="llm_auto"
+        )
+        await mock_skill_repository.create_assignment(
+            tool_id=2, skill_id="tools-skill", confidence=0.7, is_primary=False, source="llm_auto"
         )
 
         # Act
@@ -1075,9 +1132,7 @@ class TestBR008GetToolsBySkill:
         assert result[0]["confidence"] >= result[1]["confidence"]
 
     @pytest.mark.asyncio
-    async def test_get_tools_by_skill_not_found(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_get_tools_by_skill_not_found(self, skill_service, mock_skill_repository):
         """Test that unknown skill_id raises ValueError."""
         # Act & Assert
         with pytest.raises(ValueError) as exc:
@@ -1090,11 +1145,13 @@ class TestBR008GetToolsBySkill:
     ):
         """Test that skill with no tools returns empty list."""
         # Arrange - create skill without assignments
-        await mock_skill_repository.create_skill_category({
-            "id": "empty-skill",
-            "name": "Empty Skill",
-            "description": "A skill with no tools",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "empty-skill",
+                "name": "Empty Skill",
+                "description": "A skill with no tools",
+            }
+        )
 
         # Act
         result = await skill_service.get_tools_by_skill("empty-skill")
@@ -1103,23 +1160,23 @@ class TestBR008GetToolsBySkill:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_tools_by_skill_with_pagination(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_get_tools_by_skill_with_pagination(self, skill_service, mock_skill_repository):
         """Test that get_tools_by_skill supports pagination."""
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "paginated-skill",
-            "name": "Paginated Skill",
-            "description": "Skill for pagination test",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "paginated-skill",
+                "name": "Paginated Skill",
+                "description": "Skill for pagination test",
+            }
+        )
         for i in range(5):
             await mock_skill_repository.create_assignment(
                 tool_id=i + 1,
                 skill_id="paginated-skill",
                 confidence=0.9 - i * 0.1,
                 is_primary=(i == 0),
-                source="llm_auto"
+                source="llm_auto",
             )
 
         # Act - get with limit
@@ -1132,6 +1189,7 @@ class TestBR008GetToolsBySkill:
 # ═══════════════════════════════════════════════════════════════
 # Edge Cases (from logic_contract.md)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1150,31 +1208,30 @@ class TestEdgeCases:
         Expected: Last write wins, no duplicates
         """
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "concurrent-skill",
-            "name": "Concurrent Skill",
-            "description": "Skill for concurrent test",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "concurrent-skill",
+                "name": "Concurrent Skill",
+                "description": "Skill for concurrent test",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "concurrent-skill", "confidence": 0.9, "reasoning": "Match"},
-            ],
-            "primary_skill_id": "concurrent-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "concurrent-skill", "confidence": 0.9, "reasoning": "Match"},
+                    ],
+                    "primary_skill_id": "concurrent-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act - classify twice (simulating concurrent)
+        await skill_service.classify_tool(tool_id=1, tool_name="test", tool_description="Test")
         await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test",
-            tool_description="Test"
-        )
-        await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test",
-            tool_description="Test",
-            force_reclassify=True
+            tool_id=1, tool_name="test", tool_description="Test", force_reclassify=True
         )
 
         # Assert - should have exactly one assignment (last write wins)
@@ -1192,27 +1249,39 @@ class TestEdgeCases:
         Expected: Assignment rejected, skill_id validated
         """
         # Arrange - only create one skill
-        await mock_skill_repository.create_skill_category({
-            "id": "real-skill",
-            "name": "Real Skill",
-            "description": "A real skill",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "real-skill",
+                "name": "Real Skill",
+                "description": "A real skill",
+            }
+        )
 
         # Mock LLM returning hallucinated skill_id
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "hallucinated-skill", "confidence": 0.99, "reasoning": "Made up"},
-                {"skill_id": "real-skill", "confidence": 0.7, "reasoning": "Actually exists"},
-            ],
-            "primary_skill_id": "hallucinated-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": "hallucinated-skill",
+                            "confidence": 0.99,
+                            "reasoning": "Made up",
+                        },
+                        {
+                            "skill_id": "real-skill",
+                            "confidence": 0.7,
+                            "reasoning": "Actually exists",
+                        },
+                    ],
+                    "primary_skill_id": "hallucinated-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="test",
-            tool_description="Test tool"
+            tool_id=1, tool_name="test", tool_description="Test tool"
         )
 
         # Assert - hallucinated skill filtered out, only real skill remains
@@ -1231,28 +1300,32 @@ class TestEdgeCases:
         Expected: Classification works with truncated description
         """
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "long-desc-skill",
-            "name": "Long Desc Skill",
-            "description": "Skill for long description test",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "long-desc-skill",
+                "name": "Long Desc Skill",
+                "description": "Skill for long description test",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "long-desc-skill", "confidence": 0.8, "reasoning": "Match"},
-            ],
-            "primary_skill_id": "long-desc-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {"skill_id": "long-desc-skill", "confidence": 0.8, "reasoning": "Match"},
+                    ],
+                    "primary_skill_id": "long-desc-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Very long description
         long_description = "A" * 15000
 
         # Act - should not fail
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="long_tool",
-            tool_description=long_description
+            tool_id=1, tool_name="long_tool", tool_description=long_description
         )
 
         # Assert - classification succeeded
@@ -1269,23 +1342,27 @@ class TestEdgeCases:
         Expected: Empty assignments returned, suggestion may be created
         """
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "unrelated-skill",
-            "name": "Unrelated Skill",
-            "description": "Completely unrelated skill",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "unrelated-skill",
+                "name": "Unrelated Skill",
+                "description": "Completely unrelated skill",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [],
-            "primary_skill_id": None,
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [],
+                    "primary_skill_id": None,
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         # Act
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="unique_tool",
-            tool_description="A very unique tool"
+            tool_id=1, tool_name="unique_tool", tool_description="A very unique tool"
         )
 
         # Assert
@@ -1297,6 +1374,7 @@ class TestEdgeCases:
 # Performance Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.skill
@@ -1305,9 +1383,7 @@ class TestPerformanceSLAs:
     """Performance tests based on SLAs from logic contract."""
 
     @pytest.mark.asyncio
-    async def test_create_skill_under_100ms(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_create_skill_under_100ms(self, skill_service, mock_skill_repository):
         """Test that create_skill completes in < 100ms (target p95)."""
         import time
 
@@ -1325,19 +1401,19 @@ class TestPerformanceSLAs:
         assert elapsed < 100, f"create_skill took {elapsed:.2f}ms, expected < 100ms"
 
     @pytest.mark.asyncio
-    async def test_list_skills_under_50ms(
-        self, skill_service, mock_skill_repository
-    ):
+    async def test_list_skills_under_50ms(self, skill_service, mock_skill_repository):
         """Test that list_skills completes in < 50ms (target p95)."""
         import time
 
         # Seed some skills
         for i in range(10):
-            await mock_skill_repository.create_skill_category({
-                "id": f"perf_skill_{i}",
-                "name": f"Perf Skill {i}",
-                "description": f"Performance skill {i}",
-            })
+            await mock_skill_repository.create_skill_category(
+                {
+                    "id": f"perf_skill_{i}",
+                    "name": f"Perf Skill {i}",
+                    "description": f"Performance skill {i}",
+                }
+            )
 
         start = time.perf_counter()
         await skill_service.list_skills()
@@ -1354,25 +1430,33 @@ class TestPerformanceSLAs:
         import time
 
         # Arrange
-        await mock_skill_repository.create_skill_category({
-            "id": "perf-classify-skill",
-            "name": "Perf Classify Skill",
-            "description": "Skill for classification perf test",
-        })
+        await mock_skill_repository.create_skill_category(
+            {
+                "id": "perf-classify-skill",
+                "name": "Perf Classify Skill",
+                "description": "Skill for classification perf test",
+            }
+        )
 
-        mock_skill_model.set_completion_response(json.dumps({
-            "assignments": [
-                {"skill_id": "perf-classify-skill", "confidence": 0.9, "reasoning": "Match"},
-            ],
-            "primary_skill_id": "perf-classify-skill",
-            "suggested_new_skill": None,
-        }))
+        mock_skill_model.set_completion_response(
+            json.dumps(
+                {
+                    "assignments": [
+                        {
+                            "skill_id": "perf-classify-skill",
+                            "confidence": 0.9,
+                            "reasoning": "Match",
+                        },
+                    ],
+                    "primary_skill_id": "perf-classify-skill",
+                    "suggested_new_skill": None,
+                }
+            )
+        )
 
         start = time.perf_counter()
         result = await skill_service.classify_tool(
-            tool_id=1,
-            tool_name="perf_tool",
-            tool_description="Performance test tool"
+            tool_id=1, tool_name="perf_tool", tool_description="Performance test tool"
         )
         elapsed = (time.perf_counter() - start) * 1000  # ms
 

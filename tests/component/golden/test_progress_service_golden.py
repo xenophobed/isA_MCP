@@ -6,6 +6,7 @@ If these tests fail, it means behavior has changed unexpectedly.
 
 Service Under Test: services/progress_service/progress_manager.py
 """
+
 import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -40,8 +41,9 @@ class TestProgressManagerGolden:
     @pytest.fixture
     def progress_manager(self, mock_redis_client):
         """Create ProgressManager with mocked Redis - in-memory mode."""
-        with patch('services.progress_service.progress_manager.REDIS_CLIENT_AVAILABLE', False):
+        with patch("services.progress_service.progress_manager.REDIS_CLIENT_AVAILABLE", False):
             from services.progress_service.progress_manager import ProgressManager
+
             manager = ProgressManager()
             # Force in-memory mode for testing
             manager._use_redis = False
@@ -57,8 +59,7 @@ class TestProgressManagerGolden:
         CURRENT BEHAVIOR: start_operation creates ProgressData with status=RUNNING, progress=0.
         """
         result = await progress_manager.start_operation(
-            operation_id="op_123",
-            metadata={"task": "processing"}
+            operation_id="op_123", metadata={"task": "processing"}
         )
 
         assert result is not None
@@ -76,9 +77,7 @@ class TestProgressManagerGolden:
 
         # Then complete it
         result = await progress_manager.complete_operation(
-            operation_id="op_123",
-            result={"output": "success"},
-            message="Done"
+            operation_id="op_123", result={"output": "success"}, message="Done"
         )
 
         assert result is not None
@@ -94,9 +93,7 @@ class TestProgressManagerGolden:
         await progress_manager.start_operation("op_123", {})
 
         result = await progress_manager.fail_operation(
-            operation_id="op_123",
-            error="Something went wrong",
-            message="Failed"
+            operation_id="op_123", error="Something went wrong", message="Failed"
         )
 
         assert result is not None
@@ -126,9 +123,7 @@ class TestProgressManagerGolden:
         await progress_manager.start_operation("op_123", {})
 
         result = await progress_manager.update_progress(
-            operation_id="op_123",
-            progress=150,  # Over 100
-            message="Almost done"
+            operation_id="op_123", progress=150, message="Almost done"  # Over 100
         )
 
         assert result.progress == 100  # Clamped
@@ -140,9 +135,7 @@ class TestProgressManagerGolden:
         await progress_manager.start_operation("op_123", {})
 
         result = await progress_manager.update_progress(
-            operation_id="op_123",
-            progress=-10,  # Below 0
-            message="Resetting"
+            operation_id="op_123", progress=-10, message="Resetting"  # Below 0
         )
 
         assert result.progress == 0  # Clamped
@@ -161,7 +154,7 @@ class TestProgressManagerGolden:
         assert result.started_at is not None
         # Verify format: YYYY-MM-DDTHH:MM:SS...
         if isinstance(result.started_at, str):
-            datetime.fromisoformat(result.started_at.replace('Z', '+00:00'))
+            datetime.fromisoformat(result.started_at.replace("Z", "+00:00"))
 
     # ═══════════════════════════════════════════════════════════════
     # Get Progress / Result
@@ -208,8 +201,9 @@ class TestProgressManagerGolden:
         """
         CURRENT BEHAVIOR: Falls back to in-memory dict when Redis is unavailable.
         """
-        with patch('services.progress_service.progress_manager.REDIS_CLIENT_AVAILABLE', False):
+        with patch("services.progress_service.progress_manager.REDIS_CLIENT_AVAILABLE", False):
             from services.progress_service.progress_manager import ProgressManager
+
             manager = ProgressManager()
             manager._use_redis = False  # Force in-memory mode
 
@@ -243,7 +237,7 @@ class TestProgressDataGolden:
             updated_at="2024-01-01T00:01:00",
             completed_at=None,
             metadata={"task": "import"},
-            error=None
+            error=None,
         )
 
         assert data.operation_id == "op_123"
@@ -260,16 +254,12 @@ class TestProgressDataGolden:
         """
         from services.progress_service.progress_manager import ProgressData, OperationStatus
 
-        data = ProgressData(
-            operation_id="op_123",
-            status=OperationStatus.RUNNING,
-            progress=50.0
-        )
+        data = ProgressData(operation_id="op_123", status=OperationStatus.RUNNING, progress=50.0)
 
         result = data.to_dict()
 
         assert isinstance(result, dict)
-        assert result['status'] == 'running'  # String value, not enum
+        assert result["status"] == "running"  # String value, not enum
 
 
 @pytest.mark.golden

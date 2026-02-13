@@ -3,6 +3,7 @@ Random data generators for test fixtures.
 
 Provides functions to generate random test data without Factory Boy.
 """
+
 import random
 import string
 import uuid
@@ -13,7 +14,7 @@ from typing import Any, Dict, List, Optional
 def generate_random_string(length: int = 10, prefix: str = "") -> str:
     """Generate a random string."""
     chars = string.ascii_lowercase + string.digits
-    return prefix + ''.join(random.choices(chars, k=length))
+    return prefix + "".join(random.choices(chars, k=length))
 
 
 def generate_random_id(prefix: str = "") -> str:
@@ -37,11 +38,8 @@ def generate_random_timestamp(days_back: int = 30) -> datetime:
 # Domain-Specific Generators
 # ═══════════════════════════════════════════════════════════════
 
-def generate_random_tool(
-    name: str = None,
-    category: str = None,
-    **overrides
-) -> Dict[str, Any]:
+
+def generate_random_tool(name: str = None, category: str = None, **overrides) -> Dict[str, Any]:
     """Generate a random tool definition."""
     categories = ["intelligence", "utility", "web", "data", "user"]
     descriptions = [
@@ -58,13 +56,8 @@ def generate_random_tool(
         "category": category or random.choice(categories),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "The input to process"
-                }
-            },
-            "required": ["input"]
+            "properties": {"input": {"type": "string", "description": "The input to process"}},
+            "required": ["input"],
         },
         "is_active": True,
         "created_at": generate_random_timestamp(),
@@ -75,10 +68,7 @@ def generate_random_tool(
     return tool
 
 
-def generate_random_prompt(
-    name: str = None,
-    **overrides
-) -> Dict[str, Any]:
+def generate_random_prompt(name: str = None, **overrides) -> Dict[str, Any]:
     """Generate a random prompt definition."""
     templates = [
         "You are a helpful assistant. Task: {{task}}",
@@ -91,13 +81,7 @@ def generate_random_prompt(
         "name": name or generate_random_string(8, "prompt_"),
         "description": f"A prompt for {random.choice(['writing', 'analysis', 'coding', 'research'])}",
         "template": random.choice(templates),
-        "arguments": [
-            {
-                "name": "input",
-                "description": "The main input",
-                "required": True
-            }
-        ],
+        "arguments": [{"name": "input", "description": "The main input", "required": True}],
         "created_at": generate_random_timestamp(),
         "updated_at": datetime.utcnow(),
     }
@@ -106,10 +90,7 @@ def generate_random_prompt(
     return prompt
 
 
-def generate_random_resource(
-    uri: str = None,
-    **overrides
-) -> Dict[str, Any]:
+def generate_random_resource(uri: str = None, **overrides) -> Dict[str, Any]:
     """Generate a random resource definition."""
     resource_types = ["data", "config", "template", "schema"]
     mime_types = ["application/json", "text/plain", "application/yaml", "text/markdown"]
@@ -126,10 +107,7 @@ def generate_random_resource(
     return resource
 
 
-def generate_random_user(
-    tier: str = None,
-    **overrides
-) -> Dict[str, Any]:
+def generate_random_user(tier: str = None, **overrides) -> Dict[str, Any]:
     """Generate a random user."""
     tiers = ["free", "pro", "enterprise"]
 
@@ -146,10 +124,7 @@ def generate_random_user(
     return user
 
 
-def generate_random_embedding(
-    dimension: int = 1536,
-    **overrides
-) -> Dict[str, Any]:
+def generate_random_embedding(dimension: int = 1536, **overrides) -> Dict[str, Any]:
     """Generate a random embedding."""
     embedding = {
         "id": generate_random_id(),
@@ -164,10 +139,7 @@ def generate_random_embedding(
 
 
 def generate_random_search_results(
-    count: int = 10,
-    category: str = None,
-    min_score: float = 0.3,
-    max_score: float = 1.0
+    count: int = 10, category: str = None, min_score: float = 0.3, max_score: float = 1.0
 ) -> List[Dict[str, Any]]:
     """Generate random search results with descending scores."""
     categories = ["tool", "prompt", "resource"]
@@ -193,6 +165,7 @@ def generate_random_search_results(
 # Batch Generators
 # ═══════════════════════════════════════════════════════════════
 
+
 def generate_tool_batch(count: int = 5, **common_attrs) -> List[Dict[str, Any]]:
     """Generate multiple tools."""
     return [generate_random_tool(**common_attrs) for _ in range(count)]
@@ -217,40 +190,31 @@ def generate_user_batch(count: int = 5, **common_attrs) -> List[Dict[str, Any]]:
 # Schema Generators
 # ═══════════════════════════════════════════════════════════════
 
+
 def generate_json_schema(
-    properties: Dict[str, str] = None,
-    required: List[str] = None
+    properties: Dict[str, str] = None, required: List[str] = None
 ) -> Dict[str, Any]:
     """Generate a JSON schema."""
     if properties is None:
-        properties = {
-            "input": "string",
-            "count": "integer",
-            "enabled": "boolean"
-        }
+        properties = {"input": "string", "count": "integer", "enabled": "boolean"}
 
     schema_properties = {}
     for name, type_name in properties.items():
-        schema_properties[name] = {
-            "type": type_name,
-            "description": f"The {name} parameter"
-        }
+        schema_properties[name] = {"type": type_name, "description": f"The {name} parameter"}
 
     return {
         "type": "object",
         "properties": schema_properties,
-        "required": required or list(properties.keys())[:1]
+        "required": required or list(properties.keys())[:1],
     }
 
 
-def generate_tool_input_schema(
-    args: List[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+def generate_tool_input_schema(args: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Generate a tool input schema from argument definitions."""
     if args is None:
         args = [
             {"name": "input", "type": "string", "required": True},
-            {"name": "options", "type": "object", "required": False}
+            {"name": "options", "type": "object", "required": False},
         ]
 
     properties = {}
@@ -259,15 +223,11 @@ def generate_tool_input_schema(
     for arg in args:
         properties[arg["name"]] = {
             "type": arg.get("type", "string"),
-            "description": arg.get("description", f"The {arg['name']} parameter")
+            "description": arg.get("description", f"The {arg['name']} parameter"),
         }
         if arg.get("default") is not None:
             properties[arg["name"]]["default"] = arg["default"]
         if arg.get("required", False):
             required.append(arg["name"])
 
-    return {
-        "type": "object",
-        "properties": properties,
-        "required": required
-    }
+    return {"type": "object", "properties": properties, "required": required}

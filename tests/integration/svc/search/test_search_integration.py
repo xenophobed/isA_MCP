@@ -11,6 +11,7 @@ Requirements (port-forwarded from K8s):
 
 Configuration loaded from: deployment/test/config/.env.test (when ENV=test)
 """
+
 import pytest
 import os
 import time
@@ -30,6 +31,7 @@ from tests.contracts.search.data_contract import (
 # Try to import skill data contract, skip if not available
 try:
     from tests.contracts.skill.data_contract import SkillTestDataFactory
+
     SKILL_CONTRACT_AVAILABLE = True
 except ImportError:
     SKILL_CONTRACT_AVAILABLE = False
@@ -38,6 +40,7 @@ except ImportError:
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 async def integration_db_pool():
@@ -129,8 +132,7 @@ async def search_service(integration_db_pool, integration_qdrant_client, integra
     vector_repo = VectorRepository()
 
     service = HierarchicalSearchService(
-        vector_repository=vector_repo,
-        model_client=integration_model_client
+        vector_repository=vector_repo, model_client=integration_model_client
     )
     yield service
 
@@ -153,15 +155,15 @@ async def seeded_environment(integration_qdrant_client):
         yield {
             "skills_count": skills_count,
             "tools_count": tools_count,
-            "seeded": False  # Using existing staging data
+            "seeded": False,  # Using existing staging data
         }
     except Exception as e:
         # If collection doesn't exist or error, still yield to let tests handle it
         yield {
             "skills_count": -1,  # Unknown
-            "tools_count": -1,   # Unknown
+            "tools_count": -1,  # Unknown
             "seeded": False,
-            "note": f"Could not verify counts: {e}"
+            "note": f"Could not verify counts: {e}",
         }
 
 
@@ -169,15 +171,14 @@ async def seeded_environment(integration_qdrant_client):
 # Hierarchical Search Flow Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.search
 class TestHierarchicalSearchFlowIntegration:
     """Integration tests for complete hierarchical search flow."""
 
     @pytest.mark.asyncio
-    async def test_hierarchical_search_end_to_end(
-        self, search_service, seeded_environment
-    ):
+    async def test_hierarchical_search_end_to_end(self, search_service, seeded_environment):
         """Test complete hierarchical search from query to results."""
         # Act
         result = await search_service.search(query="schedule a meeting tomorrow")
@@ -239,6 +240,7 @@ class TestHierarchicalSearchFlowIntegration:
 # Fallback Behavior Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.search
 class TestSearchFallbackIntegration:
@@ -249,8 +251,7 @@ class TestSearchFallbackIntegration:
         """Test that search falls back when no skills match threshold."""
         # Use query unlikely to match any skill with very high threshold
         result = await search_service.search(
-            query="xyzabc random gibberish quantum",
-            skill_threshold=0.99  # Very high threshold
+            query="xyzabc random gibberish quantum", skill_threshold=0.99  # Very high threshold
         )
 
         # Should fall back - no skills matched
@@ -273,15 +274,14 @@ class TestSearchFallbackIntegration:
 # Search Quality Integration Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.integration
 @pytest.mark.search
 class TestSearchQualityIntegration:
     """Integration tests for search quality and relevance."""
 
     @pytest.mark.asyncio
-    async def test_calendar_query_returns_results(
-        self, search_service, seeded_environment
-    ):
+    async def test_calendar_query_returns_results(self, search_service, seeded_environment):
         """Test that calendar queries return results."""
         # Test with calendar query
         result = await search_service.search(query="schedule a meeting")
@@ -291,9 +291,7 @@ class TestSearchQualityIntegration:
         assert result.query == "schedule a meeting"
 
     @pytest.mark.asyncio
-    async def test_generic_query_returns_results(
-        self, search_service, seeded_environment
-    ):
+    async def test_generic_query_returns_results(self, search_service, seeded_environment):
         """Test that generic queries return results."""
         # Act
         result = await search_service.search(query="help me with a task")
@@ -309,16 +307,12 @@ class TestSearchQualityIntegration:
         """Test that lower threshold returns more results."""
         # Search with low threshold
         result_low = await search_service.search(
-            query="tools",
-            skill_threshold=0.1,
-            tool_threshold=0.1
+            query="tools", skill_threshold=0.1, tool_threshold=0.1
         )
 
         # Search with high threshold
         result_high = await search_service.search(
-            query="tools",
-            skill_threshold=0.9,
-            tool_threshold=0.9
+            query="tools", skill_threshold=0.9, tool_threshold=0.9
         )
 
         # Low threshold should return >= high threshold results
@@ -333,12 +327,15 @@ class TestSearchQualityIntegration:
         # Tools should be sorted by score descending
         if len(result.tools) > 1:
             scores = [t.score for t in result.tools]
-            assert scores == sorted(scores, reverse=True), "Tools should be sorted by score descending"
+            assert scores == sorted(
+                scores, reverse=True
+            ), "Tools should be sorted by score descending"
 
 
 # ═══════════════════════════════════════════════════════════════
 # Performance Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.search
@@ -381,10 +378,7 @@ class TestSearchPerformanceIntegration:
         ]
 
         # Run concurrently
-        results = await asyncio.gather(*[
-            search_service.search(query=q)
-            for q in queries
-        ])
+        results = await asyncio.gather(*[search_service.search(query=q) for q in queries])
 
         # All should complete
         assert len(results) == len(queries)
@@ -396,6 +390,7 @@ class TestSearchPerformanceIntegration:
 # ═══════════════════════════════════════════════════════════════
 # Error Handling Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.search
@@ -428,6 +423,7 @@ class TestSearchErrorHandlingIntegration:
 # ═══════════════════════════════════════════════════════════════
 # Schema Loading Integration Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.integration
 @pytest.mark.search

@@ -32,7 +32,7 @@ def register_web_tools(mcp: FastMCP):
         count: int = 10,
         freshness: Optional[str] = None,
         result_filter: Optional[str] = None,
-        goggle_type: Optional[str] = None
+        goggle_type: Optional[str] = None,
     ) -> str:
         """Search the web for information. Use when user needs latest, current, or recent information.
 
@@ -66,50 +66,53 @@ def register_web_tools(mcp: FastMCP):
                 count=count,
                 freshness=freshness,
                 result_filter=result_filter,
-                goggle_type=goggle_type
+                goggle_type=goggle_type,
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('completed'):
-                    final_result = message.get('result', {})
+                if message.get("completed"):
+                    final_result = message.get("result", {})
 
             # Return formatted response with progress history (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_result else "error",
-                action="web_search",
-                data={
-                    "query": query,
-                    "results": final_result.get('results', []) if final_result else [],
-                    "total_results": final_result.get('total_results', 0) if final_result else 0,
-                    "execution_time": final_result.get('execution_time', 0) if final_result else 0,
-                    "provider": final_result.get('provider', 'brave') if final_result else 'brave',
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_result else "error",
+                    action="web_search",
+                    data={
+                        "query": query,
+                        "results": final_result.get("results", []) if final_result else [],
+                        "total_results": (
+                            final_result.get("total_results", 0) if final_result else 0
+                        ),
+                        "execution_time": (
+                            final_result.get("execution_time", 0) if final_result else 0
+                        ),
+                        "provider": (
+                            final_result.get("provider", "brave") if final_result else "brave"
+                        ),
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in web_search: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_search",
-                data={"query": query},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error", action="web_search", data={"query": query}, error_message=str(e)
+                )
+            )
 
     @mcp.tool()
     @security_manager.security_check
     @security_manager.require_authorization(SecurityLevel.MEDIUM)
     async def deep_web_search(
-        query: str,
-        user_id: str,
-        depth: int = 2,
-        rag_mode: bool = True
+        query: str, user_id: str, depth: int = 2, rag_mode: bool = True
     ) -> str:
         """Deep web search with multi-strategy approach and progress tracking
 
@@ -155,45 +158,51 @@ def register_web_tools(mcp: FastMCP):
             final_result = None
 
             async for message in client.deep_search(
-                query=query,
-                user_id=user_id,
-                depth=depth,
-                rag_mode=rag_mode
+                query=query, user_id=user_id, depth=depth, rag_mode=rag_mode
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('completed'):
-                    final_result = message.get('result', {})
+                if message.get("completed"):
+                    final_result = message.get("result", {})
 
             # Return formatted response (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_result else "error",
-                action="deep_web_search",
-                data={
-                    "query": query,
-                    "results": final_result.get('results', []) if final_result else [],
-                    "refined_queries": final_result.get('refined_queries', []) if final_result else [],
-                    "total_results": final_result.get('total_results', 0) if final_result else 0,
-                    "execution_time": final_result.get('execution_time', 0) if final_result else 0,
-                    "rag_summary": final_result.get('rag_summary') if final_result else None,
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_result else "error",
+                    action="deep_web_search",
+                    data={
+                        "query": query,
+                        "results": final_result.get("results", []) if final_result else [],
+                        "refined_queries": (
+                            final_result.get("refined_queries", []) if final_result else []
+                        ),
+                        "total_results": (
+                            final_result.get("total_results", 0) if final_result else 0
+                        ),
+                        "execution_time": (
+                            final_result.get("execution_time", 0) if final_result else 0
+                        ),
+                        "rag_summary": final_result.get("rag_summary") if final_result else None,
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in deep_web_search: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="deep_web_search",
-                data={"query": query, "user_id": user_id},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error",
+                    action="deep_web_search",
+                    data={"query": query, "user_id": user_id},
+                    error_message=str(e),
+                )
+            )
 
     @mcp.tool()
     @security_manager.security_check
@@ -203,7 +212,7 @@ def register_web_tools(mcp: FastMCP):
         user_id: str,
         count: int = 10,
         summarize_count: int = 5,
-        include_citations: bool = True
+        include_citations: bool = True,
     ) -> str:
         """Web search with AI-powered summary and progress tracking
 
@@ -259,42 +268,49 @@ def register_web_tools(mcp: FastMCP):
                 user_id=user_id,
                 count=count,
                 summarize_count=summarize_count,
-                include_citations=include_citations
+                include_citations=include_citations,
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('completed'):
-                    final_result = message.get('result', {})
+                if message.get("completed"):
+                    final_result = message.get("result", {})
 
             # Return formatted response (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_result else "error",
-                action="web_search_with_summary",
-                data={
-                    "query": query,
-                    "results": final_result.get('results', []) if final_result else [],
-                    "summary": final_result.get('summary') if final_result else None,
-                    "citations": final_result.get('citations', []) if final_result else [],
-                    "total_results": final_result.get('total_results', 0) if final_result else 0,
-                    "execution_time": final_result.get('execution_time', 0) if final_result else 0,
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_result else "error",
+                    action="web_search_with_summary",
+                    data={
+                        "query": query,
+                        "results": final_result.get("results", []) if final_result else [],
+                        "summary": final_result.get("summary") if final_result else None,
+                        "citations": final_result.get("citations", []) if final_result else [],
+                        "total_results": (
+                            final_result.get("total_results", 0) if final_result else 0
+                        ),
+                        "execution_time": (
+                            final_result.get("execution_time", 0) if final_result else 0
+                        ),
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in web_search_with_summary: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_search_with_summary",
-                data={"query": query, "user_id": user_id},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error",
+                    action="web_search_with_summary",
+                    data={"query": query, "user_id": user_id},
+                    error_message=str(e),
+                )
+            )
 
     # ========== WEB CRAWL TOOLS ==========
 
@@ -306,7 +322,7 @@ def register_web_tools(mcp: FastMCP):
         provider: str = "self_hosted_crawl",
         use_vlm: bool = False,
         analyze: bool = False,
-        analysis_request: Optional[str] = None
+        analysis_request: Optional[str] = None,
     ) -> str:
         """Crawl and extract content from a web page with progress tracking
 
@@ -358,45 +374,47 @@ def register_web_tools(mcp: FastMCP):
                 provider=provider,
                 use_vlm=use_vlm,
                 analyze=analyze,
-                analysis_request=analysis_request
+                analysis_request=analysis_request,
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('data'):
-                    final_data = message.get('data', {})
+                if message.get("data"):
+                    final_data = message.get("data", {})
 
             # Return formatted response (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_data else "error",
-                action="web_crawl",
-                data={
-                    "url": url,
-                    "title": final_data.get('title') if final_data else None,
-                    "content": final_data.get('content') if final_data else None,
-                    "markdown": final_data.get('markdown') if final_data else None,
-                    "links": final_data.get('links', []) if final_data else [],
-                    "images": final_data.get('images', []) if final_data else [],
-                    "analysis": final_data.get('analysis') if final_data else None,
-                    "extraction_method": final_data.get('extraction_method') if final_data else None,
-                    "execution_time": final_data.get('execution_time', 0) if final_data else 0,
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_data else "error",
+                    action="web_crawl",
+                    data={
+                        "url": url,
+                        "title": final_data.get("title") if final_data else None,
+                        "content": final_data.get("content") if final_data else None,
+                        "markdown": final_data.get("markdown") if final_data else None,
+                        "links": final_data.get("links", []) if final_data else [],
+                        "images": final_data.get("images", []) if final_data else [],
+                        "analysis": final_data.get("analysis") if final_data else None,
+                        "extraction_method": (
+                            final_data.get("extraction_method") if final_data else None
+                        ),
+                        "execution_time": final_data.get("execution_time", 0) if final_data else 0,
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in web_crawl: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_crawl",
-                data={"url": url},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error", action="web_crawl", data={"url": url}, error_message=str(e)
+                )
+            )
 
     # ========== WEB AUTOMATION TOOLS ==========
 
@@ -408,7 +426,7 @@ def register_web_tools(mcp: FastMCP):
         task: str,
         provider: str = "self_hosted",
         routing_strategy: str = "dom_first",
-        use_vlm: bool = False
+        use_vlm: bool = False,
     ) -> str:
         """Execute web automation task with progress tracking
 
@@ -470,39 +488,42 @@ def register_web_tools(mcp: FastMCP):
                 task=task,
                 provider=provider,
                 routing_strategy=routing_strategy,
-                use_vlm=use_vlm
+                use_vlm=use_vlm,
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('data'):
-                    final_data = message.get('data', {})
+                if message.get("data"):
+                    final_data = message.get("data", {})
 
             # Return formatted response (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_data else "error",
-                action="web_automation_execute",
-                data={
-                    "url": url,
-                    "task": task,
-                    "result": final_data if final_data else None,
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_data else "error",
+                    action="web_automation_execute",
+                    data={
+                        "url": url,
+                        "task": task,
+                        "result": final_data if final_data else None,
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in web_automation_execute: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_automation_execute",
-                data={"url": url, "task": task},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error",
+                    action="web_automation_execute",
+                    data={"url": url, "task": task},
+                    error_message=str(e),
+                )
+            )
 
     @mcp.tool()
     @security_manager.security_check
@@ -512,7 +533,7 @@ def register_web_tools(mcp: FastMCP):
         search_engine: str = "google",
         task: Optional[str] = None,
         provider: str = "self_hosted",
-        use_vlm: bool = False
+        use_vlm: bool = False,
     ) -> str:
         """Execute automated web search with optional follow-up actions
 
@@ -564,39 +585,42 @@ def register_web_tools(mcp: FastMCP):
                 search_engine=search_engine,
                 task=task,
                 provider=provider,
-                use_vlm=use_vlm
+                use_vlm=use_vlm,
             ):
                 # Track progress
-                if 'progress' in message:
-                    progress_updates.append({
-                        'progress': message['progress'],
-                        'message': message.get('message', '')
-                    })
+                if "progress" in message:
+                    progress_updates.append(
+                        {"progress": message["progress"], "message": message.get("message", "")}
+                    )
 
                 # Capture final result
-                if message.get('data'):
-                    final_data = message.get('data', {})
+                if message.get("data"):
+                    final_data = message.get("data", {})
 
             # Return formatted response (JSON serialized for -> str return type)
-            return json.dumps(tools.create_response(
-                status="success" if final_data else "error",
-                action="web_automation_search",
-                data={
-                    "query": query,
-                    "search_engine": search_engine,
-                    "result": final_data if final_data else None,
-                    "progress_history": progress_updates
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success" if final_data else "error",
+                    action="web_automation_search",
+                    data={
+                        "query": query,
+                        "search_engine": search_engine,
+                        "result": final_data if final_data else None,
+                        "progress_history": progress_updates,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error in web_automation_search: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_automation_search",
-                data={"query": query},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error",
+                    action="web_automation_search",
+                    data={"query": query},
+                    error_message=str(e),
+                )
+            )
 
     # ========== UTILITY TOOLS ==========
 
@@ -622,26 +646,28 @@ def register_web_tools(mcp: FastMCP):
             client = get_web_client()
 
             import time
+
             start_time = time.time()
             health = await client.health_check()
             response_time = (time.time() - start_time) * 1000
 
-            return json.dumps(tools.create_response(
-                status="success",
-                action="web_service_health_check",
-                data={
-                    "status": "healthy",
-                    "service_url": client.service_url or "not discovered yet",
-                    "response_time_ms": round(response_time, 2),
-                    "health_data": health
-                }
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="success",
+                    action="web_service_health_check",
+                    data={
+                        "status": "healthy",
+                        "service_url": client.service_url or "not discovered yet",
+                        "response_time_ms": round(response_time, 2),
+                        "health_data": health,
+                    },
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error checking web service health: {e}")
-            return json.dumps(tools.create_response(
-                status="error",
-                action="web_service_health_check",
-                data={},
-                error_message=str(e)
-            ))
+            return json.dumps(
+                tools.create_response(
+                    status="error", action="web_service_health_check", data={}, error_message=str(e)
+                )
+            )

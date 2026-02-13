@@ -13,13 +13,14 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
-
 # ============================================================================
 # Enums
 # ============================================================================
 
+
 class SkillStatus(str, Enum):
     """Skill category status"""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     PENDING_REVIEW = "pending_review"
@@ -27,8 +28,9 @@ class SkillStatus(str, Enum):
 
 class AssignmentSource(str, Enum):
     """How the assignment was created"""
-    LLM_AUTO = "llm_auto"           # Automatically by LLM
-    HUMAN_MANUAL = "human_manual"   # Manually by admin
+
+    LLM_AUTO = "llm_auto"  # Automatically by LLM
+    HUMAN_MANUAL = "human_manual"  # Manually by admin
     HUMAN_OVERRIDE = "human_override"  # Human corrected LLM assignment
 
 
@@ -36,27 +38,35 @@ class AssignmentSource(str, Enum):
 # Request Contracts (Input Schemas)
 # ============================================================================
 
+
 class SkillCategoryCreateRequestContract(BaseModel):
     """
     Contract: Skill category creation request schema
 
     Used for creating predefined skill categories (admin operation).
     """
+
     id: str = Field(
         ...,
         min_length=1,
         max_length=64,
         pattern=r"^[a-z][a-z0-9_]*$",
-        description="Unique skill ID (lowercase, underscores allowed)"
+        description="Unique skill ID (lowercase, underscores allowed)",
     )
     name: str = Field(..., min_length=1, max_length=255, description="Human-readable skill name")
-    description: str = Field(..., min_length=10, max_length=1000, description="Skill description for LLM context")
-    keywords: List[str] = Field(default_factory=list, description="Hint keywords for LLM classification")
-    examples: List[str] = Field(default_factory=list, description="Example tool names that belong here")
+    description: str = Field(
+        ..., min_length=10, max_length=1000, description="Skill description for LLM context"
+    )
+    keywords: List[str] = Field(
+        default_factory=list, description="Hint keywords for LLM classification"
+    )
+    examples: List[str] = Field(
+        default_factory=list, description="Example tool names that belong here"
+    )
     parent_domain: Optional[str] = Field(None, description="Optional parent domain for grouping")
     is_active: bool = Field(True, description="Whether skill is active")
 
-    @field_validator('id')
+    @field_validator("id")
     @classmethod
     def validate_id_format(cls, v: str) -> str:
         """Validate skill ID format: lowercase, start with letter, underscores allowed"""
@@ -64,7 +74,7 @@ class SkillCategoryCreateRequestContract(BaseModel):
             raise ValueError("Skill ID must start with a letter")
         return v
 
-    @field_validator('keywords')
+    @field_validator("keywords")
     @classmethod
     def validate_keywords(cls, v: List[str]) -> List[str]:
         """Ensure keywords are lowercase"""
@@ -90,11 +100,16 @@ class ToolClassificationRequestContract(BaseModel):
 
     Used for classifying a tool into skill categories via LLM.
     """
+
     tool_id: int = Field(..., ge=1, description="Tool database ID")
     tool_name: str = Field(..., min_length=1, description="Tool name")
     tool_description: str = Field(..., min_length=1, description="Tool description")
-    input_schema_summary: Optional[str] = Field(None, description="Summary of input schema for context")
-    force_reclassify: bool = Field(False, description="Force reclassification even if already classified")
+    input_schema_summary: Optional[str] = Field(
+        None, description="Summary of input schema for context"
+    )
+    force_reclassify: bool = Field(
+        False, description="Force reclassification even if already classified"
+    )
 
     class Config:
         json_schema_extra = {
@@ -114,22 +129,23 @@ class SkillAssignmentRequestContract(BaseModel):
 
     Used for manually assigning a tool to skills (admin override).
     """
+
     tool_id: int = Field(..., ge=1, description="Tool database ID")
     skill_ids: List[str] = Field(..., min_length=1, max_length=5, description="Skill IDs to assign")
     primary_skill_id: str = Field(..., description="Primary skill ID")
     source: AssignmentSource = Field(AssignmentSource.HUMAN_MANUAL, description="Assignment source")
 
-    @field_validator('skill_ids')
+    @field_validator("skill_ids")
     @classmethod
     def validate_skill_ids(cls, v: List[str]) -> List[str]:
         """Ensure no duplicates and all lowercase"""
         return list(dict.fromkeys([s.lower().strip() for s in v]))
 
-    @field_validator('primary_skill_id')
+    @field_validator("primary_skill_id")
     @classmethod
     def validate_primary_in_list(cls, v: str, info) -> str:
         """Primary skill must be in skill_ids list"""
-        skill_ids = info.data.get('skill_ids', [])
+        skill_ids = info.data.get("skill_ids", [])
         if skill_ids and v not in skill_ids:
             raise ValueError("Primary skill must be in skill_ids list")
         return v
@@ -141,8 +157,13 @@ class SkillSuggestionRequestContract(BaseModel):
 
     Used when LLM suggests a new skill category.
     """
-    suggested_name: str = Field(..., min_length=1, max_length=255, description="Suggested skill name")
-    suggested_description: str = Field(..., min_length=10, max_length=1000, description="Suggested description")
+
+    suggested_name: str = Field(
+        ..., min_length=1, max_length=255, description="Suggested skill name"
+    )
+    suggested_description: str = Field(
+        ..., min_length=10, max_length=1000, description="Suggested description"
+    )
     source_tool_id: int = Field(..., ge=1, description="Tool ID that triggered suggestion")
     source_tool_name: str = Field(..., description="Tool name for context")
     reasoning: str = Field(..., description="LLM reasoning for suggestion")
@@ -152,12 +173,14 @@ class SkillSuggestionRequestContract(BaseModel):
 # Response Contracts (Output Schemas)
 # ============================================================================
 
+
 class SkillCategoryResponseContract(BaseModel):
     """
     Contract: Skill category response schema
 
     Validates API response structure for skill categories.
     """
+
     id: str = Field(..., description="Skill ID")
     name: str = Field(..., description="Skill name")
     description: str = Field(..., description="Skill description")
@@ -174,6 +197,7 @@ class SkillAssignmentContract(BaseModel):
     """
     Contract: Single skill assignment in classification response
     """
+
     skill_id: str = Field(..., description="Assigned skill ID")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score 0-1")
     reasoning: Optional[str] = Field(None, description="LLM reasoning for this assignment")
@@ -185,22 +209,23 @@ class ToolClassificationResponseContract(BaseModel):
 
     Validates response from LLM-based tool classification.
     """
+
     tool_id: int = Field(..., description="Classified tool ID")
     tool_name: str = Field(..., description="Tool name")
     assignments: List[SkillAssignmentContract] = Field(
-        default_factory=list,
-        description="Skill assignments with confidence scores"
+        default_factory=list, description="Skill assignments with confidence scores"
     )
     primary_skill_id: Optional[str] = Field(None, description="Primary skill (highest confidence)")
     suggested_new_skill: Optional[SkillSuggestionRequestContract] = Field(
-        None,
-        description="Suggested new skill if no match found"
+        None, description="Suggested new skill if no match found"
     )
     classification_timestamp: datetime = Field(..., description="When classification occurred")
 
-    @field_validator('assignments')
+    @field_validator("assignments")
     @classmethod
-    def validate_assignments_sorted(cls, v: List[SkillAssignmentContract]) -> List[SkillAssignmentContract]:
+    def validate_assignments_sorted(
+        cls, v: List[SkillAssignmentContract]
+    ) -> List[SkillAssignmentContract]:
         """Ensure assignments are sorted by confidence descending"""
         return sorted(v, key=lambda x: x.confidence, reverse=True)
 
@@ -211,6 +236,7 @@ class SkillAssignmentResponseContract(BaseModel):
 
     Represents a tool-skill assignment stored in database.
     """
+
     id: int = Field(..., description="Assignment ID")
     tool_id: int = Field(..., description="Tool ID")
     skill_id: str = Field(..., description="Skill ID")
@@ -226,6 +252,7 @@ class SkillEmbeddingResponseContract(BaseModel):
 
     Validates skill embedding in vector database.
     """
+
     skill_id: str = Field(..., description="Skill ID")
     name: str = Field(..., description="Skill name")
     description: str = Field(..., description="Skill description")
@@ -238,6 +265,7 @@ class SkillSuggestionResponseContract(BaseModel):
     """
     Contract: Skill suggestion response (pending review)
     """
+
     id: int = Field(..., description="Suggestion ID")
     suggested_name: str = Field(..., description="Suggested name")
     suggested_description: str = Field(..., description="Suggested description")
@@ -251,6 +279,7 @@ class SkillSuggestionResponseContract(BaseModel):
 # ============================================================================
 # Test Data Factory
 # ============================================================================
+
 
 class SkillTestDataFactory:
     """
@@ -294,7 +323,7 @@ class SkillTestDataFactory:
                 name="Calendar Management",
             )
         """
-        skill_id = overrides.pop('id', None) or SkillTestDataFactory.make_skill_id()
+        skill_id = overrides.pop("id", None) or SkillTestDataFactory.make_skill_id()
         defaults = {
             "id": skill_id,
             "name": f"Test Skill {skill_id}",
@@ -339,8 +368,8 @@ class SkillTestDataFactory:
         Returns:
             SkillAssignmentRequestContract with valid data
         """
-        skill_id = overrides.get('primary_skill_id', 'test_skill')
-        skill_ids = overrides.get('skill_ids', [skill_id])
+        skill_id = overrides.get("primary_skill_id", "test_skill")
+        skill_ids = overrides.get("skill_ids", [skill_id])
         defaults = {
             "tool_id": SkillTestDataFactory.make_tool_id(),
             "skill_ids": skill_ids,
@@ -357,7 +386,7 @@ class SkillTestDataFactory:
 
         Used in tests to validate API responses match contract.
         """
-        tool_id = overrides.pop('tool_id', None) or SkillTestDataFactory.make_tool_id()
+        tool_id = overrides.pop("tool_id", None) or SkillTestDataFactory.make_tool_id()
         defaults = {
             "tool_id": tool_id,
             "tool_name": f"test_tool_{tool_id}",
@@ -365,7 +394,7 @@ class SkillTestDataFactory:
                 SkillAssignmentContract(
                     skill_id="calendar_management",
                     confidence=0.85,
-                    reasoning="Tool handles calendar operations"
+                    reasoning="Tool handles calendar operations",
                 )
             ],
             "primary_skill_id": "calendar_management",
@@ -391,15 +420,38 @@ class SkillTestDataFactory:
                 id="calendar_management",
                 name="Calendar Management",
                 description="Tools for managing calendars, events, scheduling, and appointments. Includes creating, updating, deleting events and checking availability.",
-                keywords=["calendar", "event", "schedule", "meeting", "appointment", "reminder", "booking"],
-                examples=["create_event", "list_events", "delete_event", "update_event", "check_availability"],
+                keywords=[
+                    "calendar",
+                    "event",
+                    "schedule",
+                    "meeting",
+                    "appointment",
+                    "reminder",
+                    "booking",
+                ],
+                examples=[
+                    "create_event",
+                    "list_events",
+                    "delete_event",
+                    "update_event",
+                    "check_availability",
+                ],
                 parent_domain="productivity",
             ),
             SkillCategoryCreateRequestContract(
                 id="data_query",
                 name="Data Query & Analysis",
                 description="Tools for querying databases, searching data, filtering records, and performing data analysis operations.",
-                keywords=["query", "sql", "database", "search", "filter", "aggregate", "data", "analytics"],
+                keywords=[
+                    "query",
+                    "sql",
+                    "database",
+                    "search",
+                    "filter",
+                    "aggregate",
+                    "data",
+                    "analytics",
+                ],
                 examples=["query_database", "search_records", "get_statistics", "run_sql"],
                 parent_domain="data",
             ),
@@ -407,7 +459,16 @@ class SkillTestDataFactory:
                 id="file_operations",
                 name="File Operations",
                 description="Tools for reading, writing, uploading, downloading, and managing files in various storage systems.",
-                keywords=["file", "read", "write", "upload", "download", "delete", "storage", "document"],
+                keywords=[
+                    "file",
+                    "read",
+                    "write",
+                    "upload",
+                    "download",
+                    "delete",
+                    "storage",
+                    "document",
+                ],
                 examples=["read_file", "write_file", "list_files", "upload_file", "download_file"],
                 parent_domain="storage",
             ),
@@ -415,7 +476,16 @@ class SkillTestDataFactory:
                 id="communication",
                 name="Communication & Messaging",
                 description="Tools for sending emails, messages, notifications, and other communication channels.",
-                keywords=["email", "message", "notify", "send", "slack", "teams", "sms", "notification"],
+                keywords=[
+                    "email",
+                    "message",
+                    "notify",
+                    "send",
+                    "slack",
+                    "teams",
+                    "sms",
+                    "notification",
+                ],
                 examples=["send_email", "send_message", "notify_user", "post_to_slack"],
                 parent_domain="communication",
             ),
@@ -431,7 +501,16 @@ class SkillTestDataFactory:
                 id="code_execution",
                 name="Code Execution & Development",
                 description="Tools for running code, executing scripts, managing development environments, and coding assistance.",
-                keywords=["code", "execute", "run", "script", "python", "javascript", "compile", "debug"],
+                keywords=[
+                    "code",
+                    "execute",
+                    "run",
+                    "script",
+                    "python",
+                    "javascript",
+                    "compile",
+                    "debug",
+                ],
                 examples=["run_python", "execute_code", "run_script", "lint_code"],
                 parent_domain="development",
             ),
@@ -439,15 +518,38 @@ class SkillTestDataFactory:
                 id="knowledge_retrieval",
                 name="Knowledge Retrieval & RAG",
                 description="Tools for semantic search, vector retrieval, knowledge base queries, and RAG operations.",
-                keywords=["search", "retrieve", "knowledge", "vector", "semantic", "rag", "embedding", "similarity"],
-                examples=["semantic_search", "query_knowledge_base", "find_similar", "retrieve_context"],
+                keywords=[
+                    "search",
+                    "retrieve",
+                    "knowledge",
+                    "vector",
+                    "semantic",
+                    "rag",
+                    "embedding",
+                    "similarity",
+                ],
+                examples=[
+                    "semantic_search",
+                    "query_knowledge_base",
+                    "find_similar",
+                    "retrieve_context",
+                ],
                 parent_domain="ai",
             ),
             SkillCategoryCreateRequestContract(
                 id="image_processing",
                 name="Image & Vision Processing",
                 description="Tools for image analysis, generation, editing, OCR, and computer vision tasks.",
-                keywords=["image", "vision", "photo", "ocr", "generate", "edit", "analyze", "detect"],
+                keywords=[
+                    "image",
+                    "vision",
+                    "photo",
+                    "ocr",
+                    "generate",
+                    "edit",
+                    "analyze",
+                    "detect",
+                ],
                 examples=["analyze_image", "generate_image", "extract_text", "detect_objects"],
                 parent_domain="media",
             ),
@@ -522,6 +624,7 @@ class SkillTestDataFactory:
 # ============================================================================
 # Request Builders (for complex test scenarios)
 # ============================================================================
+
 
 class SkillCategoryBuilder:
     """
@@ -652,13 +755,11 @@ __all__ = [
     # Enums
     "SkillStatus",
     "AssignmentSource",
-
     # Request Contracts
     "SkillCategoryCreateRequestContract",
     "ToolClassificationRequestContract",
     "SkillAssignmentRequestContract",
     "SkillSuggestionRequestContract",
-
     # Response Contracts
     "SkillCategoryResponseContract",
     "SkillAssignmentContract",
@@ -666,10 +767,8 @@ __all__ = [
     "SkillAssignmentResponseContract",
     "SkillEmbeddingResponseContract",
     "SkillSuggestionResponseContract",
-
     # Factory
     "SkillTestDataFactory",
-
     # Builders
     "SkillCategoryBuilder",
     "ToolClassificationBuilder",

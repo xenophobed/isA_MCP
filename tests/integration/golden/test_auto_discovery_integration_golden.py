@@ -4,6 +4,7 @@ CHARACTERIZATION TESTS - DO NOT MODIFY
 These tests capture the current behavior of AutoDiscoverySystem integration.
 If these tests fail, it means auto-discovery integration behavior has changed.
 """
+
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
@@ -29,9 +30,11 @@ class TestAutoDiscoveryMCPIntegrationGolden:
             system = AutoDiscoverySystem(base_dir=tmpdir)
 
             # Patch discover methods to track calls
-            with patch.object(system, 'discover_tools', return_value={}) as mock_tools, \
-                 patch.object(system, 'discover_prompts', return_value={}) as mock_prompts, \
-                 patch.object(system, 'discover_resources', return_value={}) as mock_resources:
+            with (
+                patch.object(system, "discover_tools", return_value={}) as mock_tools,
+                patch.object(system, "discover_prompts", return_value={}) as mock_prompts,
+                patch.object(system, "discover_resources", return_value={}) as mock_resources,
+            ):
 
                 mock_mcp = MagicMock()
 
@@ -110,7 +113,7 @@ def register_test_tools(mcp):
 
             # Create a tool file in ml_models
             ml_tool = ml_dir / "ml_tool.py"
-            ml_tool.write_text('@mcp.tool()\ndef ml_tool(): pass')
+            ml_tool.write_text("@mcp.tool()\ndef ml_tool(): pass")
 
             # Create empty prompts and resources dirs
             (Path(tmpdir) / "prompts").mkdir()

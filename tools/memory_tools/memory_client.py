@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MemoryServiceConfig:
     """Memory service configuration"""
+
     service_name: str = "memory_service"
     consul_host: str = "localhost"
     consul_port: int = 8500
@@ -28,16 +29,16 @@ class MemoryServiceConfig:
     fallback_port: int = 8223
 
     @classmethod
-    def from_env(cls) -> 'MemoryServiceConfig':
+    def from_env(cls) -> "MemoryServiceConfig":
         """Create config from environment variables"""
         return cls(
-            service_name=os.getenv('MEMORY_SERVICE_NAME', 'memory_service'),
-            consul_host=os.getenv('CONSUL_HOST', 'localhost'),
-            consul_port=int(os.getenv('CONSUL_PORT', '8500')),
-            api_timeout=int(os.getenv('MEMORY_API_TIMEOUT', '30')),
-            max_retries=int(os.getenv('MEMORY_MAX_RETRIES', '3')),
-            fallback_host=os.getenv('MEMORY_FALLBACK_HOST', 'localhost'),
-            fallback_port=int(os.getenv('MEMORY_FALLBACK_PORT', '8223'))
+            service_name=os.getenv("MEMORY_SERVICE_NAME", "memory_service"),
+            consul_host=os.getenv("CONSUL_HOST", "localhost"),
+            consul_port=int(os.getenv("CONSUL_PORT", "8500")),
+            api_timeout=int(os.getenv("MEMORY_API_TIMEOUT", "30")),
+            max_retries=int(os.getenv("MEMORY_MAX_RETRIES", "3")),
+            fallback_host=os.getenv("MEMORY_FALLBACK_HOST", "localhost"),
+            fallback_port=int(os.getenv("MEMORY_FALLBACK_PORT", "8223")),
         )
 
 
@@ -61,18 +62,14 @@ class MemoryServiceClient:
         try:
             if not self.consul_client:
                 self.consul_client = consul.Consul(
-                    host=self.config.consul_host,
-                    port=self.config.consul_port
+                    host=self.config.consul_host, port=self.config.consul_port
                 )
 
             # Get healthy service instances
-            services = self.consul_client.health.service(
-                self.config.service_name,
-                passing=True
-            )[1]
+            services = self.consul_client.health.service(self.config.service_name, passing=True)[1]
 
             if services:
-                service = services[0]['Service']
+                service = services[0]["Service"]
                 service_url = f"http://{service['Address']}:{service['Port']}"
                 logger.info(f"Discovered memory service at: {service_url}")
                 return service_url
@@ -104,12 +101,7 @@ class MemoryServiceClient:
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
-    ) -> Dict[str, Any]:
+    async def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request with retry logic"""
         base_url = await self._get_service_url()
         # Add /api/v1 prefix for non-health endpoints
@@ -137,7 +129,9 @@ class MemoryServiceClient:
 
             except aiohttp.ClientError as e:
                 last_error = e
-                logger.warning(f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}")
+                logger.warning(
+                    f"Request failed (attempt {attempt + 1}/{self.config.max_retries}): {e}"
+                )
 
                 if attempt < self.config.max_retries - 1:
                     await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
@@ -164,10 +158,7 @@ class MemoryServiceClient:
     # ==================== AI-Powered Memory Storage ====================
 
     async def store_factual_memory(
-        self,
-        user_id: str,
-        dialog_content: str,
-        importance_score: float = 0.5
+        self, user_id: str, dialog_content: str, importance_score: float = 0.5
     ) -> Dict[str, Any]:
         """Extract and store factual memories from dialog using AI"""
         return await self._request(
@@ -176,15 +167,12 @@ class MemoryServiceClient:
             json={
                 "user_id": user_id,
                 "dialog_content": dialog_content,
-                "importance_score": importance_score
-            }
+                "importance_score": importance_score,
+            },
         )
 
     async def store_episodic_memory(
-        self,
-        user_id: str,
-        dialog_content: str,
-        importance_score: float = 0.5
+        self, user_id: str, dialog_content: str, importance_score: float = 0.5
     ) -> Dict[str, Any]:
         """Extract and store episodic memories from dialog using AI"""
         return await self._request(
@@ -193,15 +181,12 @@ class MemoryServiceClient:
             json={
                 "user_id": user_id,
                 "dialog_content": dialog_content,
-                "importance_score": importance_score
-            }
+                "importance_score": importance_score,
+            },
         )
 
     async def store_procedural_memory(
-        self,
-        user_id: str,
-        dialog_content: str,
-        importance_score: float = 0.5
+        self, user_id: str, dialog_content: str, importance_score: float = 0.5
     ) -> Dict[str, Any]:
         """Extract and store procedural memories from dialog using AI"""
         return await self._request(
@@ -210,15 +195,12 @@ class MemoryServiceClient:
             json={
                 "user_id": user_id,
                 "dialog_content": dialog_content,
-                "importance_score": importance_score
-            }
+                "importance_score": importance_score,
+            },
         )
 
     async def store_semantic_memory(
-        self,
-        user_id: str,
-        dialog_content: str,
-        importance_score: float = 0.5
+        self, user_id: str, dialog_content: str, importance_score: float = 0.5
     ) -> Dict[str, Any]:
         """Extract and store semantic memories from dialog using AI"""
         return await self._request(
@@ -227,8 +209,8 @@ class MemoryServiceClient:
             json={
                 "user_id": user_id,
                 "dialog_content": dialog_content,
-                "importance_score": importance_score
-            }
+                "importance_score": importance_score,
+            },
         )
 
     async def store_working_memory(
@@ -236,7 +218,7 @@ class MemoryServiceClient:
         user_id: str,
         dialog_content: str,
         ttl_seconds: int = 3600,
-        importance_score: float = 0.5
+        importance_score: float = 0.5,
     ) -> Dict[str, Any]:
         """Store working memory from dialog"""
         return await self._request(
@@ -246,8 +228,8 @@ class MemoryServiceClient:
                 "user_id": user_id,
                 "dialog_content": dialog_content,
                 "ttl_seconds": ttl_seconds,
-                "importance_score": importance_score
-            }
+                "importance_score": importance_score,
+            },
         )
 
     async def store_session_message(
@@ -256,7 +238,7 @@ class MemoryServiceClient:
         session_id: str,
         message_content: str,
         message_type: str = "human",
-        role: str = "user"
+        role: str = "user",
     ) -> Dict[str, Any]:
         """Store session message"""
         return await self._request(
@@ -267,8 +249,8 @@ class MemoryServiceClient:
                 "session_id": session_id,
                 "message_content": message_content,
                 "message_type": message_type,
-                "role": role
-            }
+                "role": role,
+            },
         )
 
     # ==================== Search Operations ====================
@@ -279,14 +261,14 @@ class MemoryServiceClient:
         query: str,
         memory_types: Optional[List[str]] = None,
         limit: int = 10,
-        similarity_threshold: float = 0.15
+        similarity_threshold: float = 0.15,
     ) -> Dict[str, Any]:
         """Search across memory types using semantic similarity"""
         params = {
             "user_id": user_id,
             "query": query,
             "limit": limit,
-            "similarity_threshold": similarity_threshold
+            "similarity_threshold": similarity_threshold,
         }
         if memory_types:
             params["memory_types"] = ",".join(memory_types)
@@ -294,23 +276,17 @@ class MemoryServiceClient:
         return await self._request("GET", "/memories/search", params=params)
 
     async def search_facts_by_subject(
-        self,
-        user_id: str,
-        subject: str,
-        limit: int = 10
+        self, user_id: str, subject: str, limit: int = 10
     ) -> Dict[str, Any]:
         """Search facts by subject"""
         return await self._request(
             "GET",
             "/memories/factual/search/subject",
-            params={"user_id": user_id, "subject": subject, "limit": limit}
+            params={"user_id": user_id, "subject": subject, "limit": limit},
         )
 
     async def search_concepts_by_category(
-        self,
-        user_id: str,
-        category: str,
-        limit: int = 10
+        self, user_id: str, category: str, limit: int = 10
     ) -> Dict[str, Any]:
         """Search concepts by category
 
@@ -320,20 +296,17 @@ class MemoryServiceClient:
         return await self._request(
             "GET",
             "/memories/semantic/search/category",
-            params={"user_id": user_id, "category": category, "limit": limit}
+            params={"user_id": user_id, "category": category, "limit": limit},
         )
 
     async def search_episodes_by_event_type(
-        self,
-        user_id: str,
-        event_type: str,
-        limit: int = 10
+        self, user_id: str, event_type: str, limit: int = 10
     ) -> Dict[str, Any]:
         """Search episodic memories by event type"""
         return await self._request(
             "GET",
             "/memories/episodic/search/event_type",
-            params={"user_id": user_id, "event_type": event_type, "limit": limit}
+            params={"user_id": user_id, "event_type": event_type, "limit": limit},
         )
 
     # ==================== Session Operations ====================
@@ -343,7 +316,7 @@ class MemoryServiceClient:
         user_id: str,
         session_id: str,
         include_summaries: bool = True,
-        max_recent_messages: int = 5
+        max_recent_messages: int = 5,
     ) -> Dict[str, Any]:
         """Get comprehensive session context"""
         return await self._request(
@@ -352,8 +325,8 @@ class MemoryServiceClient:
             params={
                 "user_id": user_id,
                 "include_summaries": str(include_summaries).lower(),
-                "max_recent_messages": max_recent_messages
-            }
+                "max_recent_messages": max_recent_messages,
+            },
         )
 
     async def summarize_session(
@@ -361,7 +334,7 @@ class MemoryServiceClient:
         user_id: str,
         session_id: str,
         force_update: bool = False,
-        compression_level: str = "medium"
+        compression_level: str = "medium",
     ) -> Dict[str, Any]:
         """Summarize session conversation"""
         return await self._request(
@@ -370,35 +343,21 @@ class MemoryServiceClient:
             json={
                 "user_id": user_id,
                 "force_update": force_update,
-                "compression_level": compression_level
-            }
+                "compression_level": compression_level,
+            },
         )
 
     # ==================== Working Memory Operations ====================
 
-    async def get_active_working_memories(
-        self,
-        user_id: str
-    ) -> Dict[str, Any]:
+    async def get_active_working_memories(self, user_id: str) -> Dict[str, Any]:
         """Get active working memories"""
-        return await self._request(
-            "GET",
-            "/memories/working/active",
-            params={"user_id": user_id}
-        )
+        return await self._request("GET", "/memories/working/active", params={"user_id": user_id})
 
     # ==================== Utility Operations ====================
 
-    async def get_memory_statistics(
-        self,
-        user_id: str
-    ) -> Dict[str, Any]:
+    async def get_memory_statistics(self, user_id: str) -> Dict[str, Any]:
         """Get memory statistics for a user"""
-        return await self._request(
-            "GET",
-            "/memories/statistics",
-            params={"user_id": user_id}
-        )
+        return await self._request("GET", "/memories/statistics", params={"user_id": user_id})
 
 
 # Global client instance

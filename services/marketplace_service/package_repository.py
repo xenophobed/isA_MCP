@@ -7,6 +7,7 @@ Manages CRUD operations for:
 - installed_packages
 - package_tool_mappings
 """
+
 import json
 import uuid
 from datetime import datetime, timezone
@@ -145,8 +146,7 @@ class PackageRepository:
         if self._db_pool:
             async with self._db_pool.acquire() as conn:
                 row = await conn.fetchrow(
-                    "SELECT * FROM mcp.marketplace_packages WHERE id = $1",
-                    package_id
+                    "SELECT * FROM mcp.marketplace_packages WHERE id = $1", package_id
                 )
                 return dict(row) if row else None
         return self._packages.get(package_id)
@@ -156,8 +156,7 @@ class PackageRepository:
         if self._db_pool:
             async with self._db_pool.acquire() as conn:
                 row = await conn.fetchrow(
-                    "SELECT * FROM mcp.marketplace_packages WHERE name = $1",
-                    name
+                    "SELECT * FROM mcp.marketplace_packages WHERE name = $1", name
                 )
                 return dict(row) if row else None
 
@@ -167,9 +166,7 @@ class PackageRepository:
         return None
 
     async def update_package(
-        self,
-        package_id: str,
-        data: Dict[str, Any]
+        self, package_id: str, data: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Update package fields."""
         if self._db_pool:
@@ -179,13 +176,28 @@ class PackageRepository:
             param_idx = 1
 
             allowed_fields = {
-                "display_name", "description", "author", "author_email",
-                "homepage_url", "repository_url", "documentation_url",
-                "license", "category", "tags", "registry_url",
-                "download_count", "weekly_downloads", "star_count",
-                "verified", "official", "security_score",
-                "latest_version", "latest_version_id",
-                "deprecated", "deprecation_message", "last_synced_at"
+                "display_name",
+                "description",
+                "author",
+                "author_email",
+                "homepage_url",
+                "repository_url",
+                "documentation_url",
+                "license",
+                "category",
+                "tags",
+                "registry_url",
+                "download_count",
+                "weekly_downloads",
+                "star_count",
+                "verified",
+                "official",
+                "security_score",
+                "latest_version",
+                "latest_version_id",
+                "deprecated",
+                "deprecation_message",
+                "last_synced_at",
             }
 
             for key, value in data.items():
@@ -326,11 +338,13 @@ class PackageRepository:
                 results.append(pkg)
 
             # Sort by popularity
-            results.sort(key=lambda p: (p.get("download_count", 0), p.get("star_count", 0)), reverse=True)
+            results.sort(
+                key=lambda p: (p.get("download_count", 0), p.get("star_count", 0)), reverse=True
+            )
 
             return {
                 "total": len(results),
-                "packages": results[offset:offset + limit],
+                "packages": results[offset : offset + limit],
                 "limit": limit,
                 "offset": offset,
             }
@@ -345,7 +359,7 @@ class PackageRepository:
                     SET download_count = download_count + 1
                     WHERE id = $1
                     """,
-                    package_id
+                    package_id,
                 )
         elif package_id in self._packages:
             self._packages[package_id]["download_count"] += 1
@@ -363,22 +377,23 @@ class PackageRepository:
         """List categories with package counts."""
         if self._db_pool:
             async with self._db_pool.acquire() as conn:
-                rows = await conn.fetch(
-                    """
+                rows = await conn.fetch("""
                     SELECT category, COUNT(*) as count
                     FROM mcp.marketplace_packages
                     WHERE deprecated = FALSE AND category IS NOT NULL
                     GROUP BY category
                     ORDER BY count DESC
-                    """
-                )
+                    """)
                 return [{"category": row["category"], "count": row["count"]} for row in rows]
         else:
             categories = {}
             for pkg in self._packages.values():
                 if not pkg.get("deprecated") and pkg.get("category"):
                     categories[pkg["category"]] = categories.get(pkg["category"], 0) + 1
-            return [{"category": k, "count": v} for k, v in sorted(categories.items(), key=lambda x: -x[1])]
+            return [
+                {"category": k, "count": v}
+                for k, v in sorted(categories.items(), key=lambda x: -x[1])
+            ]
 
     async def get_popular_packages(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get popular packages."""
@@ -391,12 +406,14 @@ class PackageRepository:
                     ORDER BY download_count DESC, star_count DESC
                     LIMIT $1
                     """,
-                    limit
+                    limit,
                 )
                 return [dict(row) for row in rows]
         else:
             packages = [p for p in self._packages.values() if not p.get("deprecated")]
-            packages.sort(key=lambda p: (p.get("download_count", 0), p.get("star_count", 0)), reverse=True)
+            packages.sort(
+                key=lambda p: (p.get("download_count", 0), p.get("star_count", 0)), reverse=True
+            )
             return packages[:limit]
 
     async def get_curated_packages(self, limit: int = 5) -> List[Dict[str, Any]]:
@@ -412,7 +429,7 @@ class PackageRepository:
                     ORDER BY f.display_order
                     LIMIT $1
                     """,
-                    limit
+                    limit,
                 )
                 return [dict(row) for row in rows]
         return []
@@ -500,10 +517,14 @@ class PackageRepository:
                     WHERE package_id = $1 AND yanked = FALSE
                     ORDER BY version_major DESC, version_minor DESC, version_patch DESC
                     """,
-                    package_id
+                    package_id,
                 )
                 return [dict(row) for row in rows]
-        return [v for v in self._versions.values() if v["package_id"] == package_id and not v.get("yanked")]
+        return [
+            v
+            for v in self._versions.values()
+            if v["package_id"] == package_id and not v.get("yanked")
+        ]
 
     async def get_latest_version(self, package_id: str) -> Optional[Dict[str, Any]]:
         """Get latest stable version for a package."""
@@ -521,7 +542,8 @@ class PackageRepository:
                     SELECT * FROM mcp.package_versions
                     WHERE package_id = $1 AND version = $2
                     """,
-                    package_id, version
+                    package_id,
+                    version,
                 )
                 return dict(row) if row else None
         for v in self._versions.values():
@@ -625,7 +647,8 @@ class PackageRepository:
                         SELECT * FROM mcp.installed_packages
                         WHERE package_id = $1 AND user_id = $2
                         """,
-                        package_id, user_id
+                        package_id,
+                        user_id,
                     )
                 elif org_id:
                     row = await conn.fetchrow(
@@ -633,7 +656,8 @@ class PackageRepository:
                         SELECT * FROM mcp.installed_packages
                         WHERE package_id = $1 AND org_id = $2 AND team_id IS NULL
                         """,
-                        package_id, org_id
+                        package_id,
+                        org_id,
                     )
                 else:
                     row = await conn.fetchrow(
@@ -641,7 +665,7 @@ class PackageRepository:
                         SELECT * FROM mcp.installed_packages
                         WHERE package_id = $1 AND user_id IS NULL AND org_id IS NULL
                         """,
-                        package_id
+                        package_id,
                     )
                 return dict(row) if row else None
         else:
@@ -651,7 +675,12 @@ class PackageRepository:
                         return inst
                     if org_id and inst.get("org_id") == org_id:
                         return inst
-                    if not user_id and not org_id and not inst.get("user_id") and not inst.get("org_id"):
+                    if (
+                        not user_id
+                        and not org_id
+                        and not inst.get("user_id")
+                        and not inst.get("org_id")
+                    ):
                         return inst
             return None
 
@@ -685,7 +714,7 @@ class PackageRepository:
                         WHERE i.user_id = $1
                         ORDER BY i.installed_at DESC
                         """,
-                        user_id
+                        user_id,
                     )
                 elif org_id:
                     rows = await conn.fetch(
@@ -698,19 +727,17 @@ class PackageRepository:
                         WHERE i.org_id = $1
                         ORDER BY i.installed_at DESC
                         """,
-                        org_id
+                        org_id,
                     )
                 else:
-                    rows = await conn.fetch(
-                        """
+                    rows = await conn.fetch("""
                         SELECT i.*, p.name as package_name, p.display_name,
                                p.description, p.category, v.version
                         FROM mcp.installed_packages i
                         JOIN mcp.marketplace_packages p ON i.package_id = p.id
                         JOIN mcp.package_versions v ON i.version_id = v.id
                         ORDER BY i.installed_at DESC
-                        """
-                    )
+                        """)
                 return [dict(row) for row in rows]
         return list(self._installations.values())
 
@@ -731,7 +758,9 @@ class PackageRepository:
                     SET status = $1, error_message = $2, updated_at = NOW()
                     WHERE id = $3
                     """,
-                    status_value, error_message, installation_id
+                    status_value,
+                    error_message,
+                    installation_id,
                 )
                 return "UPDATE 1" in result
         elif installation_id in self._installations:
@@ -745,8 +774,7 @@ class PackageRepository:
         if self._db_pool:
             async with self._db_pool.acquire() as conn:
                 result = await conn.execute(
-                    "DELETE FROM mcp.installed_packages WHERE id = $1",
-                    installation_id
+                    "DELETE FROM mcp.installed_packages WHERE id = $1", installation_id
                 )
                 return "DELETE 1" in result
         elif installation_id in self._installations:
@@ -764,13 +792,11 @@ class PackageRepository:
             async with self._db_pool.acquire() as conn:
                 if user_id:
                     return await conn.fetchval(
-                        "SELECT COUNT(*) FROM mcp.installed_packages WHERE user_id = $1",
-                        user_id
+                        "SELECT COUNT(*) FROM mcp.installed_packages WHERE user_id = $1", user_id
                     )
                 elif org_id:
                     return await conn.fetchval(
-                        "SELECT COUNT(*) FROM mcp.installed_packages WHERE org_id = $1",
-                        org_id
+                        "SELECT COUNT(*) FROM mcp.installed_packages WHERE org_id = $1", org_id
                     )
                 return await conn.fetchval("SELECT COUNT(*) FROM mcp.installed_packages")
         return len(self._installations)
@@ -831,7 +857,7 @@ class PackageRepository:
                     SELECT * FROM mcp.package_tool_mappings
                     WHERE installed_package_id = $1
                     """,
-                    installed_package_id
+                    installed_package_id,
                 )
                 return [dict(row) for row in rows]
         return self._tool_mappings.get(installed_package_id, [])
@@ -842,7 +868,7 @@ class PackageRepository:
             async with self._db_pool.acquire() as conn:
                 await conn.execute(
                     "DELETE FROM mcp.package_tool_mappings WHERE installed_package_id = $1",
-                    installed_package_id
+                    installed_package_id,
                 )
         elif installed_package_id in self._tool_mappings:
             del self._tool_mappings[installed_package_id]

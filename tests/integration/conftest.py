@@ -6,15 +6,16 @@ Layer 2: Service Integration Tests
 - Uses real database, mocked external APIs
 - Tests event chains and business flows
 """
+
 import pytest
 from typing import AsyncGenerator
 import os
 from pathlib import Path
 
-
 # ═══════════════════════════════════════════════════════════════
 # Database Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 async def clean_db(db_pool) -> AsyncGenerator:
@@ -68,6 +69,7 @@ async def seeded_db(clean_db) -> AsyncGenerator:
 # Qdrant Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 async def clean_qdrant(qdrant_client) -> AsyncGenerator:
     """
@@ -90,7 +92,7 @@ async def clean_qdrant(qdrant_client) -> AsyncGenerator:
     for collection in test_collections:
         qdrant_client.create_collection(
             collection_name=collection,
-            vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+            vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
         )
 
     yield qdrant_client
@@ -107,15 +109,13 @@ async def clean_qdrant(qdrant_client) -> AsyncGenerator:
 # Service Fixtures
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 async def discovery_service(clean_db, temp_tools_dir):
     """Provide auto-discovery service for testing."""
     from core.auto_discovery import AutoDiscovery
 
-    service = AutoDiscovery(
-        tools_dir=temp_tools_dir,
-        db_pool=clean_db
-    )
+    service = AutoDiscovery(tools_dir=temp_tools_dir, db_pool=clean_db)
     return service
 
 
@@ -124,10 +124,7 @@ async def sync_service(clean_db, clean_qdrant):
     """Provide sync service for testing."""
     from services.sync_service import SyncService
 
-    service = SyncService(
-        db_pool=clean_db,
-        qdrant_client=clean_qdrant
-    )
+    service = SyncService(db_pool=clean_db, qdrant_client=clean_qdrant)
     return service
 
 
@@ -136,16 +133,14 @@ async def search_service(clean_db, clean_qdrant):
     """Provide search service for testing."""
     from services.search_service import SearchService
 
-    service = SearchService(
-        db_pool=clean_db,
-        qdrant_client=clean_qdrant
-    )
+    service = SearchService(db_pool=clean_db, qdrant_client=clean_qdrant)
     return service
 
 
 # ═══════════════════════════════════════════════════════════════
 # Event/Flow Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 class EventCollector:
     """Collect events for testing event-driven flows."""
@@ -155,10 +150,7 @@ class EventCollector:
 
     def record(self, event_type: str, data: dict):
         """Record an event."""
-        self.events.append({
-            "type": event_type,
-            "data": data
-        })
+        self.events.append({"type": event_type, "data": data})
 
     def get_events(self, event_type: str = None) -> list:
         """Get recorded events, optionally filtered by type."""
@@ -192,6 +184,7 @@ def event_collector():
 # ═══════════════════════════════════════════════════════════════
 # Test Tool Files
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def populated_tools_dir(temp_tools_dir) -> Path:

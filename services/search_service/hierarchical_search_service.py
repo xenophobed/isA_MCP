@@ -6,6 +6,7 @@ Implements:
 - Stage 2: Search tools filtered by matched skill IDs
 - Stage 3: Enrich results with full schemas from PostgreSQL
 """
+
 import time
 import logging
 from typing import Any, Dict, List, Optional
@@ -58,7 +59,7 @@ def _parse_skill_ids(value) -> List[str]:
         pass
 
     # Handle Go-style format: "[item1 item2 item3]"
-    if value.startswith('[') and value.endswith(']'):
+    if value.startswith("[") and value.endswith("]"):
         inner = value[1:-1].strip()
         if inner:
             # Split by whitespace
@@ -70,6 +71,7 @@ def _parse_skill_ids(value) -> List[str]:
 
 class SearchStrategy(str, Enum):
     """Search strategy options."""
+
     HIERARCHICAL = "hierarchical"  # Skill -> Tools (default)
     DIRECT = "direct"  # Skip skill layer
     HYBRID = "hybrid"  # Parallel skill + direct
@@ -78,6 +80,7 @@ class SearchStrategy(str, Enum):
 @dataclass
 class SkillMatch:
     """A matched skill from Stage 1."""
+
     id: str
     name: str
     description: str
@@ -88,6 +91,7 @@ class SkillMatch:
 @dataclass
 class ToolMatch:
     """A matched tool from Stage 2."""
+
     id: str
     db_id: int
     type: str
@@ -104,6 +108,7 @@ class ToolMatch:
 @dataclass
 class SearchMetadata:
     """Search execution metadata."""
+
     strategy_used: str
     skill_ids_used: Optional[List[str]]
     stage1_skill_count: int
@@ -119,6 +124,7 @@ class SearchMetadata:
 @dataclass
 class HierarchicalSearchResult:
     """Complete search result."""
+
     query: str
     tools: List[ToolMatch]
     matched_skills: List[SkillMatch]
@@ -141,7 +147,7 @@ class HierarchicalSearchService:
         vector_repository: Optional[VectorRepository] = None,
         model_client=None,
         db_pool=None,
-        qdrant_client=None
+        qdrant_client=None,
     ):
         """
         Initialize the hierarchical search service.
@@ -176,11 +182,12 @@ class HierarchicalSearchService:
         """Get or create database pool."""
         if self._db_pool is None:
             from isa_common import AsyncPostgresClient
+
             settings = get_settings()
             self._db_pool = AsyncPostgresClient(
                 host=settings.infrastructure.postgres_grpc_host,
                 port=settings.infrastructure.postgres_grpc_port,
-                user_id="mcp-search-service"
+                user_id="mcp-search-service",
             )
         return self._db_pool
 
@@ -194,7 +201,7 @@ class HierarchicalSearchService:
         tool_threshold: float = 0.3,
         include_schemas: bool = True,
         strategy: str = "hierarchical",
-        org_id: Optional[str] = None
+        org_id: Optional[str] = None,
     ) -> HierarchicalSearchResult:
         """
         Perform hierarchical search.
@@ -243,9 +250,7 @@ class HierarchicalSearchService:
                 # Stage 1: Search skills
                 skill_start = time.time()
                 matched_skills = await self._search_skills(
-                    query_embedding=query_embedding,
-                    limit=skill_limit,
-                    threshold=skill_threshold
+                    query_embedding=query_embedding, limit=skill_limit, threshold=skill_threshold
                 )
                 skill_search_time = (time.time() - skill_start) * 1000
 
@@ -265,7 +270,7 @@ class HierarchicalSearchService:
                 item_type=item_type,
                 limit=limit * 2,  # Fetch more to account for filtering
                 threshold=tool_threshold,
-                org_id=org_id
+                org_id=org_id,
             )
             tool_search_time = (time.time() - tool_start) * 1000
 
@@ -292,7 +297,7 @@ class HierarchicalSearchService:
                 skill_search_time_ms=skill_search_time,
                 tool_search_time_ms=tool_search_time,
                 schema_load_time_ms=schema_load_time,
-                total_time_ms=total_time
+                total_time_ms=total_time,
             )
 
             logger.info(
@@ -301,10 +306,7 @@ class HierarchicalSearchService:
             )
 
             return HierarchicalSearchResult(
-                query=query,
-                tools=tools,
-                matched_skills=matched_skills,
-                metadata=metadata
+                query=query, tools=tools, matched_skills=matched_skills, metadata=metadata
             )
 
         except Exception as e:
@@ -314,10 +316,7 @@ class HierarchicalSearchService:
     async def _generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text."""
         model_client = await self._get_model_client()
-        response = await model_client.embeddings.create(
-            input=text,
-            model="text-embedding-3-small"
-        )
+        response = await model_client.embeddings.create(input=text, model="text-embedding-3-small")
         return response.data[0].embedding
 
     async def _get_qdrant_client(self):
@@ -325,18 +324,16 @@ class HierarchicalSearchService:
         if self._qdrant_client is not None:
             return self._qdrant_client
         from isa_common import AsyncQdrantClient
+
         settings = get_settings()
         return AsyncQdrantClient(
             host=settings.infrastructure.qdrant_grpc_host,
             port=settings.infrastructure.qdrant_grpc_port,
-            user_id="mcp-search-service"
+            user_id="mcp-search-service",
         )
 
     async def _search_skills(
-        self,
-        query_embedding: List[float],
-        limit: int,
-        threshold: float
+        self, query_embedding: List[float], limit: int, threshold: float
     ) -> List[SkillMatch]:
         """
         Search the skills collection (Stage 1).
@@ -353,11 +350,7 @@ class HierarchicalSearchService:
             client = await self._get_qdrant_client()
 
             # Build filter for active skills
-            filter_conditions = {
-                "must": [
-                    {"field": "is_active", "match": {"boolean": True}}
-                ]
-            }
+            filter_conditions = {"must": [{"field": "is_active", "match": {"boolean": True}}]}
 
             # Search skills collection
             results = await client.search_with_filter(
@@ -366,7 +359,7 @@ class HierarchicalSearchService:
                 filter_conditions=filter_conditions,
                 limit=limit,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=False,
             )
 
             # Filter by threshold and convert to SkillMatch
@@ -375,13 +368,15 @@ class HierarchicalSearchService:
                 score = result.get("score", 0.0)
                 if score >= threshold:
                     payload = result.get("payload", {})
-                    matches.append(SkillMatch(
-                        id=payload.get("id", str(result.get("id"))),
-                        name=payload.get("name", "Unknown"),
-                        description=payload.get("description", ""),
-                        score=score,
-                        tool_count=payload.get("tool_count", 0)
-                    ))
+                    matches.append(
+                        SkillMatch(
+                            id=payload.get("id", str(result.get("id"))),
+                            name=payload.get("name", "Unknown"),
+                            description=payload.get("description", ""),
+                            score=score,
+                            tool_count=payload.get("tool_count", 0),
+                        )
+                    )
 
             logger.debug(f"Skill search found {len(matches)} matches above threshold {threshold}")
             return matches
@@ -397,7 +392,7 @@ class HierarchicalSearchService:
         item_type: Optional[str],
         limit: int,
         threshold: float,
-        org_id: Optional[str] = None
+        org_id: Optional[str] = None,
     ) -> List[ToolMatch]:
         """
         Search the tools collection with optional skill filter (Stage 2).
@@ -430,25 +425,21 @@ class HierarchicalSearchService:
 
             # Add type filter if provided
             if item_type:
-                filter_conditions["must"].append({
-                    "field": "type",
-                    "match": {"keyword": item_type}
-                })
+                filter_conditions["must"].append({"field": "type", "match": {"keyword": item_type}})
 
             # Add active filter
-            filter_conditions["must"].append({
-                "field": "is_active",
-                "match": {"boolean": True}
-            })
+            filter_conditions["must"].append({"field": "is_active", "match": {"boolean": True}})
 
             # Multi-tenant filter: global items + org-scoped items
             if org_id:
-                filter_conditions["must"].append({
-                    "should": [
-                        {"field": "is_global", "match": {"boolean": True}},
-                        {"field": "org_id", "match": {"keyword": org_id}}
-                    ]
-                })
+                filter_conditions["must"].append(
+                    {
+                        "should": [
+                            {"field": "is_global", "match": {"boolean": True}},
+                            {"field": "org_id", "match": {"keyword": org_id}},
+                        ]
+                    }
+                )
 
             # Get client (uses injected mock in tests)
             client = await self._get_qdrant_client()
@@ -460,7 +451,7 @@ class HierarchicalSearchService:
                 filter_conditions=filter_conditions if filter_conditions["must"] else None,
                 limit=limit,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=False,
             )
 
             # Filter by threshold and convert to ToolMatch
@@ -469,16 +460,18 @@ class HierarchicalSearchService:
                 score = result.get("score", 0.0)
                 if score >= threshold:
                     payload = result.get("payload", {})
-                    matches.append(ToolMatch(
-                        id=str(result.get("id")),
-                        db_id=payload.get("db_id", 0),
-                        type=payload.get("type", "tool"),
-                        name=payload.get("name", "Unknown"),
-                        description=payload.get("description", ""),
-                        score=score,
-                        skill_ids=_parse_skill_ids(payload.get("skill_ids")),
-                        primary_skill_id=payload.get("primary_skill_id"),
-                    ))
+                    matches.append(
+                        ToolMatch(
+                            id=str(result.get("id")),
+                            db_id=payload.get("db_id", 0),
+                            type=payload.get("type", "tool"),
+                            name=payload.get("name", "Unknown"),
+                            description=payload.get("description", ""),
+                            score=score,
+                            skill_ids=_parse_skill_ids(payload.get("skill_ids")),
+                            primary_skill_id=payload.get("primary_skill_id"),
+                        )
+                    )
 
             # Sort by score descending
             matches.sort(key=lambda x: x.score, reverse=True)
@@ -490,10 +483,7 @@ class HierarchicalSearchService:
             logger.error(f"Tool search failed: {e}")
             return []
 
-    async def _enrich_with_schemas(
-        self,
-        tools: List[ToolMatch]
-    ) -> List[ToolMatch]:
+    async def _enrich_with_schemas(self, tools: List[ToolMatch]) -> List[ToolMatch]:
         """
         Load full schemas from PostgreSQL for matched tools (Stage 3).
 
@@ -527,10 +517,7 @@ class HierarchicalSearchService:
                 rows = await db_pool.query(query, params=db_ids)
 
             # Build lookup
-            schema_lookup = {
-                row["id"]: row
-                for row in (rows or [])
-            }
+            schema_lookup = {row["id"]: row for row in (rows or [])}
 
             # Enrich tools
             for tool in tools:
@@ -548,11 +535,7 @@ class HierarchicalSearchService:
             return tools
 
     async def search_skills_only(
-        self,
-        query: str,
-        limit: int = 5,
-        threshold: float = 0.4,
-        include_inactive: bool = False
+        self, query: str, limit: int = 5, threshold: float = 0.4, include_inactive: bool = False
     ) -> List[SkillMatch]:
         """
         Search only the skills collection.
@@ -568,9 +551,7 @@ class HierarchicalSearchService:
         """
         embedding = await self._generate_embedding(query)
         return await self._search_skills(
-            query_embedding=embedding,
-            limit=limit,
-            threshold=threshold
+            query_embedding=embedding, limit=limit, threshold=threshold
         )
 
     async def search_tools_only(
@@ -579,7 +560,7 @@ class HierarchicalSearchService:
         skill_ids: Optional[List[str]] = None,
         item_type: Optional[str] = None,
         limit: int = 10,
-        threshold: float = 0.3
+        threshold: float = 0.3,
     ) -> List[ToolMatch]:
         """
         Search only the tools collection.
@@ -600,7 +581,7 @@ class HierarchicalSearchService:
             skill_ids=skill_ids,
             item_type=item_type,
             limit=limit,
-            threshold=threshold
+            threshold=threshold,
         )
 
     def to_dict(self, result: HierarchicalSearchResult) -> Dict[str, Any]:
@@ -652,5 +633,5 @@ class HierarchicalSearchService:
                 "tool_search_time_ms": result.metadata.tool_search_time_ms,
                 "schema_load_time_ms": result.metadata.schema_load_time_ms,
                 "total_time_ms": result.metadata.total_time_ms,
-            }
+            },
         }

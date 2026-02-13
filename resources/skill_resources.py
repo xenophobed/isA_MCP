@@ -161,19 +161,23 @@ class SkillManager:
         """List all skills (vibe + external)."""
         skills = []
         for name, data in self._vibe_cache.items():
-            skills.append({
-                "name": name,
-                "type": "vibe",
-                "description": data.get("description", ""),
-                "uri": f"skill://vibe/{name}",
-            })
+            skills.append(
+                {
+                    "name": name,
+                    "type": "vibe",
+                    "description": data.get("description", ""),
+                    "uri": f"skill://vibe/{name}",
+                }
+            )
         for name, data in self._external_cache.items():
-            skills.append({
-                "name": name,
-                "type": "external",
-                "description": data.get("description", ""),
-                "uri": f"skill://external/{name}",
-            })
+            skills.append(
+                {
+                    "name": name,
+                    "type": "external",
+                    "description": data.get("description", ""),
+                    "uri": f"skill://external/{name}",
+                }
+            )
         return skills
 
     def list_vibe_skills(self) -> List[Dict[str, str]]:
@@ -237,11 +241,13 @@ class SkillManager:
 
         for guide_file in guides_dir.rglob("*.md"):
             rel_path = guide_file.relative_to(guides_dir)
-            guides.append({
-                "name": guide_file.stem,
-                "path": str(rel_path),
-                "uri": f"skill://{skill_type}/{skill_name}/guides/{rel_path}",
-            })
+            guides.append(
+                {
+                    "name": guide_file.stem,
+                    "path": str(rel_path),
+                    "uri": f"skill://{skill_type}/{skill_name}/guides/{rel_path}",
+                }
+            )
 
         return sorted(guides, key=lambda x: x["path"])
 
@@ -268,11 +274,13 @@ class SkillManager:
         for template_file in templates_dir.rglob("*"):
             if template_file.is_file():
                 rel_path = template_file.relative_to(templates_dir)
-                templates.append({
-                    "name": template_file.name,
-                    "path": str(rel_path),
-                    "uri": f"skill://{skill_type}/{skill_name}/templates/{rel_path}",
-                })
+                templates.append(
+                    {
+                        "name": template_file.name,
+                        "path": str(rel_path),
+                        "uri": f"skill://{skill_type}/{skill_name}/templates/{rel_path}",
+                    }
+                )
 
         return sorted(templates, key=lambda x: x["path"])
 
@@ -299,11 +307,13 @@ class SkillManager:
         for script_file in scripts_dir.rglob("*"):
             if script_file.is_file():
                 rel_path = script_file.relative_to(scripts_dir)
-                scripts.append({
-                    "name": script_file.name,
-                    "path": str(rel_path),
-                    "uri": f"skill://{skill_type}/{skill_name}/scripts/{rel_path}",
-                })
+                scripts.append(
+                    {
+                        "name": script_file.name,
+                        "path": str(rel_path),
+                        "uri": f"skill://{skill_type}/{skill_name}/scripts/{rel_path}",
+                    }
+                )
 
         return sorted(scripts, key=lambda x: x["path"])
 
@@ -320,25 +330,29 @@ class SkillManager:
         for name, data in self._vibe_cache.items():
             score = self._calculate_match_score(query_lower, name, data)
             if score > 0:
-                results.append({
-                    "name": name,
-                    "type": "vibe",
-                    "description": data.get("description", ""),
-                    "uri": f"skill://vibe/{name}",
-                    "match_score": score,
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "type": "vibe",
+                        "description": data.get("description", ""),
+                        "uri": f"skill://vibe/{name}",
+                        "match_score": score,
+                    }
+                )
 
         # Search external skills
         for name, data in self._external_cache.items():
             score = self._calculate_match_score(query_lower, name, data)
             if score > 0:
-                results.append({
-                    "name": name,
-                    "type": "external",
-                    "description": data.get("description", ""),
-                    "uri": f"skill://external/{name}",
-                    "match_score": score,
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "type": "external",
+                        "description": data.get("description", ""),
+                        "uri": f"skill://external/{name}",
+                        "match_score": score,
+                    }
+                )
 
         results.sort(key=lambda x: x["match_score"], reverse=True)
         return results
@@ -465,7 +479,9 @@ class SkillManager:
         resource_data = {
             "uri": uri,
             "name": skill_name,
-            "description": skill_data.get("description", f"{skill_type.title()} skill: {skill_name}"),
+            "description": skill_data.get(
+                "description", f"{skill_type.title()} skill: {skill_name}"
+            ),
             "resource_type": "skill",
             "mime_type": "text/markdown",
             "size_bytes": size_bytes,
@@ -563,18 +579,21 @@ def register_skill_resources(mcp: FastMCP):
         vibe_skills = [s for s in skills if s["type"] == "vibe"]
         external_skills = [s for s in skills if s["type"] == "external"]
 
-        return json.dumps({
-            "total_skills": len(skills),
-            "vibe_count": len(vibe_skills),
-            "external_count": len(external_skills),
-            "skills": skills,
-            "usage": {
-                "get_vibe_skill": "skill://vibe/{name}",
-                "get_external_skill": "skill://external/{name}",
-                "list_guides": "skill://{type}/{name}/guides",
-                "search": "skill://search/{query}",
-            }
-        }, indent=2)
+        return json.dumps(
+            {
+                "total_skills": len(skills),
+                "vibe_count": len(vibe_skills),
+                "external_count": len(external_skills),
+                "skills": skills,
+                "usage": {
+                    "get_vibe_skill": "skill://vibe/{name}",
+                    "get_external_skill": "skill://external/{name}",
+                    "list_guides": "skill://{type}/{name}/guides",
+                    "search": "skill://search/{query}",
+                },
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://vibe/list")
     def list_vibe_skills() -> str:
@@ -585,12 +604,15 @@ def register_skill_resources(mcp: FastMCP):
         """
         skills = skill_manager.list_vibe_skills()
 
-        return json.dumps({
-            "total": len(skills),
-            "type": "vibe",
-            "description": "Vibe coding skills for AI-SDLC workflows",
-            "skills": skills,
-        }, indent=2)
+        return json.dumps(
+            {
+                "total": len(skills),
+                "type": "vibe",
+                "description": "Vibe coding skills for AI-SDLC workflows",
+                "skills": skills,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://external/list")
     def list_external_skills() -> str:
@@ -601,13 +623,16 @@ def register_skill_resources(mcp: FastMCP):
         """
         skills = skill_manager.list_external_skills()
 
-        return json.dumps({
-            "total": len(skills),
-            "type": "external",
-            "description": "External skills installed from registries",
-            "skills": skills,
-            "install_dir": str(skill_manager.get_external_skills_dir()),
-        }, indent=2)
+        return json.dumps(
+            {
+                "total": len(skills),
+                "type": "external",
+                "description": "External skills installed from registries",
+                "skills": skills,
+                "install_dir": str(skill_manager.get_external_skills_dir()),
+            },
+            indent=2,
+        )
 
     # =========================================================================
     # Get Skill Content
@@ -628,10 +653,13 @@ def register_skill_resources(mcp: FastMCP):
 
         if skill is None:
             available = [s["name"] for s in skill_manager.list_vibe_skills()]
-            return json.dumps({
-                "error": f"Vibe skill not found: {skill_name}",
-                "available_skills": available,
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Vibe skill not found: {skill_name}",
+                    "available_skills": available,
+                },
+                indent=2,
+            )
 
         return skill["content"]
 
@@ -650,11 +678,14 @@ def register_skill_resources(mcp: FastMCP):
 
         if skill is None:
             available = [s["name"] for s in skill_manager.list_external_skills()]
-            return json.dumps({
-                "error": f"External skill not found: {skill_name}",
-                "available_skills": available,
-                "hint": "Install external skills using: npx @isa-mcp/skills install <name>",
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"External skill not found: {skill_name}",
+                    "available_skills": available,
+                    "hint": "Install external skills using: npx @isa-mcp/skills install <name>",
+                },
+                indent=2,
+            )
 
         return skill["content"]
 
@@ -670,12 +701,15 @@ def register_skill_resources(mcp: FastMCP):
             return json.dumps({"error": f"Skill not found: {skill_name}"}, indent=2)
 
         guides = skill_manager.list_guides("vibe", skill_name)
-        return json.dumps({
-            "skill": skill_name,
-            "type": "vibe",
-            "total_guides": len(guides),
-            "guides": guides,
-        }, indent=2)
+        return json.dumps(
+            {
+                "skill": skill_name,
+                "type": "vibe",
+                "total_guides": len(guides),
+                "guides": guides,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://vibe/{skill_name}/guides/{path}")
     def get_vibe_skill_guide(skill_name: str, path: str) -> str:
@@ -685,10 +719,13 @@ def register_skill_resources(mcp: FastMCP):
 
         if content is None:
             guides = skill_manager.list_guides("vibe", skill_name)
-            return json.dumps({
-                "error": f"Guide not found: {path}",
-                "available_guides": [g["path"] for g in guides],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Guide not found: {path}",
+                    "available_guides": [g["path"] for g in guides],
+                },
+                indent=2,
+            )
 
         return content
 
@@ -700,12 +737,15 @@ def register_skill_resources(mcp: FastMCP):
             return json.dumps({"error": f"Skill not found: {skill_name}"}, indent=2)
 
         guides = skill_manager.list_guides("external", skill_name)
-        return json.dumps({
-            "skill": skill_name,
-            "type": "external",
-            "total_guides": len(guides),
-            "guides": guides,
-        }, indent=2)
+        return json.dumps(
+            {
+                "skill": skill_name,
+                "type": "external",
+                "total_guides": len(guides),
+                "guides": guides,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://external/{skill_name}/guides/{path}")
     def get_external_skill_guide(skill_name: str, path: str) -> str:
@@ -715,10 +755,13 @@ def register_skill_resources(mcp: FastMCP):
 
         if content is None:
             guides = skill_manager.list_guides("external", skill_name)
-            return json.dumps({
-                "error": f"Guide not found: {path}",
-                "available_guides": [g["path"] for g in guides],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Guide not found: {path}",
+                    "available_guides": [g["path"] for g in guides],
+                },
+                indent=2,
+            )
 
         return content
 
@@ -734,12 +777,15 @@ def register_skill_resources(mcp: FastMCP):
             return json.dumps({"error": f"Skill not found: {skill_name}"}, indent=2)
 
         templates = skill_manager.list_templates("vibe", skill_name)
-        return json.dumps({
-            "skill": skill_name,
-            "type": "vibe",
-            "total_templates": len(templates),
-            "templates": templates,
-        }, indent=2)
+        return json.dumps(
+            {
+                "skill": skill_name,
+                "type": "vibe",
+                "total_templates": len(templates),
+                "templates": templates,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://vibe/{skill_name}/templates/{path}")
     def get_vibe_skill_template(skill_name: str, path: str) -> str:
@@ -749,10 +795,13 @@ def register_skill_resources(mcp: FastMCP):
 
         if content is None:
             templates = skill_manager.list_templates("vibe", skill_name)
-            return json.dumps({
-                "error": f"Template not found: {path}",
-                "available_templates": [t["path"] for t in templates][:20],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Template not found: {path}",
+                    "available_templates": [t["path"] for t in templates][:20],
+                },
+                indent=2,
+            )
 
         return content
 
@@ -764,12 +813,15 @@ def register_skill_resources(mcp: FastMCP):
             return json.dumps({"error": f"Skill not found: {skill_name}"}, indent=2)
 
         templates = skill_manager.list_templates("external", skill_name)
-        return json.dumps({
-            "skill": skill_name,
-            "type": "external",
-            "total_templates": len(templates),
-            "templates": templates,
-        }, indent=2)
+        return json.dumps(
+            {
+                "skill": skill_name,
+                "type": "external",
+                "total_templates": len(templates),
+                "templates": templates,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://external/{skill_name}/templates/{path}")
     def get_external_skill_template(skill_name: str, path: str) -> str:
@@ -779,10 +831,13 @@ def register_skill_resources(mcp: FastMCP):
 
         if content is None:
             templates = skill_manager.list_templates("external", skill_name)
-            return json.dumps({
-                "error": f"Template not found: {path}",
-                "available_templates": [t["path"] for t in templates][:20],
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": f"Template not found: {path}",
+                    "available_templates": [t["path"] for t in templates][:20],
+                },
+                indent=2,
+            )
 
         return content
 
@@ -799,22 +854,28 @@ def register_skill_resources(mcp: FastMCP):
         """
         results = skill_manager.search_skills(query)
 
-        return json.dumps({
-            "query": query,
-            "total_matches": len(results),
-            "results": results,
-        }, indent=2)
+        return json.dumps(
+            {
+                "query": query,
+                "total_matches": len(results),
+                "results": results,
+            },
+            indent=2,
+        )
 
     @mcp.resource("skill://reload")
     def reload_skills() -> str:
         """Reload all skills from disk."""
         counts = skill_manager.reload_skills()
 
-        return json.dumps({
-            "status": "success",
-            "vibe_skills_loaded": counts["vibe"],
-            "external_skills_loaded": counts["external"],
-        }, indent=2)
+        return json.dumps(
+            {
+                "status": "success",
+                "vibe_skills_loaded": counts["vibe"],
+                "external_skills_loaded": counts["external"],
+            },
+            indent=2,
+        )
 
     # =========================================================================
     # Backward Compatibility - vibe://skill/ URIs
@@ -868,11 +929,13 @@ def register_skill_resources(mcp: FastMCP):
 
     def _create_skill_getter(skill_type: str, skill_name: str):
         """Create a getter function for a specific skill (closure)."""
+
         def getter() -> str:
             skill = skill_manager.get_skill(skill_type, skill_name)
             if skill is None:
                 return json.dumps({"error": f"Skill not found: {skill_type}/{skill_name}"})
             return skill.get("content", "")
+
         # Set function name and doc for proper resource registration
         getter.__name__ = skill_name
         getter.__doc__ = f"Get {skill_type} skill: {skill_name}"

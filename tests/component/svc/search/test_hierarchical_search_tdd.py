@@ -8,6 +8,7 @@ and use data structures from tests/contracts/search/data_contract.py.
 These tests are written BEFORE implementation (RED phase).
 Implementation should make these tests pass (GREEN phase).
 """
+
 import pytest
 import time
 from datetime import datetime, timezone
@@ -39,10 +40,10 @@ from tests.component.mocks.search_mocks import (
     MockSearchModelClient,
 )
 
-
 # ═══════════════════════════════════════════════════════════════
 # Fixtures
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def mock_qdrant_search():
@@ -54,14 +55,14 @@ def mock_qdrant_search():
         name="Calendar Management",
         description="Tools for managing calendars and events",
         score=0.85,
-        tool_count=5
+        tool_count=5,
     )
     client.seed_skill(
         skill_id="file-operations",
         name="File Operations",
         description="Tools for file manipulation",
         score=0.6,
-        tool_count=10
+        tool_count=10,
     )
     # Seed default tools
     client.seed_tool(
@@ -71,7 +72,7 @@ def mock_qdrant_search():
         description="Create a calendar event",
         score=0.9,
         skill_ids=["calendar-management"],
-        primary_skill_id="calendar-management"
+        primary_skill_id="calendar-management",
     )
     client.seed_tool(
         tool_id="tool-2",
@@ -80,7 +81,7 @@ def mock_qdrant_search():
         description="List calendar events",
         score=0.85,
         skill_ids=["calendar-management"],
-        primary_skill_id="calendar-management"
+        primary_skill_id="calendar-management",
     )
     return client
 
@@ -89,7 +90,9 @@ def mock_qdrant_search():
 def mock_db_pool():
     """Provide mock database pool."""
     pool = MockDbPool()
-    pool.seed_schema(1, input_schema={"type": "object", "properties": {"title": {"type": "string"}}})
+    pool.seed_schema(
+        1, input_schema={"type": "object", "properties": {"title": {"type": "string"}}}
+    )
     pool.seed_schema(2, input_schema={"type": "object", "properties": {"date": {"type": "string"}}})
     return pool
 
@@ -115,7 +118,7 @@ def search_service(mock_vector_repository, mock_model_client, mock_db_pool, mock
         vector_repository=mock_vector_repository,
         model_client=mock_model_client,
         db_pool=mock_db_pool,
-        qdrant_client=mock_qdrant_search  # Inject mock Qdrant client
+        qdrant_client=mock_qdrant_search,  # Inject mock Qdrant client
     )
     return service
 
@@ -124,6 +127,7 @@ def search_service(mock_vector_repository, mock_model_client, mock_db_pool, mock
 # Contract Validation Tests (Data Contract)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.unit
 class TestSearchDataContractValidation:
@@ -131,9 +135,7 @@ class TestSearchDataContractValidation:
 
     def test_valid_search_request(self):
         """Test that valid search request is accepted."""
-        request = SearchTestDataFactory.make_search_request(
-            query="schedule a meeting tomorrow"
-        )
+        request = SearchTestDataFactory.make_search_request(query="schedule a meeting tomorrow")
         assert request.query == "schedule a meeting tomorrow"
         assert request.strategy == SearchStrategy.HIERARCHICAL
         assert request.include_schemas is True
@@ -210,6 +212,7 @@ class TestSearchDataContractValidation:
 # BR-001: Two-Stage Hierarchical Search
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.search
@@ -226,9 +229,7 @@ class TestBR001TwoStageHierarchicalSearch:
     """
 
     @pytest.mark.asyncio
-    async def test_hierarchical_search_returns_structured_response(
-        self, search_service
-    ):
+    async def test_hierarchical_search_returns_structured_response(self, search_service):
         """Test that hierarchical search returns proper response structure."""
         # Act
         result = await search_service.search(query="schedule a meeting tomorrow")
@@ -278,9 +279,7 @@ class TestBR001TwoStageHierarchicalSearch:
         assert len(embedding_calls) == 1
 
     @pytest.mark.asyncio
-    async def test_hierarchical_search_loads_schemas_in_stage3(
-        self, search_service, mock_db_pool
-    ):
+    async def test_hierarchical_search_loads_schemas_in_stage3(self, search_service, mock_db_pool):
         """Test that schemas are loaded from PostgreSQL for returned tools."""
         # Act
         result = await search_service.search(query="calendar event", include_schemas=True)
@@ -294,6 +293,7 @@ class TestBR001TwoStageHierarchicalSearch:
 # ═══════════════════════════════════════════════════════════════
 # BR-002: Skill Matching (Stage 1)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -311,9 +311,7 @@ class TestBR002SkillMatching:
     """
 
     @pytest.mark.asyncio
-    async def test_skill_search_respects_threshold(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_skill_search_respects_threshold(self, search_service, mock_qdrant_search):
         """Test that only skills above threshold are returned."""
         # Add a low-score skill
         mock_qdrant_search.seed_skill(
@@ -321,7 +319,7 @@ class TestBR002SkillMatching:
             name="Low Score",
             description="Should be filtered out",
             score=0.2,  # Below default threshold of 0.4
-            tool_count=1
+            tool_count=1,
         )
 
         # Act with high threshold
@@ -332,9 +330,7 @@ class TestBR002SkillMatching:
             assert skill.score >= 0.5
 
     @pytest.mark.asyncio
-    async def test_skill_search_respects_limit(
-        self, search_service
-    ):
+    async def test_skill_search_respects_limit(self, search_service):
         """Test that skill search respects skill_limit."""
         # Act with limit
         result = await search_service.search(query="test", skill_limit=1)
@@ -343,9 +339,7 @@ class TestBR002SkillMatching:
         assert len(result.matched_skills) <= 1
 
     @pytest.mark.asyncio
-    async def test_skill_search_only_active_skills(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_skill_search_only_active_skills(self, search_service, mock_qdrant_search):
         """Test that only active skills are searched."""
         # Add an inactive skill
         mock_qdrant_search.seed_skill(
@@ -354,7 +348,7 @@ class TestBR002SkillMatching:
             description="Should be filtered",
             score=0.99,
             tool_count=100,
-            is_active=False
+            is_active=False,
         )
 
         # Act
@@ -365,22 +359,21 @@ class TestBR002SkillMatching:
         assert "inactive-skill" not in skill_ids
 
     @pytest.mark.asyncio
-    async def test_skill_search_returns_tool_count(
-        self, search_service
-    ):
+    async def test_skill_search_returns_tool_count(self, search_service):
         """Test that each matched skill includes tool_count."""
         # Act
         result = await search_service.search(query="calendar")
 
         # Assert
         for skill in result.matched_skills:
-            assert hasattr(skill, 'tool_count')
+            assert hasattr(skill, "tool_count")
             assert skill.tool_count >= 0
 
 
 # ═══════════════════════════════════════════════════════════════
 # BR-003: Tool Search with Skill Filter (Stage 2)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -398,9 +391,7 @@ class TestBR003ToolSearchWithSkillFilter:
     """
 
     @pytest.mark.asyncio
-    async def test_tool_search_filters_by_skill_ids(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_tool_search_filters_by_skill_ids(self, search_service, mock_qdrant_search):
         """Test that tool search filters by matched skill IDs."""
         # Act
         result = await search_service.search(query="calendar event")
@@ -410,9 +401,7 @@ class TestBR003ToolSearchWithSkillFilter:
             assert "calendar-management" in tool.skill_ids
 
     @pytest.mark.asyncio
-    async def test_tool_search_respects_threshold(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_tool_search_respects_threshold(self, search_service, mock_qdrant_search):
         """Test that only tools above threshold are returned."""
         # Add a low-score tool
         mock_qdrant_search.seed_tool(
@@ -421,7 +410,7 @@ class TestBR003ToolSearchWithSkillFilter:
             name="low_score_tool",
             description="Low score tool",
             score=0.1,
-            skill_ids=["calendar-management"]
+            skill_ids=["calendar-management"],
         )
 
         # Act with high threshold
@@ -432,9 +421,7 @@ class TestBR003ToolSearchWithSkillFilter:
             assert tool.score >= 0.5
 
     @pytest.mark.asyncio
-    async def test_tool_search_sorted_by_score(
-        self, search_service
-    ):
+    async def test_tool_search_sorted_by_score(self, search_service):
         """Test that tools are sorted by similarity score descending."""
         # Act
         result = await search_service.search(query="calendar")
@@ -445,22 +432,21 @@ class TestBR003ToolSearchWithSkillFilter:
                 assert result.tools[i].score >= result.tools[i + 1].score
 
     @pytest.mark.asyncio
-    async def test_tool_search_includes_skill_ids_in_result(
-        self, search_service
-    ):
+    async def test_tool_search_includes_skill_ids_in_result(self, search_service):
         """Test that each tool includes its skill_ids in result."""
         # Act
         result = await search_service.search(query="calendar")
 
         # Assert
         for tool in result.tools:
-            assert hasattr(tool, 'skill_ids')
+            assert hasattr(tool, "skill_ids")
             assert isinstance(tool.skill_ids, list)
 
 
 # ═══════════════════════════════════════════════════════════════
 # BR-004: Schema Enrichment (Stage 3)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -477,9 +463,7 @@ class TestBR004SchemaEnrichment:
     """
 
     @pytest.mark.asyncio
-    async def test_schema_loading_when_enabled(
-        self, search_service, mock_db_pool
-    ):
+    async def test_schema_loading_when_enabled(self, search_service, mock_db_pool):
         """Test that schemas are loaded when include_schemas=true."""
         # Act
         result = await search_service.search(query="calendar", include_schemas=True)
@@ -488,9 +472,7 @@ class TestBR004SchemaEnrichment:
         assert result.metadata.schema_load_time_ms >= 0
 
     @pytest.mark.asyncio
-    async def test_no_schema_loading_when_disabled(
-        self, search_service, mock_db_pool
-    ):
+    async def test_no_schema_loading_when_disabled(self, search_service, mock_db_pool):
         """Test that schemas are NOT loaded when include_schemas=false."""
         # Act
         result = await search_service.search(query="calendar", include_schemas=False)
@@ -511,7 +493,7 @@ class TestBR004SchemaEnrichment:
             name="no_schema",
             description="Tool without schema",
             score=0.9,
-            skill_ids=["calendar-management"]
+            skill_ids=["calendar-management"],
         )
 
         # Act - should not raise
@@ -524,6 +506,7 @@ class TestBR004SchemaEnrichment:
 # ═══════════════════════════════════════════════════════════════
 # BR-005: Item Type Filtering
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -540,9 +523,7 @@ class TestBR005ItemTypeFiltering:
     """
 
     @pytest.mark.asyncio
-    async def test_filter_tools_only(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_filter_tools_only(self, search_service, mock_qdrant_search):
         """Test that item_type=tool returns only tools."""
         # Add a prompt type
         mock_qdrant_search.seed_tool(
@@ -552,7 +533,7 @@ class TestBR005ItemTypeFiltering:
             description="A test prompt",
             score=0.9,
             skill_ids=["calendar-management"],
-            item_type="prompt"
+            item_type="prompt",
         )
 
         # Act - filter to tools only
@@ -563,9 +544,7 @@ class TestBR005ItemTypeFiltering:
             assert tool.type == "tool"
 
     @pytest.mark.asyncio
-    async def test_filter_prompts_only(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_filter_prompts_only(self, search_service, mock_qdrant_search):
         """Test that item_type=prompt returns only prompts."""
         # Add a prompt
         mock_qdrant_search.seed_tool(
@@ -575,7 +554,7 @@ class TestBR005ItemTypeFiltering:
             description="A calendar prompt",
             score=0.9,
             skill_ids=["calendar-management"],
-            item_type="prompt"
+            item_type="prompt",
         )
 
         # Act - filter to prompts only
@@ -586,9 +565,7 @@ class TestBR005ItemTypeFiltering:
             assert tool.type == "prompt"
 
     @pytest.mark.asyncio
-    async def test_no_filter_returns_all_types(
-        self, search_service
-    ):
+    async def test_no_filter_returns_all_types(self, search_service):
         """Test that no item_type filter returns all types."""
         # Act - no type filter
         result = await search_service.search(query="calendar", item_type=None)
@@ -600,6 +577,7 @@ class TestBR005ItemTypeFiltering:
 # ═══════════════════════════════════════════════════════════════
 # BR-006: Fallback to Unfiltered Search
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -616,9 +594,7 @@ class TestBR006FallbackToUnfilteredSearch:
     """
 
     @pytest.mark.asyncio
-    async def test_fallback_when_no_skills_match(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_fallback_when_no_skills_match(self, search_service, mock_qdrant_search):
         """Test that search falls back when no skills match threshold."""
         # Add only low-score skills
         mock_qdrant_search.collections["mcp_skills"] = []
@@ -629,7 +605,7 @@ class TestBR006FallbackToUnfilteredSearch:
             name="fallback",
             description="High score but no skills",
             score=0.95,
-            skill_ids=[]  # No skills
+            skill_ids=[],  # No skills
         )
 
         # Act with very high skill threshold
@@ -640,9 +616,7 @@ class TestBR006FallbackToUnfilteredSearch:
         assert result.metadata.stage1_skill_count == 0
 
     @pytest.mark.asyncio
-    async def test_fallback_when_skill_collection_empty(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_fallback_when_skill_collection_empty(self, search_service, mock_qdrant_search):
         """Test fallback when skill collection is empty."""
         # Clear skills
         mock_qdrant_search.collections["mcp_skills"] = []
@@ -655,9 +629,7 @@ class TestBR006FallbackToUnfilteredSearch:
         assert result.metadata.stage1_skill_count == 0
 
     @pytest.mark.asyncio
-    async def test_metadata_indicates_fallback_used(
-        self, search_service
-    ):
+    async def test_metadata_indicates_fallback_used(self, search_service):
         """Test that metadata correctly indicates when fallback was used."""
         # Act with very high threshold to force fallback
         result = await search_service.search(query="test", skill_threshold=0.99)
@@ -670,6 +642,7 @@ class TestBR006FallbackToUnfilteredSearch:
 # ═══════════════════════════════════════════════════════════════
 # BR-007: Search Metadata Tracking
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -687,9 +660,7 @@ class TestBR007SearchMetadataTracking:
     """
 
     @pytest.mark.asyncio
-    async def test_metadata_includes_timing(
-        self, search_service
-    ):
+    async def test_metadata_includes_timing(self, search_service):
         """Test that metadata includes timing for each stage."""
         # Act
         result = await search_service.search(query="test")
@@ -701,9 +672,7 @@ class TestBR007SearchMetadataTracking:
         assert result.metadata.total_time_ms >= 0
 
     @pytest.mark.asyncio
-    async def test_metadata_includes_counts(
-        self, search_service
-    ):
+    async def test_metadata_includes_counts(self, search_service):
         """Test that metadata includes counts."""
         # Act
         result = await search_service.search(query="test")
@@ -714,9 +683,7 @@ class TestBR007SearchMetadataTracking:
         assert result.metadata.final_count >= 0
 
     @pytest.mark.asyncio
-    async def test_metadata_includes_strategy(
-        self, search_service
-    ):
+    async def test_metadata_includes_strategy(self, search_service):
         """Test that metadata includes strategy used."""
         # Act
         result = await search_service.search(query="test", strategy="direct")
@@ -728,6 +695,7 @@ class TestBR007SearchMetadataTracking:
 # ═══════════════════════════════════════════════════════════════
 # BR-008: Direct Search Strategy (Bypass Skills)
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -744,9 +712,7 @@ class TestBR008DirectSearchStrategy:
     """
 
     @pytest.mark.asyncio
-    async def test_direct_search_skips_skills(
-        self, search_service
-    ):
+    async def test_direct_search_skips_skills(self, search_service):
         """Test that direct search skips skill matching."""
         # Act with direct strategy
         result = await search_service.search(query="test", strategy="direct")
@@ -756,9 +722,7 @@ class TestBR008DirectSearchStrategy:
         assert result.metadata.strategy_used == "direct"
 
     @pytest.mark.asyncio
-    async def test_direct_search_still_applies_type_filter(
-        self, search_service
-    ):
+    async def test_direct_search_still_applies_type_filter(self, search_service):
         """Test that direct search still applies item_type filter."""
         # Act with direct strategy and type filter
         result = await search_service.search(query="test", strategy="direct", item_type="tool")
@@ -770,6 +734,7 @@ class TestBR008DirectSearchStrategy:
 # ═══════════════════════════════════════════════════════════════
 # BR-009: Score Normalization
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -784,9 +749,7 @@ class TestBR009ScoreNormalization:
     """
 
     @pytest.mark.asyncio
-    async def test_scores_in_valid_range(
-        self, search_service
-    ):
+    async def test_scores_in_valid_range(self, search_service):
         """Test that all scores are between 0.0 and 1.0."""
         # Act
         result = await search_service.search(query="test")
@@ -802,6 +765,7 @@ class TestBR009ScoreNormalization:
 # Edge Cases (from logic_contract.md)
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.search
@@ -809,9 +773,7 @@ class TestSearchEdgeCases:
     """Edge case tests from logic contract EC-XXX."""
 
     @pytest.mark.asyncio
-    async def test_EC001_no_skills_in_index(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_EC001_no_skills_in_index(self, search_service, mock_qdrant_search):
         """
         EC-001: No Skills in Index
 
@@ -829,9 +791,7 @@ class TestSearchEdgeCases:
         assert result.metadata.stage1_skill_count == 0
 
     @pytest.mark.asyncio
-    async def test_EC002_all_skills_match(
-        self, search_service
-    ):
+    async def test_EC002_all_skills_match(self, search_service):
         """
         EC-002: All Skills Match
 
@@ -845,9 +805,7 @@ class TestSearchEdgeCases:
         assert len(result.matched_skills) <= 2
 
     @pytest.mark.asyncio
-    async def test_EC003_skill_matches_but_no_tools(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_EC003_skill_matches_but_no_tools(self, search_service, mock_qdrant_search):
         """
         EC-003: Skill Matches But No Tools
 
@@ -864,9 +822,7 @@ class TestSearchEdgeCases:
         assert len(result.tools) == 0
 
     @pytest.mark.asyncio
-    async def test_EC004_very_long_query(
-        self, search_service
-    ):
+    async def test_EC004_very_long_query(self, search_service):
         """
         EC-004: Very Long Query
 
@@ -879,9 +835,7 @@ class TestSearchEdgeCases:
         assert "1000" in str(exc.value)
 
     @pytest.mark.asyncio
-    async def test_EC005_special_characters_in_query(
-        self, search_service
-    ):
+    async def test_EC005_special_characters_in_query(self, search_service):
         """
         EC-005: Special Characters in Query
 
@@ -893,9 +847,7 @@ class TestSearchEdgeCases:
         assert result is not None  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_EC006_concurrent_same_query(
-        self, search_service
-    ):
+    async def test_EC006_concurrent_same_query(self, search_service):
         """
         EC-006: Concurrent Same Query
 
@@ -911,9 +863,7 @@ class TestSearchEdgeCases:
         assert result1.query == result2.query
 
     @pytest.mark.asyncio
-    async def test_EC008_tool_belongs_to_zero_skills(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_EC008_tool_belongs_to_zero_skills(self, search_service, mock_qdrant_search):
         """
         EC-008: Tool Belongs to Zero Skills
 
@@ -927,7 +877,7 @@ class TestSearchEdgeCases:
             name="no_skills",
             description="Tool without skills",
             score=0.99,
-            skill_ids=[]
+            skill_ids=[],
         )
 
         # Act with hierarchical search
@@ -949,6 +899,7 @@ class TestSearchEdgeCases:
 # Query-Specific Tests
 # ═══════════════════════════════════════════════════════════════
 
+
 @pytest.mark.tdd
 @pytest.mark.component
 @pytest.mark.search
@@ -956,9 +907,7 @@ class TestQuerySpecificBehavior:
     """Tests for specific query types from test data factory."""
 
     @pytest.mark.asyncio
-    async def test_calendar_queries_match_calendar_skill(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_calendar_queries_match_calendar_skill(self, search_service, mock_qdrant_search):
         """Test that calendar queries match calendar_management skill."""
         # Ensure calendar skill is seeded with high score for calendar queries
         mock_qdrant_search.collections["mcp_skills"] = []
@@ -967,14 +916,16 @@ class TestQuerySpecificBehavior:
             name="Calendar Management",
             description="Tools for scheduling meetings, events, and calendar management",
             score=0.92,
-            tool_count=5
+            tool_count=5,
         )
 
         # Test each calendar query
         for query in SearchTestDataFactory.get_calendar_queries():
             result = await search_service.search(query=query)
             skill_ids = [s.id for s in result.matched_skills]
-            assert "calendar-management" in skill_ids, f"Query '{query}' should match calendar-management skill"
+            assert (
+                "calendar-management" in skill_ids
+            ), f"Query '{query}' should match calendar-management skill"
 
     @pytest.mark.asyncio
     async def test_ambiguous_queries_match_multiple_skills(
@@ -988,25 +939,25 @@ class TestQuerySpecificBehavior:
             name="Calendar Management",
             description="Tools for scheduling and calendar",
             score=0.75,
-            tool_count=5
+            tool_count=5,
         )
         mock_qdrant_search.seed_skill(
             skill_id="file-operations",
             name="File Operations",
             description="Tools for file management",
             score=0.70,
-            tool_count=10
+            tool_count=10,
         )
 
         # Test each ambiguous query
         for query in SearchTestDataFactory.get_ambiguous_queries():
             result = await search_service.search(query=query, skill_threshold=0.3)
-            assert len(result.matched_skills) >= 1, f"Ambiguous query '{query}' should match at least 1 skill"
+            assert (
+                len(result.matched_skills) >= 1
+            ), f"Ambiguous query '{query}' should match at least 1 skill"
 
     @pytest.mark.asyncio
-    async def test_no_match_queries_return_low_scores(
-        self, search_service, mock_qdrant_search
-    ):
+    async def test_no_match_queries_return_low_scores(self, search_service, mock_qdrant_search):
         """Test that no-match queries return low scores or empty results."""
         # Seed skills with very low scores for unrelated query
         mock_qdrant_search.collections["mcp_skills"] = []
@@ -1015,22 +966,24 @@ class TestQuerySpecificBehavior:
             name="Calendar Management",
             description="Calendar tools",
             score=0.15,  # Very low score
-            tool_count=5
+            tool_count=5,
         )
 
         # Query for something unrelated with high threshold
         result = await search_service.search(
-            query="xyzzy quantum entanglement blockchain",
-            skill_threshold=0.5
+            query="xyzzy quantum entanglement blockchain", skill_threshold=0.5
         )
 
         # Should get no matches above threshold
-        assert len(result.matched_skills) == 0, "Unrelated query should not match any skills above threshold"
+        assert (
+            len(result.matched_skills) == 0
+        ), "Unrelated query should not match any skills above threshold"
 
 
 # ═══════════════════════════════════════════════════════════════
 # Performance Tests
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1040,9 +993,7 @@ class TestSearchPerformanceSLAs:
     """Performance tests based on SLAs from logic contract."""
 
     @pytest.mark.asyncio
-    async def test_full_search_under_100ms(
-        self, search_service
-    ):
+    async def test_full_search_under_100ms(self, search_service):
         """Test that full hierarchical search completes in < 100ms (target p95)."""
         import time
 
@@ -1054,9 +1005,7 @@ class TestSearchPerformanceSLAs:
         assert elapsed_ms < 100, f"Search took {elapsed_ms:.2f}ms, expected < 100ms"
 
     @pytest.mark.asyncio
-    async def test_skill_search_under_15ms(
-        self, search_service
-    ):
+    async def test_skill_search_under_15ms(self, search_service):
         """Test that skill search (Stage 1) completes in < 15ms (target p95)."""
         import time
 
@@ -1065,12 +1014,12 @@ class TestSearchPerformanceSLAs:
         elapsed_ms = (time.time() - start) * 1000
 
         # With mocks, skill search should be fast
-        assert result.metadata.skill_search_time_ms < 15, f"Skill search took {result.metadata.skill_search_time_ms:.2f}ms"
+        assert (
+            result.metadata.skill_search_time_ms < 15
+        ), f"Skill search took {result.metadata.skill_search_time_ms:.2f}ms"
 
     @pytest.mark.asyncio
-    async def test_tool_search_under_30ms(
-        self, search_service
-    ):
+    async def test_tool_search_under_30ms(self, search_service):
         """Test that tool search (Stage 2) completes in < 30ms (target p95)."""
         start = time.time()
         result = await search_service.search(query="test")
@@ -1083,6 +1032,7 @@ class TestSearchPerformanceSLAs:
 # ═══════════════════════════════════════════════════════════════
 # Integration with Skill Service
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.tdd
 @pytest.mark.component
@@ -1122,7 +1072,7 @@ class TestSkillSearchIntegration:
             name="Email Management",
             description="Email tools",
             score=0.88,
-            tool_count=3
+            tool_count=3,
         )
 
         # Seed tools - one matching the skill, one not
@@ -1133,7 +1083,7 @@ class TestSkillSearchIntegration:
             description="Send an email",
             score=0.9,
             skill_ids=["email-management"],
-            primary_skill_id="email-management"
+            primary_skill_id="email-management",
         )
         mock_qdrant_search.seed_tool(
             tool_id="read-file",
@@ -1142,7 +1092,7 @@ class TestSkillSearchIntegration:
             description="Read a file",
             score=0.85,
             skill_ids=["file-operations"],
-            primary_skill_id="file-operations"
+            primary_skill_id="file-operations",
         )
 
         # Act

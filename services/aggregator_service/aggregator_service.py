@@ -4,6 +4,7 @@ Aggregator Service - Main service for MCP Server Aggregation.
 Coordinates server registration, connection management, tool discovery,
 and request routing for external MCP servers.
 """
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -41,7 +42,7 @@ class AggregatorService:
         vector_repository=None,
         skill_classifier=None,
         model_client=None,
-        db_pool=None
+        db_pool=None,
     ):
         """
         Initialize AggregatorService.
@@ -70,14 +71,14 @@ class AggregatorService:
             tool_repository=self._tool_repo,
             vector_repository=self._vector_repo,
             skill_classifier=self._skill_classifier,
-            model_client=self._model_client
+            model_client=self._model_client,
         )
 
         # Create request router
         self._router = RequestRouter(
             session_manager=self._session_mgr,
             server_registry=self._registry,
-            tool_repository=self._tool_repo
+            tool_repository=self._tool_repo,
         )
 
         # Health monitoring state
@@ -156,15 +157,19 @@ class AggregatorService:
                 logger.debug(f"Server already connected with active session: {server['name']}")
                 return True
             else:
-                logger.info(f"Server status is CONNECTED but no session exists, reconnecting: {server['name']}")
+                logger.info(
+                    f"Server status is CONNECTED but no session exists, reconnecting: {server['name']}"
+                )
 
         try:
             # Create session
-            await self._session_mgr.connect({
-                "id": server_id,
-                "transport_type": server["transport_type"],
-                "connection_config": server["connection_config"]
-            })
+            await self._session_mgr.connect(
+                {
+                    "id": server_id,
+                    "transport_type": server["transport_type"],
+                    "connection_config": server["connection_config"],
+                }
+            )
 
             # Trigger tool discovery
             try:
@@ -178,11 +183,7 @@ class AggregatorService:
 
         except Exception as e:
             logger.error(f"Connection failed for {server['name']}: {e}")
-            await self._registry.update_status(
-                server_id,
-                ServerStatus.ERROR,
-                str(e)
-            )
+            await self._registry.update_status(server_id, ServerStatus.ERROR, str(e))
             return False
 
     # =========================================================================
@@ -225,10 +226,7 @@ class AggregatorService:
     # =========================================================================
 
     async def execute_tool(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        server_id: str = None
+        self, tool_name: str, arguments: Dict[str, Any], server_id: str = None
     ) -> Dict[str, Any]:
         """
         Execute a tool on an external server.
@@ -242,9 +240,7 @@ class AggregatorService:
             Tool execution result
         """
         return await self._router.route_and_execute(
-            tool_name=tool_name,
-            arguments=arguments,
-            server_id=server_id
+            tool_name=tool_name, arguments=arguments, server_id=server_id
         )
 
     # =========================================================================
@@ -283,9 +279,7 @@ class AggregatorService:
         if is_healthy:
             self._health_failures[server_id] = 0
         else:
-            self._health_failures[server_id] = (
-                self._health_failures.get(server_id, 0) + 1
-            )
+            self._health_failures[server_id] = self._health_failures.get(server_id, 0) + 1
 
         consecutive_failures = self._health_failures.get(server_id, 0)
 
@@ -298,7 +292,7 @@ class AggregatorService:
                 await self._registry.update_status(
                     server_id,
                     ServerStatus.DEGRADED,
-                    f"Health check failed {consecutive_failures} times"
+                    f"Health check failed {consecutive_failures} times",
                 )
 
         return {
@@ -322,13 +316,15 @@ class AggregatorService:
                 results.append(result)
             except Exception as e:
                 logger.error(f"Health check failed for {server['name']}: {e}")
-                results.append({
-                    "server_id": server["id"],
-                    "server_name": server["name"],
-                    "status": server["status"],
-                    "is_healthy": False,
-                    "error": str(e)
-                })
+                results.append(
+                    {
+                        "server_id": server["id"],
+                        "server_name": server["name"],
+                        "status": server["status"],
+                        "is_healthy": False,
+                        "error": str(e),
+                    }
+                )
 
         return results
 
@@ -414,7 +410,9 @@ class AggregatorService:
         all_servers = await self._registry.list()
         connected = [s for s in all_servers if s["status"] == ServerStatus.CONNECTED]
         disconnected = [s for s in all_servers if s["status"] == ServerStatus.DISCONNECTED]
-        error = [s for s in all_servers if s["status"] in (ServerStatus.ERROR, ServerStatus.DEGRADED)]
+        error = [
+            s for s in all_servers if s["status"] in (ServerStatus.ERROR, ServerStatus.DEGRADED)
+        ]
 
         total_tools = sum(s.get("tool_count", 0) for s in all_servers)
 
@@ -428,14 +426,18 @@ class AggregatorService:
                 {
                     "id": s["id"],
                     "name": s["name"],
-                    "status": s["status"].value if isinstance(s["status"], ServerStatus) else s["status"],
+                    "status": (
+                        s["status"].value if isinstance(s["status"], ServerStatus) else s["status"]
+                    ),
                     "tool_count": s.get("tool_count", 0),
                 }
                 for s in all_servers
-            ]
+            ],
         }
 
-    async def list_servers(self, status: ServerStatus = None, org_id: str = None) -> List[Dict[str, Any]]:
+    async def list_servers(
+        self, status: ServerStatus = None, org_id: str = None
+    ) -> List[Dict[str, Any]]:
         """
         List registered servers.
 
@@ -461,10 +463,7 @@ class AggregatorService:
         return await self._registry.get(server_id)
 
     async def search_tools(
-        self,
-        query: str,
-        server_filter: List[str] = None,
-        limit: int = 10
+        self, query: str, server_filter: List[str] = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Search aggregated tools.
@@ -478,9 +477,7 @@ class AggregatorService:
             List of matching tools
         """
         return await self._tool_aggregator.search_tools(
-            query=query,
-            server_filter=server_filter,
-            limit=limit
+            query=query, server_filter=server_filter, limit=limit
         )
 
     # =========================================================================
@@ -494,6 +491,7 @@ class AggregatorService:
         Returns:
             Health monitor task
         """
+
         async def _monitor_loop():
             while True:
                 try:

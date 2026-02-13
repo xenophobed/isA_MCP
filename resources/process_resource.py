@@ -40,7 +40,7 @@ STANDARD_PROCESSES = {
                 "description": "Analyze project dependencies and third-party libraries",
                 "required_tools": ["code_search", "web_search"],
                 "verification": "All dependencies documented with versions",
-                "output": "Dependency list"
+                "output": "Dependency list",
             },
             {
                 "step": 2,
@@ -48,7 +48,7 @@ STANDARD_PROCESSES = {
                 "description": "Scan for known vulnerabilities and CVEs",
                 "required_tools": ["web_search", "data_query"],
                 "verification": "All CVEs documented with severity ratings",
-                "output": "Vulnerability report"
+                "output": "Vulnerability report",
             },
             {
                 "step": 3,
@@ -56,7 +56,7 @@ STANDARD_PROCESSES = {
                 "description": "Review code for security issues and best practices",
                 "required_tools": ["code_search"],
                 "verification": "All code patterns analyzed",
-                "output": "Code review findings"
+                "output": "Code review findings",
             },
             {
                 "step": 4,
@@ -64,17 +64,16 @@ STANDARD_PROCESSES = {
                 "description": "Generate comprehensive security audit report",
                 "required_tools": ["ask_human"],
                 "verification": "Report includes all findings and recommendations",
-                "output": "Complete security report"
-            }
+                "output": "Complete security report",
+            },
         ],
         "success_criteria": [
             "All dependencies audited",
             "Vulnerabilities categorized by severity",
-            "Recommendations provided"
+            "Recommendations provided",
         ],
-        "keywords": ["security", "audit", "code", "vulnerability", "scanning"]
+        "keywords": ["security", "audit", "code", "vulnerability", "scanning"],
     },
-
     "data_analysis_workflow": {
         "process_id": "data_analysis_workflow",
         "name": "Data Analysis Workflow",
@@ -89,7 +88,7 @@ STANDARD_PROCESSES = {
                 "description": "Collect and ingest data from various sources",
                 "required_tools": ["data_ingest", "web_crawl"],
                 "verification": "Data successfully ingested and validated",
-                "output": "Raw dataset"
+                "output": "Raw dataset",
             },
             {
                 "step": 2,
@@ -97,7 +96,7 @@ STANDARD_PROCESSES = {
                 "description": "Clean and preprocess data",
                 "required_tools": ["data_query"],
                 "verification": "Data quality metrics meet thresholds",
-                "output": "Clean dataset"
+                "output": "Clean dataset",
             },
             {
                 "step": 3,
@@ -105,7 +104,7 @@ STANDARD_PROCESSES = {
                 "description": "Perform exploratory data analysis",
                 "required_tools": ["data_query", "data_search"],
                 "verification": "Key patterns and distributions identified",
-                "output": "EDA report"
+                "output": "EDA report",
             },
             {
                 "step": 4,
@@ -113,7 +112,7 @@ STANDARD_PROCESSES = {
                 "description": "Apply statistical methods and modeling",
                 "required_tools": ["data_query"],
                 "verification": "Models validated with metrics",
-                "output": "Analysis results"
+                "output": "Analysis results",
             },
             {
                 "step": 5,
@@ -121,17 +120,16 @@ STANDARD_PROCESSES = {
                 "description": "Generate visualizations and report",
                 "required_tools": ["ask_human"],
                 "verification": "Results clearly communicated",
-                "output": "Data insights report"
-            }
+                "output": "Data insights report",
+            },
         ],
         "success_criteria": [
             "Data quality validated",
             "Insights actionable",
-            "Recommendations clear"
+            "Recommendations clear",
         ],
-        "keywords": ["data", "analysis", "statistics", "insights", "visualization"]
+        "keywords": ["data", "analysis", "statistics", "insights", "visualization"],
     },
-
     "web_research_process": {
         "process_id": "web_research_process",
         "name": "Web Research Process",
@@ -146,7 +144,7 @@ STANDARD_PROCESSES = {
                 "description": "Conduct initial web searches for information",
                 "required_tools": ["web_search"],
                 "verification": "Relevant sources identified",
-                "output": "Information sources"
+                "output": "Information sources",
             },
             {
                 "step": 2,
@@ -154,7 +152,7 @@ STANDARD_PROCESSES = {
                 "description": "Extract detailed content from sources",
                 "required_tools": ["web_crawl"],
                 "verification": "Content extracted and validated",
-                "output": "Extracted data"
+                "output": "Extracted data",
             },
             {
                 "step": 3,
@@ -162,17 +160,12 @@ STANDARD_PROCESSES = {
                 "description": "Synthesize findings into coherent summary",
                 "required_tools": ["search_knowledge", "knowledge_response"],
                 "verification": "Information organized and verified",
-                "output": "Research summary"
-            }
+                "output": "Research summary",
+            },
         ],
-        "success_criteria": [
-            "Information comprehensive",
-            "Sources credible",
-            "Summary clear"
-        ],
-        "keywords": ["research", "web", "search", "information", "gathering"]
+        "success_criteria": ["Information comprehensive", "Sources credible", "Summary clear"],
+        "keywords": ["research", "web", "search", "information", "gathering"],
     },
-
     "api_integration_setup": {
         "process_id": "api_integration_setup",
         "name": "API Integration Setup",
@@ -187,7 +180,7 @@ STANDARD_PROCESSES = {
                 "description": "Review API documentation and requirements",
                 "required_tools": ["web_search", "web_crawl"],
                 "verification": "API endpoints and authentication understood",
-                "output": "API specification"
+                "output": "API specification",
             },
             {
                 "step": 2,
@@ -195,7 +188,7 @@ STANDARD_PROCESSES = {
                 "description": "Configure API credentials and authentication",
                 "required_tools": ["ask_human"],
                 "verification": "Authentication successful",
-                "output": "Auth configuration"
+                "output": "Auth configuration",
             },
             {
                 "step": 3,
@@ -203,7 +196,7 @@ STANDARD_PROCESSES = {
                 "description": "Test API calls and responses",
                 "required_tools": ["web_automation"],
                 "verification": "All endpoints tested successfully",
-                "output": "Test results"
+                "output": "Test results",
             },
             {
                 "step": 4,
@@ -211,17 +204,16 @@ STANDARD_PROCESSES = {
                 "description": "Implement error handling and monitoring",
                 "required_tools": ["ask_human"],
                 "verification": "Error cases handled properly",
-                "output": "Production-ready integration"
-            }
+                "output": "Production-ready integration",
+            },
         ],
         "success_criteria": [
             "API calls successful",
             "Authentication working",
-            "Error handling complete"
+            "Error handling complete",
         ],
-        "keywords": ["api", "integration", "development", "testing", "monitoring"]
+        "keywords": ["api", "integration", "development", "testing", "monitoring"],
     },
-
     "content_creation_workflow": {
         "process_id": "content_creation_workflow",
         "name": "Content Creation Workflow",
@@ -236,7 +228,7 @@ STANDARD_PROCESSES = {
                 "description": "Research topic and gather information",
                 "required_tools": ["web_search", "search_knowledge"],
                 "verification": "Sufficient information gathered",
-                "output": "Research notes"
+                "output": "Research notes",
             },
             {
                 "step": 2,
@@ -244,7 +236,7 @@ STANDARD_PROCESSES = {
                 "description": "Create content structure and outline",
                 "required_tools": ["ask_human"],
                 "verification": "Outline approved by stakeholders",
-                "output": "Content outline"
+                "output": "Content outline",
             },
             {
                 "step": 3,
@@ -252,7 +244,7 @@ STANDARD_PROCESSES = {
                 "description": "Write the main content",
                 "required_tools": ["knowledge_response"],
                 "verification": "Content meets quality standards",
-                "output": "Draft content"
+                "output": "Draft content",
             },
             {
                 "step": 4,
@@ -260,16 +252,12 @@ STANDARD_PROCESSES = {
                 "description": "Review and refine content",
                 "required_tools": ["ask_human"],
                 "verification": "Final content approved",
-                "output": "Published content"
-            }
+                "output": "Published content",
+            },
         ],
-        "success_criteria": [
-            "Content accurate",
-            "Quality high",
-            "Stakeholders satisfied"
-        ],
-        "keywords": ["content", "writing", "creation", "editing", "quality"]
-    }
+        "success_criteria": ["Content accurate", "Quality high", "Stakeholders satisfied"],
+        "keywords": ["content", "writing", "creation", "editing", "quality"],
+    },
 }
 
 
@@ -277,14 +265,13 @@ STANDARD_PROCESSES = {
 # PROCESS MATCHING AND DISCOVERY
 # ============================================================================
 
+
 class ProcessMatcher:
     """Match user requests to standard processes"""
 
     @staticmethod
     def find_matching_processes(
-        user_request: str,
-        user_context: Optional[Dict[str, Any]] = None,
-        max_results: int = 3
+        user_request: str, user_context: Optional[Dict[str, Any]] = None, max_results: int = 3
     ) -> List[Dict[str, Any]]:
         """
         Find standard processes that match the user request
@@ -304,10 +291,7 @@ class ProcessMatcher:
             score = 0.0
 
             # Check keywords match
-            keywords_matched = sum(
-                1 for kw in process["keywords"]
-                if kw in request_lower
-            )
+            keywords_matched = sum(1 for kw in process["keywords"] if kw in request_lower)
             score += keywords_matched * 0.3
 
             # Check domain match if specified
@@ -320,10 +304,7 @@ class ProcessMatcher:
                 score += 0.2
 
             if score > 0:
-                matches.append({
-                    **process,
-                    "relevance_score": round(score, 2)
-                })
+                matches.append({**process, "relevance_score": round(score, 2)})
 
         # Sort by relevance score
         matches.sort(key=lambda x: x["relevance_score"], reverse=True)
@@ -338,16 +319,14 @@ class ProcessMatcher:
     def list_all_processes(domain: Optional[str] = None) -> List[Dict[str, Any]]:
         """List all available processes, optionally filtered by domain"""
         if domain:
-            return [
-                p for p in STANDARD_PROCESSES.values()
-                if p["domain"] == domain
-            ]
+            return [p for p in STANDARD_PROCESSES.values() if p["domain"] == domain]
         return list(STANDARD_PROCESSES.values())
 
 
 # ============================================================================
 # MCP RESOURCE REGISTRATION
 # ============================================================================
+
 
 def register_process_resource(mcp: FastMCP):
     """
@@ -373,27 +352,27 @@ def register_process_resource(mcp: FastMCP):
                         missing_tools.append(tool_name)
 
             if missing_tools:
-                validation_results.append({
-                    "process": process_id,
-                    "missing_tools": missing_tools,
-                    "status": "warning"
-                })
+                validation_results.append(
+                    {"process": process_id, "missing_tools": missing_tools, "status": "warning"}
+                )
             else:
-                validation_results.append({
-                    "process": process_id,
-                    "status": "valid"
-                })
+                validation_results.append({"process": process_id, "status": "valid"})
 
-        logger.debug(f"Process validation: {len([r for r in validation_results if r['status'] == 'valid'])}/{len(STANDARD_PROCESSES)} valid")
-        if any(r['status'] == 'warning' for r in validation_results):
+        logger.debug(
+            f"Process validation: {len([r for r in validation_results if r['status'] == 'valid'])}/{len(STANDARD_PROCESSES)} valid"
+        )
+        if any(r["status"] == "warning" for r in validation_results):
             for result in validation_results:
-                if result['status'] == 'warning':
-                    logger.debug(f"Process '{result['process']}' references missing tools: {result['missing_tools']}")
+                if result["status"] == "warning":
+                    logger.debug(
+                        f"Process '{result['process']}' references missing tools: {result['missing_tools']}"
+                    )
 
         return validation_results
 
     # Run validation (async, don't block registration)
     import asyncio
+
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -415,22 +394,26 @@ def register_process_resource(mcp: FastMCP):
         Category: planning
         """
         processes_list = list(STANDARD_PROCESSES.values())
-        return json.dumps({
-            "description": "Standard Process Catalog",
-            "total_processes": len(processes_list),
-            "processes": [
-                {
-                    "id": p["process_id"],
-                    "name": p["name"],
-                    "domain": p["domain"],
-                    "complexity": p["complexity"],
-                    "estimated_tasks": p["estimated_tasks"],
-                    "keywords": p["keywords"]
-                }
-                for p in processes_list
-            ],
-            "usage": "Reference these processes when creating execution plans for common tasks"
-        }, indent=2, ensure_ascii=False)
+        return json.dumps(
+            {
+                "description": "Standard Process Catalog",
+                "total_processes": len(processes_list),
+                "processes": [
+                    {
+                        "id": p["process_id"],
+                        "name": p["name"],
+                        "domain": p["domain"],
+                        "complexity": p["complexity"],
+                        "estimated_tasks": p["estimated_tasks"],
+                        "keywords": p["keywords"],
+                    }
+                    for p in processes_list
+                ],
+                "usage": "Reference these processes when creating execution plans for common tasks",
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     @mcp.resource("process://detail/{process_id}")
     def get_process_detail(process_id: str) -> str:
@@ -447,16 +430,24 @@ def register_process_resource(mcp: FastMCP):
         process = matcher.get_process_by_id(process_id)
 
         if not process:
-            return json.dumps({
-                "error": f"Process '{process_id}' not found",
-                "available_processes": list(STANDARD_PROCESSES.keys())
-            }, indent=2, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "error": f"Process '{process_id}' not found",
+                    "available_processes": list(STANDARD_PROCESSES.keys()),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
 
-        return json.dumps({
-            "description": f"Detailed process: {process['name']}",
-            "process": process,
-            "usage": "Follow these steps when executing this type of task"
-        }, indent=2, ensure_ascii=False)
+        return json.dumps(
+            {
+                "description": f"Detailed process: {process['name']}",
+                "process": process,
+                "usage": "Follow these steps when executing this type of task",
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     @mcp.resource("process://search")
     def search_processes() -> str:
@@ -469,23 +460,23 @@ def register_process_resource(mcp: FastMCP):
         Keywords: process, search, match, find, discovery, relevant
         Category: planning
         """
-        return json.dumps({
-            "description": "Process Search Guide",
-            "search_methods": {
-                "by_keywords": "Search using task-related keywords (security, data, research, etc.)",
-                "by_domain": "Filter by domain (security, data_science, research, development, content)",
-                "by_complexity": "Filter by complexity level (low, medium, high)"
+        return json.dumps(
+            {
+                "description": "Process Search Guide",
+                "search_methods": {
+                    "by_keywords": "Search using task-related keywords (security, data, research, etc.)",
+                    "by_domain": "Filter by domain (security, data_science, research, development, content)",
+                    "by_complexity": "Filter by complexity level (low, medium, high)",
+                },
+                "example_usage": "Use ProcessMatcher.find_matching_processes(user_request)",
+                "available_domains": list(set(p["domain"] for p in STANDARD_PROCESSES.values())),
             },
-            "example_usage": "Use ProcessMatcher.find_matching_processes(user_request)",
-            "available_domains": list(set(p["domain"] for p in STANDARD_PROCESSES.values()))
-        }, indent=2, ensure_ascii=False)
+            indent=2,
+            ensure_ascii=False,
+        )
 
     logger.debug(f"Registered {len(STANDARD_PROCESSES)} standard process resources")
 
 
 # Export for use in planning tools
-__all__ = [
-    'STANDARD_PROCESSES',
-    'ProcessMatcher',
-    'register_process_resource'
-]
+__all__ = ["STANDARD_PROCESSES", "ProcessMatcher", "register_process_resource"]

@@ -5,9 +5,10 @@ Default Reasoning Prompts
 
 from mcp.server.fastmcp import FastMCP
 
+
 def register_default_prompts(mcp: FastMCP):
     """Register default reasoning prompts"""
-    
+
     @mcp.prompt()
     def default_reason_prompt(
         user_message: str = "",
@@ -15,7 +16,7 @@ def register_default_prompts(mcp: FastMCP):
         tools: str = "",
         resources: str = "",
         skills: str = "",
-        user_instructions: str = ""
+        user_instructions: str = "",
     ) -> str:
         """
         Default reasoning prompt for intelligent assistant interactions
@@ -147,14 +148,14 @@ Remember: You're the brain showing how you think. When skills are loaded, follow
         file_context: str = "",
         file_count: int = 0,
         file_types: str = "",
-        user_instructions: str = ""
+        user_instructions: str = "",
     ) -> str:
         """
         RAG-aware reasoning prompt for users with uploaded files
-        
+
         Enhanced version of default_reason_prompt that includes document search capabilities
         and intelligent file interaction strategies.
-        
+
         Keywords: rag, files, documents, search, knowledge, analysis, reasoning
         Category: rag
         """
@@ -251,16 +252,14 @@ Remember: You're the brain with document awareness. Show how you think about bot
 
     @mcp.prompt()
     def default_response_prompt(
-        conversation_summary: str = "",
-        tool_results_summary: str = "",
-        user_instructions: str = ""
+        conversation_summary: str = "", tool_results_summary: str = "", user_instructions: str = ""
     ) -> str:
         """
         Adaptive response formatting prompt for all types of user interactions
-        
+
         Handles everything from simple greetings to complex technical responses
         by analyzing available context and choosing appropriate response format.
-        
+
         Keywords: response, user-facing, adaptive, conversational, technical
         Category: default
         """
@@ -364,14 +363,14 @@ Remember: You are the final response to the user. When you have rich information
         memory: str = "",
         tools: str = "",
         resources: str = "",
-        user_instructions: str = ""
+        user_instructions: str = "",
     ) -> str:
         """
         Default review prompt for evaluating agent execution results
-        
+
         Analyzes completed autonomous task execution and determines
         if results are satisfactory or if additional actions are needed.
-        
+
         Keywords: review, evaluation, results, replan, execution, quality
         Category: evaluation
         """
@@ -415,11 +414,7 @@ Remember: You are the final response to the user. When you have rich information
         Please evaluate the results and choose the appropriate next action."""
 
     @mcp.prompt()
-    def minimal_prompt(
-        memory: str = "",
-        tools: str = "",
-        user_instructions: str = ""
-    ) -> str:
+    def minimal_prompt(memory: str = "", tools: str = "", user_instructions: str = "") -> str:
         """
         Minimal system prompt with mostly user-provided instructions.
 
@@ -449,7 +444,7 @@ Respond helpfully and concisely to user requests."""
         available_tools: str = "",
         task_index: int = 1,
         total_tasks: int = 1,
-        user_instructions: str = ""
+        user_instructions: str = "",
     ) -> str:
         """
         Task execution prompt for autonomous agent task execution.

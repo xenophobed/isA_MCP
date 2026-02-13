@@ -6,6 +6,7 @@ Run with: python -m pytest tests/integration/test_marketplace_live.py -v -s
 
 Note: These tests require network access and may be slow.
 """
+
 import pytest
 import asyncio
 import logging
@@ -160,6 +161,7 @@ class TestMarketplaceServiceLive:
         installer = InstallManager(repository=repo, aggregator=None)
 
         from services.marketplace_service.update_manager import UpdateManager
+
         updater = UpdateManager(repository=repo, resolver=resolver, installer=installer)
 
         service = MarketplaceService(
@@ -210,11 +212,12 @@ class TestMarketplaceServiceLive:
 # Manual Test Runner
 # ═══════════════════════════════════════════════════════════════
 
+
 async def run_manual_tests():
     """Run tests manually for debugging."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MARKETPLACE SERVICE LIVE TESTS")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Test 1: Search npm
     print("1. Searching npm for MCP packages...")
@@ -294,9 +297,9 @@ async def run_manual_tests():
     finally:
         await fetcher.close()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TESTS COMPLETE")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":

@@ -7,15 +7,16 @@ These contracts serve as the single source of truth for:
 - API request/response types
 - Service interfaces
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Enums
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class RegistrySource(str, Enum):
     """
@@ -23,11 +24,12 @@ class RegistrySource(str, Enum):
 
     Database column: mcp.marketplace_packages.registry_source
     """
-    NPM = "npm"              # npm registry (npmjs.com)
-    GITHUB = "github"        # GitHub releases
+
+    NPM = "npm"  # npm registry (npmjs.com)
+    GITHUB = "github"  # GitHub releases
     ISA_CLOUD = "isa-cloud"  # isA Cloud marketplace
-    PRIVATE = "private"      # Private enterprise registry
-    LOCAL = "local"          # Local file-based package
+    PRIVATE = "private"  # Private enterprise registry
+    LOCAL = "local"  # Local file-based package
 
 
 class InstallStatus(str, Enum):
@@ -36,10 +38,11 @@ class InstallStatus(str, Enum):
 
     Database column: mcp.installed_packages.status
     """
-    INSTALLED = "installed"        # Package installed and active
-    DISABLED = "disabled"          # Package disabled but not removed
-    ERROR = "error"                # Installation/connection error
-    UPDATING = "updating"          # Update in progress
+
+    INSTALLED = "installed"  # Package installed and active
+    DISABLED = "disabled"  # Package disabled but not removed
+    ERROR = "error"  # Installation/connection error
+    UPDATING = "updating"  # Update in progress
     UNINSTALLING = "uninstalling"  # Uninstall in progress
 
 
@@ -49,9 +52,10 @@ class UpdateChannel(str, Enum):
 
     Database column: mcp.installed_packages.update_channel
     """
-    STABLE = "stable"   # Stable releases only
-    BETA = "beta"       # Include beta releases
-    LATEST = "latest"   # Always use latest (including prereleases)
+
+    STABLE = "stable"  # Stable releases only
+    BETA = "beta"  # Include beta releases
+    LATEST = "latest"  # Always use latest (including prereleases)
 
 
 class SyncType(str, Enum):
@@ -60,8 +64,9 @@ class SyncType(str, Enum):
 
     Database column: mcp.registry_sync_log.sync_type
     """
-    FULL = "full"                    # Full registry sync
-    INCREMENTAL = "incremental"      # Only changed packages
+
+    FULL = "full"  # Full registry sync
+    INCREMENTAL = "incremental"  # Only changed packages
     SINGLE_PACKAGE = "single_package"  # Single package update
 
 
@@ -71,14 +76,16 @@ class SyncStatus(str, Enum):
 
     Database column: mcp.registry_sync_log.status
     """
-    RUNNING = "running"      # Sync in progress
+
+    RUNNING = "running"  # Sync in progress
     COMPLETED = "completed"  # Sync completed successfully
-    FAILED = "failed"        # Sync failed
+    FAILED = "failed"  # Sync failed
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Database Record Contracts
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class PackageRecordContract:
@@ -87,12 +94,13 @@ class PackageRecordContract:
 
     Represents an available MCP package from any registry source.
     """
+
     # Primary key
     id: str  # UUID
 
     # Package identification
-    name: str                    # e.g., "@pencil/ui-design" or "remotion"
-    display_name: str            # e.g., "Pencil UI Design"
+    name: str  # e.g., "@pencil/ui-design" or "remotion"
+    display_name: str  # e.g., "Pencil UI Design"
 
     # Registry source
     registry_source: RegistrySource
@@ -151,7 +159,11 @@ class PackageRecordContract:
             "license": self.license,
             "category": self.category,
             "tags": self.tags,
-            "registry_source": self.registry_source.value if isinstance(self.registry_source, RegistrySource) else self.registry_source,
+            "registry_source": (
+                self.registry_source.value
+                if isinstance(self.registry_source, RegistrySource)
+                else self.registry_source
+            ),
             "registry_url": self.registry_url,
             "download_count": self.download_count,
             "weekly_downloads": self.weekly_downloads,
@@ -197,7 +209,9 @@ class PackageRecordContract:
             official=data.get("official", False),
             security_score=data.get("security_score"),
             latest_version=data.get("latest_version"),
-            latest_version_id=str(data["latest_version_id"]) if data.get("latest_version_id") else None,
+            latest_version_id=(
+                str(data["latest_version_id"]) if data.get("latest_version_id") else None
+            ),
             deprecated=data.get("deprecated", False),
             deprecation_message=data.get("deprecation_message"),
             created_at=data.get("created_at"),
@@ -213,6 +227,7 @@ class PackageVersionContract:
 
     Represents a specific version of an MCP package.
     """
+
     # Primary key
     id: str  # UUID
     package_id: str  # Foreign key to marketplace_packages
@@ -255,13 +270,17 @@ class PackageVersionContract:
         import re
 
         # Match: major.minor.patch[-prerelease]
-        match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$', version)
+        match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$", version)
         if not match:
             # Fallback for non-standard versions
-            parts = version.split('.')
+            parts = version.split(".")
             major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
             minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
-            patch = int(parts[2].split('-')[0]) if len(parts) > 2 and parts[2].split('-')[0].isdigit() else 0
+            patch = (
+                int(parts[2].split("-")[0])
+                if len(parts) > 2 and parts[2].split("-")[0].isdigit()
+                else 0
+            )
             prerelease = None
             return major, minor, patch, prerelease
 
@@ -305,6 +324,7 @@ class InstalledPackageContract:
 
     Represents a package installation for a user or organization.
     """
+
     # Primary key
     id: str  # UUID
 
@@ -355,7 +375,11 @@ class InstalledPackageContract:
             "install_config": self.install_config,
             "env_overrides": self.env_overrides,
             "auto_update": self.auto_update,
-            "update_channel": self.update_channel.value if isinstance(self.update_channel, UpdateChannel) else self.update_channel,
+            "update_channel": (
+                self.update_channel.value
+                if isinstance(self.update_channel, UpdateChannel)
+                else self.update_channel
+            ),
             "pinned_version": self.pinned_version,
             "status": self.status.value if isinstance(self.status, InstallStatus) else self.status,
             "error_message": self.error_message,
@@ -374,6 +398,7 @@ class PackageToolMappingContract:
 
     Maps discovered tools to their source package.
     """
+
     installed_package_id: str
     tool_id: int
 
@@ -393,6 +418,7 @@ class RegistrySyncLogContract:
 
     Tracks registry synchronization history.
     """
+
     id: Optional[int] = None
 
     registry_source: str = ""
@@ -415,6 +441,7 @@ class RegistrySyncLogContract:
 # Service Contracts (Request/Response Types)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class PackageSpec:
     """
@@ -422,15 +449,17 @@ class PackageSpec:
 
     Used as input to MarketplaceService.install()
     """
-    name: str                                    # Package name
-    version: Optional[str] = None                # Specific version (None = latest)
-    registry: Optional[RegistrySource] = None    # Specific registry
-    config: Optional[Dict[str, Any]] = None      # User configuration (API keys, etc.)
+
+    name: str  # Package name
+    version: Optional[str] = None  # Specific version (None = latest)
+    registry: Optional[RegistrySource] = None  # Specific registry
+    config: Optional[Dict[str, Any]] = None  # User configuration (API keys, etc.)
 
     def __post_init__(self):
         """Validate package name format."""
         import re
-        if not re.match(r'^(@[a-z0-9-]+/)?[a-z0-9-]+$', self.name):
+
+        if not re.match(r"^(@[a-z0-9-]+/)?[a-z0-9-]+$", self.name):
             raise ValueError(f"Invalid package name format: {self.name}")
 
 
@@ -441,6 +470,7 @@ class InstallResult:
 
     Returned by MarketplaceService.install()
     """
+
     success: bool
     package_id: str
     package_name: str
@@ -472,6 +502,7 @@ class SearchResult:
 
     Returned by MarketplaceService.search()
     """
+
     total: int
     packages: List[PackageRecordContract]
     query: str
@@ -500,6 +531,7 @@ class UpdateInfo:
 
     Returned by MarketplaceService.check_updates()
     """
+
     package_id: str
     package_name: str
     current_version: str
@@ -525,6 +557,7 @@ class UpdateInfo:
 # MCP Configuration Contract
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class MCPConfigContract:
     """
@@ -532,6 +565,7 @@ class MCPConfigContract:
 
     Stored in package_versions.mcp_config
     """
+
     transport: str  # "stdio", "sse", "http", "streamable_http"
 
     # For stdio transport
@@ -596,7 +630,7 @@ class MCPConfigContract:
             return {}
 
         resolved = {}
-        placeholder_pattern = re.compile(r'\{\{(\w+)\}\}')
+        placeholder_pattern = re.compile(r"\{\{(\w+)\}\}")
 
         for key, value in self.env.items():
             if isinstance(value, str):
@@ -607,8 +641,7 @@ class MCPConfigContract:
                 for match in matches:
                     if match in user_config:
                         resolved_value = resolved_value.replace(
-                            f"{{{{{match}}}}}",
-                            user_config[match]
+                            f"{{{{{match}}}}}", user_config[match]
                         )
 
                 resolved[key] = resolved_value

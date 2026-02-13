@@ -3,6 +3,7 @@ Aggregator Tools - MCP Tool Registration for Server Aggregation.
 
 Exposes aggregator service functionality as MCP tools.
 """
+
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -38,82 +39,73 @@ class AggregatorTools(BaseTool):
             {
                 "name": "add_mcp_server",
                 "description": "Register and connect a new external MCP server. "
-                              "Supports SSE, STDIO, and HTTP transports. "
-                              "After connection, the server's tools become available.",
+                "Supports SSE, STDIO, and HTTP transports. "
+                "After connection, the server's tools become available.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "name": {
                             "type": "string",
                             "description": "Unique server name (lowercase, no spaces)",
-                            "pattern": "^[a-z][a-z0-9_-]*$"
+                            "pattern": "^[a-z][a-z0-9_-]*$",
                         },
                         "transport_type": {
                             "type": "string",
                             "enum": ["sse", "stdio", "http"],
-                            "description": "Server transport type"
+                            "description": "Server transport type",
                         },
                         "connection_config": {
                             "type": "object",
                             "description": "Transport-specific configuration",
                             "properties": {
-                                "url": {
-                                    "type": "string",
-                                    "description": "Server URL (for SSE)"
-                                },
+                                "url": {"type": "string", "description": "Server URL (for SSE)"},
                                 "base_url": {
                                     "type": "string",
-                                    "description": "Base URL (for HTTP)"
+                                    "description": "Base URL (for HTTP)",
                                 },
                                 "command": {
                                     "type": "string",
-                                    "description": "Command to run (for STDIO)"
+                                    "description": "Command to run (for STDIO)",
                                 },
                                 "args": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "Command arguments (for STDIO)"
+                                    "description": "Command arguments (for STDIO)",
                                 },
-                                "headers": {
-                                    "type": "object",
-                                    "description": "HTTP headers"
-                                }
-                            }
+                                "headers": {"type": "object", "description": "HTTP headers"},
+                            },
                         },
-                        "description": {
-                            "type": "string",
-                            "description": "Server description"
-                        },
+                        "description": {"type": "string", "description": "Server description"},
                         "auto_connect": {
                             "type": "boolean",
                             "default": True,
-                            "description": "Connect immediately after registration"
+                            "description": "Connect immediately after registration",
                         },
                         "health_check_url": {
                             "type": "string",
-                            "description": "Optional health check endpoint URL"
-                        }
+                            "description": "Optional health check endpoint URL",
+                        },
                     },
-                    "required": ["name", "transport_type", "connection_config"]
-                }
+                    "required": ["name", "transport_type", "connection_config"],
+                },
             },
             {
                 "name": "remove_mcp_server",
                 "description": "Disconnect and remove an external MCP server. "
-                              "All tools from this server will become unavailable.",
+                "All tools from this server will become unavailable.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "server_name": {
                             "type": "string",
-                            "description": "Name of the server to remove"
+                            "description": "Name of the server to remove",
                         },
                         "server_id": {
                             "type": "string",
-                            "description": "UUID of the server to remove (alternative to name)"
-                        }
-                    }
-                }
+                            "description": "UUID of the server to remove (alternative to name)",
+                        },
+                    },
+                },
             },
             {
                 "name": "list_mcp_servers",
@@ -124,42 +116,42 @@ class AggregatorTools(BaseTool):
                         "status": {
                             "type": "string",
                             "enum": ["connected", "disconnected", "error", "unhealthy"],
-                            "description": "Filter by connection status"
+                            "description": "Filter by connection status",
                         },
                         "include_tools": {
                             "type": "boolean",
                             "default": False,
-                            "description": "Include tool list for each server"
-                        }
-                    }
-                }
+                            "description": "Include tool list for each server",
+                        },
+                    },
+                },
             },
             {
                 "name": "search_aggregated_tools",
                 "description": "Search for tools across all connected external servers. "
-                              "Returns matching tools with relevance scores.",
+                "Returns matching tools with relevance scores.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query (natural language)"
+                            "description": "Search query (natural language)",
                         },
                         "server_filter": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Limit search to specific servers"
+                            "description": "Limit search to specific servers",
                         },
                         "limit": {
                             "type": "integer",
                             "default": 10,
                             "minimum": 1,
                             "maximum": 100,
-                            "description": "Maximum number of results"
-                        }
+                            "description": "Maximum number of results",
+                        },
                     },
-                    "required": ["query"]
-                }
+                    "required": ["query"],
+                },
             },
             {
                 "name": "aggregator_health",
@@ -169,15 +161,15 @@ class AggregatorTools(BaseTool):
                     "properties": {
                         "server_name": {
                             "type": "string",
-                            "description": "Check specific server (optional)"
+                            "description": "Check specific server (optional)",
                         },
                         "reconnect_unhealthy": {
                             "type": "boolean",
                             "default": False,
-                            "description": "Attempt to reconnect unhealthy servers"
-                        }
-                    }
-                }
+                            "description": "Attempt to reconnect unhealthy servers",
+                        },
+                    },
+                },
             },
             {
                 "name": "connect_mcp_server",
@@ -187,14 +179,14 @@ class AggregatorTools(BaseTool):
                     "properties": {
                         "server_name": {
                             "type": "string",
-                            "description": "Name of the server to connect"
+                            "description": "Name of the server to connect",
                         },
                         "server_id": {
                             "type": "string",
-                            "description": "UUID of the server to connect (alternative)"
-                        }
-                    }
-                }
+                            "description": "UUID of the server to connect (alternative)",
+                        },
+                    },
+                },
             },
             {
                 "name": "disconnect_mcp_server",
@@ -204,14 +196,14 @@ class AggregatorTools(BaseTool):
                     "properties": {
                         "server_name": {
                             "type": "string",
-                            "description": "Name of the server to disconnect"
+                            "description": "Name of the server to disconnect",
                         },
                         "server_id": {
                             "type": "string",
-                            "description": "UUID of the server to disconnect (alternative)"
-                        }
-                    }
-                }
+                            "description": "UUID of the server to disconnect (alternative)",
+                        },
+                    },
+                },
             },
             {
                 "name": "refresh_server_tools",
@@ -221,33 +213,33 @@ class AggregatorTools(BaseTool):
                     "properties": {
                         "server_name": {
                             "type": "string",
-                            "description": "Name of the server to refresh"
+                            "description": "Name of the server to refresh",
                         },
                         "server_id": {
                             "type": "string",
-                            "description": "UUID of the server to refresh (alternative)"
-                        }
-                    }
-                }
+                            "description": "UUID of the server to refresh (alternative)",
+                        },
+                    },
+                },
             },
             {
                 "name": "execute_external_tool",
                 "description": "Execute a tool on an external MCP server. "
-                              "Use namespaced tool name (e.g., 'github-mcp.search_issues').",
+                "Use namespaced tool name (e.g., 'github-mcp.search_issues').",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "tool_name": {
                             "type": "string",
-                            "description": "Namespaced tool name (server.tool_name)"
+                            "description": "Namespaced tool name (server.tool_name)",
                         },
                         "arguments": {
                             "type": "object",
-                            "description": "Tool arguments as key-value pairs"
-                        }
-                    }
-                }
-            }
+                            "description": "Tool arguments as key-value pairs",
+                        },
+                    },
+                },
+            },
         ]
 
     async def execute(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -264,7 +256,7 @@ class AggregatorTools(BaseTool):
         if not self._service:
             return {
                 "content": [{"type": "text", "text": "Aggregator service not initialized"}],
-                "isError": True
+                "isError": True,
             }
 
         try:
@@ -289,30 +281,33 @@ class AggregatorTools(BaseTool):
             else:
                 return {
                     "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-                    "isError": True
+                    "isError": True,
                 }
 
         except Exception as e:
             import traceback
+
             logger.error(f"Aggregator tool {name} failed: {e}")
             logger.error(traceback.format_exc())
             return {
                 "content": [{"type": "text", "text": f"Error: {type(e).__name__}: {str(e)}"}],
-                "isError": True
+                "isError": True,
             }
 
     async def _add_server(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new MCP server."""
         server = await self._service.register_server(args)
         return {
-            "content": [{
-                "type": "text",
-                "text": f"Server '{server['name']}' registered successfully.\n"
-                       f"ID: {server['id']}\n"
-                       f"Status: {server['status'].value if hasattr(server['status'], 'value') else server['status']}\n"
-                       f"Tools: {server.get('tool_count', 0)}"
-            }],
-            "isError": False
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Server '{server['name']}' registered successfully.\n"
+                    f"ID: {server['id']}\n"
+                    f"Status: {server['status'].value if hasattr(server['status'], 'value') else server['status']}\n"
+                    f"Tools: {server.get('tool_count', 0)}",
+                }
+            ],
+            "isError": False,
         }
 
     async def _remove_server(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -329,15 +324,12 @@ class AggregatorTools(BaseTool):
                     break
 
         if not server_id:
-            return {
-                "content": [{"type": "text", "text": "Server not found"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": "Server not found"}], "isError": True}
 
         await self._service.remove_server(server_id)
         return {
             "content": [{"type": "text", "text": f"Server removed successfully"}],
-            "isError": False
+            "isError": False,
         }
 
     async def _list_servers(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -353,7 +345,7 @@ class AggregatorTools(BaseTool):
         if not servers:
             return {
                 "content": [{"type": "text", "text": "No servers registered"}],
-                "isError": False
+                "isError": False,
             }
 
         lines = ["Registered MCP Servers:"]
@@ -367,10 +359,7 @@ class AggregatorTools(BaseTool):
                 # Would need to query tools from tool_repository
                 pass
 
-        return {
-            "content": [{"type": "text", "text": "\n".join(lines)}],
-            "isError": False
-        }
+        return {"content": [{"type": "text", "text": "\n".join(lines)}], "isError": False}
 
     async def _search_tools(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Search aggregated tools."""
@@ -379,15 +368,13 @@ class AggregatorTools(BaseTool):
         limit = args.get("limit", 10)
 
         results = await self._service.search_tools(
-            query=query,
-            server_filter=server_filter,
-            limit=limit
+            query=query, server_filter=server_filter, limit=limit
         )
 
         if not results:
             return {
                 "content": [{"type": "text", "text": f"No tools found for: {query}"}],
-                "isError": False
+                "isError": False,
             }
 
         lines = [f"Found {len(results)} tools for '{query}':"]
@@ -397,10 +384,7 @@ class AggregatorTools(BaseTool):
             lines.append(f"  Server: {payload.get('source_server_name', 'unknown')}")
             lines.append(f"  Score: {r.get('score', 0):.2f}")
 
-        return {
-            "content": [{"type": "text", "text": "\n".join(lines)}],
-            "isError": False
-        }
+        return {"content": [{"type": "text", "text": "\n".join(lines)}], "isError": False}
 
     async def _health_check(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Check aggregator health."""
@@ -418,8 +402,10 @@ class AggregatorTools(BaseTool):
             results = await self._service.reconnect_unhealthy()
             reconnected = sum(1 for v in results.values() if v)
             return {
-                "content": [{"type": "text", "text": f"Reconnected {reconnected}/{len(results)} servers"}],
-                "isError": False
+                "content": [
+                    {"type": "text", "text": f"Reconnected {reconnected}/{len(results)} servers"}
+                ],
+                "isError": False,
             }
 
         health = await self._service.health_check(server_id)
@@ -437,10 +423,7 @@ class AggregatorTools(BaseTool):
             if health.get("consecutive_failures", 0) > 0:
                 lines.append(f"Consecutive failures: {health['consecutive_failures']}")
 
-        return {
-            "content": [{"type": "text", "text": "\n".join(lines)}],
-            "isError": False
-        }
+        return {"content": [{"type": "text", "text": "\n".join(lines)}], "isError": False}
 
     async def _connect_server(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Connect to a server."""
@@ -455,15 +438,14 @@ class AggregatorTools(BaseTool):
                     break
 
         if not server_id:
-            return {
-                "content": [{"type": "text", "text": "Server not found"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": "Server not found"}], "isError": True}
 
         success = await self._service.connect_server(server_id)
         return {
-            "content": [{"type": "text", "text": f"Connection {'successful' if success else 'failed'}"}],
-            "isError": not success
+            "content": [
+                {"type": "text", "text": f"Connection {'successful' if success else 'failed'}"}
+            ],
+            "isError": not success,
         }
 
     async def _disconnect_server(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -479,15 +461,14 @@ class AggregatorTools(BaseTool):
                     break
 
         if not server_id:
-            return {
-                "content": [{"type": "text", "text": "Server not found"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": "Server not found"}], "isError": True}
 
         success = await self._service.disconnect_server(server_id)
         return {
-            "content": [{"type": "text", "text": f"Disconnection {'successful' if success else 'failed'}"}],
-            "isError": not success
+            "content": [
+                {"type": "text", "text": f"Disconnection {'successful' if success else 'failed'}"}
+            ],
+            "isError": not success,
         }
 
     async def _refresh_tools(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -503,15 +484,12 @@ class AggregatorTools(BaseTool):
                     break
 
         if not server_id:
-            return {
-                "content": [{"type": "text", "text": "Server not found"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": "Server not found"}], "isError": True}
 
         tools = await self._service.discover_tools(server_id)
         return {
             "content": [{"type": "text", "text": f"Discovered {len(tools)} tools"}],
-            "isError": False
+            "isError": False,
         }
 
     async def _execute_external_tool(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -520,16 +498,18 @@ class AggregatorTools(BaseTool):
         arguments = args.get("arguments", {})
 
         if not tool_name:
-            return {
-                "content": [{"type": "text", "text": "tool_name is required"}],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": "tool_name is required"}], "isError": True}
 
         # Parse namespaced name to get server
         if "." not in tool_name:
             return {
-                "content": [{"type": "text", "text": f"Invalid tool name '{tool_name}'. Use format: server.tool_name"}],
-                "isError": True
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Invalid tool name '{tool_name}'. Use format: server.tool_name",
+                    }
+                ],
+                "isError": True,
             }
 
         try:
@@ -538,7 +518,7 @@ class AggregatorTools(BaseTool):
         except Exception as e:
             return {
                 "content": [{"type": "text", "text": f"Execution failed: {str(e)}"}],
-                "isError": True
+                "isError": True,
             }
 
 
@@ -565,7 +545,7 @@ def register_aggregator_tools(mcp_server, aggregator_service):
         args: Optional[List[str]] = None,
         url: Optional[str] = None,
         description: Optional[str] = None,
-        auto_connect: bool = True
+        auto_connect: bool = True,
     ) -> Dict[str, Any]:
         """
         🔌 ADD EXTERNAL MCP SERVER - Register a new MCP server for tool aggregation.
@@ -590,13 +570,16 @@ def register_aggregator_tools(mcp_server, aggregator_service):
         elif transport_type.upper() == "SSE":
             connection_config = {"url": url}
 
-        return await _aggregator_tools.execute("add_mcp_server", {
-            "name": name,
-            "description": description,
-            "transport_type": transport_type.upper(),
-            "connection_config": connection_config,
-            "auto_connect": auto_connect
-        })
+        return await _aggregator_tools.execute(
+            "add_mcp_server",
+            {
+                "name": name,
+                "description": description,
+                "transport_type": transport_type.upper(),
+                "connection_config": connection_config,
+                "auto_connect": auto_connect,
+            },
+        )
 
     @mcp_server.tool()
     async def remove_mcp_server(server_id: str) -> Dict[str, Any]:
@@ -665,7 +648,9 @@ def register_aggregator_tools(mcp_server, aggregator_service):
         return await _aggregator_tools.execute("refresh_server_tools", {"server_id": server_id})
 
     @mcp_server.tool()
-    async def execute_external_tool(tool_name: str, arguments: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def execute_external_tool(
+        tool_name: str, arguments: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """
         ▶️ EXECUTE EXTERNAL TOOL - Run a tool on an external MCP server.
 
@@ -678,9 +663,8 @@ def register_aggregator_tools(mcp_server, aggregator_service):
         Returns:
             Tool execution result from the external server
         """
-        return await _aggregator_tools.execute("execute_external_tool", {
-            "tool_name": tool_name,
-            "arguments": arguments or {}
-        })
+        return await _aggregator_tools.execute(
+            "execute_external_tool", {"tool_name": tool_name, "arguments": arguments or {}}
+        )
 
     logger.info("Registered 7 aggregator tools for external MCP server management")

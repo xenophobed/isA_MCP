@@ -45,7 +45,7 @@ Args:
     audio: Audio file path, URL, or audio data to transcribe
     language: Audio language code (en, es, fr, de, it, pt, zh) - auto-detected if not specified
     model: Specific transcription model to use (optional)""",
-            security_level=SecurityLevel.MEDIUM  # Incurs cost
+            security_level=SecurityLevel.MEDIUM,  # Incurs cost
         )
 
         # get_audio_capabilities
@@ -59,59 +59,42 @@ Returns information about supported audio features, languages, and implementatio
 
 Keywords: audio, capabilities, features, support, transcription
 Category: audio""",
-            security_level=SecurityLevel.LOW
+            security_level=SecurityLevel.LOW,
         )
 
     async def transcribe_audio_impl(
-        self,
-        audio: str,
-        language: Optional[str] = None,
-        model: Optional[str] = None
+        self, audio: str, language: Optional[str] = None, model: Optional[str] = None
     ) -> Dict[str, Any]:
         """Transcribe audio to text"""
         logger.info("Starting audio transcription")
 
         try:
-            result = await self.analyzer.transcribe(
-                audio=audio,
-                language=language,
-                model=model
-            )
+            result = await self.analyzer.transcribe(audio=audio, language=language, model=model)
 
             if result.success:
                 response_data = {
-                    "transcript": result.data['transcript'],
-                    "language": result.data['language'],
-                    "confidence": result.data['confidence'],
-                    "duration": result.data['duration'],
-                    "processing_time": result.data['processing_time'],
-                    "model_used": result.data['model_used'],
-                    "cost": result.cost_usd
+                    "transcript": result.data["transcript"],
+                    "language": result.data["language"],
+                    "confidence": result.data["confidence"],
+                    "duration": result.data["duration"],
+                    "processing_time": result.data["processing_time"],
+                    "model_used": result.data["model_used"],
+                    "cost": result.cost_usd,
                 }
 
-                logger.info(f"Transcription completed (confidence: {result.data['confidence']:.2f})")
-
-                return self.create_response(
-                    "success",
-                    "transcribe_audio",
-                    response_data
+                logger.info(
+                    f"Transcription completed (confidence: {result.data['confidence']:.2f})"
                 )
+
+                return self.create_response("success", "transcribe_audio", response_data)
             else:
                 logger.error(f"Transcription failed: {result.error}")
-                return self.create_response(
-                    "error",
-                    "transcribe_audio",
-                    {},
-                    result.error
-                )
+                return self.create_response("error", "transcribe_audio", {}, result.error)
 
         except Exception as e:
             logger.error(f"Audio transcription failed: {e}")
             return self.create_response(
-                "error",
-                "transcribe_audio",
-                {},
-                f"Audio transcription failed: {str(e)}"
+                "error", "transcribe_audio", {}, f"Audio transcription failed: {str(e)}"
             )
 
     async def get_capabilities_impl(self) -> Dict[str, Any]:
@@ -122,7 +105,7 @@ Category: audio""",
             "transcription": {
                 "description": "Convert audio to text (main feature)",
                 "status": "implemented",
-                "cost_estimate": "~$0.006/minute"
+                "cost_estimate": "~$0.006/minute",
             }
         }
 
@@ -132,7 +115,7 @@ Category: audio""",
                 feature_info[analysis_type] = {
                     "description": f"{analysis_type.replace('_', ' ').title()} analysis",
                     "status": "placeholder",
-                    "implementation": "future"
+                    "implementation": "future",
                 }
 
         response_data = {
@@ -141,14 +124,10 @@ Category: audio""",
             "features": feature_info,
             "total_features": len(feature_info),
             "implemented_features": 1,
-            "placeholder_features": len(analysis_types)
+            "placeholder_features": len(analysis_types),
         }
 
-        return self.create_response(
-            "success",
-            "get_audio_capabilities",
-            response_data
-        )
+        return self.create_response("success", "get_audio_capabilities", response_data)
 
 
 def register_audio_tools(mcp: FastMCP):

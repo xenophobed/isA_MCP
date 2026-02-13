@@ -5,32 +5,31 @@ Data Science Application Prompts - CSV Analysis Enhancement Template
 
 from mcp.server.fastmcp import FastMCP
 
+
 def register_ds_prompts(mcp: FastMCP):
     """Register data science prompts for CSV analysis enhancement"""
-    
+
     @mcp.prompt()
     def csv_analyze_prompt(
-        prompt: str = "",
-        csv_url: str = "",
-        depth: str = "comprehensive"
+        prompt: str = "", csv_url: str = "", depth: str = "comprehensive"
     ) -> str:
         """
         CSV data analysis prompt enhancer for user requests
-        
-        Transforms simple user analysis requests into comprehensive, 
+
+        Transforms simple user analysis requests into comprehensive,
         professional data analysis inquiries with proper statistical
         context and business intelligence focus.
-        
+
         Keywords: csv, data-analysis, prompt-enhancement, statistics, insights
         Category: data-science
         """
-        
+
         depth_modifiers = {
             "basic": "please conduct basic data exploration and key metric analysis",
-            "comprehensive": "please conduct comprehensive data analysis including statistical insights and business recommendations", 
-            "advanced": "please conduct advanced data analysis including predictive modeling, hypothesis testing, and deep statistical analysis"
+            "comprehensive": "please conduct comprehensive data analysis including statistical insights and business recommendations",
+            "advanced": "please conduct advanced data analysis including predictive modeling, hypothesis testing, and deep statistical analysis",
         }.get(depth.lower(), "please conduct comprehensive data analysis")
-        
+
         return f"""As a professional data analyst, {depth_modifiers}.
 
 **Data Source**: {csv_url}
@@ -60,6 +59,7 @@ def register_ds_prompts(mcp: FastMCP):
 Please ensure the analysis results are statistically rigorous while maintaining business relevance and actionability. Focus on insights that directly support decision-making."""
 
     # Registration complete (debug-level event)
+
 
 # Auto-registration for MCP server discovery
 if __name__ != "__main__":

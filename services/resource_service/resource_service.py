@@ -19,13 +19,13 @@ class ResourceService:
 
     async def register_resource(self, resource_data: Dict[str, Any]) -> Dict[str, Any]:
         """Register a new resource"""
-        if not resource_data.get('uri'):
+        if not resource_data.get("uri"):
             raise ValueError("Resource URI is required")
 
-        if not resource_data.get('name'):
+        if not resource_data.get("name"):
             raise ValueError("Resource name is required")
 
-        existing = await self.repository.get_resource_by_uri(resource_data['uri'])
+        existing = await self.repository.get_resource_by_uri(resource_data["uri"])
         if existing:
             raise ValueError(f"Resource '{resource_data['uri']}' already exists")
 
@@ -53,7 +53,7 @@ class ResourceService:
         owner_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """List resources with filters"""
         return await self.repository.list_resources(
@@ -63,23 +63,21 @@ class ResourceService:
             owner_id=owner_id,
             tags=tags,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
 
     async def update_resource(
-        self,
-        resource_identifier: Any,
-        updates: Dict[str, Any]
+        self, resource_identifier: Any, updates: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update resource information"""
         resource = await self.get_resource(resource_identifier)
         if not resource:
             raise ValueError(f"Resource not found: {resource_identifier}")
 
-        resource_id = resource['id']
+        resource_id = resource["id"]
 
-        if 'uri' in updates and updates['uri'] != resource['uri']:
-            existing = await self.repository.get_resource_by_uri(updates['uri'])
+        if "uri" in updates and updates["uri"] != resource["uri"]:
+            existing = await self.repository.get_resource_by_uri(updates["uri"])
             if existing:
                 raise ValueError(f"Resource URI '{updates['uri']}' already exists")
 
@@ -97,7 +95,7 @@ class ResourceService:
         if not resource:
             raise ValueError(f"Resource not found: {resource_identifier}")
 
-        success = await self.repository.delete_resource(resource['id'])
+        success = await self.repository.delete_resource(resource["id"])
         if success:
             logger.info(f"Deleted resource: {resource['uri']}")
         return success
@@ -109,7 +107,7 @@ class ResourceService:
             logger.warning(f"Cannot record access for unknown resource: {resource_identifier}")
             return False
 
-        return await self.repository.increment_access_count(resource['id'])
+        return await self.repository.increment_access_count(resource["id"])
 
     async def check_access(self, uri: str, user_id: str) -> bool:
         """Check if user has access to resource"""
@@ -121,7 +119,7 @@ class ResourceService:
         if not resource:
             raise ValueError(f"Resource not found: {resource_identifier}")
 
-        success = await self.repository.grant_access(resource['id'], user_id)
+        success = await self.repository.grant_access(resource["id"], user_id)
         if success:
             logger.info(f"Granted access to user {user_id} for resource {resource['uri']}")
         return success
@@ -132,7 +130,7 @@ class ResourceService:
         if not resource:
             raise ValueError(f"Resource not found: {resource_identifier}")
 
-        success = await self.repository.revoke_access(resource['id'], user_id)
+        success = await self.repository.revoke_access(resource["id"], user_id)
         if success:
             logger.info(f"Revoked access from user {user_id} for resource {resource['uri']}")
         return success
@@ -144,7 +142,9 @@ class ResourceService:
     async def get_popular_resources(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get most popular resources"""
         all_resources = await self.repository.list_resources(is_active=True, limit=1000)
-        sorted_resources = sorted(all_resources, key=lambda r: r.get('access_count', 0), reverse=True)
+        sorted_resources = sorted(
+            all_resources, key=lambda r: r.get("access_count", 0), reverse=True
+        )
         return sorted_resources[:limit]
 
     async def get_user_resources(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
@@ -157,8 +157,8 @@ class ResourceService:
 
         # Get resources where user is in allowed_users
         all_resources = await self.repository.list_resources(limit=1000)
-        allowed = [r for r in all_resources if user_id in r.get('allowed_users', [])]
+        allowed = [r for r in all_resources if user_id in r.get("allowed_users", [])]
 
         # Combine and deduplicate
-        combined = {r['id']: r for r in (owned + public + allowed)}
+        combined = {r["id"]: r for r in (owned + public + allowed)}
         return list(combined.values())[:limit]

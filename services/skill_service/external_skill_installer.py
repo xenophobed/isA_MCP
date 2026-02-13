@@ -16,6 +16,7 @@ A skill bundle contains:
 - templates/ (optional) - File templates
 - scripts/ (optional) - Automation scripts
 """
+
 import aiohttp
 import asyncio
 import json
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 class SkillSource(str, Enum):
     """Source registry for skills."""
+
     NPM = "npm"
     GITHUB = "github"
     ISA_CLOUD = "isa_cloud"
@@ -45,6 +47,7 @@ class SkillSource(str, Enum):
 @dataclass
 class SkillManifest:
     """Parsed skill manifest from SKILL.md frontmatter."""
+
     name: str
     description: str
     version: str = "1.0.0"
@@ -62,6 +65,7 @@ class SkillManifest:
 @dataclass
 class InstallResult:
     """Result of skill installation."""
+
     success: bool
     skill_name: str
     version: str
@@ -250,14 +254,16 @@ class ExternalSkillInstaller:
                 skill_file = skill_dir / "SKILL.md"
                 if skill_file.exists():
                     manifest = self._parse_manifest(skill_file.read_text())
-                    skills.append({
-                        "name": skill_dir.name,
-                        "description": manifest.description,
-                        "version": manifest.version,
-                        "path": str(skill_dir),
-                        "has_guides": (skill_dir / "guides").exists(),
-                        "has_templates": (skill_dir / "templates").exists(),
-                    })
+                    skills.append(
+                        {
+                            "name": skill_dir.name,
+                            "description": manifest.description,
+                            "version": manifest.version,
+                            "path": str(skill_dir),
+                            "has_guides": (skill_dir / "guides").exists(),
+                            "has_templates": (skill_dir / "templates").exists(),
+                        }
+                    )
 
         return skills
 
@@ -513,7 +519,9 @@ class ExternalSkillInstaller:
                 if template_file.is_file():
                     rel_path = template_file.relative_to(templates_dir)
                     try:
-                        skill_data["templates"][str(rel_path)] = template_file.read_text(encoding="utf-8")
+                        skill_data["templates"][str(rel_path)] = template_file.read_text(
+                            encoding="utf-8"
+                        )
                     except UnicodeDecodeError:
                         # Skip binary files
                         pass
@@ -525,7 +533,9 @@ class ExternalSkillInstaller:
                 if script_file.is_file():
                     rel_path = script_file.relative_to(scripts_dir)
                     try:
-                        skill_data["scripts"][str(rel_path)] = script_file.read_text(encoding="utf-8")
+                        skill_data["scripts"][str(rel_path)] = script_file.read_text(
+                            encoding="utf-8"
+                        )
                     except UnicodeDecodeError:
                         pass
 
@@ -584,7 +594,7 @@ class ExternalSkillInstaller:
         # Remove @ prefix and replace / with -
         sanitized = name.lstrip("@").replace("/", "-")
         # Remove any other invalid characters
-        sanitized = re.sub(r'[^\w\-\.]', '-', sanitized)
+        sanitized = re.sub(r"[^\w\-\.]", "-", sanitized)
         return sanitized.lower()
 
     def _parse_manifest(self, skill_md: str) -> SkillManifest:
@@ -616,6 +626,7 @@ class ExternalSkillInstaller:
 # Search Functions
 # =========================================================================
 
+
 async def search_npm_skills(query: str, limit: int = 20) -> List[Dict[str, Any]]:
     """
     Search npm for Claude skills.
@@ -644,14 +655,20 @@ async def search_npm_skills(query: str, limit: int = 20) -> List[Dict[str, Any]]
                 skills = []
                 for obj in data.get("objects", []):
                     pkg = obj["package"]
-                    skills.append({
-                        "name": pkg["name"],
-                        "description": pkg.get("description", ""),
-                        "version": pkg.get("version"),
-                        "author": pkg.get("author", {}).get("name") if isinstance(pkg.get("author"), dict) else pkg.get("author"),
-                        "source": "npm",
-                        "install_cmd": f"npx @isa-mcp/skills install {pkg['name']}",
-                    })
+                    skills.append(
+                        {
+                            "name": pkg["name"],
+                            "description": pkg.get("description", ""),
+                            "version": pkg.get("version"),
+                            "author": (
+                                pkg.get("author", {}).get("name")
+                                if isinstance(pkg.get("author"), dict)
+                                else pkg.get("author")
+                            ),
+                            "source": "npm",
+                            "install_cmd": f"npx @isa-mcp/skills install {pkg['name']}",
+                        }
+                    )
 
                 return skills
 
@@ -689,14 +706,16 @@ async def search_github_skills(query: str, limit: int = 20) -> List[Dict[str, An
 
                 skills = []
                 for repo in data.get("items", []):
-                    skills.append({
-                        "name": repo["full_name"],
-                        "description": repo.get("description", ""),
-                        "stars": repo["stargazers_count"],
-                        "author": repo["owner"]["login"],
-                        "source": "github",
-                        "install_cmd": f"npx @isa-mcp/skills install {repo['full_name']}",
-                    })
+                    skills.append(
+                        {
+                            "name": repo["full_name"],
+                            "description": repo.get("description", ""),
+                            "stars": repo["stargazers_count"],
+                            "author": repo["owner"]["login"],
+                            "source": "github",
+                            "install_cmd": f"npx @isa-mcp/skills install {repo['full_name']}",
+                        }
+                    )
 
                 return skills
 

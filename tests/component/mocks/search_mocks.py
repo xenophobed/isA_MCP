@@ -6,6 +6,7 @@ Provides in-memory mocks for:
 - Database pool (schema loading)
 - Model client (embeddings)
 """
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import uuid
@@ -45,20 +46,22 @@ class MockQdrantSearchClient:
         description: str,
         score: float = 0.8,
         tool_count: int = 5,
-        is_active: bool = True
+        is_active: bool = True,
     ):
         """Add a skill to the mock collection."""
-        self.collections["mcp_skills"].append({
-            "id": skill_id,
-            "score": score,
-            "payload": {
+        self.collections["mcp_skills"].append(
+            {
                 "id": skill_id,
-                "name": name,
-                "description": description,
-                "tool_count": tool_count,
-                "is_active": is_active,
+                "score": score,
+                "payload": {
+                    "id": skill_id,
+                    "name": name,
+                    "description": description,
+                    "tool_count": tool_count,
+                    "is_active": is_active,
+                },
             }
-        })
+        )
 
     def seed_tool(
         self,
@@ -70,22 +73,24 @@ class MockQdrantSearchClient:
         skill_ids: List[str] = None,
         primary_skill_id: str = None,
         item_type: str = "tool",
-        is_active: bool = True
+        is_active: bool = True,
     ):
         """Add a tool to the mock collection."""
-        self.collections["mcp_unified_search"].append({
-            "id": tool_id,
-            "score": score,
-            "payload": {
-                "db_id": db_id,
-                "name": name,
-                "description": description,
-                "type": item_type,
-                "skill_ids": skill_ids or [],
-                "primary_skill_id": primary_skill_id,
-                "is_active": is_active,
+        self.collections["mcp_unified_search"].append(
+            {
+                "id": tool_id,
+                "score": score,
+                "payload": {
+                    "db_id": db_id,
+                    "name": name,
+                    "description": description,
+                    "type": item_type,
+                    "skill_ids": skill_ids or [],
+                    "primary_skill_id": primary_skill_id,
+                    "is_active": is_active,
+                },
             }
-        })
+        )
 
     async def search_with_filter(
         self,
@@ -94,14 +99,14 @@ class MockQdrantSearchClient:
         filter_conditions: Optional[Dict[str, Any]] = None,
         limit: int = 10,
         with_payload: bool = True,
-        with_vectors: bool = False
+        with_vectors: bool = False,
     ) -> List[Dict[str, Any]]:
         """Mock search with filter."""
         self._record_call(
             "search_with_filter",
             collection_name=collection_name,
             filter_conditions=filter_conditions,
-            limit=limit
+            limit=limit,
         )
 
         collection = self.collections.get(collection_name, [])
@@ -156,7 +161,7 @@ class MockDbPool:
         db_id: int,
         input_schema: Optional[Dict[str, Any]] = None,
         output_schema: Optional[Dict[str, Any]] = None,
-        annotations: Optional[Dict[str, Any]] = None
+        annotations: Optional[Dict[str, Any]] = None,
     ):
         """Add schema data for a tool."""
         self.schemas[db_id] = {
@@ -204,22 +209,24 @@ class MockVectorRepository:
         query_vector: List[float],
         collection_name: str = "mcp_unified_search",
         limit: int = 10,
-        filter_conditions: Optional[Dict[str, Any]] = None
+        filter_conditions: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Mock vector search."""
-        self._calls.append({
-            "method": "search",
-            "collection_name": collection_name,
-            "limit": limit,
-            "filter_conditions": filter_conditions
-        })
+        self._calls.append(
+            {
+                "method": "search",
+                "collection_name": collection_name,
+                "limit": limit,
+                "filter_conditions": filter_conditions,
+            }
+        )
 
         if self._client:
             return await self._client.search_with_filter(
                 collection_name=collection_name,
                 vector=query_vector,
                 filter_conditions=filter_conditions,
-                limit=limit
+                limit=limit,
             )
         return []
 
@@ -227,12 +234,14 @@ class MockVectorRepository:
 @dataclass
 class MockEmbeddingData:
     """Mock embedding data."""
+
     embedding: List[float]
 
 
 @dataclass
 class MockEmbeddingResponse:
     """Mock embedding response."""
+
     data: List[MockEmbeddingData]
 
 
@@ -244,9 +253,7 @@ class MockEmbeddings:
         self._embedding_size = 1536
 
     async def create(
-        self,
-        input: str,
-        model: str = "text-embedding-3-small"
+        self, input: str, model: str = "text-embedding-3-small"
     ) -> MockEmbeddingResponse:
         """Create embedding."""
         self._calls.append({"input": input, "model": model})

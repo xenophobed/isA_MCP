@@ -23,16 +23,18 @@ logger = logging.getLogger(__name__)
 # All other tools are accessed via discover → execute pattern.
 # SDK can add additional tools via allowed_tools option.
 # ==============================================================================
-DEFAULT_TOOL_NAMES = frozenset([
-    "discover",
-    "get_tool_schema",
-    "execute",
-    "list_skills",
-    "list_prompts",
-    "get_prompt",
-    "list_resources",
-    "read_resource",
-])
+DEFAULT_TOOL_NAMES = frozenset(
+    [
+        "discover",
+        "get_tool_schema",
+        "execute",
+        "list_skills",
+        "list_prompts",
+        "get_prompt",
+        "list_resources",
+        "read_resource",
+    ]
+)
 
 
 def _normalize_db_id(value: Any) -> Optional[int]:
@@ -46,7 +48,7 @@ def _normalize_db_id(value: Any) -> Optional[int]:
 
 
 def _build_qdrant_dict_and_find_duplicates(
-    qdrant_items: List[Dict[str, Any]]
+    qdrant_items: List[Dict[str, Any]],
 ) -> Tuple[Dict[str, Dict[str, Any]], List[int], set]:
     """
     Build name->item dict and identify duplicates for cleanup.
@@ -204,13 +206,19 @@ class SyncService:
             logger.debug(f"Found {len(qdrant_tools)} existing tools in Qdrant")
 
             # Build lookup dict and find duplicates
-            qdrant_tools_dict, duplicate_ids, dup_names = _build_qdrant_dict_and_find_duplicates(qdrant_tools)
+            qdrant_tools_dict, duplicate_ids, dup_names = _build_qdrant_dict_and_find_duplicates(
+                qdrant_tools
+            )
 
             # Delete duplicate entries first
             if duplicate_ids:
-                logger.info(f"🧹 Cleaning up {len(duplicate_ids)} duplicate Qdrant entries for {len(dup_names)} tools...")
+                logger.info(
+                    f"🧹 Cleaning up {len(duplicate_ids)} duplicate Qdrant entries for {len(dup_names)} tools..."
+                )
                 await self.vector_repo.delete_multiple_vectors(duplicate_ids)
-                logger.info(f"✅ Deleted duplicates, tools with duplicates will be re-synced: {list(dup_names)[:5]}...")
+                logger.info(
+                    f"✅ Deleted duplicates, tools with duplicates will be re-synced: {list(dup_names)[:5]}..."
+                )
 
             # 3. Find orphaned tools (exist in Qdrant but not in MCP)
             mcp_tool_names = {tool.name for tool in mcp_tools}
@@ -233,7 +241,9 @@ class SyncService:
 
             # 5. Prepare tools for sync (check which ones need embedding/classification)
             items_to_embed = []  # List of (db_record, tool_data, search_text)
-            items_to_classify_only = []  # List of (db_record, tool_data) - need classification but not embedding
+            items_to_classify_only = (
+                []
+            )  # List of (db_record, tool_data) - need classification but not embedding
             skipped = 0
             failed = 0
             errors = []
@@ -244,9 +254,7 @@ class SyncService:
                     tool_info = {
                         "name": tool.name,
                         "description": tool.description or "",
-                        "input_schema": tool.inputSchema
-                        if hasattr(tool, "inputSchema")
-                        else {},
+                        "input_schema": tool.inputSchema if hasattr(tool, "inputSchema") else {},
                         "category": "general",
                     }
 
@@ -256,9 +264,7 @@ class SyncService:
                         tool_data,
                         needs_embedding,
                         needs_classification,
-                    ) = await self._prepare_tool_for_sync(
-                        tool.name, tool_info, existing_qdrant
-                    )
+                    ) = await self._prepare_tool_for_sync(tool.name, tool_info, existing_qdrant)
 
                     if needs_embedding:
                         # Needs full sync (embed + classify)
@@ -294,8 +300,7 @@ class SyncService:
                     # BATCH embedding - single API call with all texts
                     # ISA Model supports Union[str, List[str]] for input parameter
                     response = await self.isa_model.embeddings.create(
-                        input=search_texts,  # Pass all texts as batch
-                        model=self.embedding_model
+                        input=search_texts, model=self.embedding_model  # Pass all texts as batch
                     )
                     # Extract embeddings in order (API returns in same order as input)
                     embeddings = [item.embedding for item in response.data]
@@ -306,14 +311,14 @@ class SyncService:
                     # 7. Delete old Qdrant entries first (for tools with changed db_id)
                     old_ids_to_delete = [item[3] for item in items_to_embed if item[3] is not None]
                     if old_ids_to_delete:
-                        logger.info(f"🗑️ Deleting {len(old_ids_to_delete)} old Qdrant entries before upsert...")
+                        logger.info(
+                            f"🗑️ Deleting {len(old_ids_to_delete)} old Qdrant entries before upsert..."
+                        )
                         await self.vector_repo.delete_multiple_vectors(old_ids_to_delete)
                         logger.info(f"✅ Deleted {len(old_ids_to_delete)} old entries")
 
                     # 8. Upsert to Qdrant
-                    logger.info(
-                        f"🔄 Starting Qdrant upsert for {len(items_to_embed)} tools..."
-                    )
+                    logger.info(f"🔄 Starting Qdrant upsert for {len(items_to_embed)} tools...")
                     logger.info(f"   items_to_embed count: {len(items_to_embed)}")
                     logger.info(f"   embeddings count: {len(embeddings)}")
 
@@ -350,18 +355,18 @@ class SyncService:
                                     f"  ✅ [{idx + 1}/{len(items_to_embed)}] Upserted '{tool_name}' (ID: {tool_id})"
                                 )
                                 # Add to classification queue
-                                tools_to_classify.append({
-                                    'tool_id': tool_id,
-                                    'tool_name': tool_name,
-                                    'description': tool_data["description"],
-                                })
+                                tools_to_classify.append(
+                                    {
+                                        "tool_id": tool_id,
+                                        "tool_name": tool_name,
+                                        "description": tool_data["description"],
+                                    }
+                                )
                             else:
                                 logger.error(
                                     f"  ❌ [{idx + 1}/{len(items_to_embed)}] Upsert returned False for '{tool_name}' (ID: {tool_id})"
                                 )
-                                raise Exception(
-                                    f"Upsert returned False for tool ID {tool_id}"
-                                )
+                                raise Exception(f"Upsert returned False for tool ID {tool_id}")
                         except Exception as e:
                             logger.error(
                                 f"  ❌ [{idx + 1}/{len(items_to_embed)}] Failed to sync tool '{tool_name}' (ID: {tool_id}) to Qdrant: {e}"
@@ -380,10 +385,14 @@ class SyncService:
 
                     # 8. BR-002: Classify tools into skill categories (BATCH)
                     if tools_to_classify:
-                        logger.debug(f"Batch classifying {len(tools_to_classify)} newly embedded tools...")
+                        logger.debug(
+                            f"Batch classifying {len(tools_to_classify)} newly embedded tools..."
+                        )
                         try:
-                            batch_results = await self.skill_service.classify_tools_batch(tools_to_classify)
-                            classified = sum(1 for r in batch_results if r.get('primary_skill_id'))
+                            batch_results = await self.skill_service.classify_tools_batch(
+                                tools_to_classify
+                            )
+                            classified = sum(1 for r in batch_results if r.get("primary_skill_id"))
                             logger.debug(f"Classified {classified}/{len(tools_to_classify)} tools")
                         except Exception as e:
                             logger.warning(f"Batch classification failed: {e}")
@@ -400,29 +409,35 @@ class SyncService:
                 # Convert to batch format
                 tools_for_batch = [
                     {
-                        'tool_id': int(db_record["id"]),
-                        'tool_name': tool_data["name"],
-                        'description': tool_data["description"]
+                        "tool_id": int(db_record["id"]),
+                        "tool_name": tool_data["name"],
+                        "description": tool_data["description"],
                     }
                     for db_record, tool_data in items_to_classify_only
                 ]
                 try:
                     batch_results = await self.skill_service.classify_tools_batch(tools_for_batch)
-                    classified_only = sum(1 for r in batch_results if r.get('primary_skill_id'))
+                    classified_only = sum(1 for r in batch_results if r.get("primary_skill_id"))
                     for result in batch_results:
-                        if result.get('primary_skill_id'):
+                        if result.get("primary_skill_id"):
                             logger.debug(f"  {result['tool_name']} -> {result['primary_skill_id']}")
-                    logger.debug(f"Classified {classified_only}/{len(items_to_classify_only)} existing tools")
+                    logger.debug(
+                        f"Classified {classified_only}/{len(items_to_classify_only)} existing tools"
+                    )
                     # Count unclassified items as skipped (no skills available or classification N/A)
                     unclassified = len(items_to_classify_only) - classified_only
                     if unclassified > 0:
                         skipped += unclassified
-                        logger.debug(f"{unclassified} tools skipped (classification N/A - no skills)")
+                        logger.debug(
+                            f"{unclassified} tools skipped (classification N/A - no skills)"
+                        )
                 except Exception as e:
                     logger.warning(f"Batch classification failed: {e}")
                     # If classification completely fails, count all as skipped (content is already synced)
                     skipped += len(items_to_classify_only)
-                    logger.debug(f"{len(items_to_classify_only)} tools skipped (classification unavailable)")
+                    logger.debug(
+                        f"{len(items_to_classify_only)} tools skipped (classification unavailable)"
+                    )
 
             logger.info(
                 f"Tools sync: {synced} embedded, {classified_only} classified-only, {skipped} skipped, {failed} failed"
@@ -517,10 +532,14 @@ class SyncService:
                 if not description_matches:
                     logger.debug(f"🔄 Tool '{tool_name}' description changed, forcing resync")
                 elif not db_id_matches:
-                    logger.warning(f"🔄 Tool '{tool_name}' PostgreSQL ID changed: {qdrant_db_id_int} → {pg_db_id_int}, forcing resync")
+                    logger.warning(
+                        f"🔄 Tool '{tool_name}' PostgreSQL ID changed: {qdrant_db_id_int} → {pg_db_id_int}, forcing resync"
+                    )
         elif existing_qdrant and not existing_tool:
             # Qdrant exists but PostgreSQL was empty (database reset case)
-            logger.warning(f"🔄 Tool '{tool_name}' found in Qdrant but PostgreSQL was empty, forcing resync")
+            logger.warning(
+                f"🔄 Tool '{tool_name}' found in Qdrant but PostgreSQL was empty, forcing resync"
+            )
 
         # Return tuple with both flags
         return db_record, tool_data, needs_embedding, needs_classification
@@ -535,6 +554,18 @@ class SyncService:
             return name
         # Fallback for resources with uri
         return item_data.get("uri", "")
+
+    def _build_tool_search_text(self, item_data: Dict[str, Any]) -> str:
+        """Build search-friendly text for tools."""
+        return self._build_search_text(item_data)
+
+    def _build_prompt_search_text(self, item_data: Dict[str, Any]) -> str:
+        """Build search-friendly text for prompts."""
+        return self._build_search_text(item_data)
+
+    def _build_resource_search_text(self, item_data: Dict[str, Any]) -> str:
+        """Build search-friendly text for resources."""
+        return self._build_search_text(item_data)
 
     async def sync_prompts(self) -> Dict[str, Any]:
         """Sync prompts from MCP Server API to database with BATCH embeddings"""
@@ -566,7 +597,9 @@ class SyncService:
             logger.debug(f"Found {len(qdrant_prompts)} existing prompts in Qdrant")
 
             # Build lookup dict and find duplicates
-            qdrant_prompts_dict, duplicate_ids, _ = _build_qdrant_dict_and_find_duplicates(qdrant_prompts)
+            qdrant_prompts_dict, duplicate_ids, _ = _build_qdrant_dict_and_find_duplicates(
+                qdrant_prompts
+            )
 
             if duplicate_ids:
                 logger.info(f"🧹 Cleaning up {len(duplicate_ids)} duplicate prompt entries...")
@@ -604,9 +637,7 @@ class SyncService:
                                 {
                                     "name": arg.name,
                                     "description": arg.description or "",
-                                    "required": arg.required
-                                    if hasattr(arg, "required")
-                                    else False,
+                                    "required": arg.required if hasattr(arg, "required") else False,
                                 }
                             )
 
@@ -649,8 +680,7 @@ class SyncService:
                     # BATCH embedding - single API call with all texts
                     # ISA Model supports Union[str, List[str]] for input parameter
                     response = await self.isa_model.embeddings.create(
-                        input=search_texts,  # Pass all texts as batch
-                        model=self.embedding_model
+                        input=search_texts, model=self.embedding_model  # Pass all texts as batch
                     )
                     # Extract embeddings in order (API returns in same order as input)
                     embeddings = [item.embedding for item in response.data]
@@ -660,9 +690,7 @@ class SyncService:
 
                     # 7. Upsert to Qdrant and track for classification
                     prompts_to_classify = []
-                    for (db_record, prompt_data, _), embedding in zip(
-                        items_to_embed, embeddings
-                    ):
+                    for (db_record, prompt_data, _), embedding in zip(items_to_embed, embeddings):
                         try:
                             success = await self.vector_repo.upsert_vector(
                                 item_type="prompt",
@@ -679,19 +707,17 @@ class SyncService:
                             if success:
                                 synced += 1
                                 # Track for classification
-                                prompts_to_classify.append({
-                                    'id': db_record["id"],
-                                    'name': prompt_data["name"],
-                                    'description': prompt_data["description"],
-                                })
+                                prompts_to_classify.append(
+                                    {
+                                        "id": db_record["id"],
+                                        "name": prompt_data["name"],
+                                        "description": prompt_data["description"],
+                                    }
+                                )
                         except Exception as e:
-                            logger.error(
-                                f"Failed to sync prompt {prompt_data['name']}: {e}"
-                            )
+                            logger.error(f"Failed to sync prompt {prompt_data['name']}: {e}")
                             failed += 1
-                            errors.append(
-                                {"prompt": prompt_data["name"], "error": str(e)}
-                            )
+                            errors.append({"prompt": prompt_data["name"], "error": str(e)})
 
                     # 8. Classify prompts into skill categories (BATCH)
                     classified = 0
@@ -701,8 +727,10 @@ class SyncService:
                             batch_results = await self.skill_service.classify_entities_batch(
                                 prompts_to_classify, entity_type="prompt"
                             )
-                            classified = sum(1 for r in batch_results if r.get('primary_skill_id'))
-                            logger.debug(f"Classified {classified}/{len(prompts_to_classify)} prompts")
+                            classified = sum(1 for r in batch_results if r.get("primary_skill_id"))
+                            logger.debug(
+                                f"Classified {classified}/{len(prompts_to_classify)} prompts"
+                            )
                         except Exception as e:
                             logger.warning(f"Prompt classification failed: {e}")
 
@@ -711,9 +739,7 @@ class SyncService:
                     failed += len(items_to_embed)
                     errors.append({"error": f"Batch embedding failed: {str(e)}"})
 
-            logger.info(
-                f"Prompts sync: {synced} updated, {skipped} skipped, {failed} failed"
-            )
+            logger.info(f"Prompts sync: {synced} updated, {skipped} skipped, {failed} failed")
 
             return {
                 "total": len(mcp_prompts),
@@ -755,9 +781,7 @@ class SyncService:
 
         # Update or create in PostgreSQL FIRST
         if existing_prompt:
-            db_record = await self.prompt_service.update_prompt(
-                prompt_name, prompt_data
-            )
+            db_record = await self.prompt_service.update_prompt(prompt_name, prompt_data)
         else:
             db_record = await self.prompt_service.register_prompt(prompt_data)
 
@@ -775,11 +799,15 @@ class SyncService:
                 needs_update = False
                 logger.debug(f"⏭️  Prompt '{prompt_name}' unchanged, skipping")
             elif not db_id_matches:
-                logger.warning(f"🔄 Prompt '{prompt_name}' PostgreSQL ID changed: {existing_qdrant.get('db_id')} → {db_record['id']}, forcing resync")
+                logger.warning(
+                    f"🔄 Prompt '{prompt_name}' PostgreSQL ID changed: {existing_qdrant.get('db_id')} → {db_record['id']}, forcing resync"
+                )
             else:
                 logger.debug(f"🔄 Prompt '{prompt_name}' description changed, forcing resync")
         elif existing_qdrant and not existing_prompt:
-            logger.warning(f"🔄 Prompt '{prompt_name}' found in Qdrant but PostgreSQL was empty, forcing resync")
+            logger.warning(
+                f"🔄 Prompt '{prompt_name}' found in Qdrant but PostgreSQL was empty, forcing resync"
+            )
 
         return db_record, prompt_data, needs_update
 
@@ -813,7 +841,9 @@ class SyncService:
             logger.debug(f"Found {len(qdrant_resources)} existing resources in Qdrant")
 
             # Build lookup dict and find duplicates
-            qdrant_resources_dict, duplicate_ids, _ = _build_qdrant_dict_and_find_duplicates(qdrant_resources)
+            qdrant_resources_dict, duplicate_ids, _ = _build_qdrant_dict_and_find_duplicates(
+                qdrant_resources
+            )
 
             if duplicate_ids:
                 logger.info(f"🧹 Cleaning up {len(duplicate_ids)} duplicate resource entries...")
@@ -821,8 +851,7 @@ class SyncService:
 
             # 3. Find orphaned resources
             mcp_resource_names = {
-                resource.name or str(resource.uri).split("://")[-1]
-                for resource in mcp_resources
+                resource.name or str(resource.uri).split("://")[-1] for resource in mcp_resources
             }
             orphaned_ids = []
             orphaned_names = []
@@ -852,9 +881,9 @@ class SyncService:
                         "uri": resource_uri,
                         "name": resource_name,
                         "description": resource.description or "",
-                        "mime_type": resource.mimeType
-                        if hasattr(resource, "mimeType")
-                        else "text/plain",
+                        "mime_type": (
+                            resource.mimeType if hasattr(resource, "mimeType") else "text/plain"
+                        ),
                         "type": "resource",
                     }
 
@@ -890,8 +919,7 @@ class SyncService:
                     # BATCH embedding - single API call with all texts
                     # ISA Model supports Union[str, List[str]] for input parameter
                     response = await self.isa_model.embeddings.create(
-                        input=search_texts,  # Pass all texts as batch
-                        model=self.embedding_model
+                        input=search_texts, model=self.embedding_model  # Pass all texts as batch
                     )
                     # Extract embeddings in order (API returns in same order as input)
                     embeddings = [item.embedding for item in response.data]
@@ -901,9 +929,7 @@ class SyncService:
 
                     # 7. Upsert to Qdrant and track for classification
                     resources_to_classify = []
-                    for (db_record, resource_data, _), embedding in zip(
-                        items_to_embed, embeddings
-                    ):
+                    for (db_record, resource_data, _), embedding in zip(items_to_embed, embeddings):
                         try:
                             success = await self.vector_repo.upsert_vector(
                                 item_type="resource",
@@ -921,19 +947,17 @@ class SyncService:
                             if success:
                                 synced += 1
                                 # Track for classification
-                                resources_to_classify.append({
-                                    'id': db_record["id"],
-                                    'name': resource_data["name"],
-                                    'description': resource_data["description"],
-                                })
+                                resources_to_classify.append(
+                                    {
+                                        "id": db_record["id"],
+                                        "name": resource_data["name"],
+                                        "description": resource_data["description"],
+                                    }
+                                )
                         except Exception as e:
-                            logger.error(
-                                f"Failed to sync resource {resource_data['name']}: {e}"
-                            )
+                            logger.error(f"Failed to sync resource {resource_data['name']}: {e}")
                             failed += 1
-                            errors.append(
-                                {"resource": resource_data["name"], "error": str(e)}
-                            )
+                            errors.append({"resource": resource_data["name"], "error": str(e)})
 
                     # 8. Classify resources into skill categories (BATCH)
                     classified = 0
@@ -943,8 +967,10 @@ class SyncService:
                             batch_results = await self.skill_service.classify_entities_batch(
                                 resources_to_classify, entity_type="resource"
                             )
-                            classified = sum(1 for r in batch_results if r.get('primary_skill_id'))
-                            logger.debug(f"Classified {classified}/{len(resources_to_classify)} resources")
+                            classified = sum(1 for r in batch_results if r.get("primary_skill_id"))
+                            logger.debug(
+                                f"Classified {classified}/{len(resources_to_classify)} resources"
+                            )
                         except Exception as e:
                             logger.warning(f"Resource classification failed: {e}")
 
@@ -953,9 +979,7 @@ class SyncService:
                     failed += len(items_to_embed)
                     errors.append({"error": f"Batch embedding failed: {str(e)}"})
 
-            logger.info(
-                f"Resources sync: {synced} updated, {skipped} skipped, {failed} failed"
-            )
+            logger.info(f"Resources sync: {synced} updated, {skipped} skipped, {failed} failed")
 
             return {
                 "total": len(mcp_resources),
@@ -999,9 +1023,7 @@ class SyncService:
 
         # Update or create in PostgreSQL FIRST
         if existing_resource:
-            db_record = await self.resource_service.update_resource(
-                resource_uri, resource_data
-            )
+            db_record = await self.resource_service.update_resource(resource_uri, resource_data)
         else:
             db_record = await self.resource_service.register_resource(resource_data)
 
@@ -1019,11 +1041,15 @@ class SyncService:
                 needs_update = False
                 logger.debug(f"⏭️  Resource '{resource_uri}' unchanged, skipping")
             elif not db_id_matches:
-                logger.warning(f"🔄 Resource '{resource_uri}' PostgreSQL ID changed: {existing_qdrant.get('db_id')} → {db_record['id']}, forcing resync")
+                logger.warning(
+                    f"🔄 Resource '{resource_uri}' PostgreSQL ID changed: {existing_qdrant.get('db_id')} → {db_record['id']}, forcing resync"
+                )
             else:
                 logger.debug(f"🔄 Resource '{resource_uri}' description changed, forcing resync")
         elif existing_qdrant and not existing_resource:
-            logger.warning(f"🔄 Resource '{resource_uri}' found in Qdrant but PostgreSQL was empty, forcing resync")
+            logger.warning(
+                f"🔄 Resource '{resource_uri}' found in Qdrant but PostgreSQL was empty, forcing resync"
+            )
 
         return db_record, resource_data, needs_update
 
@@ -1076,7 +1102,7 @@ class SyncService:
                 await qdrant_client.create_collection(
                     collection_name=self._skill_collection,
                     vector_size=self.vector_repo.vector_dimension,
-                    distance="Cosine"
+                    distance="Cosine",
                 )
                 # Collection just created, all skills need embedding
                 existing_skills_dict = {}
@@ -1104,10 +1130,12 @@ class SyncService:
                         skipped += 1
                         continue
 
-                items_to_embed.append({
-                    "skill": skill,
-                    "search_text": description,
-                })
+                items_to_embed.append(
+                    {
+                        "skill": skill,
+                        "search_text": description,
+                    }
+                )
 
             if not items_to_embed:
                 logger.debug(f"All {len(skills)} skills unchanged, nothing to sync")
@@ -1124,8 +1152,7 @@ class SyncService:
             search_texts = [item["search_text"] for item in items_to_embed]
 
             response = await self.isa_model.embeddings.create(
-                input=search_texts,
-                model=self.embedding_model
+                input=search_texts, model=self.embedding_model
             )
             embeddings = [item.embedding for item in response.data]
             logger.debug(f"Generated {len(embeddings)} skill embeddings")
@@ -1158,11 +1185,13 @@ class SyncService:
                     # Upsert to Qdrant (use UUID as point ID)
                     operation_id = await qdrant_client.upsert_points(
                         collection_name=self._skill_collection,
-                        points=[{
-                            "id": skill_uuid,
-                            "vector": embedding,
-                            "payload": payload,
-                        }]
+                        points=[
+                            {
+                                "id": skill_uuid,
+                                "vector": embedding,
+                                "payload": payload,
+                            }
+                        ],
                     )
 
                     if operation_id:
@@ -1191,6 +1220,7 @@ class SyncService:
         except Exception as e:
             logger.error(f"Skills sync failed: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return {
                 "total": 0,
@@ -1278,7 +1308,8 @@ class SyncService:
             else:
                 # Only classify tools without primary_skill_id
                 tools_to_classify = [
-                    t for t in all_tools
+                    t
+                    for t in all_tools
                     if not t.get("metadata", {}).get("primary_skill_id")
                     and not self._get_primary_skill_from_payload(t)
                 ]
@@ -1312,13 +1343,15 @@ class SyncService:
                             logger.warning(f"  Skipping tool '{tool_name}' - invalid ID: {tool_id}")
                             continue
 
-                    logger.info(f"  [{idx + 1}/{len(tools_to_classify)}] Classifying '{tool_name}' (ID: {tool_id})...")
+                    logger.info(
+                        f"  [{idx + 1}/{len(tools_to_classify)}] Classifying '{tool_name}' (ID: {tool_id})..."
+                    )
 
                     result = await self.skill_service.classify_tool(
                         tool_id=tool_id,
                         tool_name=tool_name,
                         tool_description=description,
-                        force_reclassify=force_reclassify
+                        force_reclassify=force_reclassify,
                     )
 
                     if result.get("primary_skill_id"):
@@ -1334,7 +1367,9 @@ class SyncService:
                     failed += 1
                     errors.append({"tool": tool_name, "id": tool_id, "error": str(e)})
 
-            logger.info(f"🎯 Bulk classification completed: {classified} classified, {failed} failed")
+            logger.info(
+                f"🎯 Bulk classification completed: {classified} classified, {failed} failed"
+            )
 
             return {
                 "total": len(all_tools),
@@ -1347,6 +1382,7 @@ class SyncService:
         except Exception as e:
             logger.error(f"Bulk classification failed: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return {
                 "total": 0,

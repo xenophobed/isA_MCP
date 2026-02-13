@@ -35,7 +35,7 @@ def register_search_tools(mcp: FastMCP):
         pattern: str,
         path: Optional[str] = None,
         include_hidden: bool = False,
-        max_results: int = 500
+        max_results: int = 500,
     ) -> Dict[str, Any]:
         """
         Fast file pattern matching tool that works with any codebase size.
@@ -77,7 +77,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "glob_files",
                     "error": f"Path not found: {path}",
                     "error_code": "PATH_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             if not search_path.is_dir():
@@ -86,7 +86,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "glob_files",
                     "error": f"Path is not a directory: {path}",
                     "error_code": "NOT_A_DIRECTORY",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Collect matches
@@ -98,7 +98,7 @@ def register_search_tools(mcp: FastMCP):
                 # Skip hidden files/dirs if not included
                 if not include_hidden:
                     parts = match.relative_to(search_path).parts
-                    if any(part.startswith('.') for part in parts):
+                    if any(part.startswith(".") for part in parts):
                         continue
 
                 matches.append(match)
@@ -123,9 +123,9 @@ def register_search_tools(mcp: FastMCP):
                     "path": str(search_path.absolute()),
                     "matches": match_paths,
                     "total_matches": len(match_paths),
-                    "truncated": truncated
+                    "truncated": truncated,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -134,7 +134,7 @@ def register_search_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "glob_files",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
@@ -145,7 +145,7 @@ def register_search_tools(mcp: FastMCP):
         case_insensitive: bool = False,
         max_results: int = 100,
         context_lines: int = 0,
-        include_line_numbers: bool = True
+        include_line_numbers: bool = True,
     ) -> Dict[str, Any]:
         """
         Fast content search tool using regex patterns (ripgrep-style).
@@ -194,7 +194,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "grep_search",
                     "error": f"Path not found: {path}",
                     "error_code": "PATH_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             # Compile regex
@@ -207,7 +207,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "grep_search",
                     "error": f"Invalid regex pattern: {e}",
                     "error_code": "INVALID_REGEX",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             matches = []
@@ -224,8 +224,9 @@ def register_search_tools(mcp: FastMCP):
                 else:
                     # Search all text files
                     files_to_search = [
-                        f for f in search_path.rglob("*")
-                        if f.is_file() and not any(p.startswith('.') for p in f.parts)
+                        f
+                        for f in search_path.rglob("*")
+                        if f.is_file() and not any(p.startswith(".") for p in f.parts)
                     ]
 
             for file_path in files_to_search:
@@ -246,7 +247,7 @@ def register_search_tools(mcp: FastMCP):
                 files_searched += 1
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         lines = f.readlines()
 
                     for line_num, line in enumerate(lines, 1):
@@ -255,7 +256,7 @@ def register_search_tools(mcp: FastMCP):
 
                             match_entry = {
                                 "file": str(file_path.absolute()),
-                                "content": line.rstrip()
+                                "content": line.rstrip(),
                             }
 
                             if include_line_numbers:
@@ -266,7 +267,7 @@ def register_search_tools(mcp: FastMCP):
                                 start = max(0, line_num - 1 - context_lines)
                                 end = min(len(lines), line_num + context_lines)
                                 match_entry["context_before"] = [
-                                    l.rstrip() for l in lines[start:line_num-1]
+                                    l.rstrip() for l in lines[start : line_num - 1]
                                 ]
                                 match_entry["context_after"] = [
                                     l.rstrip() for l in lines[line_num:end]
@@ -283,7 +284,9 @@ def register_search_tools(mcp: FastMCP):
 
             truncated = len(matches) >= limit
 
-            logger.info(f"grep_search: pattern='{pattern}' found {len(matches)} matches in {len(files_matched)} files")
+            logger.info(
+                f"grep_search: pattern='{pattern}' found {len(matches)} matches in {len(files_matched)} files"
+            )
 
             return {
                 "status": "success",
@@ -295,9 +298,9 @@ def register_search_tools(mcp: FastMCP):
                     "total_matches": len(matches),
                     "files_searched": files_searched,
                     "files_matched": len(files_matched),
-                    "truncated": truncated
+                    "truncated": truncated,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -306,7 +309,7 @@ def register_search_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "grep_search",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     @mcp.tool()
@@ -315,7 +318,7 @@ def register_search_tools(mcp: FastMCP):
         include_hidden: bool = False,
         recursive: bool = False,
         max_depth: int = 3,
-        file_pattern: Optional[str] = None
+        file_pattern: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         List files and directories in a given path.
@@ -364,7 +367,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "ls_directory",
                     "error": f"Path not found: {path}",
                     "error_code": "PATH_NOT_FOUND",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             if not list_path.is_dir():
@@ -373,7 +376,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "ls_directory",
                     "error": f"Path is not a directory: {path}",
                     "error_code": "NOT_A_DIRECTORY",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             entries = []
@@ -384,7 +387,7 @@ def register_search_tools(mcp: FastMCP):
                 nonlocal dir_count, file_count
 
                 # Skip hidden if not included
-                if not include_hidden and entry_path.name.startswith('.'):
+                if not include_hidden and entry_path.name.startswith("."):
                     return
 
                 # Apply file pattern filter
@@ -433,7 +436,7 @@ def register_search_tools(mcp: FastMCP):
                     "action": "ls_directory",
                     "error": f"Permission denied: {path}",
                     "error_code": "PERMISSION_DENIED",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             logger.info(f"ls_directory: {path} ({len(entries)} entries)")
@@ -446,9 +449,9 @@ def register_search_tools(mcp: FastMCP):
                     "entries": entries,
                     "total_entries": len(entries),
                     "directories": dir_count,
-                    "files": file_count
+                    "files": file_count,
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -457,7 +460,7 @@ def register_search_tools(mcp: FastMCP):
                 "status": "error",
                 "action": "ls_directory",
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
     logger.debug("Registered search tools: glob_files, grep_search, ls_directory")
@@ -467,16 +470,56 @@ def _is_searchable_file(path: Path) -> bool:
     """Check if a file is searchable (text-based)."""
     # Skip known binary extensions
     binary_extensions = {
-        '.pyc', '.pyo', '.so', '.dylib', '.dll', '.exe',
-        '.png', '.jpg', '.jpeg', '.gif', '.ico', '.bmp', '.webp',
-        '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv',
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-        '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
-        '.bin', '.dat', '.db', '.sqlite', '.sqlite3',
-        '.woff', '.woff2', '.ttf', '.otf', '.eot',
-        '.class', '.jar', '.war',
-        '.o', '.a', '.lib',
-        '.node', '.wasm'
+        ".pyc",
+        ".pyo",
+        ".so",
+        ".dylib",
+        ".dll",
+        ".exe",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".bmp",
+        ".webp",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".mov",
+        ".mkv",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".7z",
+        ".rar",
+        ".bin",
+        ".dat",
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".class",
+        ".jar",
+        ".war",
+        ".o",
+        ".a",
+        ".lib",
+        ".node",
+        ".wasm",
     }
 
     if path.suffix.lower() in binary_extensions:
@@ -484,10 +527,10 @@ def _is_searchable_file(path: Path) -> bool:
 
     # Try to read first few bytes
     try:
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             sample = f.read(512)
             # Binary files often have null bytes
-            if b'\x00' in sample:
+            if b"\x00" in sample:
                 return False
     except:
         return False
