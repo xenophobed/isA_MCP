@@ -1,0 +1,225 @@
+# =============================================================================
+# AUTO-GENERATED from isA_Vibe templates
+# Template: .claude/skills/deployment/templates/cicd/deploy-kind.yml
+# Target: deploy-kind.yml
+# Generated: 2026-02-13 23:24:22
+# Project type: python_microservice
+#
+# DO NOT EDIT DIRECTLY - Changes will be overwritten!
+# To customize: modify template in isA_Vibe and regenerate
+# =============================================================================
+
+# =============================================================================
+# Deploy to Local Kind K8s Cluster
+# =============================================================================
+# Builds Docker images, loads into Kind, applies K8s manifests.
+# Runs on self-hosted runner with access to local Kind cluster.
+#
+# Triggers: push to develop, manual dispatch
+# Cluster: isa-cloud, Namespace: isa-cloud-staging
+# =============================================================================
+
+name: Deploy to Kind
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (blank for all)'
+        required: false
+        type: string
+      skip_build:
+        description: 'Skip Docker build (use existing images)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  KIND_CLUSTER: isa-cloud
+  K8S_NAMESPACE: isa-cloud-staging
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify Kind cluster
+        run: |
+          echo "Checking Kind cluster..."
+          if ! kind get clusters 2>/dev/null | grep -q "$KIND_CLUSTER"; then
+            echo "ERROR: Kind cluster '$KIND_CLUSTER' not found"
+            echo "Available clusters:"
+            kind get clusters 2>/dev/null || echo "  (none)"
+            exit 1
+          fi
+
+          echo "Cluster '$KIND_CLUSTER' is available"
+          kubectl cluster-info --context "kind-$KIND_CLUSTER"
+
+      - name: Ensure namespace exists
+        run: |
+          kubectl create namespace "$K8S_NAMESPACE" \
+            --context "kind-$KIND_CLUSTER" \
+            --dry-run=client -o yaml | \
+            kubectl apply --context "kind-$KIND_CLUSTER" -f -
+
+      - name: Detect services to deploy
+        id: services
+        run: |
+          SERVICE_INPUT="${{ github.event.inputs.service }}"
+
+          if [ -n "$SERVICE_INPUT" ]; then
+            echo "services=$SERVICE_INPUT" >> $GITHUB_OUTPUT
+            echo "Deploying specific service: $SERVICE_INPUT"
+          elif [ -d "microservices" ]; then
+            # Python microservices project
+            SERVICES=$(ls -d microservices/*_service 2>/dev/null | xargs -I{} basename {} | tr '\n' ' ')
+            echo "services=$SERVICES" >> $GITHUB_OUTPUT
+            echo "Deploying all services: $SERVICES"
+          elif [ -f "package.json" ]; then
+            # Next.js project - use repo name
+            REPO_NAME=$(basename $(git rev-parse --show-toplevel))
+            echo "services=$REPO_NAME" >> $GITHUB_OUTPUT
+            echo "Deploying frontend: $REPO_NAME"
+          else
+            echo "services=" >> $GITHUB_OUTPUT
+            echo "WARNING: Could not detect services to deploy"
+          fi
+
+      - name: Build Docker images
+        if: ${{ github.event.inputs.skip_build != 'true' }}
+        run: |
+          SERVICES="${{ steps.services.outputs.services }}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+
+          for service in $SERVICES; do
+            echo "=== Building $service ==="
+
+            # Check for service-specific Dockerfile
+            if [ -f "deployment/k8s/Dockerfile.$service" ]; then
+              DOCKERFILE="deployment/k8s/Dockerfile.$service"
+            elif [ -f "Dockerfile" ]; then
+              DOCKERFILE="Dockerfile"
+            else
+              echo "WARNING: No Dockerfile found for $service, skipping build"
+              continue
+            fi
+
+            docker build -f "$DOCKERFILE" \
+              -t "isa-${service}:${SHORT_SHA}" \
+              -t "isa-${service}:latest" \
+              .
+
+            echo "Built isa-${service}:${SHORT_SHA}"
+          done
+
+      - name: Load images into Kind
+        if: ${{ github.event.inputs.skip_build != 'true' }}
+        run: |
+          SERVICES="${{ steps.services.outputs.services }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+
+          for service in $SERVICES; do
+            IMAGE="isa-${service}:${SHORT_SHA}"
+            if docker image inspect "$IMAGE" &>/dev/null; then
+              echo "Loading $IMAGE into Kind..."
+              kind load docker-image "$IMAGE" --name "$KIND_CLUSTER"
+              kind load docker-image "isa-${service}:latest" --name "$KIND_CLUSTER"
+            fi
+          done
+
+      - name: Apply K8s manifests
+        run: |
+          SERVICES="${{ steps.services.outputs.services }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+
+          for service in $SERVICES; do
+            echo "=== Deploying $service ==="
+
+            # Look for K8s manifests
+            MANIFEST=""
+            if [ -f "deployment/k8s/${service}-deployment.yaml" ]; then
+              MANIFEST="deployment/k8s/${service}-deployment.yaml"
+            elif [ -f "deployment/k8s/deployment.yaml" ]; then
+              MANIFEST="deployment/k8s/deployment.yaml"
+            fi
+
+            if [ -n "$MANIFEST" ]; then
+              echo "Applying $MANIFEST"
+              kubectl apply -f "$MANIFEST" \
+                --namespace "$K8S_NAMESPACE" \
+                --context "kind-$KIND_CLUSTER"
+
+              # Update image tag
+              kubectl set image deployment/"$service" \
+                "$service=isa-${service}:${SHORT_SHA}" \
+                --namespace "$K8S_NAMESPACE" \
+                --context "kind-$KIND_CLUSTER" 2>/dev/null || true
+            else
+              echo "WARNING: No K8s manifest found for $service"
+            fi
+          done
+
+      - name: Wait for rollout
+        run: |
+          SERVICES="${{ steps.services.outputs.services }}"
+
+          for service in $SERVICES; do
+            echo "Waiting for $service rollout..."
+            kubectl rollout status deployment/"$service" \
+              --namespace "$K8S_NAMESPACE" \
+              --context "kind-$KIND_CLUSTER" \
+              --timeout=120s 2>/dev/null || echo "WARNING: $service rollout status unknown"
+          done
+
+      - name: Health checks
+        run: |
+          echo "=== Deployment Health Check ==="
+          echo ""
+
+          # Show all pods in namespace
+          echo "Pods:"
+          kubectl get pods \
+            --namespace "$K8S_NAMESPACE" \
+            --context "kind-$KIND_CLUSTER" \
+            -o wide
+
+          echo ""
+          echo "Services:"
+          kubectl get svc \
+            --namespace "$K8S_NAMESPACE" \
+            --context "kind-$KIND_CLUSTER"
+
+          echo ""
+          echo "Deployments:"
+          kubectl get deployments \
+            --namespace "$K8S_NAMESPACE" \
+            --context "kind-$KIND_CLUSTER"
+
+          # Check for any pods not in Running state
+          NOT_RUNNING=$(kubectl get pods \
+            --namespace "$K8S_NAMESPACE" \
+            --context "kind-$KIND_CLUSTER" \
+            --field-selector=status.phase!=Running \
+            --no-headers 2>/dev/null | wc -l)
+
+          if [ "$NOT_RUNNING" -gt 0 ]; then
+            echo ""
+            echo "WARNING: $NOT_RUNNING pod(s) not in Running state"
+            kubectl get pods \
+              --namespace "$K8S_NAMESPACE" \
+              --context "kind-$KIND_CLUSTER" \
+              --field-selector=status.phase!=Running
+          else
+            echo ""
+            echo "All pods are Running"
+          fi

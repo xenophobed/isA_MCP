@@ -1,0 +1,169 @@
+# =============================================================================
+# AUTO-GENERATED from isA_Vibe templates
+# Template: .claude/skills/deployment/templates/cicd/claude-review.yml
+# Target: claude-review.yml
+# Generated: 2026-02-13 23:24:22
+# Project type: python_microservice
+#
+# DO NOT EDIT DIRECTLY - Changes will be overwritten!
+# To customize: modify template in isA_Vibe and regenerate
+# =============================================================================
+
+# =============================================================================
+# AI Code Review via Claude API
+# =============================================================================
+# Posts an AI-generated code review comment on every PR.
+# Updates the same comment on force-push (via HTML marker).
+#
+# Requires: ANTHROPIC_API_KEY secret
+# =============================================================================
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Claude Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          # Get diff against base branch
+          DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD)
+
+          # Truncate at 100KB to fit context window
+          DIFF_SIZE=${#DIFF}
+          if [ "$DIFF_SIZE" -gt 102400 ]; then
+            DIFF="${DIFF:0:102400}"
+            DIFF="$DIFF
+
+          ... [TRUNCATED - diff exceeded 100KB, showing first 100KB] ..."
+          fi
+
+          # Write to file to avoid shell escaping issues
+          echo "$DIFF" > /tmp/pr_diff.txt
+          echo "diff_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Run Claude review
+        id: review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_DIFF_SIZE: ${{ steps.diff.outputs.diff_size }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import json
+          from anthropic import Anthropic
+
+          client = Anthropic()
+
+          diff = open("/tmp/pr_diff.txt").read()
+          pr_title = os.environ.get("PR_TITLE", "")
+          pr_body = os.environ.get("PR_BODY", "")
+          diff_size = os.environ.get("PR_DIFF_SIZE", "0")
+
+          prompt = f"""You are a senior code reviewer for the isA platform.
+          Review this pull request diff and provide actionable feedback.
+
+          **PR Title:** {pr_title}
+          **PR Description:** {pr_body}
+          **Diff size:** {diff_size} bytes
+
+          **Diff:**
+          ```
+          {diff}
+          ```
+
+          Provide your review in this exact format:
+
+          ## Summary
+          One paragraph summarizing what this PR does.
+
+          ## Issues Found
+          List any bugs, security concerns, or logic errors. Use bullet points.
+          If none found, say "No issues found."
+
+          ## Suggestions
+          List improvement suggestions (readability, performance, best practices). Use bullet points.
+          If none, say "Looks good."
+
+          ## CDD/TDD Compliance
+          - Are contracts/tests updated for the changes?
+          - Any missing test coverage?
+
+          Keep the review concise and actionable. Focus on what matters."""
+
+          response = client.messages.create(
+              model="claude-sonnet-4-5-20250929",
+              max_tokens=2048,
+              messages=[{"role": "user", "content": prompt}],
+          )
+
+          review_text = response.content[0].text
+
+          # Write review to file for the next step
+          with open("/tmp/review_body.txt", "w") as f:
+              f.write(review_text)
+
+          print("Review generated successfully")
+          PYEOF
+
+      - name: Post or update PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reviewBody = fs.readFileSync('/tmp/review_body.txt', 'utf8');
+            const marker = '<!-- claude-ai-review -->';
+            const body = `${marker}\n# AI Code Review\n\n${reviewBody}\n\n---\n_Reviewed by Claude Sonnet | [isA AI-SDLC](https://github.com/xenoISA)_`;
+
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.data.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+              console.log('Updated existing review comment');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+              console.log('Created new review comment');
+            }
