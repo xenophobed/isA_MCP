@@ -10,8 +10,8 @@ from .authorization_client import AuthorizationServiceClient
 from .middleware import MCPUnifiedAuthMiddleware
 
 __all__ = [
-    'MCPAuthService',
-    'AuthServiceClient', 
-    'AuthorizationServiceClient',
-    'MCPUnifiedAuthMiddleware'
+    "MCPAuthService",
+    "AuthServiceClient",
+    "AuthorizationServiceClient",
+    "MCPUnifiedAuthMiddleware",
 ]

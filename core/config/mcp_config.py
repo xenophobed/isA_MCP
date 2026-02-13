@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """MCP Server main configuration"""
+
 import os
 from dataclasses import dataclass, field
 from typing import Optional, List
@@ -9,8 +10,10 @@ from .consul_config import ConsulConfig
 from .model_config import ModelConfig
 from .service_config import ServiceConfig
 
+
 def _bool(val: str) -> bool:
     return val.lower() == "true"
+
 
 def _int(val: str, default: int) -> int:
     try:
@@ -23,9 +26,11 @@ def _int(val: str, default: int) -> int:
 # MCP-Specific Resource Configuration
 # ===========================================
 
+
 @dataclass
 class MCPQdrantConfig:
     """Qdrant collection names for MCP"""
+
     unified_collection: str = "mcp_unified_search"
     tool_collection: str = "mcp_tool_embeddings"
     prompt_collection: str = "mcp_prompt_embeddings"
@@ -47,7 +52,7 @@ class MCPQdrantConfig:
         ]
 
     @classmethod
-    def from_env(cls) -> 'MCPQdrantConfig':
+    def from_env(cls) -> "MCPQdrantConfig":
         prefix = os.getenv("MCP_QDRANT_PREFIX", "mcp")
         return cls(
             unified_collection=os.getenv("MCP_QDRANT_UNIFIED", f"{prefix}_unified_search"),
@@ -63,6 +68,7 @@ class MCPQdrantConfig:
 @dataclass
 class MCPMinIOConfig:
     """MinIO bucket names for MCP"""
+
     resources_bucket: str = "mcp-resources"
     cache_bucket: str = "mcp-cache"
     exports_bucket: str = "mcp-exports"
@@ -72,7 +78,7 @@ class MCPMinIOConfig:
         return [self.resources_bucket, self.cache_bucket, self.exports_bucket]
 
     @classmethod
-    def from_env(cls) -> 'MCPMinIOConfig':
+    def from_env(cls) -> "MCPMinIOConfig":
         prefix = os.getenv("MCP_MINIO_PREFIX", "mcp")
         return cls(
             resources_bucket=os.getenv("MCP_MINIO_RESOURCES", f"{prefix}-resources"),
@@ -84,6 +90,7 @@ class MCPMinIOConfig:
 @dataclass
 class MCPRedisConfig:
     """Redis key prefixes for MCP"""
+
     tool_prefix: str = "mcp:tool:"
     prompt_prefix: str = "mcp:prompt:"
     resource_prefix: str = "mcp:resource:"
@@ -93,7 +100,7 @@ class MCPRedisConfig:
     cache_prefix: str = "mcp:cache:"
 
     @classmethod
-    def from_env(cls) -> 'MCPRedisConfig':
+    def from_env(cls) -> "MCPRedisConfig":
         prefix = os.getenv("MCP_REDIS_PREFIX", "mcp")
         return cls(
             tool_prefix=f"{prefix}:tool:",
@@ -109,6 +116,7 @@ class MCPRedisConfig:
 @dataclass
 class MCPPostgresConfig:
     """PostgreSQL schema and table names for MCP"""
+
     schema: str = "mcp"
     tools_table: str = "tools"
     prompts_table: str = "prompts"
@@ -120,7 +128,7 @@ class MCPPostgresConfig:
     servers_table: str = "aggregated_servers"
 
     @classmethod
-    def from_env(cls) -> 'MCPPostgresConfig':
+    def from_env(cls) -> "MCPPostgresConfig":
         return cls(
             schema=os.getenv("MCP_POSTGRES_SCHEMA", "mcp"),
             tools_table=os.getenv("MCP_POSTGRES_TOOLS", "tools"),
@@ -137,13 +145,14 @@ class MCPPostgresConfig:
 @dataclass
 class MCPResourceConfig:
     """Combined MCP resource configuration"""
+
     qdrant: MCPQdrantConfig = field(default_factory=MCPQdrantConfig)
     minio: MCPMinIOConfig = field(default_factory=MCPMinIOConfig)
     redis: MCPRedisConfig = field(default_factory=MCPRedisConfig)
     postgres: MCPPostgresConfig = field(default_factory=MCPPostgresConfig)
 
     @classmethod
-    def from_env(cls) -> 'MCPResourceConfig':
+    def from_env(cls) -> "MCPResourceConfig":
         return cls(
             qdrant=MCPQdrantConfig.from_env(),
             minio=MCPMinIOConfig.from_env(),
@@ -156,9 +165,11 @@ class MCPResourceConfig:
 # Main MCP Configuration
 # ===========================================
 
+
 @dataclass
 class MCPConfig:
     """Main MCP server configuration with all sub-configs"""
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8081
@@ -204,7 +215,7 @@ class MCPConfig:
     resources: MCPResourceConfig = field(default_factory=MCPResourceConfig)
 
     @classmethod
-    def from_env(cls) -> 'MCPConfig':
+    def from_env(cls) -> "MCPConfig":
         """Load complete configuration from environment"""
         return cls(
             # Server

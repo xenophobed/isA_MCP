@@ -10,8 +10,13 @@ from typing import Optional, Any
 logger = logging.getLogger(__name__)
 
 
-def get_client(service_name: str, host: Optional[str] = None, port: Optional[int] = None,
-               user_id: str = 'system', **kwargs) -> Optional[Any]:
+def get_client(
+    service_name: str,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    user_id: str = "system",
+    **kwargs,
+) -> Optional[Any]:
     """
     Get gRPC client for specified service
 
@@ -27,7 +32,7 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
     """
     service_name = service_name.lower()
 
-    if service_name == 'minio':
+    if service_name == "minio":
         from .minio_client import MinIOClient, ConsulRegistry
 
         if MinIOClient is None:
@@ -53,7 +58,7 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
                 enable_compression=True,
                 enable_retry=True,
                 consul_registry=consul,
-                service_name_override='minio'
+                service_name_override="minio",
             )
 
             logger.info(f"✅ Created MinIO gRPC client for user: {user_id}")
@@ -62,6 +67,7 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
         except Exception as e:
             logger.error(f"Failed to create MinIO client: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
@@ -70,4 +76,4 @@ def get_client(service_name: str, host: Optional[str] = None, port: Optional[int
         return None
 
 
-__all__ = ['get_client']
+__all__ = ["get_client"]

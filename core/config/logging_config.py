@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Logging configuration for MCP"""
+
 import os
 from dataclasses import dataclass
 
+
 def _bool(val: str) -> bool:
     return val.lower() == "true"
+
 
 def _int(val: str, default: int) -> int:
     try:
@@ -12,9 +15,11 @@ def _int(val: str, default: int) -> int:
     except ValueError:
         return default
 
+
 @dataclass
 class LoggingConfig:
     """Centralized logging configuration with Loki gRPC support"""
+
     log_level: str = "INFO"
     log_file: str = "logs/mcp_server.log"
     enable_console: bool = True
@@ -30,7 +35,7 @@ class LoggingConfig:
     environment: str = "development"
 
     @classmethod
-    def from_env(cls) -> 'LoggingConfig':
+    def from_env(cls) -> "LoggingConfig":
         """Load logging config from environment variables"""
         env = os.getenv("ENV", "development")
         return cls(
@@ -42,5 +47,5 @@ class LoggingConfig:
             loki_grpc_host=os.getenv("LOKI_GRPC_HOST", "localhost"),
             loki_grpc_port=_int(os.getenv("LOKI_GRPC_PORT", "50054"), 50054),
             service_name=os.getenv("SERVICE_NAME", "mcp"),
-            environment=os.getenv("ENVIRONMENT", env)
+            environment=os.getenv("ENVIRONMENT", env),
         )

@@ -16,6 +16,7 @@ Prerequisites:
     - Qdrant accessible
     - Model service accessible
 """
+
 import asyncio
 import logging
 import os
@@ -27,10 +28,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +38,9 @@ async def apply_migration():
     logger.info("Step 1: Applying refined categories migration")
     logger.info("=" * 70)
 
-    migration_file = project_root / "services/skill_service/migrations/003_refined_skill_categories.sql"
+    migration_file = (
+        project_root / "services/skill_service/migrations/003_refined_skill_categories.sql"
+    )
 
     if not migration_file.exists():
         logger.error(f"Migration file not found: {migration_file}")
@@ -52,16 +52,22 @@ async def apply_migration():
     # Try kubectl first
     try:
         cmd = [
-            "kubectl", "exec", "-i", "postgresql-0", "-n", "isa-cloud-staging", "--",
-            "psql", "-U", "postgres", "-d", "isa_platform"
+            "kubectl",
+            "exec",
+            "-i",
+            "postgresql-0",
+            "-n",
+            "isa-cloud-staging",
+            "--",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "isa_platform",
         ]
 
         result = subprocess.run(
-            cmd,
-            input=migration_sql,
-            capture_output=True,
-            text=True,
-            timeout=60
+            cmd, input=migration_sql, capture_output=True, text=True, timeout=60
         )
 
         if result.returncode == 0:
@@ -76,7 +82,15 @@ async def apply_migration():
     # Try direct psql
     try:
         cmd = [
-            "psql", "-h", "localhost", "-U", "postgres", "-d", "isa_platform", "-f", str(migration_file)
+            "psql",
+            "-h",
+            "localhost",
+            "-U",
+            "postgres",
+            "-d",
+            "isa_platform",
+            "-f",
+            str(migration_file),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode == 0:
@@ -104,7 +118,7 @@ async def sync_skill_categories():
     result = await sync_service.sync_skills()
 
     logger.info(f"✅ Skills sync: {result}")
-    return result.get('synced', 0) >= 0
+    return result.get("synced", 0) >= 0
 
 
 async def reclassify_tools():
@@ -122,7 +136,7 @@ async def reclassify_tools():
     result = await sync_service.classify_all_tools(force_reclassify=True)
 
     logger.info(f"✅ Tools classification: {result}")
-    return result.get('classified', 0) >= 0
+    return result.get("classified", 0) >= 0
 
 
 async def reclassify_prompts():
@@ -148,12 +162,12 @@ async def reclassify_prompts():
 
     if prompts:
         entities = [
-            {'id': p['id'], 'name': p['name'], 'description': p.get('description', '')}
+            {"id": p["id"], "name": p["name"], "description": p.get("description", "")}
             for p in prompts
         ]
 
         results = await skill_service.classify_entities_batch(entities, entity_type="prompt")
-        classified = sum(1 for r in results if r.get('primary_skill_id'))
+        classified = sum(1 for r in results if r.get("primary_skill_id"))
         logger.info(f"✅ Classified {classified}/{len(prompts)} prompts")
 
     return True
@@ -181,12 +195,12 @@ async def reclassify_resources():
 
     if resources:
         entities = [
-            {'id': r['id'], 'name': r['name'], 'description': r.get('description', '')}
+            {"id": r["id"], "name": r["name"], "description": r.get("description", "")}
             for r in resources
         ]
 
         results = await skill_service.classify_entities_batch(entities, entity_type="resource")
-        classified = sum(1 for r in results if r.get('primary_skill_id'))
+        classified = sum(1 for r in results if r.get("primary_skill_id"))
         logger.info(f"✅ Classified {classified}/{len(resources)} resources")
 
     return True
@@ -232,8 +246,10 @@ async def test_search_precision():
         # Show skill distribution
         skills = await client.list_skills()
         logger.info(f"\nNew skill categories: {len(skills)}")
-        for skill in sorted(skills, key=lambda x: x.get('tool_count', 0), reverse=True)[:10]:
-            logger.info(f"  {skill.get('name', skill.get('id')):30} {skill.get('tool_count', 0):>3} tools")
+        for skill in sorted(skills, key=lambda x: x.get("tool_count", 0), reverse=True)[:10]:
+            logger.info(
+                f"  {skill.get('name', skill.get('id')):30} {skill.get('tool_count', 0):>3} tools"
+            )
 
 
 async def main():

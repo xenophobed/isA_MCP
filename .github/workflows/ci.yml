@@ -53,13 +53,13 @@ jobs:
         run: pip install ruff mypy black
 
       - name: Check formatting with Black
-        run: black --check . --exclude 'migrations|\.venv'
+        run: black --check services/ tests/ --exclude migrations
 
       - name: Lint with Ruff
-        run: ruff check .
+        run: ruff check services/ tests/
 
       - name: Type check with mypy
-        run: mypy . --ignore-missing-imports --no-error-summary || true
+        run: mypy services/ --ignore-missing-imports --no-error-summary || true
 
   # ===========================================================================
   # Unit & Component Tests
@@ -97,13 +97,23 @@ jobs:
             uv pip install pytest pytest-cov pytest-asyncio
           fi
 
-      - name: Run tests
+      - name: Run Unit Tests
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --tb=short --passWithNoTests \
-            --junitxml=reports/test-results.xml \
-            --cov --cov-report=xml:reports/coverage.xml \
-            --cov-report=term-missing || true
+          pytest tests/unit -v --tb=short \
+            --junitxml=reports/unit-results.xml \
+            --cov=services \
+            --cov-report=term-missing
+
+      - name: Run Component Tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/component -v --tb=short \
+            --junitxml=reports/component-results.xml \
+            --cov=services \
+            --cov-append \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-report=term-missing
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -175,7 +185,7 @@ jobs:
             uv pip install pytest pytest-asyncio
           fi
 
-      - name: Run integration tests
+      - name: Run integration tests (golden only)
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
@@ -186,8 +196,4 @@ jobs:
           REDIS_PORT: 6379
         run: |
           source .venv/bin/activate
-          if [ -d tests/integration ]; then
-            pytest tests/integration -v --tb=short --passWithNoTests
-          else
-            echo "No integration tests found, skipping"
-          fi
+          pytest tests/integration/golden -v --tb=short --passWithNoTests

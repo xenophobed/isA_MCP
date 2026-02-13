@@ -9,7 +9,7 @@ PROJECT DESCRIPTION:
 
 INPUTS:
     - Tool execution requests and results
-    - User authentication and authorization events  
+    - User authentication and authorization events
     - System performance metrics and resource usage
     - Security events and rate limiting triggers
     - Request timing and execution duration data
@@ -30,28 +30,28 @@ FUNCTIONALITY:
       * Request history with detailed context logging
       * User activity monitoring and behavioral analysis
       * Tool usage patterns and performance insights
-    
+
     - Performance Metrics Collection:
       * Response time measurement and statistics
       * Execution duration tracking for optimization
       * Resource utilization monitoring and alerting
       * Throughput analysis and capacity metrics
       * System uptime and availability tracking
-    
+
     - Rate Limiting and Abuse Prevention:
       * Sliding window rate limiting implementation
       * Per-user and per-tool rate limit enforcement
       * Configurable rate limiting policies and thresholds
       * Rate limit violation detection and response
       * Adaptive rate limiting based on system load
-    
+
     - Security and Audit Monitoring:
       * Security violation detection and logging
       * Authorization request tracking and analysis
       * Authentication failure monitoring and alerting
       * Suspicious activity pattern detection
       * Compliance audit trail maintenance
-    
+
     - Health and Operational Monitoring:
       * System health checks and status reporting
       * Service availability monitoring and alerting
@@ -87,24 +87,25 @@ MONITORING CATEGORIES:
 
 USAGE:
     from core.monitoring import monitor_manager
-    
+
     # Log request for monitoring
     monitor_manager.log_request(
         tool_name="analyze_data",
-        user_id="user123", 
+        user_id="user123",
         success=True,
         execution_time=1.23,
         security_level="MEDIUM"
     )
-    
+
     # Check rate limits
     if monitor_manager.check_rate_limit("tool_name", "user_id", policy):
         # Process request
         pass
-    
+
     # Get current metrics
     metrics = monitor_manager.get_metrics()
 """
+
 import time
 import logging
 from datetime import datetime
@@ -112,6 +113,7 @@ from typing import Dict
 
 # Import here to avoid circular imports when needed
 logger = logging.getLogger(__name__)
+
 
 class MonitoringManager:
     def __init__(self):
@@ -122,68 +124,71 @@ class MonitoringManager:
             "authorization_requests": 0,
             "denied_requests": 0,
             "security_violations": 0,
-            "rate_limit_hits": 0
+            "rate_limit_hits": 0,
         }
         self.request_history = []
         self.rate_limiter = {}
         self.start_time = time.time()
-    
-    def log_request(self, tool_name: str, user_id: str, success: bool, 
-                   execution_time: float, security_level):
+
+    def log_request(
+        self, tool_name: str, user_id: str, success: bool, execution_time: float, security_level
+    ):
         """Log a request for monitoring"""
         self.metrics["total_requests"] += 1
         if success:
             self.metrics["successful_requests"] += 1
         else:
             self.metrics["failed_requests"] += 1
-            
+
         request_log = {
             "timestamp": datetime.now().isoformat(),
             "tool_name": tool_name,
             "user_id": user_id,
             "success": success,
             "execution_time": execution_time,
-            "security_level": security_level.name if hasattr(security_level, 'name') else str(security_level)
+            "security_level": (
+                security_level.name if hasattr(security_level, "name") else str(security_level)
+            ),
         }
-        
+
         self.request_history.append(request_log)
-        
+
         # Keep only last 1000 requests
         if len(self.request_history) > 1000:
             self.request_history.pop(0)
-    
+
     def check_rate_limit(self, tool_name: str, user_id: str, policy) -> bool:
         """Check if request is within rate limits"""
         key = f"{user_id}:{tool_name}"
         now = time.time()
-        
+
         limit_config = policy.rate_limits.get(tool_name, policy.rate_limits["default"])
         window = limit_config["window"]
         max_calls = limit_config["calls"]
-        
+
         if key not in self.rate_limiter:
             self.rate_limiter[key] = []
-        
+
         # Clean old entries
         self.rate_limiter[key] = [
-            timestamp for timestamp in self.rate_limiter[key] 
-            if now - timestamp < window
+            timestamp for timestamp in self.rate_limiter[key] if now - timestamp < window
         ]
-        
+
         if len(self.rate_limiter[key]) >= max_calls:
             self.metrics["rate_limit_hits"] += 1
             return False
-            
+
         self.rate_limiter[key].append(now)
         return True
-    
+
     def get_metrics(self) -> Dict:
         """Get current metrics"""
         return {
             **self.metrics,
             "recent_requests": self.request_history[-10:],  # Last 10 requests
-            "uptime": time.time() - self.start_time
+            "uptime": time.time() - self.start_time,
         }
+
 
 # Global instance (will be initialized by the server)
 monitor_manager = MonitoringManager()

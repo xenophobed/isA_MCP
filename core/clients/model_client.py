@@ -18,7 +18,9 @@ logger = get_logger(__name__)
 
 # Internal service authentication headers
 # These identify MCP as an internal service when calling isA_Model
-INTERNAL_SERVICE_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "dev-internal-secret-change-in-production")
+INTERNAL_SERVICE_SECRET = os.getenv(
+    "INTERNAL_SERVICE_SECRET", "dev-internal-secret-change-in-production"
+)
 INTERNAL_SERVICE_HEADERS = {
     "X-Internal-Service": "true",
     "X-Internal-Service-Secret": INTERNAL_SERVICE_SECRET,
@@ -27,6 +29,7 @@ INTERNAL_SERVICE_HEADERS = {
 
 try:
     from isa_model.inference_client import AsyncISAModel
+
     ISA_MODEL_AVAILABLE = True
 except ImportError:
     ISA_MODEL_AVAILABLE = False
@@ -91,52 +94,51 @@ def _create_client(**kwargs) -> AsyncISAModel:
     4. Default localhost:8082
     """
     try:
-            from core.config import get_settings
-            settings = get_settings()
+        from core.config import get_settings
 
-            # Priority 1: Explicit kwargs override everything
-            base_url = kwargs.get('base_url')
-            api_key = kwargs.get('api_key')
+        settings = get_settings()
 
-            # Priority 2: Use centralized MCPConfig settings
-            if not base_url:
-                base_url = settings.isa_service_url
-            if not api_key:
-                api_key = settings.isa_api_key
+        # Priority 1: Explicit kwargs override everything
+        base_url = kwargs.get("base_url")
+        api_key = kwargs.get("api_key")
 
-            # Priority 3: Consul discovery only if still no URL
-            if not base_url:
-                try:
-                    from isa_common.consul_client import ConsulRegistry
+        # Priority 2: Use centralized MCPConfig settings
+        if not base_url:
+            base_url = settings.isa_service_url
+        if not api_key:
+            api_key = settings.isa_api_key
 
-                    consul_registry = ConsulRegistry(
-                        service_name='model_service',
-                        consul_host=settings.consul.host,
-                        consul_port=settings.consul.port
-                    )
-                    consul_url = consul_registry.get_service_endpoint('model_service')
-                    if consul_url:
-                        logger.info(f"🔍 Consul discovered ISA Model service: {consul_url}")
-                        base_url = consul_url
-                except Exception as consul_error:
-                    logger.debug(f"Consul discovery not available: {consul_error}")
+        # Priority 3: Consul discovery only if still no URL
+        if not base_url:
+            try:
+                from isa_common.consul_client import ConsulRegistry
 
-            # Priority 4: Default fallback
-            if not base_url:
-                base_url = "http://localhost:8082"
-                logger.warning(f"No ISA_SERVICE_URL configured, using default: {base_url}")
+                consul_registry = ConsulRegistry(
+                    service_name="model_service",
+                    consul_host=settings.consul.host,
+                    consul_port=settings.consul.port,
+                )
+                consul_url = consul_registry.get_service_endpoint("model_service")
+                if consul_url:
+                    logger.info(f"🔍 Consul discovered ISA Model service: {consul_url}")
+                    base_url = consul_url
+            except Exception as consul_error:
+                logger.debug(f"Consul discovery not available: {consul_error}")
 
-            # Create AsyncISAModel client with internal service headers
-            # This identifies MCP as an internal service for billing bypass
-            client = AsyncISAModel(
-                base_url=base_url,
-                api_key=api_key,
-                extra_headers=INTERNAL_SERVICE_HEADERS
-            )
+        # Priority 4: Default fallback
+        if not base_url:
+            base_url = "http://localhost:8082"
+            logger.warning(f"No ISA_SERVICE_URL configured, using default: {base_url}")
 
-            logger.debug(f"AsyncISAModel client created: {base_url}")
+        # Create AsyncISAModel client with internal service headers
+        # This identifies MCP as an internal service for billing bypass
+        client = AsyncISAModel(
+            base_url=base_url, api_key=api_key, extra_headers=INTERNAL_SERVICE_HEADERS
+        )
 
-            return client
+        logger.debug(f"AsyncISAModel client created: {base_url}")
+
+        return client
 
     except Exception as e:
         logger.error(f"Failed to create AsyncISAModel client: {e}")
@@ -151,7 +153,7 @@ async def reset_client():
         if _client_instance:
             try:
                 # Close the client if it has cleanup methods
-                if hasattr(_client_instance, '__aexit__'):
+                if hasattr(_client_instance, "__aexit__"):
                     await _client_instance.__aexit__(None, None, None)
             except Exception as e:
                 logger.error(f"Error closing client: {e}")
@@ -215,8 +217,8 @@ async def get_isa_client(**kwargs) -> AsyncISAModel:
 
 # Exports
 __all__ = [
-    'get_model_client',
-    'get_isa_client',  # Backward compatibility
-    'reset_client',
-    'AsyncISAModel'
+    "get_model_client",
+    "get_isa_client",  # Backward compatibility
+    "reset_client",
+    "AsyncISAModel",
 ]

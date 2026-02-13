@@ -3,6 +3,7 @@ Root conftest for isA_MCP tests.
 
 This file ensures the project root is in sys.path for proper imports.
 """
+
 import sys
 from pathlib import Path
 

@@ -12,6 +12,7 @@ Usage:
 
 Run 'isa_mcp --help' for full command list.
 """
+
 import sys
 from pathlib import Path
 
@@ -25,6 +26,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # =========================================================================
 # Main CLI Group
 # =========================================================================
+
 
 @click.group()
 @click.version_option(version="1.0.0", prog_name="isa-mcp")
@@ -52,6 +54,7 @@ def cli(ctx, verbose):
 # Import and Register Command Groups
 # =========================================================================
 
+
 def register_commands():
     """Register all command groups."""
     from isa_mcp.cli.skills import skill
@@ -73,6 +76,7 @@ def register_commands():
 # Quick Shortcut Commands
 # =========================================================================
 
+
 @cli.command("install")
 @click.argument("name")
 @click.option("--version", "-v", default=None, help="Specific version")
@@ -85,6 +89,7 @@ def quick_install(ctx, name: str, version: str):
       isa_mcp install remotion-dev/skills
     """
     from isa_mcp.cli.skills import skill_install
+
     ctx.invoke(skill_install, name=name, version=version, source="auto", force=False)
 
 
@@ -99,12 +104,14 @@ def quick_search(ctx, query: str):
       isa_mcp search video
     """
     from isa_mcp.cli.skills import skill_search
+
     ctx.invoke(skill_search, query=query, source="all", limit=10)
 
 
 # =========================================================================
 # Entry Point
 # =========================================================================
+
 
 def main():
     """Main entry point for CLI."""

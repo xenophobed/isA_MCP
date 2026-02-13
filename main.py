@@ -44,12 +44,13 @@ mcp = None
 # 4. Lifespan handler for async initialization
 # ==============================================================================
 
+
 class SmartMCPServer:
     """MCP Server with smart hot reload support"""
 
     def __init__(self):
         self.startup_time = datetime.now()
-        self.reload_count = int(os.getenv('SERVER_RELOAD_COUNT', '0'))
+        self.reload_count = int(os.getenv("SERVER_RELOAD_COUNT", "0"))
         self.mcp = None
         self.internal_mcp = None  # Internal MCP with all tools (for meta_tools_only mode)
 
@@ -71,6 +72,7 @@ class SmartMCPServer:
                             but accessible via the execute meta-tool.
         """
         import time as _time
+
         _startup_start = _time.monotonic()
 
         mode_label = "stdio fast" if skip_sync else "HTTP full"
@@ -102,6 +104,7 @@ class SmartMCPServer:
 
             # Register only the meta-tools, passing internal_mcp for tool execution
             from tools.meta_tools.discovery_tools import register_discovery_tools
+
             register_discovery_tools(self.mcp, internal_mcp=self.internal_mcp)
 
             # Register aggregator tools for external MCP server management
@@ -110,7 +113,9 @@ class SmartMCPServer:
                 from services.aggregator_service import create_aggregator_service
                 from tools.meta_tools.aggregator_tools import register_aggregator_tools
 
-                self.aggregator_service = await create_aggregator_service(enable_classification=True)
+                self.aggregator_service = await create_aggregator_service(
+                    enable_classification=True
+                )
                 register_aggregator_tools(self.mcp, self.aggregator_service)
                 logger.debug("  Aggregator tools registered")
             except Exception as e:
@@ -118,7 +123,9 @@ class SmartMCPServer:
                 self.aggregator_service = None
 
             external_tools = await self.mcp.list_tools()
-            logger.info(f"  Meta-tools: {len(external_tools)} visible, {len(internal_tools)} hidden")
+            logger.info(
+                f"  Meta-tools: {len(external_tools)} visible, {len(internal_tools)} hidden"
+            )
 
         else:
             # ===================================================================
@@ -138,7 +145,10 @@ class SmartMCPServer:
             logger.debug("Initializing Aggregator Service for external MCP servers...")
             try:
                 from services.aggregator_service import create_aggregator_service
-                self.aggregator_service = await create_aggregator_service(enable_classification=True)
+
+                self.aggregator_service = await create_aggregator_service(
+                    enable_classification=True
+                )
                 logger.debug("  Aggregator service initialized")
             except Exception as e:
                 logger.debug(f"  Aggregator service not available: {e}")
@@ -149,7 +159,9 @@ class SmartMCPServer:
         prompts = await self.mcp.list_prompts()
         resources = await self.mcp.list_resources()
 
-        logger.info(f"  Registered: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
+        logger.info(
+            f"  Registered: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources"
+        )
 
         # Skip Consul and sync for stdio mode (not needed, saves ~3 seconds)
         if skip_sync:
@@ -167,19 +179,19 @@ class SmartMCPServer:
 
                 # Merge service metadata
                 consul_meta = {
-                    'version': SERVICE_METADATA['version'],
-                    'capabilities': ','.join(SERVICE_METADATA['capabilities']),
-                    **route_meta
+                    "version": SERVICE_METADATA["version"],
+                    "capabilities": ",".join(SERVICE_METADATA["capabilities"]),
+                    **route_meta,
                 }
 
                 self.consul_registry = ConsulRegistry(
-                    service_name=SERVICE_METADATA['service_name'],
+                    service_name=SERVICE_METADATA["service_name"],
                     service_port=settings.port,
                     consul_host=settings.consul.host,
                     consul_port=settings.consul.port,
-                    tags=SERVICE_METADATA['tags'],
+                    tags=SERVICE_METADATA["tags"],
                     meta=consul_meta,
-                    health_check_type='ttl'  # Use TTL for reliable health checks in K8s
+                    health_check_type="ttl",  # Use TTL for reliable health checks in K8s
                 )
                 self.consul_registry.register()
                 self.consul_registry.start_maintenance()  # Start background TTL heartbeat
@@ -205,13 +217,17 @@ class SmartMCPServer:
         # Run initial sync
         logger.debug("Running initial sync from MCP Server to PostgreSQL + Qdrant...")
         sync_result = await self.sync_service.sync_all()
-        logger.info(f"  Sync: {sync_result.get('total_synced', 0)} updated, {sync_result.get('total_skipped', 0)} skipped, {sync_result.get('total_failed', 0)} failed")
+        logger.info(
+            f"  Sync: {sync_result.get('total_synced', 0)} updated, {sync_result.get('total_skipped', 0)} skipped, {sync_result.get('total_failed', 0)} failed"
+        )
 
         _elapsed = _time.monotonic() - _startup_start
         host = "0.0.0.0"
-        port = settings.port if hasattr(settings, 'port') else 8081
+        port = settings.port if hasattr(settings, "port") else 8081
         reload_info = "hot reload enabled" if not skip_sync else ""
-        logger.info(f"Server ready ({_elapsed:.1f}s) | http://{host}:{port} | {reload_info}".rstrip(" | "))
+        logger.info(
+            f"Server ready ({_elapsed:.1f}s) | http://{host}:{port} | {reload_info}".rstrip(" | ")
+        )
         return self.mcp
 
     async def get_server_info(self):
@@ -227,9 +243,10 @@ class SmartMCPServer:
             "capabilities_count": {
                 "tools": len(tools),
                 "prompts": len(prompts),
-                "resources": len(resources)
-            }
+                "resources": len(resources),
+            },
         }
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -273,6 +290,7 @@ async def lifespan(app):
 
             logger.info("Shutdown complete")
 
+
 # ==============================================================================
 # CREATE MCP APP AT MODULE LEVEL (Required for uvicorn --reload!)
 # ==============================================================================
@@ -303,10 +321,11 @@ app.add_middleware(
 
 # Step 5: Add auth middleware
 from core.auth.middleware import add_mcp_unified_auth_middleware
+
 auth_config = {
     "auth_service_url": settings.auth_service_url or "http://localhost:8000",
     "authorization_service_url": settings.authorization_service_url or "http://localhost:8203",
-    "require_auth": settings.require_auth
+    "require_auth": settings.require_auth,
 }
 add_mcp_unified_auth_middleware(app, auth_config)
 
@@ -316,6 +335,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 import json
 from core.auth.org_context import get_org_id
+
 
 async def health_check(request):
     """Health check endpoint"""
@@ -327,13 +347,16 @@ async def health_check(request):
 
     server_info = await smart_server.get_server_info()
 
-    return JSONResponse({
-        "status": "healthy",
-        "service": "Smart MCP Server",
-        "uptime": uptime_str,
-        "reload_count": smart_server.reload_count,
-        "capabilities": server_info["capabilities_count"]
-    })
+    return JSONResponse(
+        {
+            "status": "healthy",
+            "service": "Smart MCP Server",
+            "uptime": uptime_str,
+            "reload_count": smart_server.reload_count,
+            "capabilities": server_info["capabilities_count"],
+        }
+    )
+
 
 async def search_endpoint(request):
     """Hierarchical semantic search endpoint - Skill-based two-stage search"""
@@ -355,10 +378,14 @@ async def search_endpoint(request):
         include_schemas = data.get("include_schemas", True)
         strategy = data.get("strategy", "hierarchical")  # hierarchical/direct/hybrid
 
-        logger.info(f"[/search] Request: query='{query}', type={item_type}, limit={limit}, strategy={strategy}")
+        logger.info(
+            f"[/search] Request: query='{query}', type={item_type}, limit={limit}, strategy={strategy}"
+        )
 
         if not query or not smart_server:
-            logger.error(f"[/search] Invalid request: query={query}, smart_server={smart_server is not None}")
+            logger.error(
+                f"[/search] Invalid request: query={query}, smart_server={smart_server is not None}"
+            )
             return JSONResponse({"status": "error", "message": "Invalid request"})
 
         # Use hierarchical search service
@@ -372,9 +399,11 @@ async def search_endpoint(request):
                 skill_threshold=skill_threshold,
                 tool_threshold=tool_threshold,
                 include_schemas=include_schemas,
-                strategy=strategy
+                strategy=strategy,
             )
-            logger.info(f"[/search] HierarchicalSearchService returned {len(result.tools)} tools via {len(result.matched_skills)} skills")
+            logger.info(
+                f"[/search] HierarchicalSearchService returned {len(result.tools)} tools via {len(result.matched_skills)} skills"
+            )
 
             # Use the service's to_dict method for consistent serialization
             response_data = smart_server.search_service.to_dict(result)
@@ -394,7 +423,7 @@ async def search_endpoint(request):
                     "outputSchema": t.output_schema,
                     "annotations": t.annotations,
                     "skill_ids": t.skill_ids,
-                    "primary_skill_id": t.primary_skill_id
+                    "primary_skill_id": t.primary_skill_id,
                 }
                 for t in result.tools
             ]
@@ -424,10 +453,7 @@ async def sync_endpoint(request):
         logger.info("Manual sync triggered")
         sync_result = await smart_server.sync_service.sync_all()
 
-        return JSONResponse({
-            "status": "success",
-            "result": sync_result
-        })
+        return JSONResponse({"status": "success", "result": sync_result})
 
     except Exception as e:
         logger.error(f"Sync error: {e}")
@@ -439,13 +465,14 @@ async def progress_stream_endpoint(request):
     from starlette.responses import StreamingResponse
     import asyncio
 
-    operation_id = request.path_params.get('operation_id')
+    operation_id = request.path_params.get("operation_id")
 
     if not operation_id:
         return JSONResponse({"status": "error", "message": "operation_id required"})
 
     # Import ProgressManager
     from services.progress_service.progress_manager import ProgressManager
+
     progress_manager = ProgressManager()
 
     async def event_generator():
@@ -459,7 +486,7 @@ async def progress_stream_endpoint(request):
 
                 if not progress:
                     # Operation not found
-                    yield f"event: error\ndata: {{\"error\": \"Operation not found\"}}\n\n"
+                    yield f'event: error\ndata: {{"error": "Operation not found"}}\n\n'
                     break
 
                 # Convert to JSON
@@ -473,7 +500,7 @@ async def progress_stream_endpoint(request):
                     logger.info(f"SSE stream ending: {operation_id} status={progress.status}")
 
                     # Send completion event
-                    yield f"event: done\ndata: {{\"status\": \"{progress.status}\"}}\n\n"
+                    yield f'event: done\ndata: {{"status": "{progress.status}"}}\n\n'
                     break
 
                 # Wait 1 second before next update
@@ -481,7 +508,7 @@ async def progress_stream_endpoint(request):
 
         except Exception as e:
             logger.error(f"SSE stream error for {operation_id}: {e}")
-            yield f"event: error\ndata: {{\"error\": \"{str(e)}\"}}\n\n"
+            yield f'event: error\ndata: {{"error": "{str(e)}"}}\n\n'
 
     return StreamingResponse(
         event_generator(),
@@ -490,13 +517,14 @@ async def progress_stream_endpoint(request):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-        }
+        },
     )
 
 
 # ==============================================================================
 # SKILL API ENDPOINTS (/api/v1/skills/*)
 # ==============================================================================
+
 
 async def skills_list_endpoint(request):
     """GET /api/v1/skills - List all skill categories"""
@@ -512,15 +540,12 @@ async def skills_list_endpoint(request):
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
         skills = await service.list_skills(
-            is_active=is_active,
-            parent_domain=parent_domain,
-            limit=limit,
-            offset=offset
+            is_active=is_active, parent_domain=parent_domain, limit=limit, offset=offset
         )
 
         return JSONResponse([_serialize_record(s) for s in skills])
@@ -542,13 +567,12 @@ async def skills_create_endpoint(request):
         # Validate required fields
         if not data.get("id") or not data.get("name") or not data.get("description"):
             return JSONResponse(
-                {"detail": "id, name, and description are required"},
-                status_code=422
+                {"detail": "id, name, and description are required"}, status_code=422
             )
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -574,7 +598,7 @@ async def skills_get_endpoint(request):
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -600,7 +624,7 @@ async def skills_delete_endpoint(request):
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -626,7 +650,7 @@ async def skills_tools_endpoint(request):
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -655,13 +679,12 @@ async def skills_classify_endpoint(request):
         # Validate required fields
         if not data.get("tool_id") or not data.get("tool_name") or not data.get("tool_description"):
             return JSONResponse(
-                {"detail": "tool_id, tool_name, and tool_description are required"},
-                status_code=422
+                {"detail": "tool_id, tool_name, and tool_description are required"}, status_code=422
             )
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -669,7 +692,7 @@ async def skills_classify_endpoint(request):
             tool_id=data["tool_id"],
             tool_name=data["tool_name"],
             tool_description=data["tool_description"],
-            force_reclassify=data.get("force_reclassify", False)
+            force_reclassify=data.get("force_reclassify", False),
         )
 
         # Convert datetime to ISO string for JSON serialization
@@ -691,7 +714,7 @@ async def skills_suggestions_endpoint(request):
 
         repo = SkillRepository(
             host=settings.infrastructure.postgres_grpc_host,
-            port=settings.infrastructure.postgres_grpc_port
+            port=settings.infrastructure.postgres_grpc_port,
         )
         service = SkillService(repository=repo)
 
@@ -706,6 +729,7 @@ async def skills_suggestions_endpoint(request):
 # ==============================================================================
 # SEARCH API ENDPOINTS (/api/v1/search/*)
 # ==============================================================================
+
 
 async def api_search_endpoint(request):
     """POST /api/v1/search - Hierarchical search"""
@@ -730,17 +754,25 @@ async def api_search_endpoint(request):
         skill_threshold = data.get("skill_threshold", 0.4)
         tool_threshold = data.get("tool_threshold", 0.3)
         if skill_threshold < 0 or skill_threshold > 1:
-            return JSONResponse({"detail": "skill_threshold must be between 0 and 1"}, status_code=422)
+            return JSONResponse(
+                {"detail": "skill_threshold must be between 0 and 1"}, status_code=422
+            )
         if tool_threshold < 0 or tool_threshold > 1:
-            return JSONResponse({"detail": "tool_threshold must be between 0 and 1"}, status_code=422)
+            return JSONResponse(
+                {"detail": "tool_threshold must be between 0 and 1"}, status_code=422
+            )
 
         strategy = data.get("strategy", "hierarchical")
         if strategy not in ["hierarchical", "direct", "hybrid"]:
-            return JSONResponse({"detail": "strategy must be hierarchical, direct, or hybrid"}, status_code=422)
+            return JSONResponse(
+                {"detail": "strategy must be hierarchical, direct, or hybrid"}, status_code=422
+            )
 
         item_type = data.get("item_type")
         if item_type and item_type not in ["tool", "prompt", "resource"]:
-            return JSONResponse({"detail": "item_type must be tool, prompt, or resource"}, status_code=422)
+            return JSONResponse(
+                {"detail": "item_type must be tool, prompt, or resource"}, status_code=422
+            )
 
         if not smart_server or not smart_server.search_service:
             return JSONResponse({"detail": "Search service not ready"}, status_code=503)
@@ -755,7 +787,7 @@ async def api_search_endpoint(request):
             tool_threshold=tool_threshold,
             include_schemas=data.get("include_schemas", True),
             strategy=strategy,
-            org_id=org_id
+            org_id=org_id,
         )
 
         return JSONResponse(smart_server.search_service.to_dict(result))
@@ -781,21 +813,21 @@ async def search_skills_endpoint(request):
             return JSONResponse({"detail": "Search service not ready"}, status_code=503)
 
         skills = await smart_server.search_service.search_skills_only(
-            query=query,
-            limit=limit,
-            threshold=threshold
+            query=query, limit=limit, threshold=threshold
         )
 
-        return JSONResponse([
-            {
-                "id": s.id,
-                "name": s.name,
-                "description": s.description,
-                "score": s.score,
-                "tool_count": s.tool_count
-            }
-            for s in skills
-        ])
+        return JSONResponse(
+            [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "description": s.description,
+                    "score": s.score,
+                    "tool_count": s.tool_count,
+                }
+                for s in skills
+            ]
+        )
 
     except Exception as e:
         logger.error(f"Search skills error: {e}")
@@ -819,26 +851,24 @@ async def search_tools_endpoint(request):
             return JSONResponse({"detail": "Search service not ready"}, status_code=503)
 
         tools = await smart_server.search_service.search_tools_only(
-            query=query,
-            skill_ids=skill_ids,
-            item_type=item_type,
-            limit=limit,
-            threshold=threshold
+            query=query, skill_ids=skill_ids, item_type=item_type, limit=limit, threshold=threshold
         )
 
-        return JSONResponse([
-            {
-                "id": t.id,
-                "db_id": t.db_id,
-                "type": t.type,
-                "name": t.name,
-                "description": t.description,
-                "score": t.score,
-                "skill_ids": t.skill_ids,
-                "primary_skill_id": t.primary_skill_id
-            }
-            for t in tools
-        ])
+        return JSONResponse(
+            [
+                {
+                    "id": t.id,
+                    "db_id": t.db_id,
+                    "type": t.type,
+                    "name": t.name,
+                    "description": t.description,
+                    "score": t.score,
+                    "skill_ids": t.skill_ids,
+                    "primary_skill_id": t.primary_skill_id,
+                }
+                for t in tools
+            ]
+        )
 
     except Exception as e:
         logger.error(f"Search tools error: {e}")
@@ -849,6 +879,7 @@ def _serialize_record(record: dict) -> dict:
     """Serialize a database record for JSON response, converting datetime/Decimal fields."""
     from datetime import datetime, date
     from decimal import Decimal
+
     result = {}
     for key, value in record.items():
         if isinstance(value, datetime):
@@ -857,7 +888,7 @@ def _serialize_record(record: dict) -> dict:
             result[key] = value.isoformat()
         elif isinstance(value, Decimal):
             result[key] = float(value)
-        elif hasattr(value, 'value'):  # Enum
+        elif hasattr(value, "value"):  # Enum
             result[key] = value.value
         else:
             result[key] = value
@@ -887,10 +918,7 @@ async def get_default_tools_endpoint(request):
         # Serialize datetime fields for JSON response
         serialized_tools = [_serialize_tool(t) for t in default_tools]
 
-        return JSONResponse({
-            "tools": serialized_tools,
-            "count": len(serialized_tools)
-        })
+        return JSONResponse({"tools": serialized_tools, "count": len(serialized_tools)})
 
     except Exception as e:
         logger.error(f"Get default tools error: {e}")
@@ -900,6 +928,7 @@ async def get_default_tools_endpoint(request):
 # ==============================================================================
 # AGGREGATOR API ENDPOINTS (/api/v1/aggregator/*)
 # ==============================================================================
+
 
 def _serialize_server(server: dict) -> dict:
     """Serialize server dict for JSON response."""
@@ -915,10 +944,13 @@ async def aggregator_list_servers_endpoint(request):
         status_filter = request.query_params.get("status")
         if status_filter:
             from tests.contracts.aggregator.data_contract import ServerStatus
+
             status_filter = ServerStatus(status_filter)
 
         org_id = get_org_id(request)
-        servers = await smart_server.aggregator_service.list_servers(status=status_filter, org_id=org_id)
+        servers = await smart_server.aggregator_service.list_servers(
+            status=status_filter, org_id=org_id
+        )
         return JSONResponse([_serialize_server(s) for s in servers])
 
     except Exception as e:
@@ -936,10 +968,7 @@ async def aggregator_register_server_endpoint(request):
         data = json.loads(body) if body else {}
 
         if not data.get("name") or not data.get("transport_type"):
-            return JSONResponse(
-                {"detail": "name and transport_type are required"},
-                status_code=422
-            )
+            return JSONResponse({"detail": "name and transport_type are required"}, status_code=422)
 
         # Inject org_id from auth context into server config
         org_id = get_org_id(request)
@@ -1067,16 +1096,26 @@ app.router.routes.append(Route("/health", health_check))
 # /discover endpoint removed - use /search instead
 app.router.routes.append(Route("/search", search_endpoint, methods=["POST", "OPTIONS"]))  # Legacy
 app.router.routes.append(Route("/sync", sync_endpoint, methods=["POST", "OPTIONS"]))
-app.router.routes.append(Route("/progress/{operation_id}/stream", progress_stream_endpoint, methods=["GET"]))
+app.router.routes.append(
+    Route("/progress/{operation_id}/stream", progress_stream_endpoint, methods=["GET"])
+)
 
 # Skill API endpoints
 app.router.routes.append(Route("/api/v1/skills", skills_list_endpoint, methods=["GET"]))
 app.router.routes.append(Route("/api/v1/skills", skills_create_endpoint, methods=["POST"]))
-app.router.routes.append(Route("/api/v1/skills/classify", skills_classify_endpoint, methods=["POST"]))
-app.router.routes.append(Route("/api/v1/skills/suggestions", skills_suggestions_endpoint, methods=["GET"]))
+app.router.routes.append(
+    Route("/api/v1/skills/classify", skills_classify_endpoint, methods=["POST"])
+)
+app.router.routes.append(
+    Route("/api/v1/skills/suggestions", skills_suggestions_endpoint, methods=["GET"])
+)
 app.router.routes.append(Route("/api/v1/skills/{skill_id}", skills_get_endpoint, methods=["GET"]))
-app.router.routes.append(Route("/api/v1/skills/{skill_id}", skills_delete_endpoint, methods=["DELETE"]))
-app.router.routes.append(Route("/api/v1/skills/{skill_id}/tools", skills_tools_endpoint, methods=["GET"]))
+app.router.routes.append(
+    Route("/api/v1/skills/{skill_id}", skills_delete_endpoint, methods=["DELETE"])
+)
+app.router.routes.append(
+    Route("/api/v1/skills/{skill_id}/tools", skills_tools_endpoint, methods=["GET"])
+)
 
 # Search API endpoints
 app.router.routes.append(Route("/api/v1/search", api_search_endpoint, methods=["POST", "OPTIONS"]))
@@ -1084,21 +1123,56 @@ app.router.routes.append(Route("/api/v1/search/skills", search_skills_endpoint, 
 app.router.routes.append(Route("/api/v1/search/tools", search_tools_endpoint, methods=["GET"]))
 
 # Tools API endpoints
-app.router.routes.append(Route("/api/v1/tools/defaults", get_default_tools_endpoint, methods=["GET"]))
+app.router.routes.append(
+    Route("/api/v1/tools/defaults", get_default_tools_endpoint, methods=["GET"])
+)
 
 # Aggregator API endpoints
-app.router.routes.append(Route("/api/v1/aggregator/servers", aggregator_list_servers_endpoint, methods=["GET"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers", aggregator_register_server_endpoint, methods=["POST"]))
-app.router.routes.append(Route("/api/v1/aggregator/health", aggregator_health_endpoint, methods=["GET"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}", aggregator_get_server_endpoint, methods=["GET"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}", aggregator_remove_server_endpoint, methods=["DELETE"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/connect", aggregator_connect_server_endpoint, methods=["POST"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/disconnect", aggregator_disconnect_server_endpoint, methods=["POST"]))
-app.router.routes.append(Route("/api/v1/aggregator/servers/{server_id}/refresh", aggregator_refresh_server_endpoint, methods=["POST"]))
+app.router.routes.append(
+    Route("/api/v1/aggregator/servers", aggregator_list_servers_endpoint, methods=["GET"])
+)
+app.router.routes.append(
+    Route("/api/v1/aggregator/servers", aggregator_register_server_endpoint, methods=["POST"])
+)
+app.router.routes.append(
+    Route("/api/v1/aggregator/health", aggregator_health_endpoint, methods=["GET"])
+)
+app.router.routes.append(
+    Route("/api/v1/aggregator/servers/{server_id}", aggregator_get_server_endpoint, methods=["GET"])
+)
+app.router.routes.append(
+    Route(
+        "/api/v1/aggregator/servers/{server_id}",
+        aggregator_remove_server_endpoint,
+        methods=["DELETE"],
+    )
+)
+app.router.routes.append(
+    Route(
+        "/api/v1/aggregator/servers/{server_id}/connect",
+        aggregator_connect_server_endpoint,
+        methods=["POST"],
+    )
+)
+app.router.routes.append(
+    Route(
+        "/api/v1/aggregator/servers/{server_id}/disconnect",
+        aggregator_disconnect_server_endpoint,
+        methods=["POST"],
+    )
+)
+app.router.routes.append(
+    Route(
+        "/api/v1/aggregator/servers/{server_id}/refresh",
+        aggregator_refresh_server_endpoint,
+        methods=["POST"],
+    )
+)
 
 # ==============================================================================
 # DIRECT EXECUTION (for testing)
 # ==============================================================================
+
 
 async def run_stdio(meta_tools_only: bool = False):
     """Run as stdio MCP server (for Claude Code / isA_Vibe integration)
@@ -1140,9 +1214,13 @@ async def run_stdio(meta_tools_only: bool = False):
 
     if meta_tools_only and smart_server.internal_mcp:
         internal_tools = await smart_server.internal_mcp.list_tools()
-        logger.info(f"isA_MCP stdio ready: {len(tools)} meta-tools visible, {len(internal_tools)} hidden")
+        logger.info(
+            f"isA_MCP stdio ready: {len(tools)} meta-tools visible, {len(internal_tools)} hidden"
+        )
     else:
-        logger.info(f"isA_MCP stdio ready: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources")
+        logger.info(
+            f"isA_MCP stdio ready: {len(tools)} tools, {len(prompts)} prompts, {len(resources)} resources"
+        )
 
     # Run stdio server - this blocks until stdin closes
     # FastMCP provides run_stdio_async() for stdio transport
@@ -1179,8 +1257,14 @@ def main():
 
     parser = argparse.ArgumentParser(description="isA_MCP Server")
     parser.add_argument("--port", "-p", type=int, default=8081, help="HTTP server port")
-    parser.add_argument("--stdio", action="store_true", help="Run as stdio MCP server (for Claude Code integration)")
-    parser.add_argument("--meta-tools-only", action="store_true", help="Only expose 8 meta-tools (discover, get_tool_schema, execute, list_skills)")
+    parser.add_argument(
+        "--stdio", action="store_true", help="Run as stdio MCP server (for Claude Code integration)"
+    )
+    parser.add_argument(
+        "--meta-tools-only",
+        action="store_true",
+        help="Only expose 8 meta-tools (discover, get_tool_schema, execute, list_skills)",
+    )
     args = parser.parse_args()
 
     if args.stdio:
@@ -1196,7 +1280,7 @@ def main():
             host="0.0.0.0",
             port=args.port,
             reload=True,  # Enable hot reload
-            log_level="info"
+            log_level="info",
         )
 
 

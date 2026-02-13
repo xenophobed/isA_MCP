@@ -8,6 +8,7 @@ Commands:
     isa_mcp server health <name>    Check server health
     isa_mcp server tools <name>     List tools from a server
 """
+
 import asyncio
 import json
 import sys
@@ -30,6 +31,7 @@ def get_aggregator_service():
     """Get AggregatorService instance."""
     try:
         from services.aggregator_service.aggregator_service import AggregatorService
+
         return AggregatorService()
     except ImportError as e:
         click.echo(click.style(f"Error: Could not import AggregatorService: {e}", fg="red"))
@@ -63,6 +65,7 @@ def do_sync_tools(verbose: bool = False):
 # Server Command Group
 # =========================================================================
 
+
 @click.group()
 def server():
     """Manage external MCP servers."""
@@ -73,18 +76,27 @@ def server():
 @click.argument("name")
 @click.option("--url", "-u", required=True, help="Server URL (e.g., http://localhost:8082)")
 @click.option(
-    "--transport", "-t",
+    "--transport",
+    "-t",
     type=click.Choice(["sse", "stdio", "http"], case_sensitive=False),
     default="sse",
-    help="Transport type (default: sse)"
+    help="Transport type (default: sse)",
 )
 @click.option("--command", "-c", default=None, help="Command for stdio transport")
 @click.option("--args", "-a", default=None, help="Args for stdio transport (JSON array)")
 @click.option("--env", "-e", multiple=True, help="Environment variables (KEY=VALUE)")
 @click.option("--auto-connect/--no-auto-connect", default=True, help="Auto-connect after adding")
 @click.option("--sync/--no-sync", default=True, help="Auto-sync tools after adding (default: sync)")
-def server_add(name: str, url: str, transport: str, command: Optional[str],
-               args: Optional[str], env: tuple, auto_connect: bool, sync: bool):
+def server_add(
+    name: str,
+    url: str,
+    transport: str,
+    command: Optional[str],
+    args: Optional[str],
+    env: tuple,
+    auto_connect: bool,
+    sync: bool,
+):
     """
     Add/register an external MCP server.
 
@@ -135,10 +147,7 @@ def server_add(name: str, url: str, transport: str, command: Optional[str],
     async def do_add():
         service = get_aggregator_service()
         result = await service.register_server(
-            name=name,
-            transport_type=transport.upper(),
-            config=config,
-            auto_connect=auto_connect
+            name=name, transport_type=transport.upper(), config=config, auto_connect=auto_connect
         )
         return result
 
@@ -210,6 +219,7 @@ def server_list(as_json: bool, verbose: bool):
       isa_mcp server list --json
       isa_mcp server list -v
     """
+
     async def do_list():
         service = get_aggregator_service()
         return await service.list_servers()
@@ -260,6 +270,7 @@ def server_health(name: str):
     Example:
       isa_mcp server health my-server
     """
+
     async def do_health():
         service = get_aggregator_service()
         return await service.health_check(name)
@@ -290,6 +301,7 @@ def server_tools(name: str, as_json: bool):
     Example:
       isa_mcp server tools my-server
     """
+
     async def do_list_tools():
         service = get_aggregator_service()
         return await service.list_server_tools(name)
@@ -309,7 +321,7 @@ def server_tools(name: str, as_json: bool):
 
         for t in tools:
             click.echo(f"  {click.style(t['name'], fg='green')}")
-            desc = t.get('description', 'No description')
+            desc = t.get("description", "No description")
             click.echo(f"    {desc[:70]}{'...' if len(desc) > 70 else ''}")
 
     except Exception as e:
@@ -326,6 +338,7 @@ def server_connect(name: str):
     Example:
       isa_mcp server connect my-server
     """
+
     async def do_connect():
         service = get_aggregator_service()
         return await service.connect_server(name)
@@ -353,6 +366,7 @@ def server_disconnect(name: str):
     Example:
       isa_mcp server disconnect my-server
     """
+
     async def do_disconnect():
         service = get_aggregator_service()
         return await service.disconnect_server(name)

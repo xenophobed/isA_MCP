@@ -8,93 +8,89 @@ from typing import List, Dict, Any
 
 # 定义所有路由
 SERVICE_ROUTES = [
-    {
-        "path": "/",
-        "methods": ["GET"],
-        "auth_required": False,
-        "description": "Root health check"
-    },
+    {"path": "/", "methods": ["GET"], "auth_required": False, "description": "Root health check"},
     {
         "path": "/health",
         "methods": ["GET"],
         "auth_required": False,
-        "description": "Service health check"
+        "description": "Service health check",
     },
     {
         "path": "/mcp",
         "methods": ["GET", "POST", "OPTIONS"],
         "auth_required": True,
-        "description": "MCP Protocol endpoint - main MCP interface"
+        "description": "MCP Protocol endpoint - main MCP interface",
     },
     {
         "path": "/search",
         "methods": ["POST", "OPTIONS"],
         "auth_required": True,
-        "description": "Semantic search for tools/prompts/resources using Qdrant"
+        "description": "Semantic search for tools/prompts/resources using Qdrant",
     },
     {
         "path": "/sync",
         "methods": ["POST", "OPTIONS"],
         "auth_required": True,
-        "description": "Manual sync trigger for PostgreSQL + Qdrant"
+        "description": "Manual sync trigger for PostgreSQL + Qdrant",
     },
     {
         "path": "/progress/{operation_id}/stream",
         "methods": ["GET"],
         "auth_required": True,
-        "description": "SSE streaming endpoint for real-time progress updates"
+        "description": "SSE streaming endpoint for real-time progress updates",
     },
     # Skill API endpoints
     {
         "path": "/api/v1/skills",
         "methods": ["GET", "POST"],
         "auth_required": True,
-        "description": "List or create skill categories"
+        "description": "List or create skill categories",
     },
     {
         "path": "/api/v1/skills/{skill_id}",
         "methods": ["GET", "DELETE"],
         "auth_required": True,
-        "description": "Get or delete skill by ID"
+        "description": "Get or delete skill by ID",
     },
     {
         "path": "/api/v1/skills/{skill_id}/tools",
         "methods": ["GET"],
         "auth_required": True,
-        "description": "Get tools in a skill category"
+        "description": "Get tools in a skill category",
     },
     {
         "path": "/api/v1/skills/classify",
         "methods": ["POST"],
         "auth_required": True,
-        "description": "Classify a tool into skill categories"
+        "description": "Classify a tool into skill categories",
     },
     {
         "path": "/api/v1/skills/suggestions",
         "methods": ["GET"],
         "auth_required": True,
-        "description": "List pending skill suggestions"
+        "description": "List pending skill suggestions",
     },
     # Search API endpoints
     {
         "path": "/api/v1/search",
         "methods": ["POST", "OPTIONS"],
         "auth_required": True,
-        "description": "Hierarchical search with skill-based routing"
+        "description": "Hierarchical search with skill-based routing",
     },
     {
         "path": "/api/v1/search/skills",
         "methods": ["GET"],
         "auth_required": True,
-        "description": "Search skills only"
+        "description": "Search skills only",
     },
     {
         "path": "/api/v1/search/tools",
         "methods": ["GET"],
         "auth_required": True,
-        "description": "Search tools only with optional skill filter"
-    }
+        "description": "Search tools only with optional skill filter",
+    },
 ]
+
 
 def get_routes_for_consul() -> Dict[str, Any]:
     """
@@ -124,6 +120,7 @@ def get_routes_for_consul() -> Dict[str, Any]:
         "protected_count": str(sum(1 for r in SERVICE_ROUTES if r["auth_required"])),
     }
 
+
 # 服务元数据
 SERVICE_METADATA = {
     "service_name": "mcp_service",
@@ -134,6 +131,6 @@ SERVICE_METADATA = {
         "tool_discovery",
         "prompt_management",
         "resource_management",
-        "progress_tracking"
-    ]
+        "progress_tracking",
+    ],
 }

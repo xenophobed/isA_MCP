@@ -15,4 +15,4 @@ def get_org_id(request: Request) -> Optional[str]:
     Returns:
         Organization ID string, or None if not set (global-only access).
     """
-    return getattr(request.state, 'organization_id', None)
+    return getattr(request.state, "organization_id", None)

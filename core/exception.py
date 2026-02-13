@@ -35,7 +35,7 @@ FUNCTIONALITY:
       * DATABASE_ERROR: Database operation and connection failures
       * EXTERNAL_SERVICE_ERROR: Third-party service communication issues
       * CONFIGURATION_ERROR: System configuration and setup problems
-    
+
     - Hierarchical Exception Classes:
       * McpError: Base exception class with structured error data
       * AuthorizationError: Authentication and login requirement errors
@@ -46,7 +46,7 @@ FUNCTIONALITY:
       * ResourceNotFoundError: Missing resource and endpoint errors
       * ConfigurationError: System configuration problems
       * ExternalServiceError: External API and service failures
-    
+
     - Error Context and Debugging:
       * Structured error data with contextual information
       * Error chaining to preserve original exception causes
@@ -73,24 +73,24 @@ OPTIMIZATION POINTS:
 
 USAGE PATTERNS:
     The exception system is used throughout the isA MCP codebase:
-    
+
     1. **Authentication and Authorization** (core/auth.py, core/security.py):
        - AuthorizationError for missing authentication
        - AuthorizationDeniedError for insufficient permissions
        - SecurityViolationError for security policy breaches
-    
+
     2. **Input Validation** (core/utils.py, tools/*, services/*):
        - ValidationError for malformed data and invalid inputs
        - Used in email validation, user ID checking, JSON parsing
-    
+
     3. **Database Operations** (core/database/*):
        - DatabaseError for connection and query failures
        - ResourceNotFoundError for missing database records
-    
+
     4. **Admin Operations** (tools/general_tools/admin_tools.py):
        - McpError for unauthorized administrative access
        - Used in authorization request management
-    
+
     5. **External Services** (tools/services/*/):
        - ExternalServiceError for API communication failures
        - ConfigurationError for missing service credentials
@@ -100,32 +100,35 @@ USAGE:
         McpError, ValidationError, AuthorizationError,
         DatabaseError, SecurityViolationError
     )
-    
+
     # Input validation
     if not validate_email(email):
         raise ValidationError("Invalid email format", {"email": email})
-    
+
     # Authorization checking
     if not user_has_permission(user_id, "admin"):
         raise AuthorizationError("Admin access required")
-    
+
     # Database operations
     try:
         result = db.query(sql)
     except Exception as e:
         raise DatabaseError("Query failed", {"sql": sql}) from e
-    
+
     # JSON API responses
     try:
         process_request(data)
     except McpError as e:
         return JSONResponse(e.to_dict(), status_code=400)
 """
+
 from typing import Dict, Any, Optional
 from enum import Enum
 
+
 class ErrorCode(Enum):
     """Standard error codes for MCP operations"""
+
     UNKNOWN = "UNKNOWN"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     AUTHORIZATION_REQUIRED = "AUTHORIZATION_REQUIRED"
@@ -137,108 +140,88 @@ class ErrorCode(Enum):
     EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR"
     CONFIGURATION_ERROR = "CONFIGURATION_ERROR"
 
+
 class McpError(Exception):
     """Base MCP Error class with structured error information"""
+
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         error_code: ErrorCode = ErrorCode.UNKNOWN,
         data: Optional[Dict[str, Any]] = None,
-        cause: Optional[Exception] = None
+        cause: Optional[Exception] = None,
     ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code
         self.data = data or {}
         self.cause = cause
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert exception to dictionary for JSON serialization"""
         return {
-            "error": {
-                "code": self.error_code.value,
-                "message": self.message,
-                "data": self.data
-            }
+            "error": {"code": self.error_code.value, "message": self.message, "data": self.data}
         }
+
 
 class AuthorizationError(McpError):
     """Authorization related errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.AUTHORIZATION_REQUIRED, 
-            data
-        )
+        super().__init__(message, ErrorCode.AUTHORIZATION_REQUIRED, data)
+
 
 class AuthorizationDeniedError(McpError):
     """Authorization denied errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.AUTHORIZATION_DENIED, 
-            data
-        )
+        super().__init__(message, ErrorCode.AUTHORIZATION_DENIED, data)
+
 
 class RateLimitError(McpError):
     """Rate limiting errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.RATE_LIMIT_EXCEEDED, 
-            data
-        )
+        super().__init__(message, ErrorCode.RATE_LIMIT_EXCEEDED, data)
+
 
 class SecurityViolationError(McpError):
     """Security violation errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.SECURITY_VIOLATION, 
-            data
-        )
+        super().__init__(message, ErrorCode.SECURITY_VIOLATION, data)
+
 
 class ValidationError(McpError):
     """Input validation errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.VALIDATION_ERROR, 
-            data
-        )
+        super().__init__(message, ErrorCode.VALIDATION_ERROR, data)
+
 
 class DatabaseError(McpError):
     """Database operation errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.DATABASE_ERROR, 
-            data
-        )
+        super().__init__(message, ErrorCode.DATABASE_ERROR, data)
+
 
 class ResourceNotFoundError(McpError):
     """Resource not found errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.RESOURCE_NOT_FOUND, 
-            data
-        )
+        super().__init__(message, ErrorCode.RESOURCE_NOT_FOUND, data)
+
 
 class ConfigurationError(McpError):
     """Configuration related errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.CONFIGURATION_ERROR, 
-            data
-        )
+        super().__init__(message, ErrorCode.CONFIGURATION_ERROR, data)
+
 
 class ExternalServiceError(McpError):
     """External service errors"""
+
     def __init__(self, message: str, data: Optional[Dict[str, Any]] = None):
-        super().__init__(
-            message, 
-            ErrorCode.EXTERNAL_SERVICE_ERROR, 
-            data
-        )
+        super().__init__(message, ErrorCode.EXTERNAL_SERVICE_ERROR, data)

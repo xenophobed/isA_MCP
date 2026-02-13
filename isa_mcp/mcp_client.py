@@ -56,14 +56,16 @@ logger = logging.getLogger(__name__)
 
 class MCPClientMode(str, Enum):
     """MCP Client connection mode"""
-    HTTP = "http"      # Connect to HTTP server (default)
-    STDIO = "stdio"    # Spawn local process and communicate via stdio
-    AUTO = "auto"      # Try HTTP first, fallback to stdio
+
+    HTTP = "http"  # Connect to HTTP server (default)
+    STDIO = "stdio"  # Spawn local process and communicate via stdio
+    AUTO = "auto"  # Try HTTP first, fallback to stdio
 
 
 @dataclass
 class ToolMatch:
     """Represents a discovered tool match"""
+
     name: str
     type: str
     description: str
@@ -76,6 +78,7 @@ class ToolMatch:
 @dataclass
 class SearchResult:
     """Result from discover/search operation"""
+
     matches: List[ToolMatch]
     skills_matched: List[str]
     total_found: int
@@ -91,16 +94,19 @@ class SearchResult:
 
 class MCPClientError(Exception):
     """Base exception for MCP client errors"""
+
     pass
 
 
 class MCPConnectionError(MCPClientError):
     """Connection error"""
+
     pass
 
 
 class MCPToolError(MCPClientError):
     """Tool execution error"""
+
     pass
 
 
@@ -124,9 +130,9 @@ class AsyncMCPClient:
         self,
         base_url: str = "http://localhost:8081",
         timeout: float = 30.0,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ):
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.mcp_endpoint = f"{self.base_url}/mcp"
         self.search_endpoint = f"{self.base_url}/search"
         self.api_endpoint = f"{self.base_url}/api/v1"
@@ -160,7 +166,7 @@ class AsyncMCPClient:
         """Get request headers"""
         headers = {
             "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream"
+            "Accept": "application/json, text/event-stream",
         }
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
@@ -174,9 +180,9 @@ class AsyncMCPClient:
     def _parse_sse_response(self, response_text: str) -> Dict[str, Any]:
         """Parse Server-Sent Events response format"""
         if "data: " in response_text:
-            lines = response_text.strip().split('\n')
+            lines = response_text.strip().split("\n")
             for line in lines:
-                if line.startswith('data: '):
+                if line.startswith("data: "):
                     try:
                         return json.loads(line[6:])
                     except json.JSONDecodeError:
@@ -197,7 +203,7 @@ class AsyncMCPClient:
                 if "content" in result and len(result["content"]) > 0:
                     return {
                         "status": "error",
-                        "error": result["content"][0].get("text", "Unknown error")
+                        "error": result["content"][0].get("text", "Unknown error"),
                     }
 
             # Check for structuredContent (HIL tools, etc.)
@@ -218,10 +224,7 @@ class AsyncMCPClient:
 
         # JSON-RPC error
         if "error" in response:
-            return {
-                "status": "error",
-                "error": response["error"].get("message", "Unknown error")
-            }
+            return {"status": "error", "error": response["error"].get("message", "Unknown error")}
 
         return response
 
@@ -234,7 +237,7 @@ class AsyncMCPClient:
         query: str,
         item_type: Optional[str] = None,
         limit: int = 5,
-        strategy: str = "hierarchical"
+        strategy: str = "hierarchical",
     ) -> SearchResult:
         """
         Discover tools/prompts/resources using hierarchical semantic search.
@@ -259,20 +262,13 @@ class AsyncMCPClient:
         """
         await self._ensure_session()
 
-        payload = {
-            "query": query,
-            "limit": limit,
-            "strategy": strategy,
-            "include_schemas": False
-        }
+        payload = {"query": query, "limit": limit, "strategy": strategy, "include_schemas": False}
         if item_type:
             payload["item_type"] = item_type
 
         try:
             async with self._session.post(
-                f"{self.api_endpoint}/search",
-                json=payload,
-                headers=self._get_headers()
+                f"{self.api_endpoint}/search", json=payload, headers=self._get_headers()
             ) as response:
                 data = await response.json()
 
@@ -284,7 +280,7 @@ class AsyncMCPClient:
                         score=t.get("score", 0.0),
                         skill=t.get("primary_skill_id"),
                         input_schema=t.get("inputSchema"),
-                        output_schema=t.get("outputSchema")
+                        output_schema=t.get("outputSchema"),
                     )
                     for t in data.get("tools", [])
                 ]
@@ -292,9 +288,7 @@ class AsyncMCPClient:
                 skills = [s.get("id") for s in data.get("matched_skills", [])]
 
                 return SearchResult(
-                    matches=matches,
-                    skills_matched=skills,
-                    total_found=len(matches)
+                    matches=matches, skills_matched=skills, total_found=len(matches)
                 )
         except Exception as e:
             logger.error(f"discover() failed: {e}")
@@ -323,17 +317,13 @@ class AsyncMCPClient:
                     return {
                         "name": tool["name"],
                         "description": tool.get("description", ""),
-                        "input_schema": tool.get("inputSchema", {})
+                        "input_schema": tool.get("inputSchema", {}),
                     }
             return {"error": f"Tool '{tool_name}' not found"}
 
         return result
 
-    async def execute(
-        self,
-        tool_name: str,
-        parameters: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def execute(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a discovered tool.
 
@@ -348,10 +338,7 @@ class AsyncMCPClient:
             Tool execution result
         """
         # Use the execute meta-tool if available
-        result = await self.call_tool("execute", {
-            "tool_name": tool_name,
-            "parameters": parameters
-        })
+        result = await self.call_tool("execute", {"tool_name": tool_name, "parameters": parameters})
 
         # If execute meta-tool fails, try direct call
         if result.get("status") == "error" and "not found" in str(result.get("error", "")).lower():
@@ -384,9 +371,7 @@ class AsyncMCPClient:
         return result.get("prompts", [])
 
     async def get_prompt_by_name(
-        self,
-        prompt_name: str,
-        arguments: Dict[str, Any]
+        self, prompt_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Get a prompt with rendered arguments via meta-tool.
@@ -400,10 +385,9 @@ class AsyncMCPClient:
         Returns:
             Rendered prompt with messages
         """
-        return await self.call_tool("get_prompt", {
-            "prompt_name": prompt_name,
-            "arguments": arguments
-        })
+        return await self.call_tool(
+            "get_prompt", {"prompt_name": prompt_name, "arguments": arguments}
+        )
 
     # =========================================================================
     # Resource Meta-Tools (for meta-tools-only mode)
@@ -436,11 +420,7 @@ class AsyncMCPClient:
     # Direct Access Methods
     # =========================================================================
 
-    async def call_tool(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Call an MCP tool directly (when you know the exact tool name).
 
@@ -459,17 +439,12 @@ class AsyncMCPClient:
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
-            }
+            "params": {"name": tool_name, "arguments": arguments},
         }
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -486,9 +461,7 @@ class AsyncMCPClient:
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -505,9 +478,7 @@ class AsyncMCPClient:
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -516,11 +487,7 @@ class AsyncMCPClient:
             logger.error(f"list_prompts() failed: {e}")
             return []
 
-    async def get_prompt(
-        self,
-        name: str,
-        arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def get_prompt(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         Get a prompt with rendered arguments.
 
@@ -534,14 +501,12 @@ class AsyncMCPClient:
             "jsonrpc": "2.0",
             "method": "prompts/get",
             "id": 1,
-            "params": {"name": name, "arguments": arguments}
+            "params": {"name": name, "arguments": arguments},
         }
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -558,9 +523,7 @@ class AsyncMCPClient:
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -578,18 +541,11 @@ class AsyncMCPClient:
         """
         await self._ensure_session()
 
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "resources/read",
-            "id": 1,
-            "params": {"uri": uri}
-        }
+        payload = {"jsonrpc": "2.0", "method": "resources/read", "id": 1, "params": {"uri": uri}}
 
         try:
             async with self._session.post(
-                self.mcp_endpoint,
-                json=payload,
-                headers=self._get_headers()
+                self.mcp_endpoint, json=payload, headers=self._get_headers()
             ) as response:
                 response_text = await response.text()
                 data = self._parse_sse_response(response_text)
@@ -608,8 +564,7 @@ class AsyncMCPClient:
 
         try:
             async with self._session.get(
-                self.health_endpoint,
-                headers=self._get_headers()
+                self.health_endpoint, headers=self._get_headers()
             ) as response:
                 return await response.json()
         except Exception as e:
@@ -635,8 +590,7 @@ class AsyncMCPClient:
 
         try:
             async with self._session.get(
-                f"{self.api_endpoint}/tools/defaults",
-                headers=self._get_headers()
+                f"{self.api_endpoint}/tools/defaults", headers=self._get_headers()
             ) as response:
                 data = await response.json()
                 return data.get("tools", [])
@@ -649,34 +603,24 @@ class AsyncMCPClient:
     # =========================================================================
 
     async def start_task(
-        self,
-        task_type: str,
-        duration_seconds: int = 30,
-        steps: int = 10
+        self, task_type: str, duration_seconds: int = 30, steps: int = 10
     ) -> Dict[str, Any]:
         """Start a long-running task"""
-        return await self.call_tool("start_long_task", {
-            "task_type": task_type,
-            "duration_seconds": duration_seconds,
-            "steps": steps
-        })
+        return await self.call_tool(
+            "start_long_task",
+            {"task_type": task_type, "duration_seconds": duration_seconds, "steps": steps},
+        )
 
     async def get_task_progress(self, operation_id: str) -> Dict[str, Any]:
         """Get task progress by operation ID"""
-        return await self.call_tool("get_task_progress", {
-            "operation_id": operation_id
-        })
+        return await self.call_tool("get_task_progress", {"operation_id": operation_id})
 
     async def get_task_result(self, operation_id: str) -> Dict[str, Any]:
         """Get task result after completion"""
-        return await self.call_tool("get_task_result", {
-            "operation_id": operation_id
-        })
+        return await self.call_tool("get_task_result", {"operation_id": operation_id})
 
     async def stream_progress(
-        self,
-        operation_id: str,
-        callback: Optional[Callable[[Dict], None]] = None
+        self, operation_id: str, callback: Optional[Callable[[Dict], None]] = None
     ) -> Dict[str, Any]:
         """
         Stream task progress via SSE.
@@ -695,30 +639,30 @@ class AsyncMCPClient:
         final_data = None
 
         async with httpx.AsyncClient(timeout=300.0) as http_client:
-            async with http_client.stream('GET', stream_url) as response:
+            async with http_client.stream("GET", stream_url) as response:
                 if response.status_code != 200:
                     return {"status": "error", "error": f"HTTP {response.status_code}"}
 
                 event_type = None
 
                 async for line in response.aiter_lines():
-                    if line.startswith('event:'):
-                        event_type = line.split(':', 1)[1].strip()
-                    elif line.startswith('data:'):
-                        data_str = line.split(':', 1)[1].strip()
+                    if line.startswith("event:"):
+                        event_type = line.split(":", 1)[1].strip()
+                    elif line.startswith("data:"):
+                        data_str = line.split(":", 1)[1].strip()
                         try:
                             data = json.loads(data_str)
                         except json.JSONDecodeError:
                             continue
 
-                        if event_type == 'progress':
+                        if event_type == "progress":
                             final_data = data
                             if callback:
                                 callback(data)
-                        elif event_type == 'done':
+                        elif event_type == "done":
                             return final_data or data
-                        elif event_type == 'error':
-                            return {"status": "error", "error": data.get('error')}
+                        elif event_type == "error":
+                            return {"status": "error", "error": data.get("error")}
 
         return final_data or {"status": "error", "error": "Stream ended"}
 
@@ -727,10 +671,7 @@ class AsyncMCPClient:
     # =========================================================================
 
     async def search_and_execute(
-        self,
-        query: str,
-        parameters: Dict[str, Any],
-        item_type: str = "tool"
+        self, query: str, parameters: Dict[str, Any], item_type: str = "tool"
     ) -> Dict[str, Any]:
         """
         One-liner: Discover best matching tool and execute it.
@@ -750,11 +691,7 @@ class AsyncMCPClient:
         best = result.best_match()
         return await self.execute(best.name, parameters)
 
-    async def get_prompt_text(
-        self,
-        name: str,
-        arguments: Dict[str, Any]
-    ) -> str:
+    async def get_prompt_text(self, name: str, arguments: Dict[str, Any]) -> str:
         """Get rendered prompt text (convenience method)"""
         result = await self.get_prompt(name, arguments)
         messages = result.get("messages", [])
@@ -781,7 +718,7 @@ class MCPClient:
         self,
         base_url: str = "http://localhost:8081",
         timeout: float = 30.0,
-        auth_token: Optional[str] = None
+        auth_token: Optional[str] = None,
     ):
         self._async_client = AsyncMCPClient(base_url, timeout, auth_token)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -801,6 +738,7 @@ class MCPClient:
         if loop.is_running():
             # If we're already in an async context, create a task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(asyncio.run, coro)
                 return future.result()
@@ -894,6 +832,7 @@ class MCPClient:
 # =============================================================================
 # Quick Test / Example
 # =============================================================================
+
 
 async def _test_client():
     """Test the client"""
