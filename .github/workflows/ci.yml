@@ -145,7 +145,7 @@ jobs:
           source .venv/bin/activate
           uv pip install -r deployment/requirements/dev.txt
 
-      - name: Run Integration Tests
+      - name: Run Integration Tests (golden only - no external infra)
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
@@ -157,7 +157,7 @@ jobs:
           REDIS_PORT: 6379
         run: |
           source .venv/bin/activate
-          pytest tests/integration -v --tb=short \
+          pytest tests/integration/golden -v --tb=short \
             --junitxml=reports/integration-results.xml
 
       - name: Upload Test Results

@@ -513,7 +513,7 @@ class TestSkillManagerSyncIntegration:
         skill_manager = get_skill_manager()
 
         # First ensure skills are loaded
-        skill_manager.load_skills()
+        skill_manager.reload_skills()
         total_skills = len(skill_manager._vibe_cache) + len(skill_manager._external_cache)
 
         if total_skills == 0:
@@ -537,7 +537,7 @@ class TestSkillManagerSyncIntegration:
         from services.resource_service.resource_repository import ResourceRepository
 
         skill_manager = get_skill_manager()
-        skill_manager.load_skills()
+        skill_manager.reload_skills()
 
         if not skill_manager._vibe_cache:
             pytest.skip("No vibe skills found")

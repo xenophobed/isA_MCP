@@ -50,7 +50,7 @@ class TestConfigServiceIntegrationGolden:
             from services.progress_service.progress_manager import ProgressManager
 
             with patch.dict(
-                os.environ, {"REDIS_GRPC_HOST": "localhost", "REDIS_GRPC_PORT": "50055"}, clear=True
+                os.environ, {"REDIS_HOST": "localhost", "REDIS_PORT": "6379"}, clear=True
             ):
                 manager = ProgressManager()
                 assert manager is not None
@@ -134,25 +134,24 @@ class TestConfigEnvironmentIntegrationGolden:
 class TestConfigInfraIntegrationGolden:
     """Golden tests for config infrastructure integration - DO NOT MODIFY."""
 
-    def test_infra_config_grpc_endpoints(self):
-        """InfraConfig provides valid gRPC endpoint patterns."""
+    def test_infra_config_native_endpoints(self):
+        """InfraConfig provides valid native endpoint ports."""
         from core.config.infra_config import InfraConfig
 
         config = InfraConfig()
 
-        # All gRPC ports should be in valid range
-        grpc_ports = [
-            config.minio_grpc_port,
-            config.qdrant_grpc_port,
-            config.redis_grpc_port,
-            config.postgres_grpc_port,
-            config.neo4j_grpc_port,
-            config.duckdb_grpc_port,
-            config.nats_grpc_port,
-            config.mqtt_grpc_port,
+        # All native ports should be in valid range
+        native_ports = [
+            config.minio_port,
+            config.qdrant_port,
+            config.redis_port,
+            config.postgres_port,
+            config.neo4j_port,
+            config.nats_port,
+            config.mqtt_port,
         ]
 
-        for port in grpc_ports:
+        for port in native_ports:
             assert 1024 <= port <= 65535, f"Port {port} out of valid range"
 
     def test_infra_config_kubernetes_service_pattern(self):
@@ -160,17 +159,17 @@ class TestConfigInfraIntegrationGolden:
         from core.config.infra_config import InfraConfig
 
         k8s_env = {
-            "QDRANT_GRPC_HOST": "qdrant.isa-cloud-staging.svc.cluster.local",
-            "QDRANT_GRPC_PORT": "50062",
-            "REDIS_GRPC_HOST": "redis.isa-cloud-staging.svc.cluster.local",
-            "REDIS_GRPC_PORT": "50055",
-            "POSTGRES_GRPC_HOST": "postgres.isa-cloud-staging.svc.cluster.local",
-            "POSTGRES_GRPC_PORT": "50061",
+            "QDRANT_HOST": "qdrant.isa-cloud-staging.svc.cluster.local",
+            "QDRANT_PORT": "6333",
+            "REDIS_HOST": "redis.isa-cloud-staging.svc.cluster.local",
+            "REDIS_PORT": "6379",
+            "POSTGRES_HOST": "postgres.isa-cloud-staging.svc.cluster.local",
+            "POSTGRES_PORT": "5432",
         }
 
         with patch.dict(os.environ, k8s_env, clear=True):
             config = InfraConfig.from_env()
 
-        assert "svc.cluster.local" in config.qdrant_grpc_host
-        assert "svc.cluster.local" in config.redis_grpc_host
-        assert "svc.cluster.local" in config.postgres_grpc_host
+        assert "svc.cluster.local" in config.qdrant_host
+        assert "svc.cluster.local" in config.redis_host
+        assert "svc.cluster.local" in config.postgres_host
