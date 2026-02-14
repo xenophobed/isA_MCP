@@ -125,11 +125,7 @@ class AuthorizationManager:
                 cache_key = f"{request.tool_name}:{hashlib.md5(json.dumps(request.arguments, sort_keys=True).encode()).hexdigest()}"
                 self.approved_cache[cache_key] = datetime.now() + timedelta(hours=1)
 
-                # Debug logging
-                print(f"✅ Approved request {request_id}")
-                print(f"✅ Tool: {request.tool_name}, Args: {request.arguments}")
-                print(f"✅ Cache key: {cache_key}")
-                print(f"✅ Cached until: {self.approved_cache[cache_key]}")
+                logger.debug(f"Approved request {request_id} for tool {request.tool_name}")
 
                 return True
             else:
@@ -223,24 +219,15 @@ class SecurityManager:
                         logger.info(f"Tool {tool_name} pre-approved for user {user_id}")
                         return await func(*args, **kwargs)
 
-                    # TEMPORARY: Auto-approve HIGH security tools to avoid interruption
-                    self.auth_manager.approve_request(auth_request.id, "auto_approval_temp")
-                    logger.warning(
-                        f"TEMP: Auto-approved HIGH security tool {tool_name} for user {user_id}"
+                    raise AuthorizationError(
+                        f"Authorization required for {tool_name}. Request ID: {auth_request.id}",
+                        {
+                            "request_id": auth_request.id,
+                            "reason": reason,
+                            "tool_name": tool_name,
+                            "security_level": security_level.name,
+                        },
                     )
-                    return await func(*args, **kwargs)
-
-                    # Original authorization check (commented out temporarily)
-                    # raise AuthorizationError(
-                    #     f"Authorization required for {tool_name}. Request ID: {auth_request.id}",
-                    #     {
-                    #         "request_id": auth_request.id,
-                    #         "reason": reason,
-                    #         "tool_name": tool_name,
-                    #         "tool_args": kwargs,
-                    #         "security_level": security_level.name
-                    #     }
-                    # )
 
             # CRITICAL: Clean Context from annotations (same as base_tool.py)
             # This prevents FastMCP from trying to serialize Context objects
