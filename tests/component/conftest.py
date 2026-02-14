@@ -5,6 +5,12 @@ Layer 3: Component Tests
 - Tests individual service/repository methods
 - Uses mocked dependencies (DB, Qdrant, external APIs)
 - Fast execution with controlled inputs
+
+NOTE: These AsyncMock fixtures return canned responses and do NOT exercise
+real service logic. They are suitable for testing callers/consumers of these
+services, but NOT for verifying service behavior. For service behavior tests,
+use the in-memory mock implementations in tests/component/mocks/ which
+replicate actual data flow (e.g. MockSkillRepository, MockAsyncQdrantClient).
 """
 
 import pytest

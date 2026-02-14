@@ -384,9 +384,20 @@ class MockAsyncQdrantClient:
         return results[:limit]
 
     async def upsert(self, collection_name: str, points: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Upsert points."""
+        """Upsert points (legacy interface)."""
         self._record_call("upsert", collection_name=collection_name, point_count=len(points))
+        return await self._do_upsert(collection_name, points)
 
+    async def upsert_points(self, collection_name: str, points: List[Dict[str, Any]]) -> str:
+        """Upsert points — matches production AsyncQdrantClient interface."""
+        self._record_call("upsert_points", collection_name=collection_name, point_count=len(points))
+        await self._do_upsert(collection_name, points)
+        return "mock_operation_id"
+
+    async def _do_upsert(
+        self, collection_name: str, points: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Internal upsert implementation."""
         if collection_name not in self.collections:
             self.collections[collection_name] = []
 
@@ -400,15 +411,80 @@ class MockAsyncQdrantClient:
         return {"status": "ok"}
 
     async def delete(self, collection_name: str, point_ids: List[str]) -> Dict[str, Any]:
-        """Delete points."""
+        """Delete points (legacy interface)."""
         self._record_call("delete", collection_name=collection_name, point_ids=point_ids)
+        return await self._do_delete(collection_name, point_ids)
 
+    async def delete_points(self, collection_name: str, point_ids: List) -> str:
+        """Delete points — matches production AsyncQdrantClient interface."""
+        self._record_call("delete_points", collection_name=collection_name, point_ids=point_ids)
+        await self._do_delete(collection_name, point_ids)
+        return "mock_operation_id"
+
+    async def _do_delete(self, collection_name: str, point_ids: List) -> Dict[str, Any]:
+        """Internal delete implementation."""
         if collection_name in self.collections:
             self.collections[collection_name] = [
                 p for p in self.collections[collection_name] if p.get("id") not in point_ids
             ]
-
         return {"status": "ok"}
+
+    async def update_payload(
+        self,
+        collection_name: str,
+        ids: List,
+        payload: Dict[str, Any],
+    ) -> str:
+        """Update payload for specific points — matches production interface."""
+        self._record_call(
+            "update_payload", collection_name=collection_name, ids=ids, payload=payload
+        )
+        if collection_name in self.collections:
+            for point in self.collections[collection_name]:
+                if point.get("id") in ids:
+                    point.setdefault("payload", {}).update(payload)
+        return "mock_operation_id"
+
+    async def list_collections(self) -> List[str]:
+        """List all collection names."""
+        self._record_call("list_collections")
+        return list(self.collections.keys())
+
+    async def create_collection(
+        self, collection_name: str, vector_size: int, distance: str = "Cosine"
+    ) -> bool:
+        """Create a collection."""
+        self._record_call(
+            "create_collection",
+            collection_name=collection_name,
+            vector_size=vector_size,
+            distance=distance,
+        )
+        if collection_name not in self.collections:
+            self.collections[collection_name] = []
+        return True
+
+    async def create_field_index(
+        self, collection_name: str, field_name: str, field_type: str
+    ) -> bool:
+        """Create a field index (no-op in mock)."""
+        self._record_call(
+            "create_field_index",
+            collection_name=collection_name,
+            field_name=field_name,
+            field_type=field_type,
+        )
+        return True
+
+    async def get_collection_info(self, collection_name: str) -> Optional[Dict[str, Any]]:
+        """Get collection info."""
+        self._record_call("get_collection_info", collection_name=collection_name)
+        if collection_name not in self.collections:
+            return None
+        return {
+            "points_count": len(self.collections[collection_name]),
+            "status": "green",
+        }
 
     def seed_collection(self, collection_name: str, points: List[Dict[str, Any]]):
         """Seed a collection with test data."""
