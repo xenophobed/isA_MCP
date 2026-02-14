@@ -302,7 +302,7 @@ class VisionCacheManager:
                     type_counts[detection_type] = type_counts.get(detection_type, 0) + 1
                     hit_counts.append(data.get("hit_count", 0))
 
-                except:
+                except (json.JSONDecodeError, KeyError, OSError):
                     continue
 
             avg_hits = sum(hit_counts) / len(hit_counts) if hit_counts else 0
@@ -337,7 +337,7 @@ class VisionCacheManager:
                         cache_file.unlink()
                         removed_count += 1
 
-                except:
+                except (json.JSONDecodeError, KeyError, OSError):
                     continue
 
             logger.info(f"🧹 Cleaned up {removed_count} expired cache entries")
@@ -361,7 +361,7 @@ class VisionCacheManager:
                         with cache_file.open("r", encoding="utf-8") as f:
                             data = json.load(f)
                         should_remove = data.get("detection_type") == detection_type
-                    except:
+                    except (json.JSONDecodeError, KeyError, OSError):
                         should_remove = False
 
                 if should_remove:

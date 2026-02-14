@@ -831,7 +831,7 @@ def register_plan_tools(mcp: FastMCP):
                     tools_list = [
                         tool.strip() for tool in available_tools.split(",") if tool.strip()
                     ]
-            except:
+            except (json.JSONDecodeError, ValueError, TypeError):
                 tools_list = [available_tools] if available_tools else []
 
         return await planner.create_execution_plan(guidance, tools_list, actual_request, plan_id)

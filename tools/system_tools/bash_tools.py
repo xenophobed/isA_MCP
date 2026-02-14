@@ -194,7 +194,7 @@ def register_bash_tools(mcp: FastMCP):
                 try:
                     process.kill()
                     await process.wait()
-                except:
+                except ProcessLookupError:
                     pass
 
                 return {

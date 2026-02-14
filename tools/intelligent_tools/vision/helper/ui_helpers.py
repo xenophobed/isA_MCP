@@ -30,7 +30,7 @@ def draw_bounding_boxes(image_path: str, ui_elements: List[Dict]) -> str:
         # Try to load font
         try:
             font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 24)
-        except:
+        except (OSError, IOError):
             font = ImageFont.load_default()
 
         # Draw boxes with numbers

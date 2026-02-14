@@ -237,7 +237,7 @@ def register_search_tools(mcp: FastMCP):
                 try:
                     if file_path.stat().st_size > MAX_SEARCH_FILE_SIZE:
                         continue
-                except:
+                except OSError:
                     continue
 
                 # Skip binary files
@@ -532,7 +532,7 @@ def _is_searchable_file(path: Path) -> bool:
             # Binary files often have null bytes
             if b"\x00" in sample:
                 return False
-    except:
+    except OSError:
         return False
 
     return True

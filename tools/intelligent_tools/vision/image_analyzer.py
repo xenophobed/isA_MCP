@@ -124,7 +124,7 @@ class ImageAnalyzer:
                 if isinstance(image, bytes) and os.path.exists(image_path):
                     try:
                         os.unlink(image_path)
-                    except:
+                    except OSError:
                         pass
 
         except Exception as e:

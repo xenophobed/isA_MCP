@@ -379,7 +379,7 @@ def register_process_resource(mcp: FastMCP):
             asyncio.create_task(validate_process_tools())
         else:
             asyncio.run(validate_process_tools())
-    except:
+    except Exception:
         pass  # Validation is optional
 
     @mcp.resource("process://catalog/all")

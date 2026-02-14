@@ -352,7 +352,7 @@ def setup_logging(
                     if self.client:
                         try:
                             self.client.__exit__(None, None, None)
-                        except:
+                        except Exception:
                             pass
                     super().close()
 
