@@ -134,6 +134,7 @@ class SkillRepository:
         self,
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
+        org_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -143,6 +144,7 @@ class SkillRepository:
         Args:
             is_active: Filter by active status (None = all)
             parent_domain: Filter by parent domain
+            org_id: Filter by organization (returns global + org-specific)
             limit: Maximum number of results
             offset: Offset for pagination
 
@@ -157,6 +159,11 @@ class SkillRepository:
             if is_active is not None:
                 conditions.append(f"is_active = ${param_idx}")
                 params.append(is_active)
+                param_idx += 1
+
+            if org_id is not None:
+                conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
+                params.append(org_id)
                 param_idx += 1
 
             if parent_domain is not None:
@@ -346,25 +353,34 @@ class SkillRepository:
             logger.error(f"Failed to create assignment for tool {tool_id} -> {skill_id}: {e}")
             return None
 
-    async def get_assignments_for_tool(self, tool_id: int) -> List[Dict[str, Any]]:
+    async def get_assignments_for_tool(
+        self, tool_id: int, org_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
         Get all skill assignments for a tool.
 
         Args:
             tool_id: The tool database ID
+            org_id: Filter by organization (returns global + org-specific)
 
         Returns:
             List of assignment records sorted by confidence DESC
         """
         try:
+            conditions = ["tool_id = $1"]
+            params: list = [tool_id]
+            if org_id is not None:
+                conditions.append("(is_global = TRUE OR org_id = $2)")
+                params.append(org_id)
+            where = " AND ".join(conditions)
             async with self.db:
                 results = await self.db.query(
                     f"""
                     SELECT * FROM {self.schema}.{self.assignment_table}
-                    WHERE tool_id = $1
+                    WHERE {where}
                     ORDER BY confidence DESC
                     """,
-                    params=[tool_id],
+                    params=params,
                 )
             return results or []
         except Exception as e:
