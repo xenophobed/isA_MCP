@@ -3,6 +3,7 @@ Vector Repository - Qdrant vector database operations
 Handles all vector storage and retrieval for MCP search
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -10,6 +11,48 @@ from core.config.infra_config import InfraConfig
 from isa_common import AsyncQdrantClient
 
 logger = logging.getLogger(__name__)
+
+# Maximum items per type offset range
+_MAX_ITEMS_PER_TYPE = 1_000_000
+_OVERFLOW_WARNING_THRESHOLD = 900_000  # Warn at 90% capacity
+
+# Retry configuration for transient Qdrant failures
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 0.5  # seconds
+
+
+async def _retry_qdrant(coro_factory, operation_name: str, max_retries: int = _MAX_RETRIES):
+    """Retry a Qdrant operation with exponential backoff.
+
+    Args:
+        coro_factory: Callable that returns a new coroutine for each attempt
+        operation_name: Description for logging
+        max_retries: Maximum number of attempts
+
+    Returns:
+        The result of the coroutine
+
+    Raises:
+        The last exception if all retries are exhausted
+    """
+    last_exc = None
+    for attempt in range(max_retries):
+        try:
+            return await coro_factory()
+        except Exception as e:
+            last_exc = e
+            if attempt < max_retries - 1:
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    f"Qdrant {operation_name} failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {delay:.1f}s..."
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    f"Qdrant {operation_name} failed after {max_retries} attempts: {e}"
+                )
+    raise last_exc
 
 
 class VectorRepository:
@@ -34,6 +77,16 @@ class VectorRepository:
     def _compute_point_id(self, item_type: str, db_id: int) -> int:
         """Compute unique Qdrant point ID from type and PostgreSQL ID."""
         offset = self.TYPE_OFFSETS.get(item_type, 0)
+        if db_id >= _MAX_ITEMS_PER_TYPE:
+            raise ValueError(
+                f"Point ID overflow: {item_type} db_id={db_id} exceeds "
+                f"max {_MAX_ITEMS_PER_TYPE - 1}. IDs would collide with next type range."
+            )
+        if db_id >= _OVERFLOW_WARNING_THRESHOLD:
+            logger.warning(
+                f"Point ID approaching limit: {item_type} db_id={db_id} "
+                f"({db_id / _MAX_ITEMS_PER_TYPE:.0%} of capacity)"
+            )
         return offset + db_id
 
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
@@ -167,7 +220,10 @@ class VectorRepository:
             logger.debug(f"   Payload keys: {list(payload.keys())}")
             logger.debug(f"   Vector dimension: {len(embedding)}")
 
-            operation_id = await self.client.upsert_points(self.collection_name, points)
+            operation_id = await _retry_qdrant(
+                lambda: self.client.upsert_points(self.collection_name, points),
+                operation_name=f"upsert point {point_id}",
+            )
 
             logger.debug(f"   Qdrant operation_id: {operation_id}")
 
@@ -387,7 +443,7 @@ class VectorRepository:
 
     async def delete_vector(self, item_id: int) -> bool:
         """
-        Delete a vector by ID
+        Delete a vector by ID with retry for transient failures.
 
         Args:
             item_id: Vector identifier (integer point ID)
@@ -399,7 +455,10 @@ class VectorRepository:
             # Ensure item_id is an integer for Qdrant
             point_id = int(item_id) if not isinstance(item_id, int) else item_id
 
-            operation_id = await self.client.delete_points(self.collection_name, [point_id])
+            operation_id = await _retry_qdrant(
+                lambda: self.client.delete_points(self.collection_name, [point_id]),
+                operation_name=f"delete point {point_id}",
+            )
 
             if operation_id:
                 logger.info(f"Deleted vector: {point_id}")
@@ -409,7 +468,7 @@ class VectorRepository:
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to delete vector: {e}")
+            logger.error(f"Failed to delete vector after retries: {e}")
             return False
 
     async def get_stats(self) -> Dict[str, Any]:
