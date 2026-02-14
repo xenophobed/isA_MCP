@@ -101,10 +101,8 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
             if key:
                 return key
 
-        # Query parameter (仅用于测试)
-        api_key = request.query_params.get("api_key", "").strip()
-        if api_key:
-            return api_key
+        # Query parameter API key removed for security — keys leak to
+        # browser history, server access logs, proxy logs, and Referer headers.
 
         return None
 
@@ -151,11 +149,6 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """中间件主处理方法"""
         path = request.url.path
-
-        # Always extract X-Organization-Id header (even when auth is bypassed)
-        org_header = request.headers.get("X-Organization-Id", "").strip()
-        if org_header:
-            request.state.organization_id = org_header
 
         # 检查是否需要认证
         if not self.require_auth or self._should_bypass_auth(path):
@@ -234,9 +227,16 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         request.state.permissions = await self.auth_service.get_user_permissions(user_context)
 
         # Allow X-Organization-Id header to override JWT org for multi-org users
+        # Only if the user is authorized for the target organization
         org_header = request.headers.get("X-Organization-Id", "").strip()
         if org_header:
-            request.state.organization_id = org_header
+            user_orgs = getattr(user_context, "authorized_orgs", [])
+            if org_header in user_orgs:
+                request.state.organization_id = org_header
+            else:
+                logger.warning(
+                    f"User {user_context.user_id} attempted org switch to unauthorized org: {org_header}"
+                )
 
         # 继续处理请求
         response = await call_next(request)

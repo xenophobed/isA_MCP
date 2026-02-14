@@ -57,12 +57,15 @@ class UserContext:
     is_authenticated: bool = False
     permissions: Dict[str, AccessLevel] = None
     metadata: Dict[str, Any] = None
+    authorized_orgs: List[str] = None  # Organizations user has access to
 
     def __post_init__(self):
         if self.permissions is None:
             self.permissions = {}
         if self.metadata is None:
             self.metadata = {}
+        if self.authorized_orgs is None:
+            self.authorized_orgs = []
 
 
 class MCPAuthService:
@@ -137,12 +140,20 @@ class MCPAuthService:
 
             # 构建用户上下文
             user_data = auth_result.get("user", {})
+
+            # Extract authorized organizations - user can switch between these
+            authorized_orgs = user_data.get("authorized_orgs", [])
+            if not authorized_orgs and user_data.get("organization_id"):
+                # Fallback: if auth service doesn't provide list, use current org
+                authorized_orgs = [user_data.get("organization_id")]
+
             context = UserContext(
                 user_id=user_data.get("user_id", "unknown"),
                 email=user_data.get("email"),
                 organization_id=user_data.get("organization_id"),
                 subscription_tier=SubscriptionTier(user_data.get("subscription_tier", "free")),
                 is_authenticated=True,
+                authorized_orgs=authorized_orgs,
                 metadata=user_data,
             )
 
