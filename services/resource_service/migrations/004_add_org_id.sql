@@ -6,3 +6,7 @@ ALTER TABLE mcp.resources ADD COLUMN IF NOT EXISTS org_id UUID;
 
 -- Index for org-scoped resource queries
 CREATE INDEX IF NOT EXISTS idx_resources_org_id ON mcp.resources(org_id);
+
+-- DOWN / ROLLBACK:
+-- DROP INDEX IF EXISTS idx_resources_org_id;
+-- ALTER TABLE mcp.resources DROP COLUMN IF EXISTS org_id;

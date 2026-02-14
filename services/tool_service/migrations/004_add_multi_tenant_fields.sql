@@ -15,3 +15,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_tools_name_org ON mcp.tools(name, org_id) 
 
 -- Index for efficient tenant filtering queries
 CREATE INDEX IF NOT EXISTS idx_tools_tenant_filter ON mcp.tools(org_id, is_global);
+
+-- DOWN / ROLLBACK:
+-- DROP INDEX IF EXISTS idx_tools_tenant_filter;
+-- DROP INDEX IF EXISTS idx_tools_name_org;
+-- DROP INDEX IF EXISTS idx_tools_name_global;
+-- ALTER TABLE mcp.tools ADD CONSTRAINT tools_name_key UNIQUE (name);
+-- ALTER TABLE mcp.tools DROP COLUMN IF EXISTS is_global;
+-- ALTER TABLE mcp.tools DROP COLUMN IF EXISTS org_id;

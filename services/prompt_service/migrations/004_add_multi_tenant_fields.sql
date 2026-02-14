@@ -13,3 +13,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_name_org ON mcp.prompts(name, org_
 
 -- Index for efficient tenant filtering queries
 CREATE INDEX IF NOT EXISTS idx_prompts_tenant_filter ON mcp.prompts(org_id, is_global);
+
+-- DOWN / ROLLBACK:
+-- DROP INDEX IF EXISTS idx_prompts_tenant_filter;
+-- DROP INDEX IF EXISTS idx_prompts_name_org;
+-- DROP INDEX IF EXISTS idx_prompts_name_global;
+-- ALTER TABLE mcp.prompts ADD CONSTRAINT prompts_name_key UNIQUE (name);
+-- ALTER TABLE mcp.prompts DROP COLUMN IF EXISTS is_global;
+-- ALTER TABLE mcp.prompts DROP COLUMN IF EXISTS org_id;
