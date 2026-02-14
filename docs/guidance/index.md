@@ -135,18 +135,25 @@ content = await client.read_resource("guardrail://config/pii")
 ## Getting Started
 
 - [Quick Start](./quickstart) - Installation and basic usage
+- [Configuration](./configuration) - Server configuration
 - [Tools](./tools) - Creating and using tools
 - [Prompts](./prompts) - Creating and using prompts
 - [Resources](./resources) - Creating and using resources
 - [Skills](./skills) - Skill-based classification
-- [Configuration](./configuration) - Server configuration
 
-## Advanced Features
+## Platform Features
 
-- [Search Guide](./search) - Tool discovery
-- [HIL Guide](./hil) - Human interaction
-- [Progress Guide](./progress) - Progress tracking
-- [Aggregator Guide](./aggregator) - External servers
+- [Search Guide](./search) - Tool discovery and semantic search
+- [HIL Guide](./hil) - Human-in-the-loop interaction
+- [Progress Guide](./progress) - Progress tracking and streaming
+- [Aggregator Guide](./aggregator) - External MCP servers
+
+## Security & Operations
+
+- [Security](./security) - Authentication, authorization, and tenant isolation
+- [Multi-Tenant](./multi-tenant) - Organization scoping and data segregation
+- [Reliability](./reliability) - Infrastructure reliability and best practices
+- [Git Workflow](./git-workflow) - Development process
 
 ## API Endpoints
 

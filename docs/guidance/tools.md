@@ -8,17 +8,27 @@ The platform includes 88+ built-in tools organized by category, with automatic d
 
 ## Tool Categories
 
-| Category | Description | Examples |
-|----------|-------------|----------|
-| `general_tools` | System utilities | `get_current_time`, `get_current_date` |
-| `intelligent_tools` | AI-powered analysis | `analyze_text`, `generate_summary` |
-| `data_tools` | Data operations | `query_data`, `transform_data` |
-| `memory_tools` | Memory management | `store_memory`, `recall_memory` |
-| `web_tools` | Web interactions | `fetch_url`, `search_web` |
-| `plan_tools` | Execution planning | `create_execution_plan` |
-| `meta_tools` | Platform introspection | `list_tools`, `get_tool_info` |
-| `system_tools` | System operations | `execute_command` |
-| `isa_vibe_tools` | Vibe skill tools | Domain-specific workflows |
+| Category | Description | Security Level | Examples |
+|----------|-------------|----------------|----------|
+| `general_tools` | System utilities | LOW | `get_current_time`, `get_current_date` |
+| `intelligent_tools` | AI-powered analysis | LOW-MEDIUM | `analyze_text`, `generate_summary` |
+| `data_tools` | Data operations | MEDIUM | `query_data`, `transform_data` |
+| `memory_tools` | Memory management | MEDIUM | `store_memory`, `recall_memory` |
+| `web_tools` | Web interactions | HIGH | `fetch_url`, `search_web` |
+| `plan_tools` | Execution planning | LOW | `create_execution_plan` |
+| `meta_tools` | Platform introspection | LOW | `list_tools`, `get_tool_info` |
+| `system_tools` | System operations | **HIGH** | `bash_execute`, `file_write` |
+| `isa_vibe_tools` | Vibe skill tools | MEDIUM | Domain-specific workflows |
+
+## Security Levels
+
+Tools are classified by security risk:
+
+- **LOW** - Read-only, no external access (no authorization required)
+- **MEDIUM** - Limited writes, trusted sources (no authorization required)
+- **HIGH** - Shell execution, file writes, external requests (**authorization required**)
+
+HIGH security tools require explicit user approval via the authorization service. See [Security Guide](./security) for details.
 
 ## Creating Custom Tools
 
@@ -163,8 +173,32 @@ async def my_tool():
 4. Calls `register_{module_name}(mcp)` function
 5. Logs success/failure for each module
 
+## Multi-Tenant Tools
+
+Tools support organization scoping:
+
+```python
+@mcp.tool()
+async def org_specific_tool(
+    param: str,
+    ctx: Context = None
+) -> Dict[str, Any]:
+    """Tool that respects organization boundaries."""
+    # Get organization from context
+    org_id = getattr(ctx, 'organization_id', None) if ctx else None
+
+    # Query org-scoped data
+    data = await repository.get_data(org_id=org_id)
+
+    return {"result": data}
+```
+
+See [Multi-Tenant Guide](./multi-tenant) for tenant isolation patterns.
+
 ## Next Steps
 
+- [Security](./security) - Tool security and authorization
+- [Multi-Tenant](./multi-tenant) - Organization scoping
 - [Prompts](./prompts) - Create custom prompts
 - [Resources](./resources) - Create custom resources
 - [Skills](./skills) - Skill-based classification

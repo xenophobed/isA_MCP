@@ -77,14 +77,22 @@ qdrant:
 ```yaml
 redis:
   port: 6379
-  key_prefixes:
-    - "mcp:tool:"       # Tool response cache
-    - "mcp:prompt:"     # Prompt cache
-    - "mcp:resource:"   # Resource cache
-    - "mcp:embedding:"  # Embedding cache
-    - "mcp:session:"    # Session state
-    - "mcp:rate:"       # Rate limiting
+  cache_version: 1  # Increment on schema migrations to invalidate stale data
+  key_prefix: "mcp:cache:v1:"  # Versioned cache keys
+  ttl:
+    tool: 300        # 5 minutes
+    tool_list: 60    # 1 minute
+    prompt: 300      # 5 minutes
+    resource: 300    # 5 minutes
+    search: 30       # 30 seconds
+    skill: 600       # 10 minutes
 ```
+
+**Cache Versioning:**
+- Cache keys include version prefix: `mcp:cache:v{VERSION}:namespace:key`
+- Incrementing `CACHE_VERSION` in `core/cache/redis_cache.py` invalidates all cached data
+- Use when schema migrations change data format (prevents serving stale cached data)
+- Old cache keys remain until TTL expires (plan cleanup for large caches)
 
 ### MinIO (Object Storage)
 
@@ -138,13 +146,32 @@ health_checks:
 
 ## Environment Variables
 
+### Core Configuration
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `MCP_PORT` | Server port | `8081` |
 | `POSTGRES_HOST` | PostgreSQL host | `localhost` |
-| `QDRANT_HOST` | Qdrant host | `localhost` |
-| `REDIS_HOST` | Redis host | `localhost` |
 | `LOG_LEVEL` | Logging level | `INFO` |
+| `ENV` | Environment | `development` |
+
+### Qdrant Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QDRANT_HOST` | Qdrant HTTP host | `localhost` |
+| `QDRANT_PORT` | Qdrant HTTP port | `6333` |
+| `QDRANT_GRPC_HOST` | Qdrant gRPC host | `localhost` |
+| `QDRANT_GRPC_PORT` | Qdrant gRPC port | `6334` |
+
+### Redis Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_HOST` | Redis host | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_PASSWORD` | Redis password | (empty) |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 
 ## Running the Server
 
