@@ -9,10 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.aggregator.data_contract import (
-    ServerTransportType,
-    ServerStatus,
-)
+from .domain import ServerTransportType, ServerStatus
 
 logger = logging.getLogger(__name__)
 

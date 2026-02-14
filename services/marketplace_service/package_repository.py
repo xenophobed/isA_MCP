@@ -14,11 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.marketplace import (
-    RegistrySource,
-    InstallStatus,
-    UpdateChannel,
-)
+from .domain import RegistrySource, InstallStatus, UpdateChannel
 
 logger = logging.getLogger(__name__)
 

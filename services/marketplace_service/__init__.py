@@ -27,15 +27,20 @@ from .package_resolver import PackageResolver
 from .install_manager import InstallManager
 from .update_manager import UpdateManager
 
-# Re-export contracts for convenience
-from tests.contracts.marketplace import (
+# Re-export domain types for convenience
+from .domain import (
     RegistrySource,
     InstallStatus,
     UpdateChannel,
     PackageSpec,
     InstallResult,
-    SearchResult,
 )
+
+# SearchResult is a test-only contract, not needed in production
+try:
+    from tests.contracts.marketplace import SearchResult
+except ImportError:
+    SearchResult = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 

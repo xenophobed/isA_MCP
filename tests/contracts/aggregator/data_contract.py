@@ -18,32 +18,12 @@ from enum import Enum
 # ============================================================================
 
 
-class ServerTransportType(str, Enum):
-    """Transport types for external MCP servers."""
-
-    STDIO = "STDIO"  # Standard input/output (local process)
-    SSE = "SSE"  # Server-Sent Events (HTTP streaming)
-    HTTP = "HTTP"  # Standard HTTP request/response
-    STREAMABLE_HTTP = "STREAMABLE_HTTP"  # MCP Streamable HTTP (bidirectional)
-
-
-class ServerStatus(str, Enum):
-    """Connection status of external MCP server."""
-
-    CONNECTED = "CONNECTED"  # Server connected and healthy
-    DISCONNECTED = "DISCONNECTED"  # Server intentionally disconnected
-    ERROR = "ERROR"  # Server unreachable or failing
-    CONNECTING = "CONNECTING"  # Connection in progress
-    DEGRADED = "DEGRADED"  # Connected but elevated errors
-
-
-class RoutingStrategy(str, Enum):
-    """How routing decision was made."""
-
-    NAMESPACE_RESOLVED = "namespace_resolved"  # Parsed from namespaced name
-    EXPLICIT_SERVER = "explicit_server"  # Server ID provided
-    FALLBACK = "fallback"  # Using fallback server
-
+# Import canonical enums from service domain (single source of truth)
+from services.aggregator_service.domain import (  # noqa: E402
+    ServerTransportType,
+    ServerStatus,
+    RoutingStrategy,
+)
 
 # ============================================================================
 # Request Contracts (Input Schemas)

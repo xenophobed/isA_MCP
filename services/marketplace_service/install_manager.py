@@ -13,7 +13,7 @@ import re
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.marketplace import InstallStatus, InstallResult
+from .domain import InstallStatus, InstallResult
 
 logger = logging.getLogger(__name__)
 

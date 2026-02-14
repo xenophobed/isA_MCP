@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import logging
 import re
 
-from tests.contracts.marketplace import RegistrySource
+from .domain import RegistrySource
 
 logger = logging.getLogger(__name__)
 

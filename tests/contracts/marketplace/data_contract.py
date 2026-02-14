@@ -18,69 +18,17 @@ from typing import Any, Dict, List, Optional
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class RegistrySource(str, Enum):
-    """
-    Supported package registry sources.
-
-    Database column: mcp.marketplace_packages.registry_source
-    """
-
-    NPM = "npm"  # npm registry (npmjs.com)
-    GITHUB = "github"  # GitHub releases
-    ISA_CLOUD = "isa-cloud"  # isA Cloud marketplace
-    PRIVATE = "private"  # Private enterprise registry
-    LOCAL = "local"  # Local file-based package
-
-
-class InstallStatus(str, Enum):
-    """
-    Package installation status.
-
-    Database column: mcp.installed_packages.status
-    """
-
-    INSTALLED = "installed"  # Package installed and active
-    DISABLED = "disabled"  # Package disabled but not removed
-    ERROR = "error"  # Installation/connection error
-    UPDATING = "updating"  # Update in progress
-    UNINSTALLING = "uninstalling"  # Uninstall in progress
-
-
-class UpdateChannel(str, Enum):
-    """
-    Update channel for packages.
-
-    Database column: mcp.installed_packages.update_channel
-    """
-
-    STABLE = "stable"  # Stable releases only
-    BETA = "beta"  # Include beta releases
-    LATEST = "latest"  # Always use latest (including prereleases)
-
-
-class SyncType(str, Enum):
-    """
-    Registry synchronization type.
-
-    Database column: mcp.registry_sync_log.sync_type
-    """
-
-    FULL = "full"  # Full registry sync
-    INCREMENTAL = "incremental"  # Only changed packages
-    SINGLE_PACKAGE = "single_package"  # Single package update
-
-
-class SyncStatus(str, Enum):
-    """
-    Registry synchronization status.
-
-    Database column: mcp.registry_sync_log.status
-    """
-
-    RUNNING = "running"  # Sync in progress
-    COMPLETED = "completed"  # Sync completed successfully
-    FAILED = "failed"  # Sync failed
-
+# Import canonical types from service domain (single source of truth)
+from services.marketplace_service.domain import (  # noqa: E402
+    RegistrySource,
+    InstallStatus,
+    UpdateChannel,
+    SyncType,
+    SyncStatus,
+    PackageSpec,
+    InstallResult,
+    UpdateInfo,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Database Record Contracts
@@ -442,57 +390,8 @@ class RegistrySyncLogContract:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@dataclass
-class PackageSpec:
-    """
-    Package specification for installation.
-
-    Used as input to MarketplaceService.install()
-    """
-
-    name: str  # Package name
-    version: Optional[str] = None  # Specific version (None = latest)
-    registry: Optional[RegistrySource] = None  # Specific registry
-    config: Optional[Dict[str, Any]] = None  # User configuration (API keys, etc.)
-
-    def __post_init__(self):
-        """Validate package name format."""
-        import re
-
-        if not re.match(r"^(@[a-z0-9-]+/)?[a-z0-9-]+$", self.name):
-            raise ValueError(f"Invalid package name format: {self.name}")
-
-
-@dataclass
-class InstallResult:
-    """
-    Result of package installation.
-
-    Returned by MarketplaceService.install()
-    """
-
-    success: bool
-    package_id: str
-    package_name: str
-    version: str
-
-    server_id: Optional[str] = None
-    tools_discovered: int = 0
-    skills_assigned: List[str] = field(default_factory=list)
-    error: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "success": self.success,
-            "package_id": self.package_id,
-            "package_name": self.package_name,
-            "version": self.version,
-            "server_id": self.server_id,
-            "tools_discovered": self.tools_discovered,
-            "skills_assigned": self.skills_assigned,
-            "error": self.error,
-        }
+# PackageSpec, InstallResult, and UpdateInfo are now imported from
+# services.marketplace_service.domain above.
 
 
 @dataclass
@@ -524,33 +423,7 @@ class SearchResult:
         }
 
 
-@dataclass
-class UpdateInfo:
-    """
-    Information about available package update.
-
-    Returned by MarketplaceService.check_updates()
-    """
-
-    package_id: str
-    package_name: str
-    current_version: str
-    latest_version: str
-    update_channel: UpdateChannel
-    changelog: Optional[str] = None
-    breaking_changes: bool = False
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "package_id": self.package_id,
-            "package_name": self.package_name,
-            "current_version": self.current_version,
-            "latest_version": self.latest_version,
-            "update_channel": self.update_channel.value,
-            "changelog": self.changelog,
-            "breaking_changes": self.breaking_changes,
-        }
+# UpdateInfo is now imported from services.marketplace_service.domain above.
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
