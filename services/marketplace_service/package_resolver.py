@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import logging
 import re
 
-from tests.contracts.marketplace import PackageSpec, RegistrySource
+from .domain import PackageSpec, RegistrySource
 
 logger = logging.getLogger(__name__)
 

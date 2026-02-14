@@ -9,8 +9,8 @@ Contracts:
 - system_contract.md: API contracts and integration points
 """
 
-from tests.contracts.aggregator.data_contract import (
-    # Enums
+from .data_contract import (
+    # Enums (re-exported from services.aggregator_service.domain)
     ServerTransportType,
     ServerStatus,
     RoutingStrategy,

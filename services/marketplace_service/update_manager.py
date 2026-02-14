@@ -10,13 +10,7 @@ Handles:
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.marketplace import (
-    InstallStatus,
-    UpdateChannel,
-    InstallResult,
-    UpdateInfo,
-    PackageSpec,
-)
+from .domain import InstallStatus, UpdateChannel, InstallResult, UpdateInfo, PackageSpec
 
 logger = logging.getLogger(__name__)
 

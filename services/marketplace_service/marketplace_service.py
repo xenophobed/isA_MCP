@@ -10,12 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.marketplace import (
-    RegistrySource,
-    InstallStatus,
-    PackageSpec,
-    InstallResult,
-)
+from .domain import RegistrySource, InstallStatus, PackageSpec, InstallResult
 
 logger = logging.getLogger(__name__)
 

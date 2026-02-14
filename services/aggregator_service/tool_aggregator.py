@@ -7,9 +7,7 @@ Handles tool discovery, namespacing, embedding generation, and skill classificat
 from typing import Any, Dict, List, Optional
 import logging
 
-from tests.contracts.aggregator.data_contract import (
-    ServerStatus,
-)
+from .domain import ServerStatus
 
 logger = logging.getLogger(__name__)
 
