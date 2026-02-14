@@ -235,9 +235,11 @@ def register_file_tools(mcp: FastMCP):
             path = Path(file_path)
 
             # Security check: prevent writing to sensitive locations
+            # Resolve symlinks to prevent traversal bypasses
+            resolved = path.resolve()
             sensitive_paths = ["/etc", "/usr", "/bin", "/sbin", "/var", "/root"]
             for sensitive in sensitive_paths:
-                if str(path.absolute()).startswith(sensitive):
+                if str(resolved) == sensitive or str(resolved).startswith(sensitive + "/"):
                     return {
                         "status": "error",
                         "action": "write_file",
