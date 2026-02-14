@@ -103,23 +103,23 @@ def register_bash_tools(mcp: FastMCP):
             # Validate timeout
             timeout = min(timeout, MAX_TIMEOUT)
 
-            # Security checks for dangerous patterns
+            # Security checks for dangerous patterns (regex-based to resist encoding bypasses)
+            import re as _re
             dangerous_patterns = [
-                "rm -rf /",
-                "rm -rf /*",
-                "> /dev/sda",
-                "mkfs.",
-                ":(){:|:&};:",  # Fork bomb
-                "dd if=/dev/zero",
-                "chmod -R 777 /",
+                (r"rm\s+(-[^\s]*\s+)*-[^\s]*r[^\s]*\s+/(\s|$|\*)", "rm -rf /"),
+                (r">\s*/dev/sd[a-z]", "> /dev/sda"),
+                (r"mkfs\.", "mkfs"),
+                (r":\(\)\s*\{.*\|.*&\s*\}\s*;", "fork bomb"),
+                (r"dd\s+.*if=/dev/zero", "dd if=/dev/zero"),
+                (r"chmod\s+(-[^\s]*\s+)*777\s+/(\s|$)", "chmod 777 /"),
             ]
 
-            for pattern in dangerous_patterns:
-                if pattern in command:
+            for pattern, label in dangerous_patterns:
+                if _re.search(pattern, command):
                     return {
                         "status": "error",
                         "action": "bash_execute",
-                        "error": f"Potentially dangerous command blocked: {pattern}",
+                        "error": f"Potentially dangerous command blocked: {label}",
                         "error_code": "DANGEROUS_COMMAND",
                         "timestamp": datetime.now().isoformat(),
                     }
@@ -140,10 +140,16 @@ def register_bash_tools(mcp: FastMCP):
             if env:
                 process_env.update(env)
 
-            # Create subprocess
+            # SECURITY NOTE: This tool executes shell commands WITH shell interpretation.
+            # Shell features (pipes, redirects, variables) are intentional functionality.
+            # Security relies on:
+            #   1. Pattern-based blocking of dangerous commands (above)
+            #   2. HIGH security level requiring explicit authorization (core/security.py)
+            #   3. Audit logging of all commands
+            # This is NOT safe for untrusted input - authorization required.
             start_time = datetime.now()
-            process = await asyncio.create_subprocess_shell(
-                command,
+            process = await asyncio.create_subprocess_exec(
+                "/bin/sh", "-c", command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,

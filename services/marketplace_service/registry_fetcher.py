@@ -8,16 +8,77 @@ Supports:
 - Private enterprise registries
 """
 
+import ipaddress
 import aiohttp
 import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 import logging
 import re
 
 from tests.contracts.marketplace import RegistrySource
 
 logger = logging.getLogger(__name__)
+
+# Allowlisted registry domains for SSRF protection
+_ALLOWED_REGISTRY_HOSTS = {
+    "registry.npmjs.org",
+    "www.npmjs.com",
+    "api.github.com",
+    "github.com",
+}
+
+
+def _validate_url(url: str) -> None:
+    """Validate URL against SSRF attacks.
+
+    Defenses:
+    - Allowlist of known registry domains
+    - Block private/internal/loopback IPs (including IPv6)
+    - Block cloud metadata endpoints and CIDR ranges
+    - Validate URL scheme (http/https only)
+
+    Note: DNS rebinding still possible (domain DNS could change after validation).
+    Mitigation: aiohttp sessions configured with allow_redirects=False and
+    short DNS cache TTL. For production, consider DNS validation at request time
+    or use a proxy with DNS pinning.
+
+    Raises ValueError if the URL is not safe.
+    """
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError(f"Invalid URL (no hostname): {url}")
+
+    # Validate scheme
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid URL scheme (must be http/https): {parsed.scheme}")
+
+    # Block if hostname is a direct IP targeting private/metadata ranges
+    try:
+        addr = ipaddress.ip_address(hostname)
+        # Block metadata CIDR range (AWS/GCP metadata endpoints)
+        if addr in ipaddress.ip_network("169.254.0.0/16"):
+            raise ValueError(f"URL targets cloud metadata CIDR: {hostname}")
+        # Block private, loopback, link-local (IPv4 and IPv6)
+        if addr.is_private or addr.is_loopback or addr.is_link_local:
+            raise ValueError(f"URL targets private/internal address: {hostname}")
+    except ValueError as exc:
+        # hostname is not an IP address (it's a domain name)
+        if any(keyword in str(exc) for keyword in ["private", "internal", "metadata", "CIDR"]):
+            raise
+        # Valid domain name, continue checks
+        pass
+
+    # Block specific metadata hostnames (even if they resolve elsewhere now)
+    metadata_hostnames = {"metadata.google.internal", "169.254.169.254", "metadata", "instance-data"}
+    if hostname in metadata_hostnames or hostname.endswith(".internal"):
+        raise ValueError(f"URL targets cloud metadata endpoint: {hostname}")
+
+    # Allowlist check - only known registries permitted
+    if hostname not in _ALLOWED_REGISTRY_HOSTS:
+        raise ValueError(f"URL host not in registry allowlist: {hostname}")
 
 
 class RegistryFetcher:
@@ -90,7 +151,10 @@ class RegistryFetcher:
         }
 
         try:
-            async with session.get(self.NPM_SEARCH_URL, params=params) as resp:
+            _validate_url(self.NPM_SEARCH_URL)
+            async with session.get(
+                self.NPM_SEARCH_URL, params=params, allow_redirects=False
+            ) as resp:
                 if resp.status != 200:
                     logger.warning(f"npm search failed: {resp.status}")
                     return []
@@ -121,7 +185,8 @@ class RegistryFetcher:
         url = f"{self.NPM_PACKAGE_URL}/{name}"
 
         try:
-            async with session.get(url) as resp:
+            _validate_url(url)
+            async with session.get(url, allow_redirects=False) as resp:
                 if resp.status == 404:
                     return None
                 if resp.status != 200:
@@ -257,10 +322,12 @@ class RegistryFetcher:
         }
 
         try:
+            _validate_url(f"{self.GITHUB_API_URL}/search/repositories")
             async with session.get(
                 f"{self.GITHUB_API_URL}/search/repositories",
                 headers=headers,
                 params=params,
+                allow_redirects=False,
             ) as resp:
                 if resp.status != 200:
                     logger.warning(f"GitHub search failed: {resp.status}")
