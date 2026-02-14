@@ -3,6 +3,14 @@
 -- Description: Replaces broad categories with specific, non-overlapping skill domains
 --              Goal: Each tool should match 1-3 categories max (not 9+)
 
+BEGIN;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Step 0: Backup existing assignments before destructive operations
+-- ═══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS mcp.tool_skill_assignments_backup_003
+    AS SELECT * FROM mcp.tool_skill_assignments;
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Step 1: Clear existing categories and assignments for fresh start
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -391,3 +399,16 @@ BEGIN
     RAISE NOTICE 'Refined skill categories: % active categories', category_count;
     RAISE NOTICE 'All tools/resources/prompts reset for re-classification';
 END $$;
+
+COMMIT;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- DOWN / ROLLBACK
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- To rollback this migration:
+--   BEGIN;
+--   DELETE FROM mcp.tool_skill_assignments;
+--   INSERT INTO mcp.tool_skill_assignments SELECT * FROM mcp.tool_skill_assignments_backup_003;
+--   UPDATE mcp.skill_categories SET is_active = TRUE, updated_at = NOW();
+--   DROP TABLE IF EXISTS mcp.tool_skill_assignments_backup_003;
+--   COMMIT;

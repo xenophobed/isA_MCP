@@ -13,3 +13,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_external_servers_name_org ON mcp.external_
 
 -- Index for efficient tenant filtering queries
 CREATE INDEX IF NOT EXISTS idx_external_servers_tenant_filter ON mcp.external_servers(org_id, is_global);
+
+-- DOWN / ROLLBACK:
+-- DROP INDEX IF EXISTS idx_external_servers_tenant_filter;
+-- DROP INDEX IF EXISTS idx_external_servers_name_org;
+-- DROP INDEX IF EXISTS idx_external_servers_name_global;
+-- ALTER TABLE mcp.external_servers ADD CONSTRAINT external_servers_name_key UNIQUE (name);
+-- ALTER TABLE mcp.external_servers DROP COLUMN IF EXISTS is_global;
+-- ALTER TABLE mcp.external_servers DROP COLUMN IF EXISTS org_id;

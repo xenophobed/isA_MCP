@@ -11,3 +11,7 @@ UPDATE mcp.resources SET is_global = TRUE WHERE is_global IS NULL;
 CREATE INDEX IF NOT EXISTS idx_resources_tenant_filter ON mcp.resources(org_id, is_global);
 -- Keep single-column index for backwards compatibility
 CREATE INDEX IF NOT EXISTS idx_resources_org_id ON mcp.resources(org_id);
+
+-- DOWN / ROLLBACK:
+-- DROP INDEX IF EXISTS idx_resources_org_id;
+-- ALTER TABLE mcp.resources DROP COLUMN IF EXISTS org_id;

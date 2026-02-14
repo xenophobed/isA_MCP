@@ -406,21 +406,18 @@ class PromptRepository:
             Number of prompts deleted
         """
         try:
-            # Get count first
-            count_sql = f"""
-                SELECT COUNT(*) as count FROM {self.schema}.{self.table}
-                WHERE source_server_id = $1
-            """
-            async with self.db:
-                result = await self.db.query_row(count_sql, params=[server_id])
-                count = result.get("count", 0) if result else 0
-
-                # Delete the prompts
-                delete_sql = f"""
+            # Atomic count-and-delete in a single statement
+            delete_sql = f"""
+                WITH deleted AS (
                     DELETE FROM {self.schema}.{self.table}
                     WHERE source_server_id = $1
-                """
-                await self.db.execute(delete_sql, params=[server_id])
+                    RETURNING 1
+                )
+                SELECT COUNT(*) as count FROM deleted
+            """
+            async with self.db:
+                result = await self.db.query_row(delete_sql, params=[server_id])
+                count = result.get("count", 0) if result else 0
 
             logger.info(f"Deleted {count} prompts from server {server_id}")
             return count
