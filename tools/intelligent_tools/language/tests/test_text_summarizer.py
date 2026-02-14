@@ -405,7 +405,7 @@ class TestTextSummarizer:
         edge_cases_passed = 0
         total_edge_cases = 0
 
-        # Test empty text
+        # Test empty text — should reject or raise, NOT succeed
         try:
             total_edge_cases += 1
             print("Testing empty text")
@@ -414,25 +414,26 @@ class TestTextSummarizer:
                 print("   SUCCESS Empty text correctly rejected")
                 edge_cases_passed += 1
             else:
-                print("   WARNING Empty text was processed (unexpected)")
-        except Exception as e:
-            print(f"   SUCCESS Empty text raised exception: {type(e).__name__}")
+                print("   FAIL Empty text was processed (expected rejection)")
+        except (ValueError, TypeError) as e:
+            print(f"   SUCCESS Empty text raised expected exception: {type(e).__name__}")
             edge_cases_passed += 1
+        except Exception as e:
+            print(f"   FAIL Empty text raised unexpected exception: {type(e).__name__}: {e}")
 
-        # Test very short text
+        # Test very short text — should either succeed or return success=False
         try:
             total_edge_cases += 1
             print("Testing very short text")
             result = await self.summarizer.summarize_text("Short.")
             print(
-                f"   {'SUCCESS' if result['success'] else 'WARNING'} Short text result: {result['success']}"
+                f"   {'SUCCESS' if result['success'] else 'SUCCESS (rejected)'} Short text result: {result['success']}"
             )
-            edge_cases_passed += 1  # Either outcome is acceptable
+            edge_cases_passed += 1  # Either success or graceful rejection is valid
         except Exception as e:
-            print(f"   SUCCESS Short text handled: {type(e).__name__}")
-            edge_cases_passed += 1
+            print(f"   FAIL Short text raised unexpected exception: {type(e).__name__}: {e}")
 
-        # Test very long text (should be truncated)
+        # Test very long text (should be truncated and processed)
         try:
             total_edge_cases += 1
             print("Testing very long text (10k+ chars)")
@@ -442,9 +443,9 @@ class TestTextSummarizer:
                 print("   SUCCESS Long text processed successfully")
                 edge_cases_passed += 1
             else:
-                print(f"   WARNING Long text failed: {result['error']}")
+                print(f"   FAIL Long text failed: {result['error']}")
         except Exception as e:
-            print(f"   WARNING Long text exception: {e}")
+            print(f"   FAIL Long text exception: {e}")
 
         success_rate = edge_cases_passed / total_edge_cases
         print(
