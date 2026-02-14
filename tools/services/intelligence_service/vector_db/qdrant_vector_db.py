@@ -475,5 +475,5 @@ class QdrantVectorDB(BaseVectorDB):
                 # Close client if it has a close method
                 if hasattr(self.client, "close"):
                     self.client.close()
-            except:
+            except Exception:
                 pass

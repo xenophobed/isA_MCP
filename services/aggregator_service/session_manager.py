@@ -10,6 +10,7 @@ Key Design:
 """
 
 import asyncio
+import sys
 import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -327,7 +328,12 @@ class SessionManager:
 
             await session_cm.__aenter__()
 
-            await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
+            try:
+                await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
+            except Exception:
+                # Clean up session context if initialization fails
+                await session_cm.__aexit__(*sys.exc_info())
+                raise
 
             self._connections[server_id] = ManagedConnection(
                 server_id=server_id,
@@ -380,7 +386,12 @@ class SessionManager:
 
             await session_cm.__aenter__()
 
-            await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
+            try:
+                await asyncio.wait_for(session.initialize(), timeout=self._connection_timeout)
+            except Exception:
+                # Clean up session context if initialization fails
+                await session_cm.__aexit__(*sys.exc_info())
+                raise
 
             self._connections[server_id] = ManagedConnection(
                 server_id=server_id,

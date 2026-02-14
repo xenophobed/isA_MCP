@@ -192,7 +192,7 @@ class UIDetector:
                 if isinstance(screenshot, bytes) and os.path.exists(image_path):
                     try:
                         os.unlink(image_path)
-                    except:
+                    except OSError:
                         pass
 
         except Exception as e:
@@ -253,7 +253,7 @@ class UIDetector:
 
                 ui_data = json.loads(content) if isinstance(content, str) else content
                 ui_elements = ui_data.get("ui_elements", []) if isinstance(ui_data, dict) else []
-            except:
+            except (json.JSONDecodeError, ValueError, TypeError):
                 logger.warning("Could not parse UI elements as JSON, returning empty list")
                 ui_elements = []
             logger.info(f"📋 OmniParser found {len(ui_elements)} UI elements")
@@ -276,7 +276,7 @@ class UIDetector:
             # Try to load font
             try:
                 font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 24)
-            except:
+            except (OSError, IOError):
                 font = ImageFont.load_default()
 
             # Draw numbered boxes
@@ -499,7 +499,7 @@ Return ONLY this JSON format with actual element numbers:
                 if isinstance(screenshot, bytes) and os.path.exists(image_path):
                     try:
                         os.unlink(image_path)
-                    except:
+                    except OSError:
                         pass
 
         except Exception as e:

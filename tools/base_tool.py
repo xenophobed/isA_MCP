@@ -142,7 +142,7 @@ def json_serializer(obj):
         try:
             if hasattr(obj, "item"):
                 return obj.item()
-        except:
+        except Exception:
             pass
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 

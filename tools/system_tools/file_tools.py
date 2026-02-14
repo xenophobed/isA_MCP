@@ -583,7 +583,7 @@ def _is_text_file(path: Path, sample_size: int = 8192) -> bool:
             text = sample.decode("latin-1")
             printable_ratio = sum(1 for c in text if c.isprintable() or c.isspace()) / len(text)
             return printable_ratio > 0.85
-        except:
+        except Exception:
             return False
 
     except Exception:

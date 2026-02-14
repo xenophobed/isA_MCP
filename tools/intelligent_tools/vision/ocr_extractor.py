@@ -58,7 +58,7 @@ class OCRExtractor:
                 text_results = (
                     response.get("text_results", []) if isinstance(response, dict) else []
                 )
-            except:
+            except (json.JSONDecodeError, ValueError, TypeError):
                 # If not JSON, treat entire content as extracted text
                 text_results = [{"text": content}]
                 total_text = " ".join([item.get("text", "") for item in text_results])

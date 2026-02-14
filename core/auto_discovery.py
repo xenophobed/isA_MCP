@@ -476,12 +476,18 @@ class AutoDiscoverySystem:
                             try:
                                 loop = asyncio.get_event_loop()
                                 if loop.is_running():
-                                    # We're in an async context, create a task
-                                    asyncio.create_task(register_func(mcp))
+                                    # We're in an async context, create a task with error handling
+                                    task = asyncio.create_task(register_func(mcp))
+                                    task.add_done_callback(
+                                        lambda t, name=module_name: (
+                                            logger.error(f"Async registration failed for {name}: {t.exception()}")
+                                            if t.exception() else None
+                                        )
+                                    )
                                 else:
                                     # Run it in the loop
                                     loop.run_until_complete(register_func(mcp))
-                            except:
+                            except Exception:
                                 # Fallback: run in new event loop
                                 asyncio.run(register_func(mcp))
                         else:
@@ -549,7 +555,7 @@ class AutoDiscoverySystem:
 
             # Simple text search for @mcp.tool
             return "@mcp.tool" in content
-        except:
+        except Exception:
             return False
 
     def get_all_metadata(self) -> Dict[str, Any]:

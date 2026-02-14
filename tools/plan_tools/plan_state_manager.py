@@ -479,7 +479,7 @@ class RedisStateStore(PlanStateManager):
         """Context manager exit"""
         try:
             self.redis.close()
-        except:
+        except Exception:
             pass
 
 
