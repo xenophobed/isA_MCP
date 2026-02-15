@@ -10,7 +10,6 @@ These contracts serve as the single source of truth for:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -28,6 +27,7 @@ from services.marketplace_service.domain import (  # noqa: E402
     PackageSpec,
     InstallResult,
     UpdateInfo,
+    SearchResult,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -390,40 +390,8 @@ class RegistrySyncLogContract:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-# PackageSpec, InstallResult, and UpdateInfo are now imported from
+# PackageSpec, InstallResult, UpdateInfo, and SearchResult are now imported from
 # services.marketplace_service.domain above.
-
-
-@dataclass
-class SearchResult:
-    """
-    Search result from marketplace.
-
-    Returned by MarketplaceService.search()
-    """
-
-    total: int
-    packages: List[PackageRecordContract]
-    query: str
-    limit: int
-    offset: int
-
-    # Search metadata
-    search_time_ms: Optional[int] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "total": self.total,
-            "packages": [p.to_dict() for p in self.packages],
-            "query": self.query,
-            "limit": self.limit,
-            "offset": self.offset,
-            "search_time_ms": self.search_time_ms,
-        }
-
-
-# UpdateInfo is now imported from services.marketplace_service.domain above.
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
