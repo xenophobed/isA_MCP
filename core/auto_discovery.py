@@ -32,6 +32,12 @@ class AutoDiscoverySystem:
         self.discovered_prompts: Dict[str, Dict[str, Any]] = {}
         self.discovered_resources: Dict[str, Dict[str, Any]] = {}
 
+        # Track pending async tasks to ensure they complete before shutdown.
+        # This prevents fire-and-forget tasks from being lost or causing errors
+        # during application shutdown. Tasks are tracked here and can be awaited
+        # or cancelled via cleanup_pending_tasks().
+        self._pending_tasks: List[asyncio.Task] = []
+
     def _get_module_path(self, file_path: Path) -> str:
         """
         Convert file path to Python module path
@@ -472,24 +478,48 @@ class AutoDiscoverySystem:
                         # Call the register function with MCP instance
                         # Handle both sync and async functions
                         if asyncio.iscoroutinefunction(register_func):
-                            # If it's an async function, await it
+                            # If it's an async function, handle it properly with task tracking
                             try:
                                 loop = asyncio.get_event_loop()
                                 if loop.is_running():
-                                    # We're in an async context, create a task with error handling
+                                    # We're in an async context, create a tracked task
+                                    # with proper error handling via callback
                                     task = asyncio.create_task(register_func(mcp))
-                                    task.add_done_callback(
-                                        lambda t, name=module_name: (
-                                            logger.error(f"Async registration failed for {name}: {t.exception()}")
-                                            if t.exception() else None
-                                        )
-                                    )
+
+                                    # Define error callback that logs failures properly
+                                    # and removes completed tasks from tracking list
+                                    def _on_task_done(
+                                        t: asyncio.Task, name: str = module_name
+                                    ) -> None:
+                                        """Error callback for async registration tasks."""
+                                        exc = t.exception()
+                                        if exc is not None:
+                                            logger.error(
+                                                f"Async registration failed for {name}: {exc}",
+                                                exc_info=(type(exc), exc, exc.__traceback__),
+                                            )
+                                        # Remove completed task from tracking list
+                                        if t in self._pending_tasks:
+                                            self._pending_tasks.remove(t)
+
+                                    task.add_done_callback(_on_task_done)
+
+                                    # Track the task to prevent fire-and-forget behavior
+                                    self._pending_tasks.append(task)
                                 else:
-                                    # Run it in the loop
+                                    # Run it in the loop (blocking)
                                     loop.run_until_complete(register_func(mcp))
-                            except Exception:
-                                # Fallback: run in new event loop
+                            except RuntimeError as e:
+                                # No event loop or loop closed - fallback to new loop
+                                logger.debug(
+                                    f"Event loop unavailable for {module_name}: {e}, using asyncio.run()"
+                                )
                                 asyncio.run(register_func(mcp))
+                            except Exception as e:
+                                # Log any other exceptions during async registration
+                                logger.error(
+                                    f"Failed to schedule async registration for {module_name}: {e}"
+                                )
                         else:
                             # Sync function, call directly
                             register_func(mcp)
@@ -565,3 +595,51 @@ class AutoDiscoverySystem:
             "prompts": self.discovered_prompts,
             "resources": self.discovered_resources,
         }
+
+    async def cleanup_pending_tasks(self, timeout: float = 5.0) -> None:
+        """
+        Await or cancel all pending async registration tasks.
+
+        This method should be called during application shutdown to ensure
+        all fire-and-forget tasks complete properly or are cancelled gracefully.
+        Uses asyncio.wait with timeout to handle slow or stuck tasks.
+
+        Args:
+            timeout: Maximum seconds to wait for tasks to complete before cancelling.
+                     Defaults to 5.0 seconds.
+        """
+        if not self._pending_tasks:
+            logger.debug("No pending async tasks to cleanup")
+            return
+
+        logger.info(f"Cleaning up {len(self._pending_tasks)} pending async tasks...")
+
+        # Wait for tasks with timeout
+        try:
+            done, pending = await asyncio.wait(
+                self._pending_tasks, timeout=timeout, return_when=asyncio.ALL_COMPLETED
+            )
+
+            # Log any tasks that completed with errors
+            for task in done:
+                exc = task.exception()
+                if exc is not None:
+                    logger.error(f"Pending task failed during cleanup: {exc}")
+
+            # Cancel any tasks that didn't complete in time
+            if pending:
+                logger.warning(
+                    f"Cancelling {len(pending)} tasks that didn't complete in {timeout}s"
+                )
+                for task in pending:
+                    task.cancel()
+
+                # Wait for cancellations to complete
+                await asyncio.gather(*pending, return_exceptions=True)
+
+        except Exception as e:
+            logger.error(f"Error during task cleanup: {e}")
+
+        # Clear the tracking list
+        self._pending_tasks.clear()
+        logger.debug("Pending task cleanup complete")
