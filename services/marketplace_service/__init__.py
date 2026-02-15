@@ -34,13 +34,8 @@ from .domain import (
     UpdateChannel,
     PackageSpec,
     InstallResult,
+    SearchResult,
 )
-
-# SearchResult is a test-only contract, not needed in production
-try:
-    from tests.contracts.marketplace import SearchResult
-except ImportError:
-    SearchResult = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 

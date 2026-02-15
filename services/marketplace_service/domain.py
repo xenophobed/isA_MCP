@@ -119,3 +119,36 @@ class UpdateInfo:
             "changelog": self.changelog,
             "breaking_changes": self.breaking_changes,
         }
+
+
+@dataclass
+class SearchResult:
+    """
+    Search result from marketplace.
+
+    Returned by MarketplaceService.search()
+
+    Note: packages field uses List[Dict[str, Any]] to avoid dependency on
+    test-only PackageRecordContract. Each dict should have keys like:
+    id, name, display_name, description, author, etc.
+    """
+
+    total: int
+    packages: List[Dict[str, Any]]
+    query: str
+    limit: int
+    offset: int
+
+    # Search metadata
+    search_time_ms: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        return {
+            "total": self.total,
+            "packages": self.packages,
+            "query": self.query,
+            "limit": self.limit,
+            "offset": self.offset,
+            "search_time_ms": self.search_time_ms,
+        }
