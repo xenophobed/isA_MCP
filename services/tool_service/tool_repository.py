@@ -694,3 +694,48 @@ class ToolRepository:
         except Exception as e:
             logger.error(f"Failed to get tools by skill {skill_id}: {e}")
             return []
+
+    # =========================================================================
+    # Atomic Multi-Step Operations (Transaction Boundaries)
+    # =========================================================================
+
+    async def delete_tools_by_server_atomic(self, server_id: str) -> int:
+        """
+        Atomically delete all tools from a specific external server.
+
+        TRANSACTION BOUNDARY: Count + Delete (atomic)
+
+        Uses a CTE to ensure the count and delete happen atomically,
+        preventing race conditions where tools could be added between
+        counting and deleting.
+
+        Args:
+            server_id: External server UUID
+
+        Returns:
+            Number of tools deleted
+        """
+        try:
+            # Atomic count-and-delete in a single statement via CTE
+            delete_sql = f"""
+                WITH deleted AS (
+                    DELETE FROM {self.schema}.{self.table}
+                    WHERE source_server_id = $1
+                    RETURNING id
+                )
+                SELECT COUNT(*) as count FROM deleted
+            """
+            async with self.db:
+                result = await self.db.query_row(delete_sql, params=[server_id])
+                count = result.get("count", 0) if result else 0
+
+            # Invalidate caches
+            if count > 0:
+                cache = get_cache()
+                await cache.invalidate_pattern("tool_list:")
+
+            logger.info(f"Atomically deleted {count} tools from server {server_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to delete tools for server {server_id}: {e}")
+            return 0

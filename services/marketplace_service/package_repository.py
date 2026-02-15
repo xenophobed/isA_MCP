@@ -868,3 +868,208 @@ class PackageRepository:
                 )
         elif installed_package_id in self._tool_mappings:
             del self._tool_mappings[installed_package_id]
+
+    # =========================================================================
+    # Atomic Multi-Step Operations (Transaction Boundaries)
+    # =========================================================================
+
+    async def install_package_atomic(
+        self,
+        package_id: str,
+        version_id: str,
+        tools: List[Dict[str, Any]],
+        package_name: str,
+        server_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        org_id: Optional[str] = None,
+        install_config: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Atomically create installation and tool mappings.
+
+        TRANSACTION BOUNDARY: Installation + Tool Mappings (atomic)
+
+        If tool mapping creation fails, the installation record is rolled back.
+        This ensures we never have an installation without its tool mappings.
+
+        Args:
+            package_id: Package UUID
+            version_id: Version UUID
+            tools: List of tools to map
+            package_name: Package name for namespacing
+            server_id: Optional server UUID
+            user_id: Optional user UUID
+            org_id: Optional organization UUID
+            install_config: Optional installation configuration
+
+        Returns:
+            Installation record
+
+        Raises:
+            Exception: If any step fails, entire transaction is rolled back
+        """
+        installation_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+
+        installation = {
+            "id": installation_id,
+            "package_id": package_id,
+            "version_id": version_id,
+            "server_id": server_id,
+            "user_id": user_id,
+            "org_id": org_id,
+            "team_id": None,
+            "install_config": install_config or {},
+            "env_overrides": {},
+            "auto_update": True,
+            "update_channel": UpdateChannel.STABLE.value,
+            "pinned_version": False,
+            "status": InstallStatus.INSTALLED.value,
+            "error_message": None,
+            "last_used_at": None,
+            "use_count": 0,
+            "installed_at": now,
+            "updated_at": now,
+            "last_sync_at": now,
+        }
+
+        if self._db_pool:
+            # TRANSACTION BOUNDARY: Installation + Tool Mappings (atomic)
+            async with self._db_pool.acquire() as conn:
+                async with conn.transaction():
+                    # Step 1: Create installation record
+                    await conn.execute(
+                        """
+                        INSERT INTO mcp.installed_packages (
+                            id, package_id, version_id, server_id,
+                            user_id, org_id, team_id,
+                            install_config, env_overrides,
+                            auto_update, update_channel, pinned_version,
+                            status, error_message,
+                            last_used_at, use_count,
+                            installed_at, updated_at, last_sync_at
+                        ) VALUES (
+                            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+                        )
+                        """,
+                        installation["id"],
+                        installation["package_id"],
+                        installation["version_id"],
+                        installation["server_id"],
+                        installation["user_id"],
+                        installation["org_id"],
+                        installation["team_id"],
+                        json.dumps(installation["install_config"]),
+                        json.dumps(installation["env_overrides"]),
+                        installation["auto_update"],
+                        installation["update_channel"],
+                        installation["pinned_version"],
+                        installation["status"],
+                        installation["error_message"],
+                        installation["last_used_at"],
+                        installation["use_count"],
+                        installation["installed_at"],
+                        installation["updated_at"],
+                        installation["last_sync_at"],
+                    )
+
+                    # Step 2: Create tool mappings (within same transaction)
+                    for tool in tools:
+                        mapping = {
+                            "installed_package_id": installation_id,
+                            "tool_id": tool.get("id") or tool.get("tool_id"),
+                            "original_name": tool.get("name", ""),
+                            "namespaced_name": f"{package_name}:{tool.get('name', '')}",
+                            "skill_ids": tool.get("skill_ids", []),
+                            "primary_skill_id": tool.get("primary_skill_id"),
+                            "discovered_at": now,
+                        }
+                        await conn.execute(
+                            """
+                            INSERT INTO mcp.package_tool_mappings (
+                                installed_package_id, tool_id,
+                                original_name, namespaced_name,
+                                skill_ids, primary_skill_id, discovered_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                            ON CONFLICT (installed_package_id, tool_id) DO UPDATE
+                            SET skill_ids = $5, primary_skill_id = $6
+                            """,
+                            mapping["installed_package_id"],
+                            mapping["tool_id"],
+                            mapping["original_name"],
+                            mapping["namespaced_name"],
+                            mapping["skill_ids"],
+                            mapping["primary_skill_id"],
+                            mapping["discovered_at"],
+                        )
+
+            logger.info(
+                f"Atomically installed package {package_id} with {len(tools)} tool mappings"
+            )
+        else:
+            # In-memory fallback (non-transactional)
+            self._installations[installation_id] = installation
+            if tools:
+                self._tool_mappings[installation_id] = [
+                    {
+                        "installed_package_id": installation_id,
+                        "tool_id": tool.get("id") or tool.get("tool_id"),
+                        "original_name": tool.get("name", ""),
+                        "namespaced_name": f"{package_name}:{tool.get('name', '')}",
+                        "skill_ids": tool.get("skill_ids", []),
+                        "primary_skill_id": tool.get("primary_skill_id"),
+                        "discovered_at": now,
+                    }
+                    for tool in tools
+                ]
+
+        return installation
+
+    async def uninstall_package_atomic(self, installation_id: str) -> bool:
+        """
+        Atomically delete tool mappings and installation record.
+
+        TRANSACTION BOUNDARY: Tool Mappings Deletion + Installation Deletion (atomic)
+
+        If installation deletion fails, tool mappings are restored (rollback).
+        This ensures we never have orphaned tool mappings.
+
+        Args:
+            installation_id: Installation UUID to remove
+
+        Returns:
+            True if successfully uninstalled
+
+        Raises:
+            Exception: If any step fails, entire transaction is rolled back
+        """
+        if self._db_pool:
+            # TRANSACTION BOUNDARY: Tool Mappings + Installation Deletion (atomic)
+            async with self._db_pool.acquire() as conn:
+                async with conn.transaction():
+                    # Step 1: Delete tool mappings first (foreign key dependency)
+                    await conn.execute(
+                        "DELETE FROM mcp.package_tool_mappings WHERE installed_package_id = $1",
+                        installation_id,
+                    )
+
+                    # Step 2: Delete installation record
+                    result = await conn.execute(
+                        "DELETE FROM mcp.installed_packages WHERE id = $1",
+                        installation_id,
+                    )
+
+                    deleted = "DELETE 1" in result
+
+            if deleted:
+                logger.info(f"Atomically uninstalled package {installation_id}")
+            return deleted
+        else:
+            # In-memory fallback (non-transactional)
+            if installation_id in self._tool_mappings:
+                del self._tool_mappings[installation_id]
+            if installation_id in self._installations:
+                del self._installations[installation_id]
+                return True
+            return False

@@ -604,3 +604,266 @@ class SkillRepository:
         except Exception as e:
             logger.error(f"Failed to count suggestions for '{suggested_name}': {e}")
             return 0
+
+    # =========================================================================
+    # Atomic Multi-Step Operations (Transaction Boundaries)
+    # =========================================================================
+
+    async def create_assignment_atomic(
+        self,
+        tool_id: int,
+        skill_id: str,
+        confidence: float,
+        is_primary: bool = False,
+        source: str = "llm_auto",
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Atomically create assignment and increment skill tool count.
+
+        TRANSACTION BOUNDARY: Assignment Creation + Tool Count Increment (atomic)
+
+        If incrementing tool count fails, the assignment is rolled back.
+        This ensures tool counts stay accurate.
+
+        Args:
+            tool_id: The tool database ID
+            skill_id: The skill ID
+            confidence: Confidence score (0.0-1.0)
+            is_primary: Whether this is the primary skill
+            source: Assignment source (llm_auto, human_manual, human_override)
+
+        Returns:
+            Created assignment record or None on failure
+
+        Raises:
+            Exception: If any step fails, entire transaction is rolled back
+        """
+        try:
+            await self.db._ensure_connected()
+
+            # TRANSACTION BOUNDARY: Assignment + Tool Count (atomic)
+            async with self.db._pool.acquire() as conn:
+                async with conn.transaction():
+                    now = datetime.now(timezone.utc)
+
+                    # Step 1: Insert assignment
+                    await conn.execute(
+                        f"""
+                        INSERT INTO {self.schema}.{self.assignment_table}
+                        (tool_id, skill_id, confidence, is_primary, source, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        tool_id,
+                        skill_id,
+                        confidence,
+                        is_primary,
+                        source,
+                        now,
+                    )
+
+                    # Step 2: Increment tool count on the skill
+                    await conn.execute(
+                        f"""
+                        UPDATE {self.schema}.{self.skill_table}
+                        SET tool_count = GREATEST(0, tool_count + 1), updated_at = $1
+                        WHERE id = $2
+                        """,
+                        now,
+                        skill_id,
+                    )
+
+                    # Step 3: Fetch the created assignment
+                    row = await conn.fetchrow(
+                        f"""
+                        SELECT * FROM {self.schema}.{self.assignment_table}
+                        WHERE tool_id = $1 AND skill_id = $2
+                        """,
+                        tool_id,
+                        skill_id,
+                    )
+
+            logger.debug(f"Atomically created assignment: tool {tool_id} -> skill {skill_id}")
+            return dict(row) if row else None
+
+        except Exception as e:
+            logger.error(
+                f"Failed to atomically create assignment for tool {tool_id} -> {skill_id}: {e}"
+            )
+            return None
+
+    async def delete_assignments_for_tool_atomic(self, tool_id: int) -> bool:
+        """
+        Atomically delete all assignments and decrement skill tool counts.
+
+        TRANSACTION BOUNDARY: Assignments Deletion + Tool Count Decrements (atomic)
+
+        If decrementing tool counts fails, assignments are restored.
+        This ensures tool counts stay accurate.
+
+        Args:
+            tool_id: The tool database ID
+
+        Returns:
+            True if successful
+
+        Raises:
+            Exception: If any step fails, entire transaction is rolled back
+        """
+        try:
+            await self.db._ensure_connected()
+
+            # TRANSACTION BOUNDARY: Get skill IDs + Delete + Decrement (atomic)
+            async with self.db._pool.acquire() as conn:
+                async with conn.transaction():
+                    now = datetime.now(timezone.utc)
+
+                    # Step 1: Get all skill IDs before deletion
+                    rows = await conn.fetch(
+                        f"""
+                        SELECT skill_id FROM {self.schema}.{self.assignment_table}
+                        WHERE tool_id = $1
+                        """,
+                        tool_id,
+                    )
+                    skill_ids = [row["skill_id"] for row in rows]
+
+                    if not skill_ids:
+                        # No assignments to delete
+                        return True
+
+                    # Step 2: Delete assignments
+                    await conn.execute(
+                        f"DELETE FROM {self.schema}.{self.assignment_table} WHERE tool_id = $1",
+                        tool_id,
+                    )
+
+                    # Step 3: Decrement tool count for each skill
+                    for skill_id in skill_ids:
+                        await conn.execute(
+                            f"""
+                            UPDATE {self.schema}.{self.skill_table}
+                            SET tool_count = GREATEST(0, tool_count - 1), updated_at = $1
+                            WHERE id = $2
+                            """,
+                            now,
+                            skill_id,
+                        )
+
+            logger.debug(f"Atomically deleted {len(skill_ids)} assignments for tool {tool_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to atomically delete assignments for tool {tool_id}: {e}")
+            return False
+
+    async def reassign_tool_skills_atomic(
+        self,
+        tool_id: int,
+        new_skill_ids: List[str],
+        confidences: List[float],
+        primary_skill_id: Optional[str] = None,
+        source: str = "llm_auto",
+    ) -> bool:
+        """
+        Atomically reassign tool to new skills (delete old + create new + update counts).
+
+        TRANSACTION BOUNDARY: Delete Old Assignments + Create New + Update Counts (atomic)
+
+        This is used when re-classifying a tool with new skills.
+
+        Args:
+            tool_id: The tool database ID
+            new_skill_ids: List of new skill IDs
+            confidences: List of confidence scores (parallel to skill_ids)
+            primary_skill_id: Primary skill (defaults to first skill)
+            source: Assignment source
+
+        Returns:
+            True if successful
+
+        Raises:
+            Exception: If any step fails, entire transaction is rolled back
+        """
+        if not new_skill_ids:
+            # Just delete existing assignments
+            return await self.delete_assignments_for_tool_atomic(tool_id)
+
+        if len(new_skill_ids) != len(confidences):
+            logger.error("Mismatched skill_ids and confidences lengths")
+            return False
+
+        primary = primary_skill_id or new_skill_ids[0]
+
+        try:
+            await self.db._ensure_connected()
+
+            # TRANSACTION BOUNDARY: Full reassignment (atomic)
+            async with self.db._pool.acquire() as conn:
+                async with conn.transaction():
+                    now = datetime.now(timezone.utc)
+
+                    # Step 1: Get old skill IDs for decrementing
+                    old_rows = await conn.fetch(
+                        f"""
+                        SELECT skill_id FROM {self.schema}.{self.assignment_table}
+                        WHERE tool_id = $1
+                        """,
+                        tool_id,
+                    )
+                    old_skill_ids = [row["skill_id"] for row in old_rows]
+
+                    # Step 2: Delete old assignments
+                    await conn.execute(
+                        f"DELETE FROM {self.schema}.{self.assignment_table} WHERE tool_id = $1",
+                        tool_id,
+                    )
+
+                    # Step 3: Decrement old skill counts
+                    for skill_id in old_skill_ids:
+                        await conn.execute(
+                            f"""
+                            UPDATE {self.schema}.{self.skill_table}
+                            SET tool_count = GREATEST(0, tool_count - 1), updated_at = $1
+                            WHERE id = $2
+                            """,
+                            now,
+                            skill_id,
+                        )
+
+                    # Step 4: Create new assignments
+                    for skill_id, confidence in zip(new_skill_ids, confidences):
+                        is_primary = skill_id == primary
+                        await conn.execute(
+                            f"""
+                            INSERT INTO {self.schema}.{self.assignment_table}
+                            (tool_id, skill_id, confidence, is_primary, source, created_at)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                            """,
+                            tool_id,
+                            skill_id,
+                            confidence,
+                            is_primary,
+                            source,
+                            now,
+                        )
+
+                    # Step 5: Increment new skill counts
+                    for skill_id in new_skill_ids:
+                        await conn.execute(
+                            f"""
+                            UPDATE {self.schema}.{self.skill_table}
+                            SET tool_count = GREATEST(0, tool_count + 1), updated_at = $1
+                            WHERE id = $2
+                            """,
+                            now,
+                            skill_id,
+                        )
+
+            logger.debug(
+                f"Atomically reassigned tool {tool_id}: {old_skill_ids} -> {new_skill_ids}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to atomically reassign tool {tool_id}: {e}")
+            return False
