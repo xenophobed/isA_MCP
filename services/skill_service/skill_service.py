@@ -76,12 +76,21 @@ class SkillService:
     # Skill Category Management
     # =========================================================================
 
-    async def create_skill_category(self, skill_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_skill_category(
+        self,
+        skill_data: Dict[str, Any],
+        org_id: Optional[str] = None,
+        is_global: bool = True,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Create a new skill category.
+        Create a new skill category with multi-tenant support.
 
         Args:
             skill_data: Skill data including id, name, description, etc.
+            org_id: Organization ID for tenant scoping (None for global skills)
+            is_global: Whether this skill is visible to all orgs
+            user_id: User ID for audit logging
 
         Returns:
             Created skill record
@@ -109,8 +118,11 @@ class SkillService:
         if skill_id != skill_id.lower():
             raise ValueError("Skill ID must be lowercase")
 
-        # Check for duplicates
-        existing = await self.repository.get_skill_by_id(skill_id)
+        # Check for duplicates (use internal method if available to check all skills)
+        if hasattr(self.repository, "_get_skill_by_id_internal"):
+            existing = await self.repository._get_skill_by_id_internal(skill_id)
+        else:
+            existing = await self.repository.get_skill_by_id(skill_id)
         if existing:
             raise ValueError(f"Skill already exists: {skill_id}")
 
@@ -120,8 +132,10 @@ class SkillService:
                 k.lower().strip() for k in skill_data["keywords"] if k.strip()
             ]
 
-        # Create in database
-        skill = await self.repository.create_skill_category(skill_data)
+        # Create in database with org_id and is_global
+        skill = await self.repository.create_skill_category(
+            skill_data, org_id=org_id, is_global=is_global
+        )
         if not skill:
             raise RuntimeError(f"Failed to create skill category: {skill_id}")
 
@@ -131,34 +145,43 @@ class SkillService:
         except Exception as e:
             logger.warning(f"Failed to generate initial embedding for skill {skill_id}: {e}")
 
-        logger.info(f"Created skill category: {skill_id}")
+        # Audit logging with org_id and user_id
+        logger.info(
+            f"action=create skill_id={skill_id} org_id={org_id} user_id={user_id} "
+            f"is_global={is_global}"
+        )
         return skill
 
-    async def get_skill(self, skill_id: str) -> Optional[Dict[str, Any]]:
+    async def get_skill(
+        self, skill_id: str, org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Get a skill category by ID.
+        Get a skill category by ID with tenant filtering.
 
         Args:
             skill_id: The skill ID
+            org_id: Organization ID for tenant filtering (None = global only)
 
         Returns:
-            Skill record or None if not found
+            Skill record or None if not found or not accessible
         """
-        return await self.repository.get_skill_by_id(skill_id)
+        return await self.repository.get_skill_by_id(skill_id, org_id=org_id)
 
     async def list_skills(
         self,
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
+        org_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
-        List skill categories.
+        List skill categories with tenant filtering.
 
         Args:
             is_active: Filter by active status
             parent_domain: Filter by parent domain
+            org_id: Organization ID for tenant filtering (returns global + org-specific)
             limit: Maximum results
             offset: Pagination offset
 
@@ -166,25 +189,37 @@ class SkillService:
             List of skill records
         """
         return await self.repository.list_skills(
-            is_active=is_active, parent_domain=parent_domain, limit=limit, offset=offset
+            is_active=is_active,
+            parent_domain=parent_domain,
+            org_id=org_id,
+            limit=limit,
+            offset=offset,
         )
 
-    async def update_skill_category(self, skill_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_skill_category(
+        self,
+        skill_id: str,
+        updates: Dict[str, Any],
+        org_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Update a skill category.
+        Update a skill category with ownership validation.
 
         Args:
             skill_id: The skill ID to update
             updates: Fields to update
+            org_id: Organization ID for ownership validation
+            user_id: User ID for audit logging
 
         Returns:
             Updated skill record
 
         Raises:
-            ValueError: If skill not found
+            ValueError: If skill not found or not authorized
             RuntimeError: If update fails
         """
-        existing = await self.repository.get_skill_by_id(skill_id)
+        existing = await self.repository.get_skill_by_id(skill_id, org_id=org_id)
         if not existing:
             raise ValueError(f"Skill not found: {skill_id}")
 
@@ -192,7 +227,7 @@ class SkillService:
         if "keywords" in updates:
             updates["keywords"] = [k.lower().strip() for k in updates["keywords"] if k.strip()]
 
-        skill = await self.repository.update_skill_category(skill_id, updates)
+        skill = await self.repository.update_skill_category(skill_id, updates, org_id=org_id)
         if not skill:
             raise RuntimeError(f"Failed to update skill: {skill_id}")
 
@@ -203,22 +238,29 @@ class SkillService:
             except Exception as e:
                 logger.warning(f"Failed to update embedding for skill {skill_id}: {e}")
 
-        logger.info(f"Updated skill category: {skill_id}")
+        logger.info(f"action=update skill_id={skill_id} org_id={org_id} user_id={user_id}")
         return skill
 
-    async def delete_skill_category(self, skill_id: str) -> bool:
+    async def delete_skill_category(
+        self,
+        skill_id: str,
+        org_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> bool:
         """
-        Soft delete a skill category.
+        Soft delete a skill category with ownership validation.
 
         Args:
             skill_id: The skill ID to delete
+            org_id: Organization ID for ownership validation
+            user_id: User ID for audit logging
 
         Returns:
-            True if successful
+            True if successful, False if not found or not authorized
         """
-        success = await self.repository.delete_skill_category(skill_id)
+        success = await self.repository.delete_skill_category(skill_id, org_id=org_id)
         if success:
-            logger.info(f"Deleted skill category: {skill_id}")
+            logger.info(f"action=delete skill_id={skill_id} org_id={org_id} user_id={user_id}")
         return success
 
     # =========================================================================
@@ -1004,15 +1046,19 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         skill_ids: List[str],
         primary_skill_id: str,
         source: str = "human_manual",
+        org_id: Optional[str] = None,
+        is_global: bool = True,
     ) -> List[Dict[str, Any]]:
         """
-        Manually assign a tool to skills.
+        Manually assign a tool to skills with multi-tenant support.
 
         Args:
             tool_id: Tool database ID
             skill_ids: List of skill IDs to assign
             primary_skill_id: Primary skill ID (must be in skill_ids)
             source: Assignment source (human_manual or human_override)
+            org_id: Organization ID for tenant scoping
+            is_global: Whether assignments are visible to all orgs
 
         Returns:
             List of created assignments
@@ -1025,16 +1071,16 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
         if primary_skill_id not in skill_ids:
             raise ValueError("Primary skill must be in skill_ids list")
 
-        # Validate all skill IDs exist
+        # Validate all skill IDs exist (check with org_id for tenant filtering)
         for skill_id in skill_ids:
-            skill = await self.repository.get_skill_by_id(skill_id)
+            skill = await self.repository.get_skill_by_id(skill_id, org_id=org_id)
             if not skill:
                 raise ValueError(f"Skill not found: {skill_id}")
 
         # Delete existing assignments
         await self.repository.delete_assignments_for_tool(tool_id)
 
-        # Create new assignments
+        # Create new assignments with org_id and is_global
         assignments = []
         for skill_id in skill_ids:
             is_primary = skill_id == primary_skill_id
@@ -1044,6 +1090,8 @@ Return exactly {len(entities)} classifications. Most should have only 1 assignme
                 confidence=1.0,  # Human assignments have full confidence
                 is_primary=is_primary,
                 source=source,
+                org_id=org_id,
+                is_global=is_global,
             )
             if assignment:
                 assignments.append(assignment)

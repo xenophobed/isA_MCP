@@ -44,9 +44,19 @@ class MockSkillRepository:
     # Skill Category Operations
     # =========================================================================
 
-    async def create_skill_category(self, skill_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Create a skill category."""
-        self._record_call("create_skill_category", skill_data=skill_data)
+    async def create_skill_category(
+        self,
+        skill_data: Dict[str, Any],
+        org_id: Optional[str] = None,
+        is_global: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Create a skill category with multi-tenant support."""
+        self._record_call(
+            "create_skill_category",
+            skill_data=skill_data,
+            org_id=org_id,
+            is_global=is_global,
+        )
 
         skill_id = skill_data["id"]
         now = datetime.now(timezone.utc)
@@ -60,6 +70,8 @@ class MockSkillRepository:
             "parent_domain": skill_data.get("parent_domain"),
             "is_active": skill_data.get("is_active", True),
             "tool_count": 0,
+            "org_id": org_id,
+            "is_global": is_global,
             "created_at": now,
             "updated_at": now,
         }
@@ -67,31 +79,64 @@ class MockSkillRepository:
         self.skills[skill_id] = skill
         return skill
 
-    async def get_skill_by_id(self, skill_id: str) -> Optional[Dict[str, Any]]:
-        """Get a skill by ID."""
-        self._record_call("get_skill_by_id", skill_id=skill_id)
+    async def _get_skill_by_id_internal(self, skill_id: str) -> Optional[Dict[str, Any]]:
+        """Get a skill by ID without tenant filtering (internal use)."""
+        self._record_call("_get_skill_by_id_internal", skill_id=skill_id)
         return self.skills.get(skill_id)
 
-    async def get_skill_by_name(self, name: str) -> Optional[Dict[str, Any]]:
-        """Get a skill by name."""
-        self._record_call("get_skill_by_name", name=name)
+    async def get_skill_by_id(
+        self, skill_id: str, org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a skill by ID with tenant filtering."""
+        self._record_call("get_skill_by_id", skill_id=skill_id, org_id=org_id)
+
+        skill = self.skills.get(skill_id)
+        if not skill:
+            return None
+
+        # Tenant filtering logic
+        if org_id is not None:
+            # Return if global OR belongs to the requesting org
+            if skill.get("is_global", True) or skill.get("org_id") == org_id:
+                return skill
+            return None
+        else:
+            # Without org_id, only return global skills
+            if skill.get("is_global", True):
+                return skill
+            return None
+
+    async def get_skill_by_name(
+        self, name: str, org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a skill by name with tenant filtering."""
+        self._record_call("get_skill_by_name", name=name, org_id=org_id)
+
         for skill in self.skills.values():
             if skill["name"] == name:
-                return skill
+                # Apply tenant filtering
+                if org_id is not None:
+                    if skill.get("is_global", True) or skill.get("org_id") == org_id:
+                        return skill
+                else:
+                    if skill.get("is_global", True):
+                        return skill
         return None
 
     async def list_skills(
         self,
         is_active: Optional[bool] = True,
         parent_domain: Optional[str] = None,
+        org_id: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """List skills with optional filters."""
+        """List skills with optional filters and tenant filtering."""
         self._record_call(
             "list_skills",
             is_active=is_active,
             parent_domain=parent_domain,
+            org_id=org_id,
             limit=limit,
             offset=offset,
         )
@@ -102,6 +147,17 @@ class MockSkillRepository:
                 continue
             if parent_domain is not None and skill.get("parent_domain") != parent_domain:
                 continue
+
+            # Tenant filtering
+            if org_id is not None:
+                # Return global skills OR skills belonging to this org
+                if not (skill.get("is_global", True) or skill.get("org_id") == org_id):
+                    continue
+            else:
+                # Without org_id, only return global skills
+                if not skill.get("is_global", True):
+                    continue
+
             results.append(skill)
 
         # Sort by name
@@ -109,27 +165,54 @@ class MockSkillRepository:
         return results[offset : offset + limit]
 
     async def update_skill_category(
-        self, skill_id: str, updates: Dict[str, Any]
+        self, skill_id: str, updates: Dict[str, Any], org_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """Update a skill."""
-        self._record_call("update_skill_category", skill_id=skill_id, updates=updates)
+        """Update a skill with ownership validation."""
+        self._record_call(
+            "update_skill_category", skill_id=skill_id, updates=updates, org_id=org_id
+        )
 
         if skill_id not in self.skills:
             return None
 
         skill = self.skills[skill_id]
+
+        # Ownership validation
+        if org_id is not None:
+            # Can only update own org's skills
+            if skill.get("org_id") != org_id:
+                return None
+        else:
+            # Without org_id, can only update global skills
+            if not skill.get("is_global", True):
+                return None
+
         for key, value in updates.items():
-            if key not in ["id", "created_at"]:
+            if key not in ["id", "created_at", "org_id", "is_global"]:
                 skill[key] = value
         skill["updated_at"] = datetime.now(timezone.utc)
         return skill
 
-    async def delete_skill_category(self, skill_id: str) -> bool:
-        """Soft delete a skill."""
-        self._record_call("delete_skill_category", skill_id=skill_id)
+    async def delete_skill_category(
+        self, skill_id: str, org_id: Optional[str] = None
+    ) -> bool:
+        """Soft delete a skill with ownership validation."""
+        self._record_call("delete_skill_category", skill_id=skill_id, org_id=org_id)
 
         if skill_id not in self.skills:
             return False
+
+        skill = self.skills[skill_id]
+
+        # Ownership validation
+        if org_id is not None:
+            # Can only delete own org's skills
+            if skill.get("org_id") != org_id:
+                return False
+        else:
+            # Without org_id, can only delete global skills
+            if not skill.get("is_global", True):
+                return False
 
         self.skills[skill_id]["is_active"] = False
         self.skills[skill_id]["updated_at"] = datetime.now(timezone.utc)
@@ -156,8 +239,10 @@ class MockSkillRepository:
         confidence: float,
         is_primary: bool = False,
         source: str = "llm_auto",
+        org_id: Optional[str] = None,
+        is_global: bool = True,
     ) -> Optional[Dict[str, Any]]:
-        """Create a tool-skill assignment."""
+        """Create a tool-skill assignment with multi-tenant support."""
         self._record_call(
             "create_assignment",
             tool_id=tool_id,
@@ -165,6 +250,8 @@ class MockSkillRepository:
             confidence=confidence,
             is_primary=is_primary,
             source=source,
+            org_id=org_id,
+            is_global=is_global,
         )
 
         now = datetime.now(timezone.utc)
@@ -174,6 +261,8 @@ class MockSkillRepository:
             "confidence": confidence,
             "is_primary": is_primary,
             "source": source,
+            "org_id": org_id,
+            "is_global": is_global,
             "created_at": now,
             "updated_at": now,
         }
@@ -187,23 +276,57 @@ class MockSkillRepository:
         self.assignments.append(assignment)
         return assignment
 
-    async def get_assignments_for_tool(self, tool_id: int) -> List[Dict[str, Any]]:
-        """Get assignments for a tool."""
-        self._record_call("get_assignments_for_tool", tool_id=tool_id)
+    async def get_assignments_for_tool(
+        self, tool_id: int, org_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get assignments for a tool with tenant filtering."""
+        self._record_call("get_assignments_for_tool", tool_id=tool_id, org_id=org_id)
 
-        results = [a for a in self.assignments if a["tool_id"] == tool_id]
+        results = []
+        for a in self.assignments:
+            if a["tool_id"] != tool_id:
+                continue
+
+            # Tenant filtering
+            if org_id is not None:
+                if a.get("is_global", True) or a.get("org_id") == org_id:
+                    results.append(a)
+            else:
+                if a.get("is_global", True):
+                    results.append(a)
+
         results.sort(key=lambda x: x["confidence"], reverse=True)
         return results
 
     async def get_assignments_for_skill(
-        self, skill_id: str, limit: int = 100, offset: int = 0
+        self,
+        skill_id: str,
+        org_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """Get assignments for a skill."""
+        """Get assignments for a skill with tenant filtering."""
         self._record_call(
-            "get_assignments_for_skill", skill_id=skill_id, limit=limit, offset=offset
+            "get_assignments_for_skill",
+            skill_id=skill_id,
+            org_id=org_id,
+            limit=limit,
+            offset=offset,
         )
 
-        results = [a for a in self.assignments if a["skill_id"] == skill_id]
+        results = []
+        for a in self.assignments:
+            if a["skill_id"] != skill_id:
+                continue
+
+            # Tenant filtering
+            if org_id is not None:
+                if a.get("is_global", True) or a.get("org_id") == org_id:
+                    results.append(a)
+            else:
+                if a.get("is_global", True):
+                    results.append(a)
+
         results.sort(key=lambda x: x["confidence"], reverse=True)
         return results[offset : offset + limit]
 
@@ -235,8 +358,9 @@ class MockSkillRepository:
         source_tool_id: int,
         source_tool_name: str,
         reasoning: str,
+        org_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Create a skill suggestion."""
+        """Create a skill suggestion with multi-tenant support."""
         self._record_call(
             "create_suggestion",
             suggested_name=suggested_name,
@@ -244,6 +368,7 @@ class MockSkillRepository:
             source_tool_id=source_tool_id,
             source_tool_name=source_tool_name,
             reasoning=reasoning,
+            org_id=org_id,
         )
 
         now = datetime.now(timezone.utc)
@@ -255,6 +380,7 @@ class MockSkillRepository:
             "source_tool_name": source_tool_name,
             "reasoning": reasoning,
             "status": "pending",
+            "org_id": org_id,
             "created_at": now,
             "updated_at": now,
         }
@@ -264,12 +390,30 @@ class MockSkillRepository:
         return suggestion
 
     async def list_suggestions(
-        self, status: str = "pending", limit: int = 100, offset: int = 0
+        self,
+        status: str = "pending",
+        org_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """List skill suggestions."""
-        self._record_call("list_suggestions", status=status, limit=limit, offset=offset)
+        """List skill suggestions with optional org filtering."""
+        self._record_call(
+            "list_suggestions", status=status, org_id=org_id, limit=limit, offset=offset
+        )
 
-        results = [s for s in self.suggestions if s["status"] == status]
+        results = []
+        for s in self.suggestions:
+            if s["status"] != status:
+                continue
+
+            # Org filtering (if org_id is provided, filter by it)
+            if org_id is not None:
+                if s.get("org_id") != org_id:
+                    continue
+            # If org_id is None, return all (admin view)
+
+            results.append(s)
+
         results.sort(key=lambda x: x["created_at"], reverse=True)
         return results[offset : offset + limit]
 

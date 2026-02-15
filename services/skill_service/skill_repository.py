@@ -53,12 +53,19 @@ class SkillRepository:
     # Skill Category Operations
     # =========================================================================
 
-    async def create_skill_category(self, skill_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def create_skill_category(
+        self,
+        skill_data: Dict[str, Any],
+        org_id: Optional[str] = None,
+        is_global: bool = True,
+    ) -> Optional[Dict[str, Any]]:
         """
-        Create a new skill category.
+        Create a new skill category with multi-tenant support.
 
         Args:
             skill_data: Skill data including id, name, description, keywords, etc.
+            org_id: Organization ID that owns this skill (None for system skills)
+            is_global: Whether this skill is visible to all organizations
 
         Returns:
             Created skill record or None on failure
@@ -74,14 +81,16 @@ class SkillRepository:
                 "parent_domain": skill_data.get("parent_domain"),
                 "is_active": skill_data.get("is_active", True),
                 "tool_count": 0,
+                "org_id": org_id,
+                "is_global": is_global,
             }
 
             async with self.db:
                 count = await self.db.insert_into(self.skill_table, [record], schema=self.schema)
 
                 if count > 0:
-                    # Fetch the created record
-                    return await self.get_skill_by_id(skill_data["id"])
+                    # Fetch the created record (internal fetch, no tenant filter)
+                    return await self._get_skill_by_id_internal(skill_data["id"])
 
             return None
 
@@ -89,12 +98,14 @@ class SkillRepository:
             logger.error(f"Failed to create skill category '{skill_data.get('id')}': {e}")
             return None
 
-    async def get_skill_by_id(self, skill_id: str) -> Optional[Dict[str, Any]]:
+    async def _get_skill_by_id_internal(self, skill_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get a skill category by ID.
+        Internal method to get skill by ID without tenant filtering.
+
+        Used after create operations where we need to fetch the just-created record.
 
         Args:
-            skill_id: The skill category ID (string)
+            skill_id: The skill category ID
 
         Returns:
             Skill record or None if not found
@@ -107,24 +118,78 @@ class SkillRepository:
                 )
             return result
         except Exception as e:
+            logger.error(f"Failed to get skill by ID (internal) '{skill_id}': {e}")
+            return None
+
+    async def get_skill_by_id(
+        self, skill_id: str, org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a skill category by ID with tenant filtering.
+
+        Args:
+            skill_id: The skill category ID (string)
+            org_id: Organization ID for tenant filtering (returns global + org-specific)
+                    If None, returns only global skills (backward compatible)
+
+        Returns:
+            Skill record or None if not found or not accessible
+        """
+        try:
+            if org_id is not None:
+                # Tenant-aware: return global OR org-specific
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.skill_table}
+                    WHERE id = $1 AND (is_global = TRUE OR org_id = $2)
+                """
+                params = [skill_id, org_id]
+            else:
+                # Backward compatible: return only global skills
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.skill_table}
+                    WHERE id = $1 AND is_global = TRUE
+                """
+                params = [skill_id]
+
+            async with self.db:
+                result = await self.db.query_row(query, params=params)
+            return result
+        except Exception as e:
             logger.error(f"Failed to get skill by ID '{skill_id}': {e}")
             return None
 
-    async def get_skill_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+    async def get_skill_by_name(
+        self, name: str, org_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Get a skill category by name.
+        Get a skill category by name with tenant filtering.
 
         Args:
             name: The skill category name
+            org_id: Organization ID for tenant filtering (returns global + org-specific)
+                    If None, returns only global skills (backward compatible)
 
         Returns:
-            Skill record or None if not found
+            Skill record or None if not found or not accessible
         """
         try:
+            if org_id is not None:
+                # Tenant-aware: return global OR org-specific
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.skill_table}
+                    WHERE name = $1 AND (is_global = TRUE OR org_id = $2)
+                """
+                params = [name, org_id]
+            else:
+                # Backward compatible: return only global skills
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.skill_table}
+                    WHERE name = $1 AND is_global = TRUE
+                """
+                params = [name]
+
             async with self.db:
-                result = await self.db.query_row(
-                    f"SELECT * FROM {self.schema}.{self.skill_table} WHERE name = $1", params=[name]
-                )
+                result = await self.db.query_row(query, params=params)
             return result
         except Exception as e:
             logger.error(f"Failed to get skill by name '{name}': {e}")
@@ -139,12 +204,13 @@ class SkillRepository:
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
-        List skill categories with optional filters.
+        List skill categories with optional filters and tenant isolation.
 
         Args:
             is_active: Filter by active status (None = all)
             parent_domain: Filter by parent domain
             org_id: Filter by organization (returns global + org-specific)
+                    If None, returns only global skills (backward compatible)
             limit: Maximum number of results
             offset: Offset for pagination
 
@@ -162,9 +228,13 @@ class SkillRepository:
                 param_idx += 1
 
             if org_id is not None:
+                # Tenant-aware: return global + org-specific
                 conditions.append(f"(is_global = TRUE OR org_id = ${param_idx})")
                 params.append(org_id)
                 param_idx += 1
+            else:
+                # Backward compatible: return only global skills
+                conditions.append("is_global = TRUE")
 
             if parent_domain is not None:
                 conditions.append(f"parent_domain = ${param_idx}")
@@ -192,24 +262,26 @@ class SkillRepository:
             return []
 
     async def update_skill_category(
-        self, skill_id: str, updates: Dict[str, Any]
+        self, skill_id: str, updates: Dict[str, Any], org_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Update a skill category.
+        Update a skill category with ownership validation.
 
         Args:
             skill_id: The skill ID to update
             updates: Dictionary of fields to update
+            org_id: Organization ID for ownership validation
+                    If provided, validates the skill belongs to this org or is global
 
         Returns:
-            Updated skill record or None on failure
+            Updated skill record or None on failure/not found/not authorized
         """
         try:
             # Filter out immutable fields
             valid_updates = {k: v for k, v in updates.items() if k not in self._immutable_fields}
 
             if not valid_updates:
-                return await self.get_skill_by_id(skill_id)
+                return await self.get_skill_by_id(skill_id, org_id=org_id)
 
             # Build SET clause
             set_parts = []
@@ -230,43 +302,64 @@ class SkillRepository:
             params.append(datetime.now(timezone.utc))
             param_idx += 1
 
-            # Add WHERE clause param
+            # Add WHERE clause - include org_id ownership check if provided
             params.append(skill_id)
-
-            query = f"""
-                UPDATE {self.schema}.{self.skill_table}
-                SET {', '.join(set_parts)}
-                WHERE id = ${param_idx}
-            """
+            if org_id is not None:
+                # Can only update org's own skills (not global system skills)
+                params.append(org_id)
+                query = f"""
+                    UPDATE {self.schema}.{self.skill_table}
+                    SET {', '.join(set_parts)}
+                    WHERE id = ${param_idx} AND org_id = ${param_idx + 1}
+                """
+            else:
+                query = f"""
+                    UPDATE {self.schema}.{self.skill_table}
+                    SET {', '.join(set_parts)}
+                    WHERE id = ${param_idx}
+                """
 
             async with self.db:
                 await self.db.execute(query, params=params)
-                return await self.get_skill_by_id(skill_id)
+                return await self.get_skill_by_id(skill_id, org_id=org_id)
 
         except Exception as e:
             logger.error(f"Failed to update skill '{skill_id}': {e}")
             return None
 
-    async def delete_skill_category(self, skill_id: str) -> bool:
+    async def delete_skill_category(
+        self, skill_id: str, org_id: Optional[str] = None
+    ) -> bool:
         """
-        Soft delete a skill category (set is_active=False).
+        Soft delete a skill category (set is_active=False) with ownership validation.
 
         Args:
             skill_id: The skill ID to delete
+            org_id: Organization ID for ownership validation
+                    If provided, validates the skill belongs to this org
 
         Returns:
-            True if successful, False otherwise
+            True if successful, False otherwise (including not found/not authorized)
         """
         try:
-            async with self.db:
-                await self.db.execute(
-                    f"""
+            if org_id is not None:
+                # Can only delete org's own skills (not global system skills)
+                query = f"""
+                    UPDATE {self.schema}.{self.skill_table}
+                    SET is_active = FALSE, updated_at = $1
+                    WHERE id = $2 AND org_id = $3
+                """
+                params = [datetime.now(timezone.utc), skill_id, org_id]
+            else:
+                query = f"""
                     UPDATE {self.schema}.{self.skill_table}
                     SET is_active = FALSE, updated_at = $1
                     WHERE id = $2
-                    """,
-                    params=[datetime.now(timezone.utc), skill_id],
-                )
+                """
+                params = [datetime.now(timezone.utc), skill_id]
+
+            async with self.db:
+                await self.db.execute(query, params=params)
             return True
         except Exception as e:
             logger.error(f"Failed to delete skill '{skill_id}': {e}")
@@ -309,9 +402,11 @@ class SkillRepository:
         confidence: float,
         is_primary: bool = False,
         source: str = "llm_auto",
+        org_id: Optional[str] = None,
+        is_global: bool = True,
     ) -> Optional[Dict[str, Any]]:
         """
-        Create a tool-skill assignment.
+        Create a tool-skill assignment with multi-tenant support.
 
         Args:
             tool_id: The tool database ID
@@ -319,6 +414,8 @@ class SkillRepository:
             confidence: Confidence score (0.0-1.0)
             is_primary: Whether this is the primary skill
             source: Assignment source (llm_auto, human_manual, human_override)
+            org_id: Organization ID that owns this assignment
+            is_global: Whether this assignment is visible to all organizations
 
         Returns:
             Created assignment record or None
@@ -330,6 +427,8 @@ class SkillRepository:
                 "confidence": confidence,
                 "is_primary": is_primary,
                 "source": source,
+                "org_id": org_id,
+                "is_global": is_global,
             }
 
             async with self.db:
@@ -357,11 +456,12 @@ class SkillRepository:
         self, tool_id: int, org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get all skill assignments for a tool.
+        Get all skill assignments for a tool with tenant filtering.
 
         Args:
             tool_id: The tool database ID
             org_id: Filter by organization (returns global + org-specific)
+                    If None, returns only global assignments (backward compatible)
 
         Returns:
             List of assignment records sorted by confidence DESC
@@ -370,8 +470,12 @@ class SkillRepository:
             conditions = ["tool_id = $1"]
             params: list = [tool_id]
             if org_id is not None:
+                # Tenant-aware: return global + org-specific
                 conditions.append("(is_global = TRUE OR org_id = $2)")
                 params.append(org_id)
+            else:
+                # Backward compatible: return only global assignments
+                conditions.append("is_global = TRUE")
             where = " AND ".join(conditions)
             async with self.db:
                 results = await self.db.query(
@@ -388,30 +492,43 @@ class SkillRepository:
             return []
 
     async def get_assignments_for_skill(
-        self, skill_id: str, limit: int = 100, offset: int = 0
+        self, skill_id: str, limit: int = 100, offset: int = 0, org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Get all tool assignments for a skill.
+        Get all tool assignments for a skill with tenant filtering.
 
         Args:
             skill_id: The skill ID
             limit: Maximum results
             offset: Pagination offset
+            org_id: Filter by organization (returns global + org-specific)
+                    If None, returns only global assignments (backward compatible)
 
         Returns:
             List of assignment records sorted by confidence DESC
         """
         try:
-            async with self.db:
-                results = await self.db.query(
-                    f"""
+            if org_id is not None:
+                # Tenant-aware: return global + org-specific
+                query = f"""
                     SELECT * FROM {self.schema}.{self.assignment_table}
-                    WHERE skill_id = $1
+                    WHERE skill_id = $1 AND (is_global = TRUE OR org_id = $2)
+                    ORDER BY confidence DESC
+                    LIMIT $3 OFFSET $4
+                """
+                params = [skill_id, org_id, limit, offset]
+            else:
+                # Backward compatible: return only global assignments
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.assignment_table}
+                    WHERE skill_id = $1 AND is_global = TRUE
                     ORDER BY confidence DESC
                     LIMIT $2 OFFSET $3
-                    """,
-                    params=[skill_id, limit, offset],
-                )
+                """
+                params = [skill_id, limit, offset]
+
+            async with self.db:
+                results = await self.db.query(query, params=params)
             return results or []
         except Exception as e:
             logger.error(f"Failed to get assignments for skill '{skill_id}': {e}")
@@ -476,9 +593,10 @@ class SkillRepository:
         source_tool_id: int,
         source_tool_name: str,
         reasoning: str,
+        org_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Create a skill suggestion from LLM.
+        Create a skill suggestion from LLM with multi-tenant support.
 
         Args:
             suggested_name: Suggested skill name
@@ -486,6 +604,7 @@ class SkillRepository:
             source_tool_id: Tool that triggered the suggestion
             source_tool_name: Tool name for context
             reasoning: LLM reasoning for suggestion
+            org_id: Organization ID that owns this suggestion
 
         Returns:
             Created suggestion record or None
@@ -498,6 +617,7 @@ class SkillRepository:
                 "source_tool_name": source_tool_name,
                 "reasoning": reasoning,
                 "status": "pending",
+                "org_id": org_id,
             }
 
             async with self.db:
@@ -524,30 +644,43 @@ class SkillRepository:
             return None
 
     async def list_suggestions(
-        self, status: str = "pending", limit: int = 100, offset: int = 0
+        self, status: str = "pending", limit: int = 100, offset: int = 0, org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        List skill suggestions.
+        List skill suggestions with optional tenant filtering.
 
         Args:
             status: Filter by status (pending, approved, rejected, merged)
             limit: Maximum results
             offset: Pagination offset
+            org_id: Filter by organization (returns only org's suggestions)
+                    If None, returns all suggestions (backward compatible for admins)
 
         Returns:
             List of suggestion records
         """
         try:
-            async with self.db:
-                results = await self.db.query(
-                    f"""
+            if org_id is not None:
+                # Tenant-aware: return only org's suggestions
+                query = f"""
+                    SELECT * FROM {self.schema}.{self.suggestion_table}
+                    WHERE status = $1 AND org_id = $2
+                    ORDER BY created_at DESC
+                    LIMIT $3 OFFSET $4
+                """
+                params = [status, org_id, limit, offset]
+            else:
+                # Backward compatible: return all (for admins)
+                query = f"""
                     SELECT * FROM {self.schema}.{self.suggestion_table}
                     WHERE status = $1
                     ORDER BY created_at DESC
                     LIMIT $2 OFFSET $3
-                    """,
-                    params=[status, limit, offset],
-                )
+                """
+                params = [status, limit, offset]
+
+            async with self.db:
+                results = await self.db.query(query, params=params)
             return results or []
         except Exception as e:
             logger.error(f"Failed to list suggestions: {e}")
