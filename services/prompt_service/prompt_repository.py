@@ -517,3 +517,43 @@ class PromptRepository:
         except Exception as e:
             logger.error(f"Failed to get unclassified prompts: {e}")
             return []
+
+    # =========================================================================
+    # Atomic Multi-Step Operations (Transaction Boundaries)
+    # =========================================================================
+
+    async def delete_prompts_by_server_atomic(self, server_id: str) -> int:
+        """
+        Atomically delete all prompts from a specific external server.
+
+        TRANSACTION BOUNDARY: Count + Delete (atomic)
+
+        Uses a CTE to ensure the count and delete happen atomically,
+        preventing race conditions where prompts could be added between
+        counting and deleting.
+
+        Args:
+            server_id: External server UUID
+
+        Returns:
+            Number of prompts deleted
+        """
+        try:
+            # Atomic count-and-delete in a single statement via CTE
+            delete_sql = f"""
+                WITH deleted AS (
+                    DELETE FROM {self.schema}.{self.table}
+                    WHERE source_server_id = $1
+                    RETURNING 1
+                )
+                SELECT COUNT(*) as count FROM deleted
+            """
+            async with self.db:
+                result = await self.db.query_row(delete_sql, params=[server_id])
+                count = result.get("count", 0) if result else 0
+
+            logger.info(f"Atomically deleted {count} prompts from server {server_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to delete prompts for server {server_id}: {e}")
+            return 0

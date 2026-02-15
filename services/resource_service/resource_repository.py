@@ -569,3 +569,138 @@ class ResourceRepository:
         else:
             # Create new resource
             return await self.create_resource(resource_data)
+
+    # =========================================================================
+    # Atomic Multi-Step Operations (Transaction Boundaries)
+    # =========================================================================
+
+    async def delete_resources_by_server_atomic(self, server_id: str) -> int:
+        """
+        Atomically delete all resources from a server.
+
+        TRANSACTION BOUNDARY: Count + Delete (atomic)
+
+        Uses a CTE to ensure the count and delete happen atomically.
+
+        Args:
+            server_id: External server UUID
+
+        Returns:
+            Number of resources deleted
+        """
+        try:
+            # Atomic count-and-delete in a single statement via CTE
+            delete_sql = f"""
+                WITH deleted AS (
+                    DELETE FROM {self.schema}.{self.table}
+                    WHERE source_server_id = $1
+                    RETURNING 1
+                )
+                SELECT COUNT(*) as count FROM deleted
+            """
+            async with self.db:
+                result = await self.db.query_row(delete_sql, params=[server_id])
+                count = result.get("count", 0) if result else 0
+
+            logger.info(f"Atomically deleted {count} resources from server {server_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to delete resources for server {server_id}: {e}")
+            return 0
+
+    async def upsert_resource_atomic(self, resource_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Atomically insert or update a resource by URI.
+
+        TRANSACTION BOUNDARY: Check + Insert/Update (atomic)
+
+        Uses PostgreSQL's ON CONFLICT clause for true atomicity,
+        preventing race conditions in the get-then-update pattern.
+
+        Args:
+            resource_data: Resource data with 'uri' field
+
+        Returns:
+            The created/updated resource record
+        """
+        uri = resource_data.get("uri")
+        if not uri:
+            logger.error("Cannot upsert resource without URI")
+            return None
+
+        try:
+            # Serialize metadata dict to JSON string for PostgreSQL jsonb
+            metadata = resource_data.get("metadata", {})
+            metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else metadata
+
+            # Handle skill_ids - ensure it's a list
+            skill_ids = resource_data.get("skill_ids", [])
+            if not isinstance(skill_ids, list):
+                skill_ids = []
+
+            # TRANSACTION BOUNDARY: Atomic upsert via ON CONFLICT
+            sql = f"""
+                INSERT INTO {self.schema}.{self.table} (
+                    uri, name, description, resource_type, mime_type,
+                    size_bytes, metadata, tags, is_public, owner_id,
+                    allowed_users, is_active, source_server_id, original_name,
+                    original_uri, is_external, skill_ids, primary_skill_id,
+                    is_classified, org_id
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10,
+                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+                )
+                ON CONFLICT (uri) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    description = EXCLUDED.description,
+                    resource_type = EXCLUDED.resource_type,
+                    mime_type = EXCLUDED.mime_type,
+                    size_bytes = EXCLUDED.size_bytes,
+                    metadata = EXCLUDED.metadata,
+                    tags = EXCLUDED.tags,
+                    is_public = EXCLUDED.is_public,
+                    is_active = EXCLUDED.is_active,
+                    source_server_id = EXCLUDED.source_server_id,
+                    original_name = EXCLUDED.original_name,
+                    original_uri = EXCLUDED.original_uri,
+                    is_external = EXCLUDED.is_external,
+                    skill_ids = EXCLUDED.skill_ids,
+                    primary_skill_id = EXCLUDED.primary_skill_id,
+                    is_classified = EXCLUDED.is_classified,
+                    org_id = EXCLUDED.org_id,
+                    updated_at = NOW()
+                RETURNING *
+            """
+            async with self.db:
+                result = await self.db.query_row(
+                    sql,
+                    params=[
+                        uri,
+                        resource_data["name"],
+                        resource_data.get("description"),
+                        resource_data.get("resource_type"),
+                        resource_data.get("mime_type"),
+                        resource_data.get("size_bytes", 0),
+                        metadata_json,
+                        resource_data.get("tags", []),
+                        resource_data.get("is_public", False),
+                        resource_data.get("owner_id"),
+                        resource_data.get("allowed_users", []),
+                        resource_data.get("is_active", True),
+                        resource_data.get("source_server_id"),
+                        resource_data.get("original_name"),
+                        resource_data.get("original_uri"),
+                        resource_data.get("is_external", False),
+                        skill_ids,
+                        resource_data.get("primary_skill_id"),
+                        resource_data.get("is_classified", False),
+                        resource_data.get("org_id"),
+                    ],
+                )
+
+            logger.debug(f"Atomically upserted resource: {uri}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to atomically upsert resource {uri}: {e}")
+            return None
