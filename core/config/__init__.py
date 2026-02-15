@@ -25,6 +25,13 @@ from .mcp_config import (
     MCPRedisConfig,
     MCPPostgresConfig,
 )
+from .security_config import (
+    SecurityConfig,
+    validate_command,
+    ALLOWED_COMMANDS,
+    BLOCKED_PATTERNS,
+    MAX_COMMAND_LENGTH,
+)
 
 # Load environment file based on ENV
 env = os.getenv("ENV", "development")
@@ -69,4 +76,10 @@ __all__ = [
     "MCPMinIOConfig",
     "MCPRedisConfig",
     "MCPPostgresConfig",
+    # Security config
+    "SecurityConfig",
+    "validate_command",
+    "ALLOWED_COMMANDS",
+    "BLOCKED_PATTERNS",
+    "MAX_COMMAND_LENGTH",
 ]

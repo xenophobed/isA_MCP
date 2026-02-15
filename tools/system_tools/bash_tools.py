@@ -6,6 +6,34 @@ Provides:
 - bash_output: Retrieve output from background shell sessions
 - kill_shell: Terminate running background shells
 
+Security Model:
+    This module implements a comprehensive command injection protection system:
+
+    1. ALLOWLIST VALIDATION (via SecurityConfig):
+       - In STRICT mode: Only commands in the allowlist can execute
+       - In PERMISSIVE mode: All commands pass unless they match dangerous patterns
+       - Configure via BASH_COMMAND_ALLOWLIST_MODE environment variable
+
+    2. DANGEROUS PATTERN BLOCKING:
+       - Always blocks command injection attempts (;, &&, ||, $(), ``, etc.)
+       - Always blocks destructive commands (rm -rf /, mkfs, dd, etc.)
+       - Always blocks privilege escalation (sudo, su)
+       - Always blocks sensitive file access (/etc/passwd, /etc/shadow)
+
+    3. AUDIT LOGGING:
+       - Blocked command attempts are logged when BASH_AUDIT_BLOCKED_COMMANDS=true
+       - All executed commands are logged with exit codes and duration
+
+    Configuration:
+       - BASH_COMMAND_ALLOWLIST: Comma-separated additional allowed commands
+       - BASH_COMMAND_ALLOWLIST_MODE: "strict" or "permissive" (default: permissive)
+       - BASH_AUDIT_BLOCKED_COMMANDS: "true" or "false" (default: true)
+
+    Note: This tool executes commands WITH shell interpretation (/bin/sh -c).
+    Shell features like pipes and redirects work but are blocked when they
+    appear in injection patterns. This is NOT safe for untrusted input -
+    proper authorization via core/security.py is required.
+
 Keywords: bash, shell, command, execute, terminal, run, script
 """
 
@@ -20,6 +48,9 @@ from datetime import datetime
 from dataclasses import dataclass, field
 
 from mcp.server.fastmcp import FastMCP
+
+# Import security validation
+from core.config.security_config import validate_command
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +124,19 @@ def register_bash_tools(mcp: FastMCP):
             }
 
         Security:
-            - Commands are executed in a subprocess, not directly in the system shell
-            - Dangerous commands (rm -rf /, sudo, etc.) should be blocked by policy
+            This tool implements comprehensive command injection protection:
+
+            - Commands are validated against SecurityConfig BEFORE execution
+            - In STRICT mode: Only allowlisted commands can execute
+            - In PERMISSIVE mode: Commands pass unless they match dangerous patterns
+            - Dangerous patterns (injection, destructive ops) are ALWAYS blocked
+            - Blocked attempts are logged for security auditing
             - Output is limited to prevent memory issues
+
+            Configure via environment variables:
+            - BASH_COMMAND_ALLOWLIST_MODE: "strict" or "permissive"
+            - BASH_COMMAND_ALLOWLIST: Additional allowed commands
+            - BASH_AUDIT_BLOCKED_COMMANDS: Enable audit logging
 
         Keywords: bash, shell, command, execute, run, terminal, script, cli
         """
@@ -103,26 +144,22 @@ def register_bash_tools(mcp: FastMCP):
             # Validate timeout
             timeout = min(timeout, MAX_TIMEOUT)
 
-            # Security checks for dangerous patterns (regex-based to resist encoding bypasses)
-            import re as _re
-            dangerous_patterns = [
-                (r"rm\s+(-[^\s]*\s+)*-[^\s]*r[^\s]*\s+/(\s|$|\*)", "rm -rf /"),
-                (r">\s*/dev/sd[a-z]", "> /dev/sda"),
-                (r"mkfs\.", "mkfs"),
-                (r":\(\)\s*\{.*\|.*&\s*\}\s*;", "fork bomb"),
-                (r"dd\s+.*if=/dev/zero", "dd if=/dev/zero"),
-                (r"chmod\s+(-[^\s]*\s+)*777\s+/(\s|$)", "chmod 777 /"),
-            ]
-
-            for pattern, label in dangerous_patterns:
-                if _re.search(pattern, command):
-                    return {
-                        "status": "error",
-                        "action": "bash_execute",
-                        "error": f"Potentially dangerous command blocked: {label}",
-                        "error_code": "DANGEROUS_COMMAND",
-                        "timestamp": datetime.now().isoformat(),
-                    }
+            # Security validation using the centralized SecurityConfig
+            # This checks:
+            #   1. Command allowlist (in strict mode)
+            #   2. Dangerous pattern blocking (always)
+            #   3. Command length limits
+            #   4. Empty/whitespace commands
+            is_allowed, block_reason = validate_command(command)
+            if not is_allowed:
+                logger.warning(f"bash_execute: Command blocked - {block_reason}")
+                return {
+                    "status": "error",
+                    "action": "bash_execute",
+                    "error": f"Command blocked: {block_reason}",
+                    "error_code": "COMMAND_BLOCKED",
+                    "timestamp": datetime.now().isoformat(),
+                }
 
             # Set working directory
             cwd = working_directory if working_directory else os.getcwd()
@@ -141,11 +178,11 @@ def register_bash_tools(mcp: FastMCP):
                 process_env.update(env)
 
             # SECURITY NOTE: This tool executes shell commands WITH shell interpretation.
-            # Shell features (pipes, redirects, variables) are intentional functionality.
+            # Shell features (pipes, redirects, variables) are intentional but controlled.
             # Security relies on:
-            #   1. Pattern-based blocking of dangerous commands (above)
+            #   1. SecurityConfig validation (allowlist + dangerous pattern blocking)
             #   2. HIGH security level requiring explicit authorization (core/security.py)
-            #   3. Audit logging of all commands
+            #   3. Audit logging of all commands and blocked attempts
             # This is NOT safe for untrusted input - authorization required.
             start_time = datetime.now()
             process = await asyncio.create_subprocess_exec(
