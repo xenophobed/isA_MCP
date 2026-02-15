@@ -29,7 +29,8 @@ async def test_vlm_matching():
 
         try:
             font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
-        except:
+        except OSError:
+            # Font file not found or cannot be loaded - use default font
             font = ImageFont.load_default()
 
         # Draw simple button

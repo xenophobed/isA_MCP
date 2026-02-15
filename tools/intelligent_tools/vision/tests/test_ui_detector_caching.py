@@ -30,7 +30,8 @@ async def test_caching_optimization():
 
         try:
             font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
-        except:
+        except OSError:
+            # Font file not found or cannot be loaded - use default font
             font = ImageFont.load_default()
 
         # Simple button

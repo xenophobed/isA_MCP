@@ -45,7 +45,8 @@ class TestUIDetector:
                 try:
                     font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
                     large_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 24)
-                except:
+                except OSError:
+                    # Font file not found or cannot be loaded - use default font
                     font = ImageFont.load_default()
                     large_font = font
 
@@ -79,7 +80,8 @@ class TestUIDetector:
                 try:
                     font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
                     title_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 24)
-                except:
+                except OSError:
+                    # Font file not found or cannot be loaded - use default font
                     font = ImageFont.load_default()
                     title_font = font
 
@@ -114,7 +116,8 @@ class TestUIDetector:
                 try:
                     font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
                     title_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
-                except:
+                except OSError:
+                    # Font file not found or cannot be loaded - use default font
                     font = ImageFont.load_default()
                     title_font = font
 
@@ -163,7 +166,8 @@ class TestUIDetector:
 
                 try:
                     font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 16)
-                except:
+                except OSError:
+                    # Font file not found or cannot be loaded - use default font
                     font = ImageFont.load_default()
 
                 # Simple button
@@ -196,7 +200,8 @@ class TestUIDetector:
             if os.path.exists(path):
                 try:
                     os.unlink(path)
-                except:
+                except OSError:
+                    # File cleanup failed - may already be deleted or locked
                     pass
         self.test_images.clear()
 
