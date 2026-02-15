@@ -30,6 +30,73 @@ DEFAULT_MAX_LINES = 2000
 MAX_LINE_LENGTH = 2000
 
 
+def _validate_path_security(file_path: str, path: Path) -> Optional[Dict[str, Any]]:
+    """
+    Validate path against path traversal attacks.
+
+    Security checks:
+    1. Reject paths containing '..' traversal patterns
+    2. Resolve symlinks to prevent symlink-based traversal
+    3. Block access to sensitive system directories
+
+    Args:
+        file_path: The original file path string provided by user
+        path: The Path object created from file_path
+
+    Returns:
+        None if path is safe, or an error dict if path is unsafe
+    """
+    # Check for path traversal patterns in the original input
+    # This catches attempts like '../../../etc/passwd' before resolution
+    if ".." in file_path:
+        logger.warning(f"SECURITY: Path traversal attempt blocked: {file_path}")
+        return {
+            "status": "error",
+            "action": "path_validation",
+            "error": "Path traversal patterns ('..') are not allowed",
+            "error_code": "PATH_TRAVERSAL",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    # Resolve symlinks to get the real path
+    # This prevents symlink-based traversal where a symlink points outside allowed dirs
+    try:
+        resolved = path.resolve()
+    except (OSError, RuntimeError) as e:
+        logger.warning(f"SECURITY: Path resolution failed: {file_path} - {e}")
+        return {
+            "status": "error",
+            "action": "path_validation",
+            "error": f"Cannot resolve path: {e}",
+            "error_code": "PATH_RESOLUTION_ERROR",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    # Block access to sensitive system paths
+    # Include both Linux paths and macOS paths (where /etc -> /private/etc, etc.)
+    # Note: /var and /private/var are not fully blocked because user temp dirs
+    # are often under /var/folders or /private/var/folders on macOS
+    sensitive_paths = [
+        "/etc", "/usr", "/bin", "/sbin", "/root", "/boot", "/sys", "/proc",
+        "/private/etc",  # macOS /etc
+        "/var/log", "/var/run", "/var/spool", "/var/lib", "/var/cache",
+        "/private/var/log", "/private/var/run",
+    ]
+    resolved_str = str(resolved)
+    for sensitive in sensitive_paths:
+        if resolved_str == sensitive or resolved_str.startswith(sensitive + "/"):
+            logger.warning(f"SECURITY: Sensitive path access blocked: {resolved_str}")
+            return {
+                "status": "error",
+                "action": "path_validation",
+                "error": f"Access to sensitive system path is not allowed: {sensitive}",
+                "error_code": "SENSITIVE_PATH",
+                "timestamp": datetime.now().isoformat(),
+            }
+
+    return None
+
+
 def register_file_tools(mcp: FastMCP):
     """Register file operation tools with the MCP server."""
 
@@ -74,6 +141,12 @@ def register_file_tools(mcp: FastMCP):
         """
         try:
             path = Path(file_path)
+
+            # Security check: prevent path traversal
+            security_error = _validate_path_security(file_path, path)
+            if security_error:
+                security_error["action"] = "read_file"
+                return security_error
 
             # Validate file exists
             if not path.exists():
@@ -333,6 +406,12 @@ def register_file_tools(mcp: FastMCP):
         try:
             path = Path(file_path)
 
+            # Security check: prevent path traversal
+            security_error = _validate_path_security(file_path, path)
+            if security_error:
+                security_error["action"] = "edit_file"
+                return security_error
+
             # Validate file exists
             if not path.exists():
                 return {
@@ -462,6 +541,12 @@ def register_file_tools(mcp: FastMCP):
         """
         try:
             path = Path(file_path)
+
+            # Security check: prevent path traversal
+            security_error = _validate_path_security(file_path, path)
+            if security_error:
+                security_error["action"] = "multi_edit_file"
+                return security_error
 
             # Validate file exists
             if not path.exists():

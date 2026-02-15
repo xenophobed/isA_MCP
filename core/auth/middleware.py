@@ -37,12 +37,12 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         # 是否要求认证
         self.require_auth = self._get_auth_setting()
 
-        # 路径配置
+        # 路径配置 - exact match paths that should bypass auth
+        # Note: "/" is handled separately to avoid matching all paths
         self.bypass_paths = {
             "/health",
             "/static",
             "/portal",
-            "/",
             "/admin",
             "/docs",
             "/redoc",
@@ -79,6 +79,10 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
 
     def _should_bypass_auth(self, path: str) -> bool:
         """检查是否应该绕过认证"""
+        # Exact match for root path
+        if path == "/":
+            return True
+
         for bypass_path in self.bypass_paths:
             if path.startswith(bypass_path):
                 return True
@@ -101,10 +105,35 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
             if key:
                 return key
 
-        # Query parameter API key removed for security — keys leak to
+        # Query parameter API key removed for security - keys leak to
         # browser history, server access logs, proxy logs, and Referer headers.
 
         return None
+
+    def _check_query_param_api_key(self, request: Request) -> bool:
+        """
+        Check if request contains API key in query parameters.
+
+        Defense in depth: explicitly reject requests that attempt to pass
+        API keys via query parameters, which would leak to logs/history.
+
+        Returns:
+            True if API key found in query params (should be rejected)
+            False if no API key in query params (safe to proceed)
+        """
+        # Common API key parameter names to check
+        api_key_params = ["api_key", "apikey", "api-key", "key", "token", "access_token"]
+
+        query_params = request.query_params
+        for param in api_key_params:
+            if param in query_params:
+                logger.warning(
+                    f"SECURITY: API key detected in query parameter '{param}' "
+                    f"for path {request.url.path}. Query param auth is disabled."
+                )
+                return True
+
+        return False
 
     def _parse_mcp_request(self, request: Request) -> tuple[Optional[ResourceType], Optional[str]]:
         """
@@ -152,13 +181,25 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
 
         # 检查是否需要认证
         if not self.require_auth or self._should_bypass_auth(path):
-            logger.debug(f"🔓 Bypassing auth for: {path}")
+            logger.debug(f"Bypassing auth for: {path}")
             return await call_next(request)
+
+        # Defense in depth: reject requests with API key in query params
+        if self._check_query_param_api_key(request):
+            return JSONResponse(
+                {
+                    "error": "Invalid authentication method",
+                    "message": "API keys in query parameters are not allowed for security reasons. "
+                    "Use Authorization header (Bearer token) or X-API-Key header instead.",
+                    "path": path,
+                },
+                status_code=400,
+            )
 
         # 提取token
         token = self._extract_token(request)
         if not token:
-            logger.warning(f"❌ No token provided for: {path}")
+            logger.warning(f"No token provided for: {path}")
             return JSONResponse(
                 {
                     "error": "Authentication required",
@@ -176,7 +217,7 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
         user_context = await self.auth_service.authenticate_token(token)
 
         if not user_context.is_authenticated:
-            logger.warning(f"❌ Invalid token for: {path}")
+            logger.warning(f"Invalid token for: {path}")
             return JSONResponse(
                 {
                     "error": "Invalid authentication",
@@ -200,7 +241,7 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
 
             if not access_result.get("has_access"):
                 logger.warning(
-                    f"❌ Access denied for {user_context.user_id} to {resource_type.value}/{resource_name}"
+                    f"Access denied for {user_context.user_id} to {resource_type.value}/{resource_name}"
                 )
                 return JSONResponse(
                     {
@@ -215,7 +256,7 @@ class MCPUnifiedAuthMiddleware(BaseHTTPMiddleware):
                 )
 
             logger.debug(
-                f"✅ Access granted for {user_context.user_id} to {resource_type.value}/{resource_name}"
+                f"Access granted for {user_context.user_id} to {resource_type.value}/{resource_name}"
             )
 
         # 设置请求状态供下游使用
